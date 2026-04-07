@@ -2,8 +2,11 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.campaign_intakes (
   id uuid primary key default gen_random_uuid(),
+  contact_name text not null default '',
   objective text not null default '',
   business_name text not null default '',
+  whatsapp text not null default '',
+  email text not null default '',
   campaign_title text not null default '',
   vertical text not null default '',
   budget_range text not null default '',

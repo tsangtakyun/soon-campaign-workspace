@@ -24,8 +24,11 @@ const inputStyle: CSSProperties = {
 }
 
 type FormState = {
+  contactName: string
   objective: string
   businessName: string
+  whatsapp: string
+  email: string
   campaignTitle: string
   vertical: string
   budgetRange: string
@@ -34,8 +37,11 @@ type FormState = {
 }
 
 const initialState: FormState = {
+  contactName: '',
   objective: 'sales',
   businessName: '',
+  whatsapp: '',
+  email: '',
   campaignTitle: '',
   vertical: 'food',
   budgetRange: '8000-15000',
@@ -48,6 +54,7 @@ export default function SubmitBriefPage() {
   const [generatedPreview, setGeneratedPreview] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [showPaidAnalysis, setShowPaidAnalysis] = useState(false)
 
   const aiPreview = useMemo(() => {
     if (!form.brief.trim()) return null
@@ -100,8 +107,11 @@ export default function SubmitBriefPage() {
     try {
       const supabase = createClient()
       const { error } = await supabase.from('campaign_intakes').insert({
+        contact_name: form.contactName.trim(),
         objective: form.objective,
         business_name: form.businessName.trim(),
+        whatsapp: form.whatsapp.trim(),
+        email: form.email.trim(),
         campaign_title: form.campaignTitle.trim(),
         vertical: form.vertical,
         budget_range: form.budgetRange,
@@ -149,6 +159,28 @@ export default function SubmitBriefPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(320px, 0.9fr)', gap: '22px', alignItems: 'start' }}>
           <form onSubmit={handleSubmit} style={cardStyle}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              <label>
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>姓名</div>
+                <input value={form.contactName} onChange={(e) => updateField('contactName', e.target.value)} style={inputStyle} placeholder="例如 Tommy" />
+              </label>
+              <label>
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>公司 / 品牌</div>
+                <input value={form.businessName} onChange={(e) => updateField('businessName', e.target.value)} style={inputStyle} placeholder="例如 Panda Cafe" />
+              </label>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
+              <label>
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>WhatsApp</div>
+                <input value={form.whatsapp} onChange={(e) => updateField('whatsapp', e.target.value)} style={inputStyle} placeholder="例如 9123 4567" />
+              </label>
+              <label>
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Email</div>
+                <input value={form.email} onChange={(e) => updateField('email', e.target.value)} style={inputStyle} placeholder="例如 hello@pandacafe.com" />
+              </label>
+            </div>
+
             <div style={{ marginBottom: '18px' }}>
               <div style={{ marginBottom: '10px', fontSize: '13px', color: '#6b6257' }}>你今次最想達成咩宣傳目標？</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -182,13 +214,10 @@ export default function SubmitBriefPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <label>
-                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Business / Brand</div>
-                <input value={form.businessName} onChange={(e) => updateField('businessName', e.target.value)} style={inputStyle} placeholder="例如 One Bite / cafe / 餐廳品牌" />
-              </label>
-              <label>
                 <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Campaign Title</div>
                 <input value={form.campaignTitle} onChange={(e) => updateField('campaignTitle', e.target.value)} style={inputStyle} placeholder="例如 春季新 menu 推廣" />
               </label>
+              <div />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -226,22 +255,86 @@ export default function SubmitBriefPage() {
               </label>
             </div>
 
-            <button type="submit" style={{
-              border: 'none',
-              borderRadius: '999px',
-              padding: '14px 22px',
-              background: '#1a1a18',
-              color: '#f4efe6',
-              cursor: 'pointer',
-              fontSize: '14px',
-              letterSpacing: '0.05em',
-            }}>
-              {saving ? '生成中...' : 'AI 自動生成分析'}
-            </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <button type="submit" style={{
+                border: 'none',
+                borderRadius: '999px',
+                padding: '14px 22px',
+                background: '#1a1a18',
+                color: '#f4efe6',
+                cursor: 'pointer',
+                fontSize: '14px',
+                letterSpacing: '0.05em',
+              }}>
+                {saving ? '生成中...' : 'AI 自動生成分析'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPaidAnalysis((prev) => !prev)}
+                style={{
+                  border: '1px solid rgba(26,26,24,0.16)',
+                  borderRadius: '999px',
+                  padding: '14px 22px',
+                  background: 'rgba(255,255,255,0.82)',
+                  color: '#1a1a18',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                完整 AI 分析宣傳方向
+              </button>
+            </div>
 
             {generatedPreview && (
               <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '14px', background: '#f7f2d8', color: '#6b5d1c', fontSize: '14px' }}>
                 {saveMessage || 'AI 已經根據你填寫嘅內容生成第一版方向建議。下一步我哋可以再將呢份 brief 接去真實 campaign workflow。'}
+              </div>
+            )}
+
+            {showPaidAnalysis && (
+              <div style={{
+                marginTop: '18px',
+                padding: '18px',
+                borderRadius: '18px',
+                background: '#fbf8f1',
+                border: '1px solid rgba(26,26,24,0.10)',
+              }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: '#8a7f71', marginBottom: '8px' }}>PAID UNLOCK</div>
+                <div style={{ fontSize: '22px', lineHeight: 1.2, marginBottom: '10px', color: '#1a1a18' }}>
+                  完整 AI 分析宣傳方向
+                </div>
+                <div style={{ fontSize: '15px', lineHeight: 1.7, color: '#5a5349', marginBottom: '12px' }}>
+                  解鎖後可獲得完整 `Budget Shape`、多個 `Content Angles`、建議 `Deliverable Plan`、適合 creator 類型，同埋首輪投放建議。
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                  {['3 個預算打法', '5 個題材角度', '2 組交付建議', '首輪宣傳建議'].map((item) => (
+                    <span key={item} style={{ padding: '8px 12px', borderRadius: '999px', background: '#fff', border: '1px solid rgba(26,26,24,0.08)', fontSize: '13px' }}>
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#8a7f71' }}>Launch offer</div>
+                    <div style={{ fontSize: '28px', color: '#1a1a18' }}>HK$199</div>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      border: 'none',
+                      borderRadius: '999px',
+                      padding: '14px 20px',
+                      background: '#1a1a18',
+                      color: '#f4efe6',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                    }}
+                  >
+                    付款後解鎖
+                  </button>
+                </div>
               </div>
             )}
           </form>
