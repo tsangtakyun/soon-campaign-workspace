@@ -43,7 +43,7 @@ const initialState: FormState = {
 
 export default function SubmitBriefPage() {
   const [form, setForm] = useState<FormState>(initialState)
-  const [submitted, setSubmitted] = useState(false)
+  const [generatedPreview, setGeneratedPreview] = useState(false)
 
   const aiPreview = useMemo(() => {
     if (!form.brief.trim()) return null
@@ -89,7 +89,7 @@ export default function SubmitBriefPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSubmitted(true)
+    setGeneratedPreview(true)
   }
 
   return (
@@ -204,12 +204,12 @@ export default function SubmitBriefPage() {
               fontSize: '14px',
               letterSpacing: '0.05em',
             }}>
-              Save Brief Draft
+              AI 自動生成分析
             </button>
 
-            {submitted && (
+            {generatedPreview && (
               <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '14px', background: '#f7f2d8', color: '#6b5d1c', fontSize: '14px' }}>
-                呢一版先係 workflow prototype，暫時未寫入 Supabase。下一步會直接將呢份 brief 接去 `campaigns` table 同 ops queue。
+                AI 已經根據你填寫嘅內容生成第一版方向建議。下一步我哋可以再將呢份 brief 接去真實 campaign workflow。
               </div>
             )}
           </form>
@@ -217,7 +217,7 @@ export default function SubmitBriefPage() {
           <aside style={{ display: 'grid', gap: '18px' }}>
             <section style={cardStyle}>
               <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.16em', color: '#857866' }}>AI ENRICHED PREVIEW</p>
-              {aiPreview ? (
+              {generatedPreview && aiPreview ? (
                 <>
                   <p style={{ margin: '0 0 12px', fontSize: '16px', lineHeight: 1.7, color: '#433d35' }}>{aiPreview.summary}</p>
                   <div style={{ display: 'grid', gap: '10px' }}>
@@ -237,21 +237,21 @@ export default function SubmitBriefPage() {
                 </>
               ) : (
                 <p style={{ margin: 0, fontSize: '15px', lineHeight: 1.7, color: '#6f675d' }}>
-                  商戶一填 brief，右邊就可以即時見到 AI 幫手整理過嘅 summary、angle suggestions 同 deliverable 建議。
+                  當你按下「AI 自動生成分析」之後，系統先會根據你嘅品牌目標、預算同 brief，生成專屬題材方向同宣傳建議。
                 </p>
               )}
             </section>
 
             <section style={cardStyle}>
-              <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.16em', color: '#857866' }}>MVP FLOW</p>
+              <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.16em', color: '#857866' }}>運作流程</p>
               <div style={{ display: 'grid', gap: '10px' }}>
                 {[
-                  '1. Merchant submit brief',
-                  '2. AI enrich campaign',
-                  '3. SOON / system match creator',
-                  '4. Generate script',
-                  '5. Generate storyboard',
-                  '6. Track deliverables',
+                  '1. 填寫品牌 brief',
+                  '2. AI 分析宣傳方向',
+                  '3. 系統配對合適 creator',
+                  '4. 生成題材與腳本建議',
+                  '5. 整理拍攝方向與分鏡',
+                  '6. 跟進內容交付',
                 ].map((step) => (
                   <div key={step} style={{ padding: '12px 14px', borderRadius: '14px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', fontSize: '14px' }}>
                     {step}
