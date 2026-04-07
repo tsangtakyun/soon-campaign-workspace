@@ -1,5 +1,30 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.campaign_intakes (
+  id uuid primary key default gen_random_uuid(),
+  objective text not null default '',
+  business_name text not null default '',
+  campaign_title text not null default '',
+  vertical text not null default '',
+  budget_range text not null default '',
+  brief text not null default '',
+  must_include text not null default '',
+  ai_summary text not null default '',
+  suggested_budget_shape text not null default '',
+  suggested_angle text not null default '',
+  suggested_deliverable_shape text not null default '',
+  source_channel text not null default '',
+  created_at timestamptz not null default now()
+);
+
+alter table public.campaign_intakes enable row level security;
+
+create policy "Anyone can insert campaign intakes"
+on public.campaign_intakes
+for insert
+to anon, authenticated
+with check (true);
+
 create table if not exists public.merchants (
   id uuid primary key default gen_random_uuid(),
   name text not null,

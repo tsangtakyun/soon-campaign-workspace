@@ -3,6 +3,8 @@
 import type { CSSProperties, FormEvent } from 'react'
 import { useMemo, useState } from 'react'
 
+import { createClient } from '@/lib/supabase'
+
 const cardStyle: CSSProperties = {
   background: 'rgba(255,255,255,0.72)',
   border: '1px solid rgba(26,26,24,0.12)',
@@ -44,6 +46,8 @@ const initialState: FormState = {
 export default function SubmitBriefPage() {
   const [form, setForm] = useState<FormState>(initialState)
   const [generatedPreview, setGeneratedPreview] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
 
   const aiPreview = useMemo(() => {
     if (!form.brief.trim()) return null
@@ -87,9 +91,37 @@ export default function SubmitBriefPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setGeneratedPreview(true)
+    setSaving(true)
+    setSaveMessage('')
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('campaign_intakes').insert({
+        objective: form.objective,
+        business_name: form.businessName.trim(),
+        campaign_title: form.campaignTitle.trim(),
+        vertical: form.vertical,
+        budget_range: form.budgetRange,
+        brief: form.brief.trim(),
+        must_include: form.mustInclude.trim(),
+        ai_summary: aiPreview?.summary || '',
+        suggested_budget_shape: aiPreview?.budgetGuide || '',
+        suggested_angle: aiPreview?.angleA || '',
+        suggested_deliverable_shape: aiPreview?.angleB || '',
+        source_channel: 'soon-campaign-workspace',
+      })
+
+      if (error) throw error
+      setSaveMessage('已經成功記錄你嘅 brief，我哋可以用呢份資料繼續跟進。')
+    } catch (error) {
+      console.error(error)
+      setSaveMessage('AI 分析已生成，但資料暫時未成功寫入系統。請稍後再試，或先繼續用預覽。')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -204,12 +236,12 @@ export default function SubmitBriefPage() {
               fontSize: '14px',
               letterSpacing: '0.05em',
             }}>
-              AI 自動生成分析
+              {saving ? '生成中...' : 'AI 自動生成分析'}
             </button>
 
             {generatedPreview && (
               <div style={{ marginTop: '18px', padding: '14px 16px', borderRadius: '14px', background: '#f7f2d8', color: '#6b5d1c', fontSize: '14px' }}>
-                AI 已經根據你填寫嘅內容生成第一版方向建議。下一步我哋可以再將呢份 brief 接去真實 campaign workflow。
+                {saveMessage || 'AI 已經根據你填寫嘅內容生成第一版方向建議。下一步我哋可以再將呢份 brief 接去真實 campaign workflow。'}
               </div>
             )}
           </form>
