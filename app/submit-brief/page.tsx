@@ -22,25 +22,21 @@ const inputStyle: CSSProperties = {
 }
 
 type FormState = {
+  objective: string
   businessName: string
   campaignTitle: string
   vertical: string
   budgetRange: string
-  locationText: string
-  deadline: string
-  targetPlatforms: string
   brief: string
   mustInclude: string
 }
 
 const initialState: FormState = {
+  objective: 'sales',
   businessName: '',
   campaignTitle: '',
   vertical: 'food',
-  budgetRange: '',
-  locationText: '',
-  deadline: '',
-  targetPlatforms: 'Instagram Reels',
+  budgetRange: '8000-15000',
   brief: '',
   mustInclude: '',
 }
@@ -59,8 +55,14 @@ export default function SubmitBriefPage() {
       experience: '以體驗前後反差同過程感做主線',
     }
 
+    const objectiveMap: Record<string, string> = {
+      sales: '直接推動查詢、落單同轉化',
+      reach: '盡量吸引多人睇、多人分享同多人記得',
+      branding: '建立品牌形象同感覺，唔急住硬 sell',
+    }
+
     return {
-      summary: `${form.businessName || '呢個商戶'}想做一個 ${form.vertical} 向 campaign，核心需求係「${form.brief.slice(0, 56)}${form.brief.length > 56 ? '...' : ''}」，建議先以 ${focusMap[form.vertical] || '清楚 angle'} 包裝，再決定最適合嘅 creator。`,
+      summary: `${form.businessName || '你嘅品牌'}而家最想要嘅方向係${objectiveMap[form.objective] || '清楚 angle'}。系統會根據你填寫嘅內容，極速生成最適合你嘅題材方向，再分析適合點樣做 social media 宣傳。`,
       angleA: form.vertical === 'food'
         ? '值唔值得專程去食'
         : form.vertical === 'travel'
@@ -71,6 +73,11 @@ export default function SubmitBriefPage() {
       angleB: form.vertical === 'product'
         ? '一條偏實測，一條偏情境種草'
         : '一條主 Reel + 一條補充 cutdown',
+      budgetGuide: form.budgetRange === '3000-8000'
+        ? '適合做單條快狠準測試內容'
+        : form.budgetRange === '8000-15000'
+          ? '適合做一條主片 + 一條補充內容'
+          : '適合做完整 campaign 試驗同多角度內容',
     }
   }, [form])
 
@@ -94,18 +101,51 @@ export default function SubmitBriefPage() {
       <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
         <section style={{ marginBottom: '28px' }}>
           <p style={{ fontSize: '12px', letterSpacing: '0.18em', color: '#857866', marginBottom: '10px' }}>
-            SOON EXTERNAL PLATFORM
+            SOON AI SYSTEM
           </p>
           <h1 style={{ fontSize: '54px', lineHeight: 1.02, fontWeight: 500, margin: '0 0 14px' }}>
-            Submit A Campaign Brief
+            一鍵配對
+            <br />
+            <span style={{ fontSize: '34px', fontWeight: 400 }}>Submit A Campaign Brief</span>
           </h1>
           <p style={{ maxWidth: '760px', fontSize: '18px', lineHeight: 1.7, color: '#5a5349', margin: 0 }}>
-            呢頁係 merchant 入口。商戶交 brief 之後，SOON 可以幫佢整理需求、配對 creator，直接進入 script 同 storyboard workflow。
+            商戶交 brief 之後，系統會極速生成最適合你的題材做選擇，AI 分析你需要嘅 social media 宣傳方案。
           </p>
         </section>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(320px, 0.9fr)', gap: '22px', alignItems: 'start' }}>
           <form onSubmit={handleSubmit} style={cardStyle}>
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ marginBottom: '10px', fontSize: '13px', color: '#6b6257' }}>你今次最想達成咩宣傳目標？</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                {[
+                  { value: 'sales', label: '全力衝 Sales！', desc: '最想快啲有查詢、落單、轉化。' },
+                  { value: 'reach', label: '我要多人睇！', desc: '最想衝觀看、分享、討論度。' },
+                  { value: 'branding', label: '品牌形象優先', desc: '重感覺同定位，唔急住 hard sell。' },
+                ].map((option) => {
+                  const selected = form.objective === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateField('objective', option.value)}
+                      style={{
+                        textAlign: 'left',
+                        padding: '14px',
+                        borderRadius: '16px',
+                        border: selected ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.12)',
+                        background: selected ? '#f7f1e4' : 'rgba(255,255,255,0.82)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ fontSize: '15px', color: '#1a1a18', marginBottom: '6px' }}>{option.label}</div>
+                      <div style={{ fontSize: '12px', color: '#6e665b', lineHeight: 1.5 }}>{option.desc}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <label>
                 <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Business / Brand</div>
@@ -117,7 +157,7 @@ export default function SubmitBriefPage() {
               </label>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <label>
                 <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Vertical</div>
                 <select value={form.vertical} onChange={(e) => updateField('vertical', e.target.value)} style={inputStyle}>
@@ -128,23 +168,12 @@ export default function SubmitBriefPage() {
                 </select>
               </label>
               <label>
-                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Budget</div>
-                <input value={form.budgetRange} onChange={(e) => updateField('budgetRange', e.target.value)} style={inputStyle} placeholder="HK$8k - 12k" />
-              </label>
-              <label>
-                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Location</div>
-                <input value={form.locationText} onChange={(e) => updateField('locationText', e.target.value)} style={inputStyle} placeholder="尖沙咀 / 香港 / Online" />
-              </label>
-              <label>
-                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Deadline</div>
-                <input type="date" value={form.deadline} onChange={(e) => updateField('deadline', e.target.value)} style={inputStyle} />
-              </label>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label>
-                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>Target Platforms</div>
-                <input value={form.targetPlatforms} onChange={(e) => updateField('targetPlatforms', e.target.value)} style={inputStyle} placeholder="Instagram Reels, YouTube Shorts" />
+                <div style={{ marginBottom: '8px', fontSize: '13px', color: '#6b6257' }}>預算範圍</div>
+                <select value={form.budgetRange} onChange={(e) => updateField('budgetRange', e.target.value)} style={inputStyle}>
+                  <option value="3000-8000">HK$3,000 - 8,000</option>
+                  <option value="8000-15000">HK$8,000 - 15,000</option>
+                  <option value="15000-30000">HK$15,000 - 30,000</option>
+                </select>
               </label>
             </div>
 
@@ -189,6 +218,10 @@ export default function SubmitBriefPage() {
                 <>
                   <p style={{ margin: '0 0 12px', fontSize: '16px', lineHeight: 1.7, color: '#433d35' }}>{aiPreview.summary}</p>
                   <div style={{ display: 'grid', gap: '10px' }}>
+                    <div style={{ padding: '14px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                      <div style={{ fontSize: '12px', color: '#8a7f71', marginBottom: '6px' }}>Suggested Budget Shape</div>
+                      <strong style={{ fontSize: '16px', fontWeight: 500 }}>{aiPreview.budgetGuide}</strong>
+                    </div>
                     <div style={{ padding: '14px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
                       <div style={{ fontSize: '12px', color: '#8a7f71', marginBottom: '6px' }}>Suggested Angle A</div>
                       <strong style={{ fontSize: '16px', fontWeight: 500 }}>{aiPreview.angleA}</strong>
