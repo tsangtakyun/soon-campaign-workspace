@@ -33,6 +33,9 @@ function NavBar() {
         <Link href="/ops/campaigns" style={{ fontSize: '13px', color: '#1a1a1a', textDecoration: 'none', padding: '6px 14px', borderBottom: '1px solid #1a1a1a', letterSpacing: '0.03em' }}>
           Ops Workspace
         </Link>
+        <Link href="/ops/strategy-library" style={{ fontSize: '13px', color: '#1a1a1a', textDecoration: 'none', padding: '6px 14px', borderBottom: '1px solid #1a1a1a', letterSpacing: '0.03em' }}>
+          Strategy Library
+        </Link>
       </div>
     </nav>
   )

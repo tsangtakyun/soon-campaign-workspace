@@ -47,6 +47,34 @@ export default function OpsCampaignsPage() {
         </section>
 
         <section style={{
+          marginBottom: '18px',
+          padding: '18px 20px',
+          borderRadius: '22px',
+          background: 'rgba(255,255,255,0.75)',
+          border: '1px solid rgba(26,26,24,0.10)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+        }}>
+          <div>
+            <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: '#887b68', marginBottom: '6px' }}>INTERNAL CONTROL</div>
+            <div style={{ fontSize: '18px', color: '#1a1a18' }}>管理 Budget Shape / Angle / Deliverable Shape library</div>
+          </div>
+          <Link href="/ops/strategy-library" style={{
+            display: 'inline-flex',
+            padding: '12px 16px',
+            borderRadius: '999px',
+            textDecoration: 'none',
+            background: '#1a1a18',
+            color: '#f6f1e8',
+            fontSize: '13px',
+          }}>
+            Open Strategy Library
+          </Link>
+        </section>
+
+        <section style={{
           background: 'rgba(255,255,255,0.70)',
           border: '1px solid rgba(26,26,24,0.10)',
           borderRadius: '26px',
