@@ -77,6 +77,8 @@ export default function SubmitBriefPage() {
         ? '適合做單條快狠準測試內容'
         : form.budgetRange === '8000-15000'
           ? '適合做一條主片 + 一條補充內容'
+          : form.budgetRange === '30000-50000'
+            ? '適合做多 creator 測試、完整 campaign 包裝同更進取放大'
           : '適合做完整 campaign 試驗同多角度內容',
     }
   }, [form])
@@ -173,6 +175,7 @@ export default function SubmitBriefPage() {
                   <option value="3000-8000">HK$3,000 - 8,000</option>
                   <option value="8000-15000">HK$8,000 - 15,000</option>
                   <option value="15000-30000">HK$15,000 - 30,000</option>
+                  <option value="30000-50000">HK$30,000 - 50,000</option>
                 </select>
               </label>
             </div>
