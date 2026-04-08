@@ -24,18 +24,22 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminSupabase()
+  const normalizedEmail = user.email.trim().toLowerCase()
   const { data, error } = await admin
     .from('campaign_intakes')
-    .select('id, contact_name, objective, business_name, whatsapp, email, campaign_title, vertical, budget_range, brief, must_include, full_analysis, payment_status')
+    .select('id, contact_name, objective, business_name, whatsapp, email, campaign_title, vertical, budget_range, brief, must_include, full_analysis, payment_status, stripe_customer_email')
     .eq('id', campaignIntakeId)
-    .eq('email', user.email)
     .maybeSingle()
 
   if (error) {
     return NextResponse.json({ error: error.message || 'Unable to load saved analysis' }, { status: 500 })
   }
 
-  if (!data || data.payment_status !== 'paid') {
+  const recordEmail = (data?.email || '').trim().toLowerCase()
+  const stripeCustomerEmail = (data?.stripe_customer_email || '').trim().toLowerCase()
+  const emailMatches = recordEmail === normalizedEmail || stripeCustomerEmail === normalizedEmail
+
+  if (!data || data.payment_status !== 'paid' || !emailMatches) {
     return NextResponse.json({ error: 'No saved paid analysis found for this account' }, { status: 404 })
   }
 
