@@ -81,8 +81,10 @@ export default async function WorkspaceCampaignDetailPage(
     hasFullAnalysis: Boolean(campaign.full_analysis && Object.keys(campaign.full_analysis).length),
     hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
     hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
+    hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
   })
   const creatorMatches = buildCreatorMatches(form)
+  const storyboardHref = `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaign.id)}`
 
   return (
     <main style={{
@@ -226,6 +228,23 @@ export default async function WorkspaceCampaignDetailPage(
                   }}
                 >
                   進入 script planning
+                </Link>
+                <Link
+                  href={storyboardHref}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '999px',
+                    background: '#f5efe5',
+                    color: '#1a1a18',
+                    padding: '14px 18px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    border: '1px solid rgba(245,239,229,0.4)',
+                  }}
+                >
+                  進入 storyboard planning
                 </Link>
                 <Link
                   href={`/paid-analysis?campaign_intake_id=${encodeURIComponent(campaign.id)}`}

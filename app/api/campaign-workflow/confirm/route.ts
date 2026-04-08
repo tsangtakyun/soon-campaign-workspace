@@ -4,7 +4,7 @@ import { createAdminSupabase } from '@/lib/server-supabase'
 
 type ConfirmPayload = {
   campaignIntakeId?: string
-  step?: 'creator-matching' | 'script-planning'
+  step?: 'creator-matching' | 'script-planning' | 'storyboard-planning'
   selectedCreatorTitle?: string
   scriptPlanningDraft?: {
     corePositioning?: string
@@ -12,6 +12,12 @@ type ConfirmPayload = {
     suitableAudience?: string
     backgroundNotes?: string
     testContentItems?: string[]
+  }
+  storyboardDraft?: {
+    openingShot?: string
+    heroProductShot?: string
+    environmentShot?: string
+    ctaShot?: string
   }
 }
 
@@ -60,6 +66,14 @@ export async function POST(request: Request) {
         ...(workflow.scriptPlanningDraft as Record<string, unknown> || {}),
         ...(body.scriptPlanningDraft || {}),
       }
+    }
+
+    if (body.step === 'storyboard-planning') {
+      workflow.storyboardPlanningConfirmedAt = now
+      workflow.openingShot = body.storyboardDraft?.openingShot || workflow.openingShot || ''
+      workflow.heroProductShot = body.storyboardDraft?.heroProductShot || workflow.heroProductShot || ''
+      workflow.environmentShot = body.storyboardDraft?.environmentShot || workflow.environmentShot || ''
+      workflow.ctaShot = body.storyboardDraft?.ctaShot || workflow.ctaShot || ''
     }
 
     const { error: updateError } = await supabase

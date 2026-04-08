@@ -58,6 +58,19 @@ export type ScriptPlanningPack = {
   ctaDirection: string
 }
 
+export type StoryboardPlanningPack = {
+  headline: string
+  rationale: string
+  shotPlan: Array<{
+    title: string
+    purpose: string
+    visualDirection: string
+    notes: string
+  }>
+  visualPriority: string[]
+  deliveryNotes: string[]
+}
+
 export type CampaignProgressStep = {
   label: string
   status: '完成' | '進行中' | '下一步'
@@ -75,6 +88,7 @@ export type CampaignProgress = {
 export type WorkflowState = {
   creatorMatchingConfirmed: boolean
   scriptPlanningConfirmed: boolean
+  storyboardPlanningConfirmed: boolean
   selectedCreatorTitle: string
   scriptPlanningDraft: {
     corePositioning?: string
@@ -82,6 +96,12 @@ export type WorkflowState = {
     suitableAudience?: string
     backgroundNotes?: string
     testContentItems?: string[]
+  }
+  storyboardDraft: {
+    openingShot?: string
+    heroProductShot?: string
+    environmentShot?: string
+    ctaShot?: string
   }
 }
 
@@ -459,9 +479,12 @@ export function buildCampaignProgress(options: {
   hasFullAnalysis?: boolean
   hasCreatorMatchingConfirmed?: boolean
   hasScriptPlanningConfirmed?: boolean
+  hasStoryboardPlanningConfirmed?: boolean
 }) : CampaignProgress {
   const currentStageIndex: number =
-    options.hasScriptPlanningConfirmed
+    options.hasStoryboardPlanningConfirmed
+      ? 6
+      : options.hasScriptPlanningConfirmed
       ? 5
       : options.hasCreatorMatchingConfirmed
         ? 4
@@ -500,6 +523,17 @@ export function buildCampaignProgress(options: {
     }
   }
 
+  if (currentStageIndex === 6) {
+    return {
+      currentStageLabel: 'Content Delivery 準備中',
+      currentStageIndex,
+      nextActionLabel: '開始跟進交付、拍攝與 production handoff',
+      summary: '你已經完成 storyboard planning，下一步係進入真實拍攝、交付管理同內容上線前準備。',
+      latestUpdate: 'Storyboard planning 已確認，等待進入內容交付階段。',
+      steps,
+    }
+  }
+
   if (currentStageIndex === 3) {
     return {
       currentStageLabel: 'Creator Matching 進行中',
@@ -528,6 +562,7 @@ export function extractWorkflowState(fullAnalysis: Record<string, unknown> | nul
   return {
     creatorMatchingConfirmed: Boolean(workflow.creatorMatchingConfirmedAt),
     scriptPlanningConfirmed: Boolean(workflow.scriptPlanningConfirmedAt),
+    storyboardPlanningConfirmed: Boolean(workflow.storyboardPlanningConfirmedAt),
     selectedCreatorTitle: typeof workflow.selectedCreatorTitle === 'string' ? workflow.selectedCreatorTitle : '',
     scriptPlanningDraft: {
       corePositioning: typeof draft.corePositioning === 'string' ? draft.corePositioning : '',
@@ -535,6 +570,12 @@ export function extractWorkflowState(fullAnalysis: Record<string, unknown> | nul
       suitableAudience: typeof draft.suitableAudience === 'string' ? draft.suitableAudience : '',
       backgroundNotes: typeof draft.backgroundNotes === 'string' ? draft.backgroundNotes : '',
       testContentItems: Array.isArray(draft.testContentItems) ? draft.testContentItems.filter((item): item is string => typeof item === 'string') : [],
+    },
+    storyboardDraft: {
+      openingShot: typeof workflow.openingShot === 'string' ? workflow.openingShot : '',
+      heroProductShot: typeof workflow.heroProductShot === 'string' ? workflow.heroProductShot : '',
+      environmentShot: typeof workflow.environmentShot === 'string' ? workflow.environmentShot : '',
+      ctaShot: typeof workflow.ctaShot === 'string' ? workflow.ctaShot : '',
     },
   }
 }
@@ -641,5 +682,86 @@ export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanning
     testContentItems,
     clientDecisions,
     ctaDirection,
+  }
+}
+
+export function buildStoryboardPlanningPack(form: CampaignFormInput): StoryboardPlanningPack {
+  const brand = form.businessName || '你嘅品牌'
+  const isFood = form.vertical === 'food'
+
+  return {
+    headline: `${brand} storyboard planning`,
+    rationale: isFood
+      ? '呢一步會將已確認嘅 backing information 同實測內容，整理成 creator 真正落鏡時最需要嘅 shot order。同 script planning 一樣，唔係寫死表演，而係整理最值得拍、最值得見到嘅畫面。'
+      : '呢一步會將已確認腳本方向整理成更具體 shot plan，方便 creator 同 production 知道邊啲畫面最重要、邊個資訊位要優先出現。',
+    shotPlan: isFood
+      ? [
+          {
+            title: 'Opening Stop-Scroll Shot',
+            purpose: '第一秒先令人停低，建立「值唔值得專程去」問題。',
+            visualDirection: '先用最吸睛甜品 / 主打菜式 close-up，或者第一啖反應做 opening。',
+            notes: '開場唔需要講晒資料，先搶 attention。',
+          },
+          {
+            title: 'Hero Product / Dish Shot',
+            purpose: '清楚帶出最強賣點，令觀眾一眼知值唔值得去試。',
+            visualDirection: '主打菜式、甜品、出煙 / 拉絲 / 切開 / 倒醬等最有感畫面優先。',
+            notes: '呢一格應該配合最強 selling point。',
+          },
+          {
+            title: 'Environment / Mood Shot',
+            purpose: '補足情境，講清楚呢個地方適合邊類人去。',
+            visualDirection: '店內氣氛、打卡位、夜晚燈光、朋友 / 情侶到場感。',
+            notes: '唔只係靚，係要幫觀眾想像自己到場。',
+          },
+          {
+            title: 'CTA / Action Shot',
+            purpose: '最後將觀眾導向 follow、DM、WhatsApp、到店或預約。',
+            visualDirection: '優惠、位置、限定資訊、最後一口 / 最後一幕配 CTA。',
+            notes: '收尾要清楚，唔好只係靚畫面完結。',
+          },
+        ]
+      : [
+          {
+            title: 'Opening Hook Shot',
+            purpose: '一開場先令觀眾停低。',
+            visualDirection: '用最有張力、最有對比或者最有驚喜嘅一幕做第一鏡。',
+            notes: '唔好一開始就講太多字。',
+          },
+          {
+            title: 'Core Value Shot',
+            purpose: '清楚交代最強賣點。',
+            visualDirection: '將產品 / 體驗最有感嗰一幕放喺前段。',
+            notes: '觀眾應該一眼知點解值得繼續睇。',
+          },
+          {
+            title: 'Context / Proof Shot',
+            purpose: '補足可信度同場景感。',
+            visualDirection: '加入使用情景、環境、反應、比較、實測片段。',
+            notes: '讓觀眾理解唔係空口講。',
+          },
+          {
+            title: 'CTA Shot',
+            purpose: '將 attention 轉成下一步行動。',
+            visualDirection: '收尾畫面要配合 CTA、優惠、連結或行動。',
+            notes: 'CTA 要直接，唔好太含糊。',
+          },
+        ],
+    visualPriority: isFood
+      ? [
+          '最強賣點畫面一定要早出，不要拖到中後段。',
+          '氣氛鏡頭唔係裝飾，而係幫觀眾想像「我會唔會想去」。',
+          '實測內容優先對應 client 已確認嗰 4 個重點。',
+        ]
+      : [
+          '先 attention，後解釋，再行動。',
+          '所有畫面都應該服務已確認嘅核心 angle。',
+          '場景 / 實測 / 反應要成為可信度來源。',
+        ],
+    deliveryNotes: [
+      '呢一頁確認後，就代表 client 已接受第一輪 storyboard 方向。',
+      '下一步可以交俾 creator / production 再變成正式 shot list 同拍攝執行。',
+      '之後 dashboard 會進入內容交付階段。',
+    ],
   }
 }

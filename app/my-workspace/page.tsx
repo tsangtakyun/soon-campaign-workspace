@@ -56,6 +56,7 @@ export default async function MyWorkspacePage() {
           hasFullAnalysis: Boolean(activeCampaign.full_analysis && Object.keys(activeCampaign.full_analysis).length),
           hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
           hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
+          hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
         })
       })()
     : null
@@ -113,6 +114,7 @@ export default async function MyWorkspacePage() {
                 hasFullAnalysis: Boolean(item.full_analysis && Object.keys(item.full_analysis).length),
                 hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
                 hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
+                hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
               })
 
               return (
