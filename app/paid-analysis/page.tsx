@@ -53,22 +53,26 @@ function PaidAnalysisContent() {
         if (data.payment_status !== 'paid') throw new Error('付款尚未完成。')
         setPaid(true)
 
-        if (draft) {
-          const syncRes = await fetch('/api/paid-analysis/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId,
-              campaignIntakeId: campaignIntakeId || undefined,
-              form: draft,
-            }),
-          })
+        const syncRes = await fetch('/api/paid-analysis/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            campaignIntakeId: campaignIntakeId || undefined,
+            form: draft || undefined,
+          }),
+        })
 
-          const syncData = await syncRes.json()
-          if (!syncRes.ok) throw new Error(syncData.error || '未能同步付款資料。')
-          setSavedAnalysis(syncData.analysis as FullAnalysis)
-          setSyncMessage('付款狀態同完整分析已經成功寫入系統。')
+        const syncData = await syncRes.json()
+        if (!syncRes.ok) throw new Error(syncData.error || '未能同步付款資料。')
+        setSavedAnalysis(syncData.analysis as FullAnalysis)
+        if (syncData.form) {
+          setDraft(syncData.form as CampaignFormInput)
         }
+        if (syncData.campaignIntakeId) {
+          setCampaignIntakeId(syncData.campaignIntakeId as string)
+        }
+        setSyncMessage('付款狀態同完整分析已經成功寫入系統。')
       } catch (error: any) {
         setError(error.message || '未能確認付款狀態。')
       } finally {
