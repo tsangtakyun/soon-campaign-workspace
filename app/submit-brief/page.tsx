@@ -60,6 +60,7 @@ export default function SubmitBriefPage() {
   const [showPaidAnalysis, setShowPaidAnalysis] = useState(false)
   const [campaignIntakeId, setCampaignIntakeId] = useState('')
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false)
+  const [paidUnlockMessage, setPaidUnlockMessage] = useState('')
 
   const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
 
@@ -77,11 +78,11 @@ export default function SubmitBriefPage() {
     } catch {}
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+  async function createCampaignIntake() {
     setGeneratedPreview(true)
     setSaving(true)
     setSaveMessage('')
+    setPaidUnlockMessage('')
     persistPaidAnalysisDraft()
 
     try {
@@ -120,20 +121,34 @@ export default function SubmitBriefPage() {
         } catch {}
       }
       setSaveMessage('已經成功記錄你嘅 brief，我哋可以用呢份資料繼續跟進。')
+      return data?.id || ''
     } catch (error) {
       console.error(error)
       setSaveMessage('AI 分析已生成，但資料暫時未成功寫入系統。請稍後再試，或先繼續用預覽。')
+      return ''
     } finally {
       setSaving(false)
     }
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await createCampaignIntake()
+  }
+
   async function handleCheckout() {
     persistPaidAnalysisDraft()
+    setPaidUnlockMessage('')
 
-    if (!campaignIntakeId) {
+    let resolvedCampaignIntakeId = campaignIntakeId
+
+    if (!resolvedCampaignIntakeId) {
+      resolvedCampaignIntakeId = await createCampaignIntake()
+    }
+
+    if (!resolvedCampaignIntakeId) {
       setShowPaidAnalysis(true)
-      setSaveMessage('請先按一次「AI 自動生成分析」，等系統記錄 brief 後先可進入付款。')
+      setPaidUnlockMessage('系統暫時未能記錄你嘅 brief，所以未能進入付款。請檢查資料後再試。')
       return
     }
 
@@ -144,7 +159,7 @@ export default function SubmitBriefPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          campaignIntakeId,
+          campaignIntakeId: resolvedCampaignIntakeId,
           email: form.email.trim(),
         }),
       })
@@ -161,7 +176,7 @@ export default function SubmitBriefPage() {
 
       window.location.href = data.url
     } catch (error: any) {
-      setSaveMessage(error.message || '未能建立付款頁面。')
+      setPaidUnlockMessage(error.message || '未能建立付款頁面。')
       setRedirectingToCheckout(false)
     }
   }
@@ -355,6 +370,7 @@ export default function SubmitBriefPage() {
                   <button
                     type="button"
                     onClick={handleCheckout}
+                    disabled={redirectingToCheckout}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -363,13 +379,19 @@ export default function SubmitBriefPage() {
                       padding: '14px 20px',
                       background: '#1a1a18',
                       color: '#f4efe6',
-                      cursor: 'pointer',
+                      cursor: redirectingToCheckout ? 'wait' : 'pointer',
+                      opacity: redirectingToCheckout ? 0.72 : 1,
                       fontSize: '14px',
                     }}
                   >
                     {redirectingToCheckout ? '前往付款中...' : '付款後解鎖'}
                   </button>
                 </div>
+                {paidUnlockMessage && (
+                  <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '14px', background: '#f7f2d8', color: '#6b5d1c', fontSize: '13px', lineHeight: 1.6 }}>
+                    {paidUnlockMessage}
+                  </div>
+                )}
               </div>
             )}
           </form>
