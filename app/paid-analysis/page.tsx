@@ -52,6 +52,14 @@ export default function PaidAnalysisPage() {
     return buildFullAnalysis(draft)
   }, [draft, paid])
 
+  const sections: Array<{ title: string; items: string[] }> = analysis ? [
+    { title: '預算打法', items: analysis.budgetShapes },
+    { title: '題材角度', items: analysis.contentAngles },
+    { title: '交付組合', items: analysis.deliverablePlan },
+    { title: 'Creator 建議', items: analysis.creatorFit },
+    { title: '第一輪行動建議', items: analysis.firstWavePlan },
+  ] : []
+
   return (
     <main style={{
       minHeight: '100vh',
@@ -99,17 +107,11 @@ export default function PaidAnalysisPage() {
               <div style={{ fontSize: '17px', lineHeight: 1.7 }}>{analysis.overview}</div>
             </section>
 
-            {[
-              ['預算打法', analysis.budgetShapes],
-              ['題材角度', analysis.contentAngles],
-              ['交付組合', analysis.deliverablePlan],
-              ['Creator 建議', analysis.creatorFit],
-              ['第一輪行動建議', analysis.firstWavePlan],
-            ].map(([title, items]) => (
+            {sections.map(({ title, items }) => (
               <section key={title} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>{title}</div>
                 <div style={{ display: 'grid', gap: '10px' }}>
-                  {(items as string[]).map((item) => (
+                  {items.map((item) => (
                     <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                       {item}
                     </div>
