@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { answerFollowUpQuestion, buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import { buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -21,6 +21,7 @@ function PaidAnalysisContent() {
   const [openExplanationId, setOpenExplanationId] = useState('')
   const [followUpQuestions, setFollowUpQuestions] = useState<Record<string, string>>({})
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({})
+  const [followUpLoadingId, setFollowUpLoadingId] = useState('')
 
   useEffect(() => {
     try {
@@ -88,13 +89,37 @@ function PaidAnalysisContent() {
     setFollowUpQuestions((prev) => ({ ...prev, [id]: value }))
   }
 
-  function askQuestion(id: string, sectionTitle: string, item: string) {
+  async function askQuestion(id: string, sectionTitle: string, item: string) {
     if (!draft) return
     const question = (followUpQuestions[id] || '').trim()
     if (!question) return
 
-    const answer = answerFollowUpQuestion(draft, sectionTitle, item, question)
-    setFollowUpAnswers((prev) => ({ ...prev, [id]: answer }))
+    setFollowUpLoadingId(id)
+
+    try {
+      const response = await fetch('/api/ai/follow-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          form: draft,
+          sectionTitle,
+          item,
+          question,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || '未能取得 AI 回答。')
+      }
+
+      setFollowUpAnswers((prev) => ({ ...prev, [id]: data.answer }))
+    } catch (error: any) {
+      setFollowUpAnswers((prev) => ({ ...prev, [id]: error.message || '未能取得 AI 回答。' }))
+    } finally {
+      setFollowUpLoadingId('')
+    }
   }
 
   const sections: Array<{ title: string; kicker: string; items: string[] }> = analysis ? [
@@ -238,17 +263,19 @@ function PaidAnalysisContent() {
                                     <button
                                       type="button"
                                       onClick={() => askQuestion(explanationId, title, item)}
+                                      disabled={followUpLoadingId === explanationId}
                                       style={{
                                         border: '1px solid rgba(26,26,24,0.12)',
                                         borderRadius: '999px',
                                         background: '#1a1a18',
                                         color: '#f5efe5',
                                         padding: '10px 14px',
-                                        cursor: 'pointer',
+                                        cursor: followUpLoadingId === explanationId ? 'wait' : 'pointer',
+                                        opacity: followUpLoadingId === explanationId ? 0.72 : 1,
                                         fontSize: '12px',
                                       }}
                                     >
-                                      即刻問 AI
+                                      {followUpLoadingId === explanationId ? 'AI 回答中...' : '即刻問 AI'}
                                     </button>
                                   </div>
 
