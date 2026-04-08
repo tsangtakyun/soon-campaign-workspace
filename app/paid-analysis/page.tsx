@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -8,7 +8,7 @@ import { buildFullAnalysis, type CampaignFormInput } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
-export default function PaidAnalysisPage() {
+function PaidAnalysisContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [draft, setDraft] = useState<CampaignFormInput | null>(null)
@@ -123,5 +123,27 @@ export default function PaidAnalysisPage() {
         )}
       </div>
     </main>
+  )
+}
+
+export default function PaidAnalysisPage() {
+  return (
+    <Suspense fallback={
+      <main style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
+        color: '#1a1a18',
+        fontFamily: 'Georgia, Times New Roman, serif',
+        padding: '42px 24px 90px',
+      }}>
+        <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
+          <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+            正在載入付款結果...
+          </section>
+        </div>
+      </main>
+    }>
+      <PaidAnalysisContent />
+    </Suspense>
   )
 }
