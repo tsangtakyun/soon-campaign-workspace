@@ -14,10 +14,7 @@ type ConfirmPayload = {
     testContentItems?: string[]
   }
   storyboardDraft?: {
-    openingShot?: string
-    heroProductShot?: string
-    environmentShot?: string
-    ctaShot?: string
+    mustHaveShots?: string[]
   }
 }
 
@@ -70,10 +67,9 @@ export async function POST(request: Request) {
 
     if (body.step === 'storyboard-planning') {
       workflow.storyboardPlanningConfirmedAt = now
-      workflow.openingShot = body.storyboardDraft?.openingShot || workflow.openingShot || ''
-      workflow.heroProductShot = body.storyboardDraft?.heroProductShot || workflow.heroProductShot || ''
-      workflow.environmentShot = body.storyboardDraft?.environmentShot || workflow.environmentShot || ''
-      workflow.ctaShot = body.storyboardDraft?.ctaShot || workflow.ctaShot || ''
+      workflow.mustHaveShots = Array.isArray(body.storyboardDraft?.mustHaveShots)
+        ? body.storyboardDraft?.mustHaveShots
+        : workflow.mustHaveShots || []
     }
 
     const { error: updateError } = await supabase
