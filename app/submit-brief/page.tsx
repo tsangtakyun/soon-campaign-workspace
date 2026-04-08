@@ -79,6 +79,13 @@ export default function SubmitBriefPage() {
     } catch {}
   }
 
+  function getOrCreateCampaignIntakeId() {
+    if (campaignIntakeId) return campaignIntakeId
+    const nextId = crypto.randomUUID()
+    setCampaignIntakeId(nextId)
+    return nextId
+  }
+
   async function createCampaignIntake() {
     setGeneratedPreview(true)
     setSaving(true)
@@ -88,9 +95,11 @@ export default function SubmitBriefPage() {
 
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
+      const nextCampaignIntakeId = getOrCreateCampaignIntakeId()
+      const { error } = await supabase
         .from('campaign_intakes')
         .insert({
+        id: nextCampaignIntakeId,
         contact_name: form.contactName.trim(),
         objective: form.objective,
         business_name: form.businessName.trim(),
@@ -107,23 +116,18 @@ export default function SubmitBriefPage() {
         suggested_deliverable_shape: aiPreview?.angleB || '',
         source_channel: 'soon-campaign-workspace',
       })
-        .select('id')
-        .single()
 
       if (error) throw error
-      if (data?.id) {
-        setCampaignIntakeId(data.id)
-        try {
-          const payload: StoredPaidAnalysisDraft = {
-            campaignIntakeId: data.id,
-            form,
-          }
-          window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(payload))
-        } catch {}
-      }
+      try {
+        const payload: StoredPaidAnalysisDraft = {
+          campaignIntakeId: nextCampaignIntakeId,
+          form,
+        }
+        window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(payload))
+      } catch {}
       setSaveMessage('已經成功記錄你嘅 brief，我哋可以用呢份資料繼續跟進。')
       setCheckoutStatus('品牌 brief 已記錄。')
-      return data?.id || ''
+      return nextCampaignIntakeId
     } catch (error) {
       console.error(error)
       setSaveMessage('AI 分析已生成，但資料暫時未成功寫入系統。請稍後再試，或先繼續用預覽。')
