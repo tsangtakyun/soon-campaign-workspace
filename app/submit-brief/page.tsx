@@ -320,20 +320,25 @@ export default function SubmitBriefPage() {
                     <div style={{ fontSize: '12px', color: '#8a7f71' }}>Launch offer</div>
                     <div style={{ fontSize: '28px', color: '#1a1a18' }}>HK$199</div>
                   </div>
-                  <button
-                    type="button"
+                  <a
+                    href="https://buy.stripe.com/test_28EaEZgrTgt573M2hJ0Fi00"
+                    target="_blank"
+                    rel="noreferrer"
                     style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
                       border: 'none',
                       borderRadius: '999px',
                       padding: '14px 20px',
                       background: '#1a1a18',
                       color: '#f4efe6',
+                      textDecoration: 'none',
                       cursor: 'pointer',
                       fontSize: '14px',
                     }}
                   >
                     付款後解鎖
-                  </button>
+                  </a>
                 </div>
               </div>
             )}
