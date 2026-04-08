@@ -7,10 +7,23 @@ import { useSearchParams } from 'next/navigation'
 import { buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
+const DEMO_FORM: CampaignFormInput = {
+  contactName: 'Tommy',
+  objective: 'sales',
+  businessName: 'Panda Cafe',
+  whatsapp: '9123 4567',
+  email: 'hello@pandacafe.com',
+  campaignTitle: 'Panda Cafe 春季宣傳',
+  vertical: 'food',
+  budgetRange: '15000-30000',
+  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。今次想做一條 social media 宣傳片，感覺唔好太似廣告，而係令人覺得呢間 cafe 真係值得去坐下、影相、食甜品。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+}
 
 function PaidAnalysisContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const demoMode = searchParams.get('demo') === '1'
   const campaignIntakeIdFromUrl = searchParams.get('campaign_intake_id')
   const [draft, setDraft] = useState<CampaignFormInput | null>(null)
   const [campaignIntakeId, setCampaignIntakeId] = useState('')
@@ -35,12 +48,23 @@ function PaidAnalysisContent() {
         } else {
           setDraft(parsed)
         }
+      } else if (demoMode) {
+        setDraft(DEMO_FORM)
       }
-    } catch {}
-  }, [])
+    } catch {
+      if (demoMode) setDraft(DEMO_FORM)
+    }
+  }, [demoMode])
 
   useEffect(() => {
     async function checkSession() {
+      if (demoMode) {
+        setPaid(true)
+        setChecking(false)
+        setSyncMessage('Demo mode 已開啟，已直接解鎖完整分析。')
+        return
+      }
+
       if (!sessionId) {
         setChecking(false)
         setError('未找到付款 session。')
@@ -82,7 +106,7 @@ function PaidAnalysisContent() {
     }
 
     checkSession()
-  }, [campaignIntakeId, campaignIntakeIdFromUrl, draft, sessionId])
+  }, [campaignIntakeId, campaignIntakeIdFromUrl, demoMode, draft, sessionId])
 
   const analysis = useMemo(() => {
     if (savedAnalysis) return savedAnalysis
