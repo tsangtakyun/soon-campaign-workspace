@@ -22,11 +22,13 @@ export type AnalysisPreview = {
 export type FullAnalysis = {
   headline: string
   overview: string
-  budgetShapes: string[]
-  contentAngles: string[]
-  deliverablePlan: string[]
-  creatorFit: string[]
-  firstWavePlan: string[]
+  campaignNorthStar: string
+  strategy: string[]
+  contentPlanning: string[]
+  production: string[]
+  distribution: string[]
+  conversion: string[]
+  optimization: string[]
 }
 
 export type StoredPaidAnalysisDraft = {
@@ -71,48 +73,52 @@ export function buildAnalysisPreview(form: CampaignFormInput): AnalysisPreview |
 export function buildFullAnalysis(form: CampaignFormInput): FullAnalysis {
   const preview = buildAnalysisPreview(form)
   const brand = form.businessName || '你嘅品牌'
+  const audienceHint =
+    form.vertical === 'food'
+      ? '18-35 歲、會睇飲食內容、願意為新店同打卡感買單嘅 audience'
+      : form.vertical === 'travel'
+        ? '想搵週末短逃離、重視體驗感同地點驚喜嘅 audience'
+        : form.vertical === 'product'
+          ? '會主動比較產品、想即睇即知值唔值得試嘅 audience'
+          : '重視新鮮感、生活品味同分享慾望嘅 audience'
 
   return {
     headline: `${brand} 完整 AI 宣傳方向分析`,
-    overview: `${brand} 呢次最應該先集中處理一個主目標，而唔係同時平均分散投放。先用最 fit 嘅 angle 打入市場，再根據反應加碼，會比盲目搵中介同亂出內容更有效率。`,
-    budgetShapes: [
-      `${preview?.budgetGuide || '以一條主片做第一輪測試'}。`,
-      '將預算拆成：主內容、補充 cutdown、必要放大測試，避免一開始所有錢落同一種做法。',
+    overview: `${brand} 呢次唔應該只係「出一條片」咁簡單，而係要將 attention、內容節奏、分發同轉化串成一個完整 campaign。先用最 fit 嘅 angle 打入市場，再根據數據搵 winning formula，會比盲目搵中介同亂出內容更有效率。`,
+    campaignNorthStar: '用內容去測試 attention -> 用數據搵 winning -> 再用錢放大 -> 最後變現。',
+    strategy: [
+      `${brand} 呢次建議只集中一個主目標：${objectiveText(form.objective)}，避免 campaign 一開始平均分散火力。`,
+      `核心 audience 應先鎖定為 ${audienceHint}，然後所有內容都圍住「點樣令觀眾停低」去設計，而唔係只係介紹你賣緊乜。`,
+      `主角度建議以「${preview?.angleA || '主角度'}」切入，第二條角度先再延伸做對比、驚喜或轉化版本。`,
+    ],
+    contentPlanning: [
+      `${preview?.angleB || '一條主 Reel + 一條補充 cutdown'} 會係最合理嘅第一輪 content shape，再按 budget 拉開 hero content 同補充短片比例。`,
+      '內容規劃唔止分平台，仲要分節奏：先用爆點內容搶 attention，再用解釋型或信任型內容承接。',
+      '每條片都應該有清晰 hook template，Must include 內嘅元素要自然散落喺片中，而唔係最後一次過硬塞。',
+    ],
+    production: [
+      `${preview?.budgetGuide || '先用一條主內容做測試'}，production 重點唔係拍得幾靚，而係每一秒有冇為 retention 設計。`,
+      '拍攝前應先有 script、shot list、opening hook、關鍵 close-up，同埋明確知道邊幾秒要帶出產品或場景價值。',
+      '剪接階段要優先處理節奏、字幕、畫面資訊密度同開頭 3 秒停留力，而唔係只係執顏色同靚畫面。',
+    ],
+    distribution: [
+      '內容出街唔係完結，真正 campaign 要設 posting schedule、creator 分發節奏同後續放大策略。',
       form.budgetRange === '30000-50000'
-        ? '呢個 budget 可考慮加入第二位 creator 或第二輪放大，增加試驗廣度。'
-        : '建議先做精第一輪，再按成效決定第二輪加碼。',
+        ? '以你而家呢個 budget，可以預留部份資源去放大 winning content，甚至做第二位 creator 測試。'
+        : '如果唔想一開始燒太多 budget，可以先靠 creator 分發、多帳號矩陣同 cutdown 重發去放大表現最好嘅內容。',
+      'Hashtag、SEO、caption 同發佈時間都應該跟內容角度配合，而唔係每次固定同一套。',
     ],
-    contentAngles: [
-      `${preview?.angleA || '主角度'}會最適合做第一條內容入口。`,
+    conversion: [
+      '真正分水嶺唔係出 content，而係有冇將觀眾導去 CTA，同埋收返查詢、DM、WhatsApp 或落單。',
       form.objective === 'sales'
-        ? '第二角度建議偏問題 -> 解法，令觀眾更快理解行動理由。'
-        : form.objective === 'reach'
-          ? '第二角度建議偏驚喜 / reveal，令內容更易被人停低睇完。'
-          : '第二角度建議偏 mood / identity，令品牌感覺更完整。',
-      'Must include 內提到嘅重點應該自然分散喺片中，而唔係最後一次過塞滿。',
+        ? '你而家最需要設計明確嘅轉化路線，例如 Reel -> WhatsApp -> closing，而唔係只係期望觀眾自己會搵你。'
+        : '即使主目標唔係即刻 sales，都應該有輕量 CTA，例如 follow、收藏、DM、預約，等流量有承接位。',
+      'Landing page、link in bio 同 CTA 文案應跟內容 angle 一致，咁先唔會由吸引人去到臨門一腳斷層。',
     ],
-    deliverablePlan: [
-      `${preview?.angleB || '一條主 Reel + 一條補充 cutdown'} 會係最穩陣嘅交付組合。`,
-      '主片用嚟講完整故事，cutdown 用嚟補充賣點或者做第二輪分發。',
-      form.objective === 'branding'
-        ? '如果要建立品牌形象，可加 story / static assets 做視覺延伸。'
-        : '如果第一輪表現好，應快速追加一條更直接嘅轉化版本。',
-    ],
-    creatorFit: [
-      form.vertical === 'food'
-        ? '優先找擅長食物反應、空間氣氛感、close-up 質感鏡頭嘅 creator。'
-        : form.vertical === 'travel'
-          ? '優先找擅長地點 reveal、路線感、地方故事包裝嘅 creator。'
-          : form.vertical === 'product'
-            ? '優先找擅長使用情境同清晰解說嘅 creator。'
-            : '優先找擅長體驗式敘事同情緒代入嘅 creator。',
-      '第一輪重點唔係數量，而係 creator 同 campaign 氣質夠唔夠 fit。',
-      '簡報時應明確寫低：目標、語氣、必帶資訊、可自由發揮範圍。',
-    ],
-    firstWavePlan: [
-      '上線後先睇頭 48 小時反應，特別係儲存、分享、留言同查詢。',
-      '將表現最好嘅 angle 再做 cutdown 或小額放大，避免太早分散。',
-      '如果要追轉化，CTA 應盡量自然承接，而唔係突然硬 sell。',
+    optimization: [
+      'Campaign 唔係做一次就完，第一輪上線後應集中睇 retention、儲存、分享、CTR 同查詢質量。',
+      '下一輪最值得做嘅係 A/B testing：開頭 hook、thumbnail、第一句字幕、CTA 位置，都可以逐樣測。',
+      '將表現最好嘅 opening、角度同 creator formula 留低，再用第二輪 budget 放大，先係專業 campaign 最值錢嘅地方。',
     ],
   }
 }

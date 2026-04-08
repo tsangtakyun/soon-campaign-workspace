@@ -81,12 +81,13 @@ function PaidAnalysisContent() {
     return buildFullAnalysis(draft)
   }, [draft, paid, savedAnalysis])
 
-  const sections: Array<{ title: string; items: string[] }> = analysis ? [
-    { title: '預算打法', items: analysis.budgetShapes },
-    { title: '題材角度', items: analysis.contentAngles },
-    { title: '交付組合', items: analysis.deliverablePlan },
-    { title: 'Creator 建議', items: analysis.creatorFit },
-    { title: '第一輪行動建議', items: analysis.firstWavePlan },
+  const sections: Array<{ title: string; kicker: string; items: string[] }> = analysis ? [
+    { title: '1. Strategy', kicker: '定位 + 目標', items: analysis.strategy },
+    { title: '2. Content Planning', kicker: '內容設計', items: analysis.contentPlanning },
+    { title: '3. Production', kicker: '拍攝 / 製作', items: analysis.production },
+    { title: '4. Distribution', kicker: '發佈 + 放大', items: analysis.distribution },
+    { title: '5. Conversion', kicker: '變現 / Lead', items: analysis.conversion },
+    { title: '6. Data & Optimization', kicker: '數據優化', items: analysis.optimization },
   ] : []
 
   return (
@@ -135,15 +136,24 @@ function PaidAnalysisContent() {
                 {syncMessage}
               </section>
             )}
+
+            <section style={{ padding: '24px', borderRadius: '24px', background: '#f7f1e1', border: '1px solid rgba(26,26,24,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN LOGIC</div>
+              <div style={{ fontSize: '28px', lineHeight: 1.3, color: '#1a1a18' }}>
+                {analysis.campaignNorthStar}
+              </div>
+            </section>
+
             <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>UNLOCKED</div>
               <div style={{ fontSize: '34px', lineHeight: 1.15, marginBottom: '10px' }}>{analysis.headline}</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7 }}>{analysis.overview}</div>
             </section>
 
-            {sections.map(({ title, items }) => (
+            {sections.map(({ title, kicker, items }) => (
               <section key={title} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>{title}</div>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '6px' }}>{kicker}</div>
+                <div style={{ fontSize: '30px', lineHeight: 1.1, marginBottom: '14px', color: '#1a1a18' }}>{title}</div>
                 <div style={{ display: 'grid', gap: '10px' }}>
                   {items.map((item) => (
                     <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
