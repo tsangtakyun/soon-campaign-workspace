@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const isPublicPage =
     request.nextUrl.pathname === '/' ||
     request.nextUrl.pathname === '/submit-brief' ||
-    request.nextUrl.pathname === '/paid-analysis' ||
+    request.nextUrl.pathname.startsWith('/paid-analysis') ||
     request.nextUrl.pathname === '/login' ||
     request.nextUrl.pathname.startsWith('/auth')
 
