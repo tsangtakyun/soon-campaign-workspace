@@ -40,6 +40,10 @@ function LoginContent() {
           Sign in once, then return to your paid analysis any time
         </p>
 
+        <div style={{ marginBottom: '24px', padding: '14px 16px', borderRadius: '16px', background: '#f8f2e4', color: '#5b5348', fontSize: '14px', lineHeight: 1.7 }}>
+          用你付款時同一個 email 嘅 Google 帳號登入，之後就可以直接返嚟睇已購買分析，唔使再重複經付款流程。
+        </div>
+
         {error === 'unauthorized' && (
           <p style={{ color: '#c0392b', marginBottom: '24px', fontSize: '14px' }}>
             你的帳號未獲授權，請聯絡管理員。
@@ -60,7 +64,7 @@ function LoginContent() {
             letterSpacing: '0.05em',
           }}
         >
-          Sign in with Google
+          用 Google 登入並保存分析
         </button>
       </div>
     </div>

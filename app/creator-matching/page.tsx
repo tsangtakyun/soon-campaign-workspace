@@ -34,6 +34,12 @@ function getDraftForm() {
 export default function CreatorMatchingPage() {
   const form = getDraftForm()
   const creatorMatches = buildCreatorMatches(form)
+  const objectiveLabel =
+    form.objective === 'sales'
+      ? 'Conversion（轉化 / 銷售）'
+      : form.objective === 'reach'
+        ? 'Awareness（曝光）'
+        : 'Engagement / Branding（互動 / 品牌感）'
 
   return (
     <main style={{
@@ -68,9 +74,26 @@ export default function CreatorMatchingPage() {
           <div style={{ display: 'grid', gap: '18px' }}>
             <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>MATCHING STATUS</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.12, marginBottom: '10px' }}>SOON 已收到你嘅確認，正為 {form.businessName || '品牌'} 進入 creator matching。</div>
+              <div style={{ fontSize: '34px', lineHeight: 1.12, marginBottom: '10px' }}>揀錯 creator = 燒錢；睇錯 KPI = 以為成功，但其實未必有生意。</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf' }}>
-                我哋會由 creator 類型、語氣風格、內容表現方式同 audience fit 開始篩選，而唔係只睇 follower 數字。以下係第一輪最值得優先睇嘅 creator archetypes。
+                所以 SOON 唔會只睇 follower 數。對 {form.businessName || '品牌'} 而言，真正應該先睇目標、內容 fit、受眾、互動質素，同埋過往有冇轉化能力。
+              </div>
+            </section>
+
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>HOW SOON MATCHES CREATORS</div>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {[
+                  `Step 1：先睇目的。你今次主目標係 ${objectiveLabel}，所以揀 creator 唔會同曝光 campaign 一樣。`,
+                  'Step 2：睇內容 fit。唔係佢紅唔紅，而係佢平時講嘅內容、語氣同你產品 / 體驗有冇真正關聯。',
+                  'Step 3：睇受眾。地區、年齡層、興趣，全部要對到你想要嘅客，而唔係得高 view 就算。',
+                  'Step 4：睇數據。真正會睇 engagement rate、平均 view、retention、completion，而唔係只睇 followers。',
+                  'Step 5：睇轉化能力。有啲人好紅，但完全賣唔到嘢；真正值錢係佢之前有冇 sales / click / leads 表現。',
+                ].map((item) => (
+                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                    {item}
+                  </div>
+                ))}
               </div>
             </section>
 
@@ -118,12 +141,29 @@ export default function CreatorMatchingPage() {
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>WHAT HAPPENS NEXT</div>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>KPI PRIORITY</div>
               <div style={{ display: 'grid', gap: '10px' }}>
                 {[
-                  '系統先按 campaign angle、budget 同 vertical 篩走唔 fit 嘅 creator。',
-                  '之後會整理出第一輪建議 creator pool，同埋每位 creator 可以點樣切入內容。',
-                  '再下一步會接住生成題材方向、腳本建議同拍攝分鏡。',
+                  'Level 1：曝光 KPI（Reach / Impressions / Views）只係最表面，好睇但未必有用。',
+                  'Level 2：內容 KPI（Retention / Completion / Shares / Saves / Comments）先反映 content 質素。Retention 高，先有機會爆。',
+                  'Level 3：商業 KPI（CTR / Leads / Conversion / CPA / ROAS）先係最重要，因為真正要睇有冇變成生意。',
+                  '總結：錢（conversion） > 行為（retention） > 表面（views）。',
+                ].map((item) => (
+                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CONTENT TESTING LOOP</div>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {[
+                  'Step 1：唔係一開始搵一個最紅嘅人，而係可以同時測 5-10 個 creator，每人出 1-2 條內容。',
+                  'Step 2：7 日內睇 retention、saves、comments、CTR，同埋邊個 creator 最容易帶出查詢。',
+                  'Step 3：揀 top 20% 組合，再去 boost ads、再拍 variation、再放大 winning content。',
+                  '呢個先係真係賺錢嘅玩法：creator 唔止 deliver content，而係幫你做 content testing loop。',
                 ].map((item) => (
                   <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                     {item}
@@ -136,7 +176,7 @@ export default function CreatorMatchingPage() {
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
               <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>下一步會根據選定 creator 組合，開始生成題材與腳本建議。</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
-                第一輪建議唔係同時搵最多 creator，而係先用最 fit 嗰一至兩類組合測最有機會爆嘅角度，然後再放大。
+                第一輪建議唔係同時搵最大量 creator，而係先用最 fit 嗰一至兩類組合測最有機會出結果嘅 angle，再用數據決定點樣放大。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <button

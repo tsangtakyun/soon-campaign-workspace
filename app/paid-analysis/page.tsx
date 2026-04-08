@@ -345,7 +345,7 @@ function PaidAnalysisContent() {
                   你可以直接確認方向，交俾系統開始配對合適 creator；如果你想先同真人策略團隊對一對重點，我哋都可以下一步幫你承接。
                 </div>
                 <div style={{ marginBottom: '18px', padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.08)', color: '#f0e7da', lineHeight: 1.7 }}>
-                  想之後唔使再經付款流程？你可以用同一個 email 嘅 Google 帳號登入，之後直接喺你的 workspace 睇返已買分析。
+                  想之後唔使再經付款流程？下一步會先帶你去 Google 登入頁。只要用同一個 email 嘅 Google 帳號登入，之後就可以直接喺你的 workspace 睇返已買分析。
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                   <Link
@@ -394,7 +394,7 @@ function PaidAnalysisContent() {
                       textDecoration: 'none',
                     }}
                   >
-                    用 Google 保存並隨時返回
+                    用 Google 登入，保存並隨時返回
                   </Link>
                 </div>
               </section>
