@@ -40,6 +40,16 @@ export type CreatorArchetype = {
   deliverableShape: string
 }
 
+export type ScriptPlanningPack = {
+  headline: string
+  rationale: string
+  topicDirections: string[]
+  hookOptions: string[]
+  scriptBlocks: string[]
+  shootNotes: string[]
+  ctaDirection: string
+}
+
 export type CampaignProgressStep = {
   label: string
   status: '完成' | '進行中' | '下一步'
@@ -437,5 +447,98 @@ export function buildCampaignProgress(options: {
     summary: '品牌 brief 已經提交，下一步應該先解鎖完整 AI 分析，搵出最值得先做嘅 campaign 方向。',
     latestUpdate: '品牌 brief 已成功記錄，等待進入完整分析階段。',
     steps,
+  }
+}
+
+export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanningPack {
+  const brand = form.businessName || '你嘅品牌'
+  const product = form.campaignTitle || `${brand} campaign`
+  const objectiveText =
+    form.objective === 'sales'
+      ? '帶查詢、DM、WhatsApp 或落單'
+      : form.objective === 'reach'
+        ? '提高觀看、分享同停留'
+        : '建立品牌印象同情緒連結'
+
+  const topicDirections =
+    form.vertical === 'food'
+      ? [
+          `值唔值得專程去食：用「${brand} 到底值唔值得專程去」做第一輪最直接測試。`,
+          `情緒代入版：將 ${brand} 包裝成朋友 / 情侶週末會想去嘅地方。`,
+          `賣點轉化版：直接拆招牌菜、氣氛同優惠，令觀眾睇完即刻想 DM / 到店。`,
+        ]
+      : form.vertical === 'travel'
+        ? [
+            `短逃離角度：離開城市半日就去到另一個世界。`,
+            `實用攻略角度：交通、時間、景點節奏一次講清。`,
+            `高質感體驗角度：將行程包裝成值得預留 budget 嘅體驗。`,
+          ]
+        : form.vertical === 'product'
+          ? [
+              `問題解決角度：一開場先講痛點，再證明 ${brand} 幫你點解決。`,
+              `生活情境角度：將產品融入一個真實日常 moment。`,
+              `轉化證明角度：before / after 或直接實測帶出價值。`,
+            ]
+          : [
+              `第一輪先測最強 angle：用一個最容易令人停低嘅 opening 去打 attention。`,
+              `第二輪做情境代入：將品牌放入觀眾最熟悉嘅生活場景。`,
+              `第三輪先補轉化：用更直接 CTA 嘅版本收 DM / 查詢。`,
+            ]
+
+  const hookOptions =
+    form.vertical === 'food'
+      ? [
+          `呢間 ${brand}，點解本地人唔想你知？`,
+          `如果你週末只揀一間 cafe / 餐廳，我會叫你試呢間。`,
+          `我原本以為又係普通打卡店，點知最尾真係想 bookmark 低。`,
+        ]
+      : form.vertical === 'travel'
+        ? [
+            '離開城市半日，原來可以即刻去到另一個世界。',
+            '如果你呢排好想抖一抖，呢個地方真係可以即刻收藏。',
+            '我原本只係想快閃去下，點知最後成個行程都值回票價。',
+          ]
+        : form.vertical === 'product'
+          ? [
+              `如果你一直有呢個問題，${brand} 可能真係幫到你。`,
+              '我本身唔信呢類產品，但呢次一用真係有分別。',
+              '最怕買完冇感？我直接俾你睇最真實效果。',
+            ]
+          : [
+              `如果你而家只可以測一個內容角度，我會先試呢條。`,
+              '唔係介紹產品先，而係先令觀眾停低先。',
+              '第一輪 content 唔求多，最重要係快啲搵到 winning angle。',
+            ]
+
+  const scriptBlocks = [
+    `Opening：用最有停留力嘅 hook 開場，第一句先搶 attention，而唔係先介紹 ${brand} 背景。`,
+    `Scene 1：用最直觀畫面帶出 ${brand} 嘅核心價值，等觀眾即刻知道點解要繼續睇。`,
+    `Scene 2：補一個情緒 / 對比 / 實測 moment，令內容唔止好睇，仲有記憶點。`,
+    `Scene 3：自然放入 must include，同時保持節奏，避免變成硬 sell。`,
+    `Ending：用最清楚 CTA 收尾，直接承接 ${objectiveText}。`,
+  ]
+
+  const shootNotes = [
+    '開頭 3 秒一定要先有最強畫面或最強一句，唔好先鋪陳太耐。',
+    '每一段都要知道觀眾睇完之後應該明白乜，同埋點解要繼續睇。',
+    'Close-up、反應、環境 / 使用情境要交錯，避免全片同一種鏡頭節奏。',
+    '如果第一輪係測試片，寧願簡潔直接，都唔好一次塞太多訊息。',
+  ]
+
+  const ctaDirection =
+    form.objective === 'sales'
+      ? `CTA 應直接導去 DM / WhatsApp / 查詢，唔好太含糊。對 ${brand} 呢次 campaign，最理想係觀眾睇完即刻有下一步。`
+      : form.objective === 'reach'
+        ? `CTA 可先以收藏、分享、follow 為主，等內容先放大，再由第二輪收轉化。`
+        : `CTA 先以 follow、bookmark、記住 ${brand} 為主，建立之後再補轉化內容。`
+
+  return {
+    headline: `${brand} 題材與腳本建議`,
+    rationale: `而家唔係求拍得最多，而係先將 creator matching 轉化成第一輪可測試嘅腳本方向。對 ${brand} 而言，第一輪腳本最重要係快啲測出邊個 opening、邊個角度、邊個 CTA 最有反應。`,
+    topicDirections,
+    hookOptions,
+    scriptBlocks,
+    shootNotes,
+    ctaDirection,
   }
 }

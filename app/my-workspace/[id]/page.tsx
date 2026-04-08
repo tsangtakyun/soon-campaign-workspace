@@ -192,6 +192,23 @@ export default async function WorkspaceCampaignDetailPage(
                   進入 creator matching
                 </Link>
                 <Link
+                  href={`/script-planning?campaign_intake_id=${encodeURIComponent(campaign.id)}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '999px',
+                    background: '#f5efe5',
+                    color: '#1a1a18',
+                    padding: '14px 18px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    border: '1px solid rgba(245,239,229,0.4)',
+                  }}
+                >
+                  進入 script planning
+                </Link>
+                <Link
                   href={`/paid-analysis?campaign_intake_id=${encodeURIComponent(campaign.id)}`}
                   style={{
                     display: 'inline-flex',

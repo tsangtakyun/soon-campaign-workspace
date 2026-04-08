@@ -78,6 +78,9 @@ function CreatorMatchingContent() {
   const dashboardHref = campaignIntakeId
     ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}`
     : '/my-workspace'
+  const scriptPlanningHref = campaignIntakeId
+    ? `/script-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`
+    : '/script-planning'
 
   return (
     <main style={{
@@ -223,8 +226,8 @@ function CreatorMatchingContent() {
                 第一輪建議唔係同時搵最大量 creator，而係先用最 fit 嗰一至兩類組合測最有機會出結果嘅 angle，再用數據決定點樣放大。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                <button
-                  type="button"
+                <Link
+                  href={scriptPlanningHref}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -236,10 +239,11 @@ function CreatorMatchingContent() {
                     fontSize: '14px',
                     border: '1px solid rgba(245,239,229,0.4)',
                     cursor: 'pointer',
+                    textDecoration: 'none',
                   }}
                 >
                   先用 Match 1 開始生成腳本
-                </button>
+                </Link>
                 <button
                   type="button"
                   style={{
