@@ -40,6 +40,20 @@ export type CreatorArchetype = {
   deliverableShape: string
 }
 
+export type CampaignProgressStep = {
+  label: string
+  status: '完成' | '進行中' | '下一步'
+}
+
+export type CampaignProgress = {
+  currentStageLabel: string
+  currentStageIndex: number
+  nextActionLabel: string
+  summary: string
+  latestUpdate: string
+  steps: CampaignProgressStep[]
+}
+
 export function explainAnalysisPoint(
   form: CampaignFormInput,
   sectionTitle: string,
@@ -371,4 +385,57 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
       deliverableShape: '1 條 CTA 短片 + 1 條 reminder cutdown',
     },
   ]
+}
+
+export function buildCampaignProgress(options: {
+  paymentStatus?: string | null
+  hasFullAnalysis?: boolean
+  hasCreatorShortlist?: boolean
+}) : CampaignProgress {
+  const currentStageIndex =
+    options.hasCreatorShortlist
+      ? 4
+      : options.hasFullAnalysis || options.paymentStatus === 'paid'
+        ? 3
+        : 2
+
+  const steps: CampaignProgressStep[] = [
+    { label: '1. 填寫品牌 brief', status: currentStageIndex > 1 ? '完成' : '進行中' },
+    { label: '2. AI 分析宣傳方向', status: currentStageIndex > 2 ? '完成' : currentStageIndex === 2 ? '進行中' : '下一步' },
+    { label: '3. 系統配對合適 creator', status: currentStageIndex > 3 ? '完成' : currentStageIndex === 3 ? '進行中' : '下一步' },
+    { label: '4. 生成題材與腳本建議', status: currentStageIndex > 4 ? '完成' : currentStageIndex === 4 ? '進行中' : '下一步' },
+    { label: '5. 整理拍攝方向與分鏡', status: currentStageIndex > 5 ? '完成' : currentStageIndex === 5 ? '進行中' : '下一步' },
+    { label: '6. 跟進內容交付', status: currentStageIndex === 6 ? '進行中' : '下一步' },
+  ]
+
+  if (currentStageIndex === 4) {
+    return {
+      currentStageLabel: '腳本規劃準備中',
+      currentStageIndex,
+      nextActionLabel: '開始生成第一輪腳本方向',
+      summary: '你已經完成 AI 分析同 creator matching，下一步係將最 fit 嘅 creator 組合同 campaign angle 變成可拍嘅腳本方向。',
+      latestUpdate: '系統已完成 creator matching，等待進入 script planning。',
+      steps,
+    }
+  }
+
+  if (currentStageIndex === 3) {
+    return {
+      currentStageLabel: 'Creator Matching 進行中',
+      currentStageIndex,
+      nextActionLabel: '確認 creator 組合，進入腳本規劃',
+      summary: '已完成付費分析，系統而家應該先揀最合適嘅 creator 類型，避免一開始用錯人燒 budget。',
+      latestUpdate: '完整 AI 分析已解鎖，等待確認 creator matching 方向。',
+      steps,
+    }
+  }
+
+  return {
+    currentStageLabel: 'AI Analysis Ready',
+    currentStageIndex,
+    nextActionLabel: '完成付款後解鎖完整分析',
+    summary: '品牌 brief 已經提交，下一步應該先解鎖完整 AI 分析，搵出最值得先做嘅 campaign 方向。',
+    latestUpdate: '品牌 brief 已成功記錄，等待進入完整分析階段。',
+    steps,
+  }
 }

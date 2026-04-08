@@ -1,4 +1,8 @@
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 import { buildCreatorMatches, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
@@ -17,29 +21,63 @@ const DEMO_FORM: CampaignFormInput = {
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
-function getDraftForm() {
-  if (typeof window === 'undefined') return DEMO_FORM
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEMO_FORM
-    const parsed = JSON.parse(raw) as StoredPaidAnalysisDraft | CampaignFormInput
-    if ('form' in parsed) return parsed.form
-    return parsed
-  } catch {
-    return DEMO_FORM
-  }
-}
-
 export default function CreatorMatchingPage() {
-  const form = getDraftForm()
-  const creatorMatches = buildCreatorMatches(form)
+  const searchParams = useSearchParams()
+  const campaignIntakeId = searchParams.get('campaign_intake_id')
+  const [form, setForm] = useState<CampaignFormInput>(DEMO_FORM)
+  const [loadingSaved, setLoadingSaved] = useState(Boolean(campaignIntakeId))
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as StoredPaidAnalysisDraft | CampaignFormInput
+      if ('form' in parsed) {
+        setForm(parsed.form)
+      } else {
+        setForm(parsed)
+      }
+    } catch {
+      // ignore local draft errors and fall back to demo
+    }
+  }, [])
+
+  useEffect(() => {
+    async function loadSavedCampaign() {
+      if (!campaignIntakeId) {
+        setLoadingSaved(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/paid-analysis/by-intake?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`)
+        const data = await response.json()
+
+        if (response.ok && data.form) {
+          setForm(data.form as CampaignFormInput)
+        }
+      } finally {
+        setLoadingSaved(false)
+      }
+    }
+
+    loadSavedCampaign()
+  }, [campaignIntakeId])
+
+  const creatorMatches = useMemo(() => buildCreatorMatches(form), [form])
   const objectiveLabel =
     form.objective === 'sales'
       ? 'Conversion（轉化 / 銷售）'
       : form.objective === 'reach'
         ? 'Awareness（曝光）'
         : 'Engagement / Branding（互動 / 品牌感）'
+
+  const analysisHref = campaignIntakeId
+    ? `/paid-analysis?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`
+    : '/paid-analysis'
+  const dashboardHref = campaignIntakeId
+    ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}`
+    : '/my-workspace'
 
   return (
     <main style={{
@@ -64,6 +102,12 @@ export default function CreatorMatchingPage() {
             你已經確認咗 {form.businessName || '品牌'} 嘅 campaign 方向。下一步，SOON 會根據你嘅目標、budget、內容角度同品牌氣質，開始配對最合適嘅 creator 組合。
           </p>
         </section>
+
+        {loadingSaved && (
+          <section style={{ padding: '20px 22px', borderRadius: '22px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
+            正在同步你呢個 campaign 嘅 creator matching 資料...
+          </section>
+        )}
 
         <section style={{
           display: 'grid',
@@ -260,12 +304,13 @@ export default function CreatorMatchingPage() {
                 })}
               </div>
             </section>
+            <div style={{ marginTop: '14px', fontSize: '14px', color: '#5b5348', lineHeight: 1.7 }}>
+              <Link href={analysisHref} style={{ color: '#1a1a18' }}>返回完整分析</Link>
+              {' · '}
+              <Link href={dashboardHref} style={{ color: '#1a1a18' }}>返回 campaign dashboard</Link>
+            </div>
           </aside>
         </section>
-
-        <div>
-          <Link href="/paid-analysis" style={{ color: '#1a1a18' }}>返回完整分析</Link>
-        </div>
       </div>
     </main>
   )
