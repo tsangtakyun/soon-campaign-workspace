@@ -65,12 +65,6 @@ function PaidAnalysisContent() {
         return
       }
 
-      if (!sessionId) {
-        setChecking(false)
-        setError('未找到付款 session。')
-        return
-      }
-
       try {
         if (!sessionId && campaignIntakeIdFromUrl) {
           const savedRes = await fetch(`/api/paid-analysis/by-intake?campaign_intake_id=${encodeURIComponent(campaignIntakeIdFromUrl)}`)
@@ -83,6 +77,10 @@ function PaidAnalysisContent() {
           setSyncMessage('已從你的帳戶載入已保存分析。')
           setChecking(false)
           return
+        }
+
+        if (!sessionId) {
+          throw new Error('未找到付款 session。')
         }
 
         const res = await fetch(`/api/stripe/checkout-session?session_id=${encodeURIComponent(sessionId)}`)
