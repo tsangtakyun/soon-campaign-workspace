@@ -3,7 +3,10 @@
 import type { CSSProperties, FormEvent } from 'react'
 import { useMemo, useState } from 'react'
 
+import { buildAnalysisPreview, type CampaignFormInput } from '@/lib/analysis'
 import { createClient } from '@/lib/supabase'
+
+const PAID_ANALYSIS_STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
 const cardStyle: CSSProperties = {
   background: 'rgba(255,255,255,0.72)',
@@ -56,46 +59,16 @@ export default function SubmitBriefPage() {
   const [saveMessage, setSaveMessage] = useState('')
   const [showPaidAnalysis, setShowPaidAnalysis] = useState(false)
 
-  const aiPreview = useMemo(() => {
-    if (!form.brief.trim()) return null
-
-    const focusMap: Record<string, string> = {
-      food: '以第一口 reaction 同氛圍感做主線',
-      travel: '以地方感同 reveal 動線做主線',
-      product: '以實用情境同轉化點做主線',
-      experience: '以體驗前後反差同過程感做主線',
-    }
-
-    const objectiveMap: Record<string, string> = {
-      sales: '直接推動查詢、落單同轉化',
-      reach: '盡量吸引多人睇、多人分享同多人記得',
-      branding: '建立品牌形象同感覺，唔急住硬 sell',
-    }
-
-    return {
-      summary: `${form.businessName || '你嘅品牌'}而家最想要嘅方向係${objectiveMap[form.objective] || '清楚 angle'}。系統會根據你填寫嘅內容，極速生成最適合你嘅題材方向，再分析適合點樣做 social media 宣傳。`,
-      angleA: form.vertical === 'food'
-        ? '值唔值得專程去食'
-        : form.vertical === 'travel'
-          ? '離開城市半日就去到另一個世界'
-          : form.vertical === 'product'
-            ? '生活中一用就有感分別'
-            : '原來香港仲有呢種體驗',
-      angleB: form.vertical === 'product'
-        ? '一條偏實測，一條偏情境種草'
-        : '一條主 Reel + 一條補充 cutdown',
-      budgetGuide: form.budgetRange === '3000-8000'
-        ? '適合做單條快狠準測試內容'
-        : form.budgetRange === '8000-15000'
-          ? '適合做一條主片 + 一條補充內容'
-          : form.budgetRange === '30000-50000'
-            ? '適合做多 creator 測試、完整 campaign 包裝同更進取放大'
-          : '適合做完整 campaign 試驗同多角度內容',
-    }
-  }, [form])
+  const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function persistPaidAnalysisDraft() {
+    try {
+      window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(form))
+    } catch {}
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -103,6 +76,7 @@ export default function SubmitBriefPage() {
     setGeneratedPreview(true)
     setSaving(true)
     setSaveMessage('')
+    persistPaidAnalysisDraft()
 
     try {
       const supabase = createClient()
@@ -324,6 +298,7 @@ export default function SubmitBriefPage() {
                     href="https://buy.stripe.com/test_28EaEZgrTgt573M2hJ0Fi00"
                     target="_blank"
                     rel="noreferrer"
+                    onClick={persistPaidAnalysisDraft}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
