@@ -80,7 +80,7 @@ function ScriptPlanningContent() {
           <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>STEP 4</p>
           <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>生成題材與腳本建議</h1>
           <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '820px' }}>
-            依家已經由 creator matching 再行前一步。SOON 會先幫你整理第一輪最值得測嘅題材、opening hooks 同腳本骨架，等 campaign 唔係停喺策略，而係開始變成可拍、可測、可放大嘅內容。
+            呢一步唔係幫客戶寫死完整 script。真正應該由客戶先確認嘅，係 internal script system 入面最重要嘅兩塊：第 2 part【背景 VO】同第 4 part【實測內容】；至於 Hook / 轉場 / Ending，應該交返俾 creator 用自己風格去發揮。
           </p>
         </section>
 
@@ -99,9 +99,9 @@ function ScriptPlanningContent() {
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>TOPIC DIRECTIONS</div>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CREATOR CREATIVE SCOPE</div>
               <div style={{ display: 'grid', gap: '10px' }}>
-                {pack.topicDirections.map((item) => (
+                {pack.creatorCreativeDirection.map((item) => (
                   <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                     {item}
                   </div>
@@ -110,9 +110,9 @@ function ScriptPlanningContent() {
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>OPENING HOOKS</div>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 2 · 背景 VO / BACKING INFORMATION</div>
               <div style={{ display: 'grid', gap: '10px' }}>
-                {pack.hookOptions.map((item) => (
+                {pack.backingInformation.map((item) => (
                   <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                     {item}
                   </div>
@@ -121,9 +121,9 @@ function ScriptPlanningContent() {
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>SCRIPT BLOCKS</div>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 4 · 實測內容</div>
               <div style={{ display: 'grid', gap: '10px' }}>
-                {pack.scriptBlocks.map((item) => (
+                {pack.testContentItems.map((item) => (
                   <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                     {item}
                   </div>
@@ -132,9 +132,9 @@ function ScriptPlanningContent() {
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>SHOOT NOTES + CTA</div>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CLIENT DECISIONS + CTA</div>
               <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
-                {pack.shootNotes.map((item) => (
+                {pack.clientDecisions.map((item) => (
                   <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
                     {item}
                   </div>

@@ -43,10 +43,10 @@ export type CreatorArchetype = {
 export type ScriptPlanningPack = {
   headline: string
   rationale: string
-  topicDirections: string[]
-  hookOptions: string[]
-  scriptBlocks: string[]
-  shootNotes: string[]
+  creatorCreativeDirection: string[]
+  backingInformation: string[]
+  testContentItems: string[]
+  clientDecisions: string[]
   ctaDirection: string
 }
 
@@ -452,7 +452,6 @@ export function buildCampaignProgress(options: {
 
 export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanningPack {
   const brand = form.businessName || '你嘅品牌'
-  const product = form.campaignTitle || `${brand} campaign`
   const objectiveText =
     form.objective === 'sales'
       ? '帶查詢、DM、WhatsApp 或落單'
@@ -460,69 +459,78 @@ export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanning
         ? '提高觀看、分享同停留'
         : '建立品牌印象同情緒連結'
 
-  const topicDirections =
+  const creatorCreativeDirection =
     form.vertical === 'food'
       ? [
-          `值唔值得專程去食：用「${brand} 到底值唔值得專程去」做第一輪最直接測試。`,
-          `情緒代入版：將 ${brand} 包裝成朋友 / 情侶週末會想去嘅地方。`,
-          `賣點轉化版：直接拆招牌菜、氣氛同優惠，令觀眾睇完即刻想 DM / 到店。`,
+          'Opening Hook 應交俾 creator 根據佢自己 audience 同鏡頭感去發揮，唔需要客戶而家寫死。',
+          '轉場應該由 creator 自己決定用「懷疑 / 驚喜 / 親自試」邊種節奏，令條片似佢自己平時會出嘅內容。',
+          'Ending 亦應該留返俾 creator 用自己最有說服力嘅收尾方法，外部客戶只需要先定 CTA 方向。',
+        ]
+      : [
+          'Hook / 轉場 / Ending 係 creator creative 範圍，重點係保持佢自己本身最自然、最有 retention 嘅表達方式。',
+          'SOON 呢步唔會幫客戶寫死每一句，而係先將重要素材整理清楚，再俾 creator 發揮。',
+          '真正要由客戶確認嘅唔係表演方法，而係 backing information 同實測內容到底想帶出乜。',
+        ]
+
+  const backingInformation =
+    form.vertical === 'food'
+      ? [
+          `${brand} 嘅核心定位：呢間店最值得被記住嘅唔係「全部都好」，而係最強賣點係咩，例如招牌甜品、氣氛、位置，定開幕優惠。`,
+          `觀眾點解要理：而家要先清楚講出 ${brand} 係適合咩人去，例如朋友聚會、情侶約會、週末打卡，定真係值唔值得專程去食。`,
+          `品牌背景要補充乜：例如新開幕、限定 menu、人氣招牌、尖沙咀位置、夜晚氣氛，呢啲就係【背景 VO】真正要講清楚嘅 backing information。`,
         ]
       : form.vertical === 'travel'
         ? [
-            `短逃離角度：離開城市半日就去到另一個世界。`,
-            `實用攻略角度：交通、時間、景點節奏一次講清。`,
-            `高質感體驗角度：將行程包裝成值得預留 budget 嘅體驗。`,
+            `${brand} / 呢個行程最核心價值係咩：離市區幾耐、最獨特景點係咩、值唔值得週末即刻去。`,
+            `觀眾要先知道嘅資料：交通、時間、景點順序、適合咩人去，呢啲就係【背景 VO】應該先交代嘅 backing information。`,
+            `如果想帶轉化，就要先定清楚 package、預約、路線安排等資料，唔係等 creator 自己估。`,
           ]
         : form.vertical === 'product'
           ? [
-              `問題解決角度：一開場先講痛點，再證明 ${brand} 幫你點解決。`,
-              `生活情境角度：將產品融入一個真實日常 moment。`,
-              `轉化證明角度：before / after 或直接實測帶出價值。`,
+              `${brand} 產品真正解決咩問題，要用一句人話講清楚。`,
+              `觀眾買之前最常見疑問、比較點同使用情境，應該先整理成【背景 VO】素材。`,
+              `如果要收轉化，產品差異、價值、最值得試嘅位，唔應該留俾 creator 自己估。`,
             ]
           : [
-              `第一輪先測最強 angle：用一個最容易令人停低嘅 opening 去打 attention。`,
-              `第二輪做情境代入：將品牌放入觀眾最熟悉嘅生活場景。`,
-              `第三輪先補轉化：用更直接 CTA 嘅版本收 DM / 查詢。`,
+              `${brand} 呢次 campaign 想令觀眾記住咩，應該先用【背景 VO】清楚講。`,
+              '觀眾點解要停低睇，背後一定有一個產品 / 體驗 / 地點嘅理由，呢個要由客戶先定義。',
+              '創意演法可以交俾 creator，但基本事實、賣點、比較點唔應該模糊。',
             ]
 
-  const hookOptions =
+  const testContentItems =
     form.vertical === 'food'
       ? [
-          `呢間 ${brand}，點解本地人唔想你知？`,
-          `如果你週末只揀一間 cafe / 餐廳，我會叫你試呢間。`,
-          `我原本以為又係普通打卡店，點知最尾真係想 bookmark 低。`,
+          '招牌甜品 / 主打菜式：要影咩、試食時最想帶出咩口感或驚喜。',
+          '空間 / 氣氛位：邊個角落、燈光、打卡位值得一定拍。',
+          '限定優惠 / 開幕重點：邊一個行動位最值得放入實測內容。',
+          '真實反應位：例如第一啖、朋友 / 情侶到場感受、值唔值得專程去。',
         ]
       : form.vertical === 'travel'
         ? [
-            '離開城市半日，原來可以即刻去到另一個世界。',
-            '如果你呢排好想抖一抖，呢個地方真係可以即刻收藏。',
-            '我原本只係想快閃去下，點知最後成個行程都值回票價。',
+            '最值得拍嘅景點 / 體驗 1',
+            '最值得拍嘅景點 / 體驗 2',
+            '觀眾最想知嘅實用位，例如交通、時間、費用',
+            '最有驚喜或最值得收藏嘅一幕',
           ]
         : form.vertical === 'product'
           ? [
-              `如果你一直有呢個問題，${brand} 可能真係幫到你。`,
-              '我本身唔信呢類產品，但呢次一用真係有分別。',
-              '最怕買完冇感？我直接俾你睇最真實效果。',
+              '實測項目 1：最能證明產品價值嘅使用場景',
+              '實測項目 2：before / after 或對比位',
+              '實測項目 3：觀眾最常問嘅問題，用真實使用回應',
+              '實測項目 4：最值得帶 CTA 嘅結果或感受',
             ]
           : [
-              `如果你而家只可以測一個內容角度，我會先試呢條。`,
-              '唔係介紹產品先，而係先令觀眾停低先。',
-              '第一輪 content 唔求多，最重要係快啲搵到 winning angle。',
+              '實測位 1：最有代表性嘅主角度',
+              '實測位 2：一個對比 / 轉折位',
+              '實測位 3：觀眾最關心嘅資訊',
+              '實測位 4：最直接連到 CTA 嘅一幕',
             ]
 
-  const scriptBlocks = [
-    `Opening：用最有停留力嘅 hook 開場，第一句先搶 attention，而唔係先介紹 ${brand} 背景。`,
-    `Scene 1：用最直觀畫面帶出 ${brand} 嘅核心價值，等觀眾即刻知道點解要繼續睇。`,
-    `Scene 2：補一個情緒 / 對比 / 實測 moment，令內容唔止好睇，仲有記憶點。`,
-    `Scene 3：自然放入 must include，同時保持節奏，避免變成硬 sell。`,
-    `Ending：用最清楚 CTA 收尾，直接承接 ${objectiveText}。`,
-  ]
-
-  const shootNotes = [
-    '開頭 3 秒一定要先有最強畫面或最強一句，唔好先鋪陳太耐。',
-    '每一段都要知道觀眾睇完之後應該明白乜，同埋點解要繼續睇。',
-    'Close-up、反應、環境 / 使用情境要交錯，避免全片同一種鏡頭節奏。',
-    '如果第一輪係測試片，寧願簡潔直接，都唔好一次塞太多訊息。',
+  const clientDecisions = [
+    `第 2 part【背景 VO】要由客戶先確認 backing information：品牌定位、賣點、比較點、適合邊類 audience。`,
+    `第 4 part【實測內容】要由客戶先確認最值得拍 / 試 / 講嘅 4 個位，唔係留俾 creator 自己估。`,
+    `Hook / 轉場 / Ending 應留俾 creator 發揮，因為呢啲係內容風格、鏡頭感、表演方式，同 creator 本身最有關。`,
+    `所以 external 呢一步最重要唔係寫完整 script，而係先幫客戶交清楚「背景資料」同「實測內容素材」。`,
   ]
 
   const ctaDirection =
@@ -534,11 +542,11 @@ export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanning
 
   return {
     headline: `${brand} 題材與腳本建議`,
-    rationale: `而家唔係求拍得最多，而係先將 creator matching 轉化成第一輪可測試嘅腳本方向。對 ${brand} 而言，第一輪腳本最重要係快啲測出邊個 opening、邊個角度、邊個 CTA 最有反應。`,
-    topicDirections,
-    hookOptions,
-    scriptBlocks,
-    shootNotes,
+    rationale: `而家唔係求一次寫好完整 script，而係先將 internal script system 入面最需要由客戶提供嘅兩塊整理清楚：第 2 part【背景 VO】同第 4 part【實測內容】。至於 Hook、轉場、Ending，應該交返俾 creator 按自己風格同 audience 去發揮。`,
+    creatorCreativeDirection,
+    backingInformation,
+    testContentItems,
+    clientDecisions,
     ctaDirection,
   }
 }
