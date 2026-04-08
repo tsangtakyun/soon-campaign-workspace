@@ -91,6 +91,18 @@ export default function HomePage() {
               }}>
                 了解運作方式
               </a>
+              <Link href="/login?next=/my-workspace" style={{
+                display: 'inline-flex',
+                padding: '14px 22px',
+                borderRadius: '999px',
+                textDecoration: 'none',
+                border: '1px solid rgba(26,26,24,0.18)',
+                color: '#1a1a18',
+                fontSize: '15px',
+                background: '#f8f4ec',
+              }}>
+                Google 登入查看已買分析
+              </Link>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#6a6156', fontSize: '14px' }}>
@@ -109,7 +121,7 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-              <span>AI 先幫你整理方向，再決定點樣投放預算最有效。</span>
+              <span>AI 先幫你整理方向，再決定點樣投放預算最有效。已購買客戶亦可以直接 Google 登入返自己 dashboard。</span>
             </div>
           </div>
 
