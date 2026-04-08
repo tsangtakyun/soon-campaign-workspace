@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { buildFullAnalysis, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import { buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -18,6 +18,7 @@ function PaidAnalysisContent() {
   const [error, setError] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
   const [savedAnalysis, setSavedAnalysis] = useState<FullAnalysis | null>(null)
+  const [openExplanationId, setOpenExplanationId] = useState('')
 
   useEffect(() => {
     try {
@@ -165,11 +166,41 @@ function PaidAnalysisContent() {
                   <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '6px' }}>{kicker}</div>
                   <div style={{ fontSize: '30px', lineHeight: 1.1, marginBottom: '14px', color: '#1a1a18' }}>{title}</div>
                   <div style={{ display: 'grid', gap: '10px' }}>
-                    {items.map((item) => (
-                      <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                        {item}
-                      </div>
-                    ))}
+                    {items.map((item, index) => {
+                      const explanationId = `${title}-${index}`
+                      const isOpen = openExplanationId === explanationId
+
+                      return (
+                        <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                            <div style={{ lineHeight: 1.7, flex: 1 }}>{item}</div>
+                            <button
+                              type="button"
+                              onClick={() => setOpenExplanationId(isOpen ? '' : explanationId)}
+                              style={{
+                                border: '1px solid rgba(26,26,24,0.12)',
+                                borderRadius: '999px',
+                                background: isOpen ? '#1a1a18' : 'rgba(255,255,255,0.9)',
+                                color: isOpen ? '#f5efe5' : '#1a1a18',
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {isOpen ? '收起 AI 解釋' : '問 AI 點解'}
+                            </button>
+                          </div>
+
+                          {isOpen && draft && (
+                            <div style={{ marginTop: '12px', padding: '14px 16px', borderRadius: '14px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.8, color: '#4f493f' }}>
+                              <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '8px' }}>AI EXPLANATION</div>
+                              {explainAnalysisPoint(draft, title, item)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </section>
               ))}

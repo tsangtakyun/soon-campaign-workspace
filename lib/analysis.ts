@@ -31,6 +31,32 @@ export type FullAnalysis = {
   optimization: string[]
 }
 
+export function explainAnalysisPoint(
+  form: CampaignFormInput,
+  sectionTitle: string,
+  item: string
+) {
+  const brand = form.businessName || '你嘅品牌'
+  const objectiveMap: Record<string, string> = {
+    sales: '盡快帶到查詢、WhatsApp、DM 或落單',
+    reach: '盡量推高觀看、分享同停留',
+    branding: '先建立品牌感覺同記憶點',
+  }
+
+  const objective = objectiveMap[form.objective] || '清楚咁打入市場'
+
+  const sectionMap: Record<string, string> = {
+    '1. Strategy': `${brand} 而家最重要唔係做得多，而係做得準。呢個建議背後嘅意思係要先鎖定一個主目標，因為你今次 campaign 如果同時又想多人睇、又想即刻賣、又想建立品牌，最後通常每樣都只做到一半。對 ${brand} 來講，現階段最值得優先處理係 ${objective}。`,
+    '2. Content Planning': `呢點唔係單純講出幾多條片，而係講 ${brand} 應該點樣安排內容節奏。先用最容易令人停低嘅內容打開 attention，再用第二類內容承接解釋、信任或者行動，咁先似一個完整 campaign，而唔係一堆分散內容。`,
+    '3. Production': `呢點想講清楚 production 唔係追求畫面靚就夠，而係每一秒都要服務結果。對 ${brand} 而言，腳本、開頭 hook、字幕節奏、close-up 同資訊密度，全部都會直接影響 retention，同埋觀眾會唔會繼續睇落去。`,
+    '4. Distribution': `呢點係提醒 ${brand}，內容出咗街先至真正開始。發佈時間、分發方式、creator 配合、cutdown 重發，甚至後續有冇放大 winning content，都會決定條片係一閃即逝定可以真正放大成效。`,
+    '5. Conversion': `呢點最關鍵，因為流量本身唔會自動變錢。對 ${brand} 來講，內容之後觀眾要去邊、點樣 DM、點樣撳 link、點樣入 WhatsApp，都需要提前設計，否則即使條片多人睇，最後都未必收到生意。`,
+    '6. Data & Optimization': `呢點代表 campaign 唔應該只做一次就算。${brand} 真正值錢嘅地方係由第一輪數據搵到 winning formula，再複製同放大。即係唔係估邊條片會好，而係用數據知道邊條真係好。`,
+  }
+
+  return `${sectionMap[sectionTitle] || `${brand} 呢個建議重點係幫你將 campaign 做得更聚焦。`} 簡單講，呢一點係想你明白：「${item}」唔係額外負擔，而係幫你提升成個 campaign 命中率同轉化效率。`
+}
+
 export type StoredPaidAnalysisDraft = {
   campaignIntakeId?: string
   form: CampaignFormInput
