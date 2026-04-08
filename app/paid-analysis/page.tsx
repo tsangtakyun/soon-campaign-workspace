@@ -295,6 +295,47 @@ function PaidAnalysisContent() {
                   </div>
                 </section>
               ))}
+
+              <section style={{ padding: '26px', borderRadius: '24px', background: '#1a1a18', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
+                <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>如果你認同呢個方向，可以即刻進入下一步。</div>
+                <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
+                  你可以直接確認方向，交俾系統開始配對合適 creator；如果你想先同真人策略團隊對一對重點，我哋都可以下一步幫你承接。
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  <Link
+                    href={`/creator-matching${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '999px',
+                      background: '#f5efe5',
+                      color: '#1a1a18',
+                      padding: '14px 18px',
+                      textDecoration: 'none',
+                      fontSize: '14px',
+                      border: '1px solid rgba(245,239,229,0.4)',
+                    }}
+                  >
+                    確認方向，開始配對 creator
+                  </Link>
+                  <button
+                    type="button"
+                    style={{
+                      borderRadius: '999px',
+                      background: 'transparent',
+                      color: '#f5efe5',
+                      padding: '14px 18px',
+                      fontSize: '14px',
+                      border: '1px solid rgba(245,239,229,0.35)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    想先同 SOON 策略團隊傾一傾
+                  </button>
+                </div>
+              </section>
             </div>
 
             <aside style={{ position: 'sticky', top: '24px' }}>
