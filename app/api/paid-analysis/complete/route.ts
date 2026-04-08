@@ -75,30 +75,45 @@ export async function POST(request: Request) {
     )
 
     let resolvedForm = body.form || null
-    let resolvedCampaignIntakeId = body.campaignIntakeId || ''
+    let resolvedCampaignIntakeId = body.campaignIntakeId || session.metadata?.campaign_intake_id || ''
 
     if (!resolvedForm) {
-      const customerEmail = session.customer_details?.email || session.customer_email || ''
+      if (resolvedCampaignIntakeId) {
+        const { data: intakeById, error: intakeByIdError } = await supabase
+          .from('campaign_intakes')
+          .select('id, contact_name, objective, business_name, whatsapp, email, campaign_title, vertical, budget_range, brief, must_include')
+          .eq('id', resolvedCampaignIntakeId)
+          .maybeSingle<CampaignIntakeRow>()
 
-      if (!customerEmail) {
-        return NextResponse.json({ error: 'Missing form payload and customer email lookup failed' }, { status: 400 })
+        if (intakeByIdError) throw intakeByIdError
+        if (intakeById) {
+          resolvedForm = toCampaignForm(intakeById)
+        }
       }
 
-      const { data: intake, error: intakeError } = await supabase
-        .from('campaign_intakes')
-        .select('id, contact_name, objective, business_name, whatsapp, email, campaign_title, vertical, budget_range, brief, must_include')
-        .eq('email', customerEmail)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle<CampaignIntakeRow>()
+      if (!resolvedForm) {
+        const customerEmail = session.customer_details?.email || session.customer_email || ''
 
-      if (intakeError) throw intakeError
-      if (!intake) {
-        return NextResponse.json({ error: 'Unable to find the matching campaign brief for this payment' }, { status: 404 })
+        if (!customerEmail) {
+          return NextResponse.json({ error: 'Missing form payload and customer email lookup failed' }, { status: 400 })
+        }
+
+        const { data: intake, error: intakeError } = await supabase
+          .from('campaign_intakes')
+          .select('id, contact_name, objective, business_name, whatsapp, email, campaign_title, vertical, budget_range, brief, must_include')
+          .eq('email', customerEmail)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle<CampaignIntakeRow>()
+
+        if (intakeError) throw intakeError
+        if (!intake) {
+          return NextResponse.json({ error: 'Unable to find the matching campaign brief for this payment' }, { status: 404 })
+        }
+
+        resolvedForm = toCampaignForm(intake)
+        resolvedCampaignIntakeId = intake.id
       }
-
-      resolvedForm = toCampaignForm(intake)
-      resolvedCampaignIntakeId = intake.id
     }
 
     const analysis = buildFullAnalysis(resolvedForm)

@@ -59,6 +59,7 @@ export default function SubmitBriefPage() {
   const [saveMessage, setSaveMessage] = useState('')
   const [showPaidAnalysis, setShowPaidAnalysis] = useState(false)
   const [campaignIntakeId, setCampaignIntakeId] = useState('')
+  const [redirectingToCheckout, setRedirectingToCheckout] = useState(false)
 
   const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
 
@@ -124,6 +125,44 @@ export default function SubmitBriefPage() {
       setSaveMessage('AI 分析已生成，但資料暫時未成功寫入系統。請稍後再試，或先繼續用預覽。')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleCheckout() {
+    persistPaidAnalysisDraft()
+
+    if (!campaignIntakeId) {
+      setShowPaidAnalysis(true)
+      setSaveMessage('請先按一次「AI 自動生成分析」，等系統記錄 brief 後先可進入付款。')
+      return
+    }
+
+    setRedirectingToCheckout(true)
+
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignIntakeId,
+          email: form.email.trim(),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || '未能建立付款頁面。')
+      }
+
+      if (!data.url) {
+        throw new Error('Stripe checkout URL missing')
+      }
+
+      window.location.href = data.url
+    } catch (error: any) {
+      setSaveMessage(error.message || '未能建立付款頁面。')
+      setRedirectingToCheckout(false)
     }
   }
 
@@ -313,11 +352,9 @@ export default function SubmitBriefPage() {
                     <div style={{ fontSize: '12px', color: '#8a7f71' }}>Launch offer</div>
                     <div style={{ fontSize: '28px', color: '#1a1a18' }}>HK$199</div>
                   </div>
-                  <a
-                    href="https://buy.stripe.com/test_28EaEZgrTgt573M2hJ0Fi00"
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={persistPaidAnalysisDraft}
+                  <button
+                    type="button"
+                    onClick={handleCheckout}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -326,13 +363,12 @@ export default function SubmitBriefPage() {
                       padding: '14px 20px',
                       background: '#1a1a18',
                       color: '#f4efe6',
-                      textDecoration: 'none',
                       cursor: 'pointer',
                       fontSize: '14px',
                     }}
                   >
-                    付款後解鎖
-                  </a>
+                    {redirectingToCheckout ? '前往付款中...' : '付款後解鎖'}
+                  </button>
                 </div>
               </div>
             )}

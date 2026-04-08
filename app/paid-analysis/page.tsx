@@ -11,6 +11,7 @@ const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 function PaidAnalysisContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const campaignIntakeIdFromUrl = searchParams.get('campaign_intake_id')
   const [draft, setDraft] = useState<CampaignFormInput | null>(null)
   const [campaignIntakeId, setCampaignIntakeId] = useState('')
   const [paid, setPaid] = useState(false)
@@ -58,7 +59,7 @@ function PaidAnalysisContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId,
-            campaignIntakeId: campaignIntakeId || undefined,
+            campaignIntakeId: campaignIntakeIdFromUrl || campaignIntakeId || undefined,
             form: draft || undefined,
           }),
         })
@@ -81,7 +82,7 @@ function PaidAnalysisContent() {
     }
 
     checkSession()
-  }, [campaignIntakeId, draft, sessionId])
+  }, [campaignIntakeId, campaignIntakeIdFromUrl, draft, sessionId])
 
   const analysis = useMemo(() => {
     if (savedAnalysis) return savedAnalysis
