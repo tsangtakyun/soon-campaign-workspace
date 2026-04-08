@@ -90,6 +90,15 @@ function PaidAnalysisContent() {
     { title: '6. Data & Optimization', kicker: '數據優化', items: analysis.optimization },
   ] : []
 
+  const campaignFlow = [
+    '1. 填寫品牌 brief',
+    '2. AI 分析宣傳方向',
+    '3. 系統配對合適 creator',
+    '4. 生成題材與腳本建議',
+    '5. 整理拍攝方向與分鏡',
+    '6. 跟進內容交付',
+  ]
+
   return (
     <main style={{
       minHeight: '100vh',
@@ -130,39 +139,82 @@ function PaidAnalysisContent() {
         )}
 
         {!checking && paid && analysis && (
-          <div style={{ display: 'grid', gap: '18px' }}>
-            {syncMessage && (
-              <section style={{ padding: '18px 20px', borderRadius: '20px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
-                {syncMessage}
-              </section>
-            )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) 340px', gap: '22px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gap: '18px' }}>
+              {syncMessage && (
+                <section style={{ padding: '18px 20px', borderRadius: '20px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
+                  {syncMessage}
+                </section>
+              )}
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: '#f7f1e1', border: '1px solid rgba(26,26,24,0.08)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN LOGIC</div>
-              <div style={{ fontSize: '28px', lineHeight: 1.3, color: '#1a1a18' }}>
-                {analysis.campaignNorthStar}
-              </div>
-            </section>
-
-            <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>UNLOCKED</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.15, marginBottom: '10px' }}>{analysis.headline}</div>
-              <div style={{ fontSize: '17px', lineHeight: 1.7 }}>{analysis.overview}</div>
-            </section>
-
-            {sections.map(({ title, kicker, items }) => (
-              <section key={title} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '6px' }}>{kicker}</div>
-                <div style={{ fontSize: '30px', lineHeight: 1.1, marginBottom: '14px', color: '#1a1a18' }}>{title}</div>
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  {items.map((item) => (
-                    <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                      {item}
-                    </div>
-                  ))}
+              <section style={{ padding: '24px', borderRadius: '24px', background: '#f7f1e1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN LOGIC</div>
+                <div style={{ fontSize: '28px', lineHeight: 1.3, color: '#1a1a18' }}>
+                  {analysis.campaignNorthStar}
                 </div>
               </section>
-            ))}
+
+              <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>UNLOCKED</div>
+                <div style={{ fontSize: '34px', lineHeight: 1.15, marginBottom: '10px' }}>{analysis.headline}</div>
+                <div style={{ fontSize: '17px', lineHeight: 1.7 }}>{analysis.overview}</div>
+              </section>
+
+              {sections.map(({ title, kicker, items }) => (
+                <section key={title} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+                  <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '6px' }}>{kicker}</div>
+                  <div style={{ fontSize: '30px', lineHeight: 1.1, marginBottom: '14px', color: '#1a1a18' }}>{title}</div>
+                  <div style={{ display: 'grid', gap: '10px' }}>
+                    {items.map((item) => (
+                      <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <aside style={{ position: 'sticky', top: '24px' }}>
+              <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(26,26,24,0.10)' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN FLOW</div>
+                <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {campaignFlow.map((step, index) => {
+                    const current = index === 1
+                    const completed = index < 1
+                    return (
+                      <div
+                        key={step}
+                        style={{
+                          padding: '18px 18px',
+                          borderRadius: '20px',
+                          border: current ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
+                          background: current ? '#f7f1e1' : completed ? '#f1f5eb' : '#fbf8f1',
+                          color: '#1a1a18',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                          <div style={{ fontSize: '16px', lineHeight: 1.55 }}>{step}</div>
+                          <div style={{
+                            minWidth: '64px',
+                            textAlign: 'center',
+                            padding: '6px 10px',
+                            borderRadius: '999px',
+                            background: current ? '#1a1a18' : completed ? '#dbe7d0' : 'rgba(26,26,24,0.06)',
+                            color: current ? '#f5efe5' : '#4f5b41',
+                            fontSize: '11px',
+                            letterSpacing: '0.06em',
+                          }}>
+                            {current ? '進行中' : completed ? '完成' : '下一步'}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            </aside>
           </div>
         )}
       </div>
