@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://soon-campaign-workspace.vercel.app'
+    const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'https://soon-campaign-workspace.vercel.app'
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

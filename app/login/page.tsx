@@ -10,13 +10,14 @@ function LoginContent() {
   const error = searchParams.get('error')
   const next = searchParams.get('next') || '/my-workspace'
   const supabase = createClient()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://soon-campaign-workspace.vercel.app'
 
   const handleGoogleLogin = async () => {
     document.cookie = `soon_auth_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax`
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${appUrl}/auth/callback`,
       },
     })
   }
