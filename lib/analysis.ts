@@ -392,7 +392,7 @@ export function buildCampaignProgress(options: {
   hasFullAnalysis?: boolean
   hasCreatorShortlist?: boolean
 }) : CampaignProgress {
-  const currentStageIndex =
+  const currentStageIndex: number =
     options.hasCreatorShortlist
       ? 4
       : options.hasFullAnalysis || options.paymentStatus === 'paid'
