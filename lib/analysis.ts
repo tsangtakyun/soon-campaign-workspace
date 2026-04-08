@@ -31,6 +31,15 @@ export type FullAnalysis = {
   optimization: string[]
 }
 
+export type CreatorArchetype = {
+  title: string
+  fitScore: string
+  summary: string
+  strengths: string[]
+  bestUse: string
+  deliverableShape: string
+}
+
 export function explainAnalysisPoint(
   form: CampaignFormInput,
   sectionTitle: string,
@@ -196,4 +205,170 @@ export function buildFullAnalysis(form: CampaignFormInput): FullAnalysis {
       '將表現最好嘅 opening、角度同 creator formula 留低，再用第二輪 budget 放大，先係專業 campaign 最值錢嘅地方。',
     ],
   }
+}
+
+export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[] {
+  const brand = form.businessName || '你嘅品牌'
+
+  if (form.vertical === 'food') {
+    return [
+      {
+        title: 'Foodie Discoverer',
+        fitScore: '96',
+        summary: `最適合幫 ${brand} 用「值唔值得專程去」角度打開第一輪 attention，特別適合新店、話題感 menu 同打卡位內容。`,
+        strengths: [
+          '擅長食物反應、空間氣氛同 close-up 質感鏡頭',
+          '開場 hook 容易令觀眾停低，適合打第一輪曝光',
+          '可自然將甜品 / 主打 menu 包裝成「值得去試」',
+        ],
+        bestUse: '第一條 hero reel + 餐牌重點 cutdown',
+        deliverableShape: '1 條主 Reel + 1 條 menu / 招牌品補充短片',
+      },
+      {
+        title: 'Lifestyle Date Mood Creator',
+        fitScore: '89',
+        summary: `如果 ${brand} 想強化品牌感同情侶 / 朋友約會氣氛，呢類 creator 會更易做出「我都想去」嘅情緒代入。`,
+        strengths: [
+          '擅長包裝 mood、約會感、週末行程感',
+          '觀眾唔會覺得太 hard sell，適合品牌形象 build-up',
+          '適合帶出空間、打卡位同體驗節奏',
+        ],
+        bestUse: '第二輪品牌感 angle / story-based reel',
+        deliverableShape: '1 條情境感主片 + story / vertical cutdown',
+      },
+      {
+        title: 'Micro Conversion Closer',
+        fitScore: '84',
+        summary: `如果 ${brand} 之後要追查詢、優惠兌換或落單，呢類 creator 會比純打卡型 creator 更擅長帶 CTA 同行動。`,
+        strengths: [
+          '講解清楚、CTA 直接、容易帶到 DM / WhatsApp / 優惠行動',
+          '適合 coupon、限時優惠、開幕 offer',
+          '比純 aesthetic 內容更接近 conversion',
+        ],
+        bestUse: '表現最好角度後嘅轉化加碼版本',
+        deliverableShape: '1 條直入賣點轉化短片 + 1 條 CTA cutdown',
+      },
+    ]
+  }
+
+  if (form.vertical === 'travel') {
+    return [
+      {
+        title: 'Local Escape Storyteller',
+        fitScore: '95',
+        summary: `最適合幫 ${brand} 包裝成「短時間離開城市就去到另一個世界」呢種旅遊感內容。`,
+        strengths: [
+          '擅長 reveal、路線感同地方故事包裝',
+          '容易做週末 short getaway 類內容',
+          '適合第一輪 attention 測試',
+        ],
+        bestUse: 'hero destination reel',
+        deliverableShape: '1 條主片 + 1 條行程補充 cutdown',
+      },
+      {
+        title: 'Practical Guide Creator',
+        fitScore: '87',
+        summary: `如果 ${brand} 想令觀眾覺得「我即刻都做到呢個行程」，呢類 creator 會更有行動推動力。`,
+        strengths: [
+          '資訊清楚、路線易明、容易提升儲存率',
+          '適合加入交通、時間、價錢等實用資訊',
+          '有助帶到 click / itinerary action',
+        ],
+        bestUse: '攻略型補充內容',
+        deliverableShape: '1 條 guide reel + 1 條懶人包 cutdown',
+      },
+      {
+        title: 'Luxury Mood Curator',
+        fitScore: '82',
+        summary: `當 ${brand} 想賣高質感體驗、住宿或 premium 行程，呢類 creator 更易帶出 aspirational feeling。`,
+        strengths: [
+          '擅長畫面感、節奏感同高級氛圍',
+          '容易提升品牌 perception',
+          '適合 higher-end positioning',
+        ],
+        bestUse: '品牌形象 / premium package angle',
+        deliverableShape: '1 條品牌感主片 + story asset',
+      },
+    ]
+  }
+
+  if (form.vertical === 'product') {
+    return [
+      {
+        title: 'Problem-Solution Demonstrator',
+        fitScore: '94',
+        summary: `最適合幫 ${brand} 用「一用就見到分別」去快速證明產品價值。`,
+        strengths: [
+          '擅長實測、before/after、清楚解釋',
+          '容易令觀眾理解點解要買',
+          '對 sales / conversion 目標特別有效',
+        ],
+        bestUse: '第一輪賣點證明片',
+        deliverableShape: '1 條實測主片 + 1 條重點 cutdown',
+      },
+      {
+        title: 'Lifestyle Use-Case Creator',
+        fitScore: '88',
+        summary: `如果 ${brand} 想令產品更自然咁入生活，呢類 creator 更適合做情境種草。`,
+        strengths: [
+          '擅長生活情景包裝',
+          '觀眾接受度高，唔似硬 sell',
+          '可將產品融入日常 routine',
+        ],
+        bestUse: '情境種草 / second angle',
+        deliverableShape: '1 條情境片 + 1 條生活感補充內容',
+      },
+      {
+        title: 'Trust Builder Reviewer',
+        fitScore: '83',
+        summary: `當 ${brand} 需要更強信任感，例如較高單價或較新產品，呢類 creator 會幫到建立可信度。`,
+        strengths: [
+          '評論方式較穩陣、有說服力',
+          '適合較理性 audience',
+          '可承接常見疑問同 objection',
+        ],
+        bestUse: '轉化前信任補強內容',
+        deliverableShape: '1 條 review 型影片 + Q&A 型 cutdown',
+      },
+    ]
+  }
+
+  return [
+    {
+      title: 'Attention Hook Creator',
+      fitScore: '91',
+      summary: `最適合幫 ${brand} 打開第一輪 attention，先測邊個角度最有機會爆。`,
+      strengths: [
+        '擅長 opening hook',
+        '容易提高第一輪停留率',
+        '適合做 angle 測試',
+      ],
+      bestUse: '第一條主角度內容',
+      deliverableShape: '1 條主片 + 1 條 cutdown',
+    },
+    {
+      title: 'Story-led Lifestyle Creator',
+      fitScore: '86',
+      summary: `適合幫 ${brand} 做品牌感同情境代入，令內容更自然。`,
+      strengths: [
+        '情境感強',
+        '適合建立品牌印象',
+        '有助提升分享同收藏',
+      ],
+      bestUse: '第二輪品牌形象內容',
+      deliverableShape: '1 條情境片 + story asset',
+    },
+    {
+      title: 'Conversion-focused Closer',
+      fitScore: '82',
+      summary: `適合幫 ${brand} 喺有 attention 之後補一條更接近轉化嘅內容。`,
+      strengths: [
+        'CTA 清晰',
+        '容易導向 DM / click / 查詢',
+        '適合 performance 取向 campaign',
+      ],
+      bestUse: '轉化補強片',
+      deliverableShape: '1 條 CTA 短片 + 1 條 reminder cutdown',
+    },
+  ]
 }
