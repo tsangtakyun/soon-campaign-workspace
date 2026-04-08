@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import { answerFollowUpQuestion, buildFullAnalysis, explainAnalysisPoint, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -19,6 +19,8 @@ function PaidAnalysisContent() {
   const [syncMessage, setSyncMessage] = useState('')
   const [savedAnalysis, setSavedAnalysis] = useState<FullAnalysis | null>(null)
   const [openExplanationId, setOpenExplanationId] = useState('')
+  const [followUpQuestions, setFollowUpQuestions] = useState<Record<string, string>>({})
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({})
 
   useEffect(() => {
     try {
@@ -81,6 +83,19 @@ function PaidAnalysisContent() {
     if (!draft || !paid) return null
     return buildFullAnalysis(draft)
   }, [draft, paid, savedAnalysis])
+
+  function updateQuestion(id: string, value: string) {
+    setFollowUpQuestions((prev) => ({ ...prev, [id]: value }))
+  }
+
+  function askQuestion(id: string, sectionTitle: string, item: string) {
+    if (!draft) return
+    const question = (followUpQuestions[id] || '').trim()
+    if (!question) return
+
+    const answer = answerFollowUpQuestion(draft, sectionTitle, item, question)
+    setFollowUpAnswers((prev) => ({ ...prev, [id]: answer }))
+  }
 
   const sections: Array<{ title: string; kicker: string; items: string[] }> = analysis ? [
     { title: '1. Strategy', kicker: '定位 + 目標', items: analysis.strategy },
@@ -193,9 +208,58 @@ function PaidAnalysisContent() {
                           </div>
 
                           {isOpen && draft && (
-                            <div style={{ marginTop: '12px', padding: '14px 16px', borderRadius: '14px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.8, color: '#4f493f' }}>
-                              <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '8px' }}>AI EXPLANATION</div>
-                              {explainAnalysisPoint(draft, title, item)}
+                            <div style={{ marginTop: '12px', display: 'grid', gap: '12px' }}>
+                              <div style={{ padding: '14px 16px', borderRadius: '14px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.8, color: '#4f493f' }}>
+                                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '8px' }}>AI EXPLANATION</div>
+                                {explainAnalysisPoint(draft, title, item)}
+                              </div>
+
+                              <div style={{ padding: '14px 16px', borderRadius: '14px', background: '#fffdf8', border: '1px solid rgba(26,26,24,0.08)' }}>
+                                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '10px' }}>追問 AI</div>
+                                <div style={{ display: 'grid', gap: '10px' }}>
+                                  <textarea
+                                    value={followUpQuestions[explanationId] || ''}
+                                    onChange={(event) => updateQuestion(explanationId, event.target.value)}
+                                    placeholder="例如：點解唔建議我一開始衝曝光？"
+                                    style={{
+                                      width: '100%',
+                                      minHeight: '92px',
+                                      resize: 'vertical',
+                                      borderRadius: '14px',
+                                      border: '1px solid rgba(26,26,24,0.12)',
+                                      padding: '12px 14px',
+                                      background: '#ffffff',
+                                      boxSizing: 'border-box',
+                                      fontSize: '14px',
+                                      fontFamily: 'inherit',
+                                    }}
+                                  />
+                                  <div>
+                                    <button
+                                      type="button"
+                                      onClick={() => askQuestion(explanationId, title, item)}
+                                      style={{
+                                        border: '1px solid rgba(26,26,24,0.12)',
+                                        borderRadius: '999px',
+                                        background: '#1a1a18',
+                                        color: '#f5efe5',
+                                        padding: '10px 14px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                      }}
+                                    >
+                                      即刻問 AI
+                                    </button>
+                                  </div>
+
+                                  {followUpAnswers[explanationId] && (
+                                    <div style={{ padding: '14px 16px', borderRadius: '14px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.8, color: '#4f493f' }}>
+                                      <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '8px' }}>AI FOLLOW-UP</div>
+                                      {followUpAnswers[explanationId]}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>

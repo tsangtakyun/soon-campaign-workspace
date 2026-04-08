@@ -57,6 +57,55 @@ export function explainAnalysisPoint(
   return `${sectionMap[sectionTitle] || `${brand} 呢個建議重點係幫你將 campaign 做得更聚焦。`} 簡單講，呢一點係想你明白：「${item}」唔係額外負擔，而係幫你提升成個 campaign 命中率同轉化效率。`
 }
 
+export function answerFollowUpQuestion(
+  form: CampaignFormInput,
+  sectionTitle: string,
+  item: string,
+  question: string
+) {
+  const brand = form.businessName || '你嘅品牌'
+  const normalizedQuestion = question.trim()
+
+  if (!normalizedQuestion) {
+    return ''
+  }
+
+  const base = explainAnalysisPoint(form, sectionTitle, item)
+
+  const patterns: Array<{ match: RegExp; answer: string }> = [
+    {
+      match: /點解|為什麼|why/i,
+      answer: `如果用最直接方法答你，係因為 ${brand} 而家最需要先將資源集中喺最有機會出結果嘅位。呢個建議唔係理論上最好睇，而係最有機會令你第一輪 campaign 快啲見到反應、知道應唔應該加碼。`,
+    },
+    {
+      match: /預算|budget|平啲|貴/i,
+      answer: `如果你擔心預算，做法唔係完全刪走呢一步，而係縮細規模先測。對 ${brand} 來講，可以先保留核心做法，用更細 budget 驗證 opening、angle 同 CTA，有反應先再放大。`,
+    },
+    {
+      match: /唔明|即係|意思/i,
+      answer: `用最白話講，呢一點其實係想幫 ${brand} 避免「內容有出，但結果唔知點解冇」呢種情況。你可以當佢係 campaign 入面一個必做檢查位，確保每一步都係為結果服務。`,
+    },
+    {
+      match: /點做|如何|how/i,
+      answer: `實際做法可以由一個最小版本開始：先揀一條主角度，再配一個最清晰 CTA，出第一輪內容後睇數據。等你見到邊種 opening、內容節奏或者 creator 最 fit，再展開下一輪。`,
+    },
+    {
+      match: /creator|kol|influencer/i,
+      answer: `如果你係問 creator 點配，重點唔係 follower 數量，而係佢講故事方式、鏡頭感同 audience 氣質同 ${brand} 今次 campaign 夠唔夠貼。第一輪通常應先搵 fit，而唔係先搵最大。`,
+    },
+    {
+      match: /sales|轉化|whatsapp|dm|落單/i,
+      answer: `如果你最關心 sales，咁每條內容都要諗埋「觀眾睇完之後去邊」。對 ${brand} 來講，Reel 後面接 DM、WhatsApp、預約頁或者簡單 landing page，先有機會將 attention 真正變成收入。`,
+    },
+  ]
+
+  const matched = patterns.find((pattern) => pattern.match.test(normalizedQuestion))
+
+  return matched
+    ? `${matched.answer} 另外，回到你啱啱睇緊呢一點：「${item}」其實就係幫你將呢件事落地。`
+    : `${base} 如果直接回應你呢條問題「${normalizedQuestion}」，我會建議你將佢理解成 campaign 入面一個決策工具：幫 ${brand} 判斷而家邊個方向最值得先做、邊啲可以留待第二輪先加。`
+}
+
 export type StoredPaidAnalysisDraft = {
   campaignIntakeId?: string
   form: CampaignFormInput
