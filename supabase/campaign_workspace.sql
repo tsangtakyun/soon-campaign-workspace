@@ -16,6 +16,12 @@ create table if not exists public.campaign_intakes (
   suggested_budget_shape text not null default '',
   suggested_angle text not null default '',
   suggested_deliverable_shape text not null default '',
+  payment_status text not null default '',
+  payment_session_id text not null default '',
+  stripe_customer_email text not null default '',
+  stripe_payment_mode text not null default '',
+  paid_at timestamptz,
+  full_analysis jsonb not null default '{}'::jsonb,
   source_channel text not null default '',
   created_at timestamptz not null default now()
 );

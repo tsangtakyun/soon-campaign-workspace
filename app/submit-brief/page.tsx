@@ -3,7 +3,7 @@
 import type { CSSProperties, FormEvent } from 'react'
 import { useMemo, useState } from 'react'
 
-import { buildAnalysisPreview, type CampaignFormInput } from '@/lib/analysis'
+import { buildAnalysisPreview, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 import { createClient } from '@/lib/supabase'
 
 const PAID_ANALYSIS_STORAGE_KEY = 'soon-paid-analysis-draft-v1'
@@ -58,6 +58,7 @@ export default function SubmitBriefPage() {
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [showPaidAnalysis, setShowPaidAnalysis] = useState(false)
+  const [campaignIntakeId, setCampaignIntakeId] = useState('')
 
   const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
 
@@ -67,7 +68,11 @@ export default function SubmitBriefPage() {
 
   function persistPaidAnalysisDraft() {
     try {
-      window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(form))
+      const payload: StoredPaidAnalysisDraft = {
+        campaignIntakeId: campaignIntakeId || undefined,
+        form,
+      }
+      window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(payload))
     } catch {}
   }
 
@@ -80,7 +85,9 @@ export default function SubmitBriefPage() {
 
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('campaign_intakes').insert({
+      const { data, error } = await supabase
+        .from('campaign_intakes')
+        .insert({
         contact_name: form.contactName.trim(),
         objective: form.objective,
         business_name: form.businessName.trim(),
@@ -97,8 +104,20 @@ export default function SubmitBriefPage() {
         suggested_deliverable_shape: aiPreview?.angleB || '',
         source_channel: 'soon-campaign-workspace',
       })
+        .select('id')
+        .single()
 
       if (error) throw error
+      if (data?.id) {
+        setCampaignIntakeId(data.id)
+        try {
+          const payload: StoredPaidAnalysisDraft = {
+            campaignIntakeId: data.id,
+            form,
+          }
+          window.localStorage.setItem(PAID_ANALYSIS_STORAGE_KEY, JSON.stringify(payload))
+        } catch {}
+      }
       setSaveMessage('已經成功記錄你嘅 brief，我哋可以用呢份資料繼續跟進。')
     } catch (error) {
       console.error(error)

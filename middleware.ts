@@ -6,13 +6,16 @@ const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || '').split(',').map((e) => 
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
+  const pathname = request.nextUrl.pathname
 
   const isPublicPage =
-    request.nextUrl.pathname === '/' ||
-    request.nextUrl.pathname === '/submit-brief' ||
-    request.nextUrl.pathname.startsWith('/paid-analysis') ||
-    request.nextUrl.pathname === '/login' ||
-    request.nextUrl.pathname.startsWith('/auth')
+    pathname === '/' ||
+    pathname === '/submit-brief' ||
+    pathname.startsWith('/paid-analysis') ||
+    pathname === '/login' ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/api/stripe') ||
+    pathname.startsWith('/api/paid-analysis')
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,7 +48,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
   }
 
-  if (request.nextUrl.pathname === '/login') {
+  if (pathname === '/login') {
     return NextResponse.redirect(new URL('/ops/campaigns', request.url))
   }
 
@@ -53,5 +56,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|paid-analysis|.*\\..*).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|paid-analysis|api|.*\\..*).*)'],
 }

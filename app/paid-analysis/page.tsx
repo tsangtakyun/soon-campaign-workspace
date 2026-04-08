@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { buildFullAnalysis, type CampaignFormInput } from '@/lib/analysis'
+import { buildFullAnalysis, type CampaignFormInput, type FullAnalysis, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -12,14 +12,25 @@ function PaidAnalysisContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [draft, setDraft] = useState<CampaignFormInput | null>(null)
+  const [campaignIntakeId, setCampaignIntakeId] = useState('')
   const [paid, setPaid] = useState(false)
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
+  const [syncMessage, setSyncMessage] = useState('')
+  const [savedAnalysis, setSavedAnalysis] = useState<FullAnalysis | null>(null)
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw) setDraft(JSON.parse(raw) as CampaignFormInput)
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredPaidAnalysisDraft | CampaignFormInput
+        if ('form' in parsed) {
+          setDraft(parsed.form)
+          setCampaignIntakeId(parsed.campaignIntakeId || '')
+        } else {
+          setDraft(parsed)
+        }
+      }
     } catch {}
   }, [])
 
@@ -37,6 +48,23 @@ function PaidAnalysisContent() {
         if (!res.ok) throw new Error(data.error || 'Unable to verify payment')
         if (data.payment_status !== 'paid') throw new Error('付款尚未完成。')
         setPaid(true)
+
+        if (draft) {
+          const syncRes = await fetch('/api/paid-analysis/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              campaignIntakeId: campaignIntakeId || undefined,
+              form: draft,
+            }),
+          })
+
+          const syncData = await syncRes.json()
+          if (!syncRes.ok) throw new Error(syncData.error || '未能同步付款資料。')
+          setSavedAnalysis(syncData.analysis as FullAnalysis)
+          setSyncMessage('付款狀態同完整分析已經成功寫入系統。')
+        }
       } catch (error: any) {
         setError(error.message || '未能確認付款狀態。')
       } finally {
@@ -45,12 +73,13 @@ function PaidAnalysisContent() {
     }
 
     checkSession()
-  }, [sessionId])
+  }, [campaignIntakeId, draft, sessionId])
 
   const analysis = useMemo(() => {
+    if (savedAnalysis) return savedAnalysis
     if (!draft || !paid) return null
     return buildFullAnalysis(draft)
-  }, [draft, paid])
+  }, [draft, paid, savedAnalysis])
 
   const sections: Array<{ title: string; items: string[] }> = analysis ? [
     { title: '預算打法', items: analysis.budgetShapes },
@@ -101,6 +130,11 @@ function PaidAnalysisContent() {
 
         {!checking && paid && analysis && (
           <div style={{ display: 'grid', gap: '18px' }}>
+            {syncMessage && (
+              <section style={{ padding: '18px 20px', borderRadius: '20px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
+                {syncMessage}
+              </section>
+            )}
             <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>UNLOCKED</div>
               <div style={{ fontSize: '34px', lineHeight: 1.15, marginBottom: '10px' }}>{analysis.headline}</div>

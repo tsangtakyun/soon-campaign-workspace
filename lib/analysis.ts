@@ -1,4 +1,5 @@
 export type CampaignFormInput = {
+  campaignIntakeId?: string
   contactName?: string
   objective: string
   businessName: string
@@ -26,6 +27,11 @@ export type FullAnalysis = {
   deliverablePlan: string[]
   creatorFit: string[]
   firstWavePlan: string[]
+}
+
+export type StoredPaidAnalysisDraft = {
+  campaignIntakeId?: string
+  form: CampaignFormInput
 }
 
 function objectiveText(objective: string) {
