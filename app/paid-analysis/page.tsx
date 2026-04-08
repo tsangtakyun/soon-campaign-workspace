@@ -181,6 +181,9 @@ function PaidAnalysisContent() {
     '5. 整理拍攝方向與分鏡',
     '6. 跟進內容交付',
   ]
+  const savedAnalysisHref = campaignIntakeIdFromUrl || campaignIntakeId
+    ? `/paid-analysis?campaign_intake_id=${encodeURIComponent(campaignIntakeIdFromUrl || campaignIntakeId)}`
+    : '/my-workspace'
 
   return (
     <main style={{
@@ -380,7 +383,7 @@ function PaidAnalysisContent() {
                     想先同 SOON 策略團隊傾一傾
                   </button>
                   <Link
-                    href="/login?next=/my-workspace"
+                    href={`/login?next=${encodeURIComponent(savedAnalysisHref)}`}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',

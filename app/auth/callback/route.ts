@@ -7,7 +7,8 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next')
+  const nextFromQuery = requestUrl.searchParams.get('next')
+  const nextFromCookie = request.cookies.get('soon_auth_next')?.value
 
   if (code) {
     const cookieStore = await cookies()
@@ -28,6 +29,9 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  const safeNext = next && next.startsWith('/') ? next : '/my-workspace'
-  return NextResponse.redirect(new URL(safeNext, request.url))
+  const next = nextFromQuery || nextFromCookie || '/my-workspace'
+  const safeNext = next.startsWith('/') ? next : '/my-workspace'
+  const response = NextResponse.redirect(new URL(safeNext, request.url))
+  response.cookies.set('soon_auth_next', '', { path: '/', maxAge: 0 })
+  return response
 }

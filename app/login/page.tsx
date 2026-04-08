@@ -12,10 +12,11 @@ function LoginContent() {
   const supabase = createClient()
 
   const handleGoogleLogin = async () => {
+    document.cookie = `soon_auth_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax`
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     })
   }
