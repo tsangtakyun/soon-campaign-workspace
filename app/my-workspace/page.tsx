@@ -14,12 +14,18 @@ export default async function MyWorkspacePage() {
   }
 
   const admin = createAdminSupabase()
+  const normalizedEmail = user.email.trim().toLowerCase()
   const { data: analyses } = await admin
     .from('campaign_intakes')
-    .select('id, business_name, campaign_title, objective, vertical, created_at, payment_status')
-    .eq('email', user.email)
+    .select('id, business_name, campaign_title, objective, vertical, created_at, payment_status, email, stripe_customer_email')
     .eq('payment_status', 'paid')
     .order('created_at', { ascending: false })
+
+  const savedAnalyses = (analyses || []).filter((item: any) => {
+    const formEmail = (item.email || '').trim().toLowerCase()
+    const stripeEmail = (item.stripe_customer_email || '').trim().toLowerCase()
+    return formEmail === normalizedEmail || stripeEmail === normalizedEmail
+  })
 
   return (
     <main style={{
@@ -38,9 +44,9 @@ export default async function MyWorkspacePage() {
           </p>
         </section>
 
-        {analyses?.length ? (
+        {savedAnalyses.length ? (
           <div style={{ display: 'grid', gap: '16px' }}>
-            {analyses.map((item: any) => (
+            {savedAnalyses.map((item: any) => (
               <section key={item.id} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '14px' }}>
                   <div>
