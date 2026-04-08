@@ -61,6 +61,7 @@ export default function SubmitBriefPage() {
   const [campaignIntakeId, setCampaignIntakeId] = useState('')
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false)
   const [paidUnlockMessage, setPaidUnlockMessage] = useState('')
+  const [checkoutStatus, setCheckoutStatus] = useState('')
 
   const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
 
@@ -121,10 +122,12 @@ export default function SubmitBriefPage() {
         } catch {}
       }
       setSaveMessage('已經成功記錄你嘅 brief，我哋可以用呢份資料繼續跟進。')
+      setCheckoutStatus('品牌 brief 已記錄。')
       return data?.id || ''
     } catch (error) {
       console.error(error)
       setSaveMessage('AI 分析已生成，但資料暫時未成功寫入系統。請稍後再試，或先繼續用預覽。')
+      setCheckoutStatus('未能記錄品牌 brief。')
       return ''
     } finally {
       setSaving(false)
@@ -139,20 +142,25 @@ export default function SubmitBriefPage() {
   async function handleCheckout() {
     persistPaidAnalysisDraft()
     setPaidUnlockMessage('')
+    setCheckoutStatus('準備建立付款流程...')
+    setShowPaidAnalysis(true)
+    setRedirectingToCheckout(true)
 
     let resolvedCampaignIntakeId = campaignIntakeId
 
     if (!resolvedCampaignIntakeId) {
+      setCheckoutStatus('先為你記錄品牌 brief...')
       resolvedCampaignIntakeId = await createCampaignIntake()
     }
 
     if (!resolvedCampaignIntakeId) {
-      setShowPaidAnalysis(true)
       setPaidUnlockMessage('系統暫時未能記錄你嘅 brief，所以未能進入付款。請檢查資料後再試。')
+      setCheckoutStatus('付款流程未能開始。')
+      setRedirectingToCheckout(false)
       return
     }
 
-    setRedirectingToCheckout(true)
+    setCheckoutStatus('正在建立 Stripe 付款頁面...')
 
     try {
       const response = await fetch('/api/stripe/create-checkout-session', {
@@ -174,9 +182,11 @@ export default function SubmitBriefPage() {
         throw new Error('Stripe checkout URL missing')
       }
 
+      setCheckoutStatus('即將跳轉去付款頁面...')
       window.location.href = data.url
     } catch (error: any) {
       setPaidUnlockMessage(error.message || '未能建立付款頁面。')
+      setCheckoutStatus('未能建立付款頁面。')
       setRedirectingToCheckout(false)
     }
   }
@@ -390,6 +400,11 @@ export default function SubmitBriefPage() {
                 {paidUnlockMessage && (
                   <div style={{ marginTop: '12px', padding: '12px 14px', borderRadius: '14px', background: '#f7f2d8', color: '#6b5d1c', fontSize: '13px', lineHeight: 1.6 }}>
                     {paidUnlockMessage}
+                  </div>
+                )}
+                {checkoutStatus && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#8a7f71', lineHeight: 1.6 }}>
+                    {checkoutStatus}
                   </div>
                 )}
               </div>
