@@ -44,7 +44,12 @@ export type ScriptPlanningPack = {
   headline: string
   rationale: string
   creatorCreativeDirection: string[]
-  backingInformation: string[]
+  backingInformation: {
+    corePositioning: string
+    strongestSellingPoint: string
+    suitableAudience: string
+    backgroundNotes: string
+  }
   testContentItems: string[]
   clientDecisions: string[]
   ctaDirection: string
@@ -474,28 +479,32 @@ export function buildScriptPlanningPack(form: CampaignFormInput): ScriptPlanning
 
   const backingInformation =
     form.vertical === 'food'
-      ? [
-          `${brand} 嘅核心定位：呢間店最值得被記住嘅唔係「全部都好」，而係最強賣點係咩，例如招牌甜品、氣氛、位置，定開幕優惠。`,
-          `觀眾點解要理：而家要先清楚講出 ${brand} 係適合咩人去，例如朋友聚會、情侶約會、週末打卡，定真係值唔值得專程去食。`,
-          `品牌背景要補充乜：例如新開幕、限定 menu、人氣招牌、尖沙咀位置、夜晚氣氛，呢啲就係【背景 VO】真正要講清楚嘅 backing information。`,
-        ]
+      ? {
+          corePositioning: `${brand} 最值得被記住嘅唔係全部都好，而係「氣氛 + 招牌甜品 / 主打菜式 + 值得專程去」呢個組合。`,
+          strongestSellingPoint: '招牌甜品 / 主打菜式最值得做第一個賣點，因為最易一眼睇得明，亦最容易令觀眾想即刻去試。',
+          suitableAudience: '適合朋友聚會、情侶約會、週末打卡，同埋想搵一個有氣氛又有記憶點地方嘅 audience。',
+          backgroundNotes: '可補充新開幕、限定 menu、人氣招牌、尖沙咀位置、夜晚氣氛，等 creator 有足夠背景做【背景 VO】。',
+        }
       : form.vertical === 'travel'
-        ? [
-            `${brand} / 呢個行程最核心價值係咩：離市區幾耐、最獨特景點係咩、值唔值得週末即刻去。`,
-            `觀眾要先知道嘅資料：交通、時間、景點順序、適合咩人去，呢啲就係【背景 VO】應該先交代嘅 backing information。`,
-            `如果想帶轉化，就要先定清楚 package、預約、路線安排等資料，唔係等 creator 自己估。`,
-          ]
+        ? {
+            corePositioning: `${brand} / 呢個行程最值得被記住嘅，係可以用最短時間換到最大體驗感。`,
+            strongestSellingPoint: '最強賣點應該先定喺景點驚喜、行程方便，定整體質感體驗，避免每樣平均講。',
+            suitableAudience: '適合週末想短逃離、情侶 / 朋友小旅行、重視體驗同打卡感嘅 audience。',
+            backgroundNotes: '可補充交通、時間、景點順序、預算、季節性亮點，等【背景 VO】唔會空泛。',
+          }
         : form.vertical === 'product'
-          ? [
-              `${brand} 產品真正解決咩問題，要用一句人話講清楚。`,
-              `觀眾買之前最常見疑問、比較點同使用情境，應該先整理成【背景 VO】素材。`,
-              `如果要收轉化，產品差異、價值、最值得試嘅位，唔應該留俾 creator 自己估。`,
-            ]
-          : [
-              `${brand} 呢次 campaign 想令觀眾記住咩，應該先用【背景 VO】清楚講。`,
-              '觀眾點解要停低睇，背後一定有一個產品 / 體驗 / 地點嘅理由，呢個要由客戶先定義。',
-              '創意演法可以交俾 creator，但基本事實、賣點、比較點唔應該模糊。',
-            ]
+          ? {
+              corePositioning: `${brand} 最重要唔係列晒功能，而係一句講清楚幫觀眾解決咩問題。`,
+              strongestSellingPoint: '最強賣點應該先聚焦喺最有感嘅功能 / 差異，而唔係一開始列太多 feature。',
+              suitableAudience: '適合本身已經有相關痛點、會主動比較產品、願意睇實測先決定買唔買嘅 audience。',
+              backgroundNotes: '可補充品牌定位、常見疑問、使用場景、對比點、價值證明，呢啲都係【背景 VO】最需要嘅素材。',
+            }
+          : {
+              corePositioning: `${brand} 呢次 campaign 想令人記住嘅核心價值，應該先濃縮成一句人話。`,
+              strongestSellingPoint: '先揀一個最值得先講嘅賣點，唔好一開始平均分散。',
+              suitableAudience: '先清楚講出最適合邊類人，等 creator 唔使自己估 audience。',
+              backgroundNotes: '品牌背景、比較點、關鍵資訊、CTA 前置資料，都應該先交代清楚。',
+            }
 
   const testContentItems =
     form.vertical === 'food'

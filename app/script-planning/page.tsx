@@ -26,6 +26,13 @@ function ScriptPlanningContent() {
   const campaignIntakeId = searchParams.get('campaign_intake_id')
   const [form, setForm] = useState<CampaignFormInput>(DEMO_FORM)
   const [loadingSaved, setLoadingSaved] = useState(Boolean(campaignIntakeId))
+  const [backingInfo, setBackingInfo] = useState({
+    corePositioning: '',
+    strongestSellingPoint: '',
+    suitableAudience: '',
+    backgroundNotes: '',
+  })
+  const [testContentItems, setTestContentItems] = useState(['', '', '', ''])
 
   useEffect(() => {
     try {
@@ -64,8 +71,20 @@ function ScriptPlanningContent() {
   }, [campaignIntakeId])
 
   const pack = useMemo(() => buildScriptPlanningPack(form), [form])
+  useEffect(() => {
+    setBackingInfo(pack.backingInformation)
+    setTestContentItems(pack.testContentItems)
+  }, [pack])
   const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
   const creatorHref = campaignIntakeId ? `/creator-matching?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/creator-matching'
+
+  function updateBackingInfo(field: 'corePositioning' | 'strongestSellingPoint' | 'suitableAudience' | 'backgroundNotes', value: string) {
+    setBackingInfo((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function updateTestContent(index: number, value: string) {
+    setTestContentItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? value : item)))
+  }
 
   return (
     <main style={{
@@ -111,22 +130,81 @@ function ScriptPlanningContent() {
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 2 · 背景 VO / BACKING INFORMATION</div>
-              <div style={{ display: 'grid', gap: '10px' }}>
-                {pack.backingInformation.map((item) => (
-                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                    {item}
-                  </div>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {[
+                  {
+                    key: 'corePositioning' as const,
+                    label: `${form.businessName || '品牌'} 嘅核心定位`,
+                    placeholder: '例如：呢間店最值得被記住嘅唔係「全部都好」，而係最強賣點夠集中。',
+                  },
+                  {
+                    key: 'strongestSellingPoint' as const,
+                    label: '最強賣點',
+                    placeholder: '例如：AI 可先幫你揀一個，但你亦可以再改。',
+                  },
+                  {
+                    key: 'suitableAudience' as const,
+                    label: `清楚講出 ${form.businessName || '品牌'} 適合咩人去`,
+                    placeholder: '例如：朋友聚會、情侶約會、週末打卡',
+                  },
+                  {
+                    key: 'backgroundNotes' as const,
+                    label: '品牌背景要補充乜',
+                    placeholder: '例如：新開幕、限定 menu、人氣招牌、尖沙咀位置、夜晚氣氛',
+                  },
+                ].map((field) => (
+                  <label key={field.key} style={{ display: 'grid', gap: '8px' }}>
+                    <div style={{ fontSize: '14px', color: '#5b5348' }}>{field.label}</div>
+                    <textarea
+                      value={backingInfo[field.key]}
+                      onChange={(event) => updateBackingInfo(field.key, event.target.value)}
+                      placeholder={field.placeholder}
+                      style={{
+                        width: '100%',
+                        minHeight: field.key === 'backgroundNotes' ? '96px' : '78px',
+                        resize: 'vertical',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(26,26,24,0.12)',
+                        padding: '14px 16px',
+                        boxSizing: 'border-box',
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                        fontFamily: 'inherit',
+                        background: '#fbf8f1',
+                        color: '#1a1a18',
+                      }}
+                    />
+                  </label>
                 ))}
               </div>
             </section>
 
             <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 4 · 實測內容</div>
-              <div style={{ display: 'grid', gap: '10px' }}>
-                {pack.testContentItems.map((item) => (
-                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                    {item}
-                  </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                {testContentItems.map((item, index) => (
+                  <label key={`test-content-${index}`} style={{ display: 'grid', gap: '8px' }}>
+                    <div style={{ fontSize: '14px', color: '#5b5348' }}>實測內容 {index + 1}</div>
+                    <textarea
+                      value={item}
+                      onChange={(event) => updateTestContent(index, event.target.value)}
+                      placeholder={`第 ${index + 1} 個最值得拍 / 試 / 講嘅位`}
+                      style={{
+                        width: '100%',
+                        minHeight: '110px',
+                        resize: 'vertical',
+                        borderRadius: '16px',
+                        border: '1px solid rgba(26,26,24,0.12)',
+                        padding: '14px 16px',
+                        boxSizing: 'border-box',
+                        fontSize: '14px',
+                        lineHeight: 1.7,
+                        fontFamily: 'inherit',
+                        background: '#fbf8f1',
+                        color: '#1a1a18',
+                      }}
+                    />
+                  </label>
                 ))}
               </div>
             </section>
