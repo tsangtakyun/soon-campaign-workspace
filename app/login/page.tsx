@@ -8,13 +8,14 @@ import { createClient } from '@/lib/supabase'
 function LoginContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
+  const next = searchParams.get('next') || '/my-workspace'
   const supabase = createClient()
 
   const handleGoogleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
   }
@@ -36,7 +37,7 @@ function LoginContent() {
           Merchant & Creator Platform
         </h1>
         <p style={{ fontSize: '14px', color: '#888', marginBottom: '40px', fontStyle: 'italic' }}>
-          Brief, matching, production, delivery
+          Sign in once, then return to your paid analysis any time
         </p>
 
         {error === 'unauthorized' && (

@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const next = requestUrl.searchParams.get('next')
 
   if (code) {
     const cookieStore = await cookies()
@@ -27,5 +28,6 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  return NextResponse.redirect(new URL('/', request.url))
+  const safeNext = next && next.startsWith('/') ? next : '/my-workspace'
+  return NextResponse.redirect(new URL(safeNext, request.url))
 }

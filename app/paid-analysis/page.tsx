@@ -72,6 +72,19 @@ function PaidAnalysisContent() {
       }
 
       try {
+        if (!sessionId && campaignIntakeIdFromUrl) {
+          const savedRes = await fetch(`/api/paid-analysis/by-intake?campaign_intake_id=${encodeURIComponent(campaignIntakeIdFromUrl)}`)
+          const savedData = await savedRes.json()
+          if (!savedRes.ok) throw new Error(savedData.error || '未能載入已保存分析。')
+          setPaid(true)
+          setSavedAnalysis(savedData.analysis as FullAnalysis)
+          setDraft(savedData.form as CampaignFormInput)
+          setCampaignIntakeId(campaignIntakeIdFromUrl)
+          setSyncMessage('已從你的帳戶載入已保存分析。')
+          setChecking(false)
+          return
+        }
+
         const res = await fetch(`/api/stripe/checkout-session?session_id=${encodeURIComponent(sessionId)}`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Unable to verify payment')
@@ -331,6 +344,9 @@ function PaidAnalysisContent() {
                 <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
                   你可以直接確認方向，交俾系統開始配對合適 creator；如果你想先同真人策略團隊對一對重點，我哋都可以下一步幫你承接。
                 </div>
+                <div style={{ marginBottom: '18px', padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.08)', color: '#f0e7da', lineHeight: 1.7 }}>
+                  想之後唔使再經付款流程？你可以用同一個 email 嘅 Google 帳號登入，之後直接喺你的 workspace 睇返已買分析。
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                   <Link
                     href={`/creator-matching${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`}
@@ -363,6 +379,23 @@ function PaidAnalysisContent() {
                   >
                     想先同 SOON 策略團隊傾一傾
                   </button>
+                  <Link
+                    href="/login?next=/my-workspace"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '999px',
+                      background: 'transparent',
+                      color: '#f5efe5',
+                      padding: '14px 18px',
+                      fontSize: '14px',
+                      border: '1px solid rgba(245,239,229,0.35)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    用 Google 保存並隨時返回
+                  </Link>
                 </div>
               </section>
             </div>

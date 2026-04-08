@@ -39,18 +39,22 @@ export async function middleware(request: NextRequest) {
 
   if (!user) {
     if (!isPublicPage) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
     }
     return response
   }
 
-  if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(user.email || '')) {
+  if (pathname.startsWith('/ops') && ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(user.email || '')) {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
   }
 
   if (pathname === '/login') {
-    return NextResponse.redirect(new URL('/ops/campaigns', request.url))
+    const next = request.nextUrl.searchParams.get('next')
+    const safeNext = next && next.startsWith('/') ? next : '/my-workspace'
+    return NextResponse.redirect(new URL(safeNext, request.url))
   }
 
   return response
