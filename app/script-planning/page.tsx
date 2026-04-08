@@ -4,7 +4,12 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { buildScriptPlanningPack, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import {
+  buildScriptPlanningPack,
+  extractWorkflowState,
+  type CampaignFormInput,
+  type StoredPaidAnalysisDraft,
+} from '@/lib/analysis'
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -33,6 +38,9 @@ function ScriptPlanningContent() {
     backgroundNotes: '',
   })
   const [testContentItems, setTestContentItems] = useState(['', '', '', ''])
+  const [scriptPlanningConfirmed, setScriptPlanningConfirmed] = useState(false)
+  const [confirmingScriptPlanning, setConfirmingScriptPlanning] = useState(false)
+  const [confirmMessage, setConfirmMessage] = useState('')
 
   useEffect(() => {
     try {
@@ -61,6 +69,25 @@ function ScriptPlanningContent() {
         const data = await response.json()
         if (response.ok && data.form) {
           setForm(data.form as CampaignFormInput)
+          const workflow = data.workflow || extractWorkflowState(data.analysis as Record<string, unknown>)
+          if (workflow?.scriptPlanningDraft) {
+            setBackingInfo({
+              corePositioning: workflow.scriptPlanningDraft.corePositioning || '',
+              strongestSellingPoint: workflow.scriptPlanningDraft.strongestSellingPoint || '',
+              suitableAudience: workflow.scriptPlanningDraft.suitableAudience || '',
+              backgroundNotes: workflow.scriptPlanningDraft.backgroundNotes || '',
+            })
+            setTestContentItems([
+              workflow.scriptPlanningDraft.testContentItems?.[0] || '',
+              workflow.scriptPlanningDraft.testContentItems?.[1] || '',
+              workflow.scriptPlanningDraft.testContentItems?.[2] || '',
+              workflow.scriptPlanningDraft.testContentItems?.[3] || '',
+            ])
+          }
+          if (workflow?.scriptPlanningConfirmed) {
+            setScriptPlanningConfirmed(true)
+            setConfirmMessage('Script planning 已確認，campaign 進度已更新。')
+          }
         }
       } finally {
         setLoadingSaved(false)
@@ -72,8 +99,8 @@ function ScriptPlanningContent() {
 
   const pack = useMemo(() => buildScriptPlanningPack(form), [form])
   useEffect(() => {
-    setBackingInfo(pack.backingInformation)
-    setTestContentItems(pack.testContentItems)
+    setBackingInfo((prev) => (prev.corePositioning || prev.strongestSellingPoint || prev.suitableAudience || prev.backgroundNotes ? prev : pack.backingInformation))
+    setTestContentItems((prev) => (prev.some((item) => item.trim()) ? prev : pack.testContentItems))
   }, [pack])
   const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
   const creatorHref = campaignIntakeId ? `/creator-matching?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/creator-matching'
@@ -84,6 +111,43 @@ function ScriptPlanningContent() {
 
   function updateTestContent(index: number, value: string) {
     setTestContentItems((prev) => prev.map((item, itemIndex) => (itemIndex === index ? value : item)))
+  }
+
+  async function confirmScriptPlanning() {
+    if (!campaignIntakeId) {
+      setConfirmMessage('呢個 demo 版本未有 campaign id，未能正式確認。')
+      return
+    }
+
+    setConfirmingScriptPlanning(true)
+    setConfirmMessage('')
+
+    try {
+      const response = await fetch('/api/campaign-workflow/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignIntakeId,
+          step: 'script-planning',
+          scriptPlanningDraft: {
+            ...backingInfo,
+            testContentItems,
+          },
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || '未能確認 script planning')
+      }
+
+      setScriptPlanningConfirmed(true)
+      setConfirmMessage('Script planning 已確認，系統知道可以進入 storyboard planning。')
+    } catch (error: any) {
+      setConfirmMessage(error.message || '未能確認 script planning')
+    } finally {
+      setConfirmingScriptPlanning(false)
+    }
   }
 
   return (
@@ -232,12 +296,13 @@ function ScriptPlanningContent() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <button
                   type="button"
+                  onClick={confirmScriptPlanning}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
+                    background: scriptPlanningConfirmed ? '#dbe7d0' : '#f5efe5',
                     color: '#1a1a18',
                     padding: '14px 18px',
                     fontSize: '14px',
@@ -245,7 +310,7 @@ function ScriptPlanningContent() {
                     cursor: 'pointer',
                   }}
                 >
-                  下一步整理 storyboard
+                  {confirmingScriptPlanning ? '確認中...' : scriptPlanningConfirmed ? '已確認 script planning' : '確認 script planning'}
                 </button>
                 <Link
                   href={dashboardHref}
@@ -265,6 +330,11 @@ function ScriptPlanningContent() {
                   返回 campaign dashboard
                 </Link>
               </div>
+              {confirmMessage && (
+                <div style={{ marginTop: '14px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.08)', color: '#f0e7da', lineHeight: 1.7 }}>
+                  {confirmMessage}
+                </div>
+              )}
             </section>
           </div>
 
@@ -277,8 +347,8 @@ function ScriptPlanningContent() {
                   { label: '1. 填寫品牌 brief', status: '完成' },
                   { label: '2. AI 分析宣傳方向', status: '完成' },
                   { label: '3. 系統配對合適 creator', status: '完成' },
-                  { label: '4. 生成題材與腳本建議', status: '進行中' },
-                  { label: '5. 整理拍攝方向與分鏡', status: '下一步' },
+                  { label: '4. 生成題材與腳本建議', status: scriptPlanningConfirmed ? '完成' : '進行中' },
+                  { label: '5. 整理拍攝方向與分鏡', status: scriptPlanningConfirmed ? '進行中' : '下一步' },
                   { label: '6. 跟進內容交付', status: '下一步' },
                 ].map((step) => {
                   const isCurrent = step.status === '進行中'

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
+import { extractWorkflowState } from '@/lib/analysis'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 export async function GET(request: Request) {
@@ -58,5 +59,6 @@ export async function GET(request: Request) {
       mustInclude: data.must_include,
     },
     analysis: data.full_analysis,
+    workflow: extractWorkflowState(data.full_analysis as Record<string, unknown>),
   })
 }

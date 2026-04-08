@@ -4,7 +4,12 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
-import { buildCreatorMatches, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import {
+  buildCreatorMatches,
+  extractWorkflowState,
+  type CampaignFormInput,
+  type StoredPaidAnalysisDraft,
+} from '@/lib/analysis'
 
 const DEMO_FORM: CampaignFormInput = {
   contactName: 'Tommy',
@@ -26,6 +31,10 @@ function CreatorMatchingContent() {
   const campaignIntakeId = searchParams.get('campaign_intake_id')
   const [form, setForm] = useState<CampaignFormInput>(DEMO_FORM)
   const [loadingSaved, setLoadingSaved] = useState(Boolean(campaignIntakeId))
+  const [selectedCreatorTitle, setSelectedCreatorTitle] = useState('')
+  const [creatorConfirmed, setCreatorConfirmed] = useState(false)
+  const [confirmingCreator, setConfirmingCreator] = useState(false)
+  const [confirmMessage, setConfirmMessage] = useState('')
 
   useEffect(() => {
     try {
@@ -55,6 +64,14 @@ function CreatorMatchingContent() {
 
         if (response.ok && data.form) {
           setForm(data.form as CampaignFormInput)
+          const workflow = data.workflow || extractWorkflowState(data.analysis as Record<string, unknown>)
+          if (workflow?.selectedCreatorTitle) {
+            setSelectedCreatorTitle(workflow.selectedCreatorTitle)
+          }
+          if (workflow?.creatorMatchingConfirmed) {
+            setCreatorConfirmed(true)
+            setConfirmMessage('已確認 creator matching，dashboard 進度已更新。')
+          }
         }
       } finally {
         setLoadingSaved(false)
@@ -65,6 +82,11 @@ function CreatorMatchingContent() {
   }, [campaignIntakeId])
 
   const creatorMatches = useMemo(() => buildCreatorMatches(form), [form])
+  useEffect(() => {
+    if (!selectedCreatorTitle && creatorMatches[0]) {
+      setSelectedCreatorTitle(creatorMatches[0].title)
+    }
+  }, [creatorMatches, selectedCreatorTitle])
   const objectiveLabel =
     form.objective === 'sales'
       ? 'Conversion（轉化 / 銷售）'
@@ -81,6 +103,40 @@ function CreatorMatchingContent() {
   const scriptPlanningHref = campaignIntakeId
     ? `/script-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`
     : '/script-planning'
+
+  async function confirmCreatorMatching() {
+    if (!campaignIntakeId) {
+      setConfirmMessage('呢個 demo 版本未有 campaign id，未能正式確認。')
+      return
+    }
+
+    setConfirmingCreator(true)
+    setConfirmMessage('')
+
+    try {
+      const response = await fetch('/api/campaign-workflow/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignIntakeId,
+          step: 'creator-matching',
+          selectedCreatorTitle,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || '未能確認 creator matching')
+      }
+
+      setCreatorConfirmed(true)
+      setConfirmMessage('Creator matching 已確認，系統知道可以進入 script planning。')
+    } catch (error: any) {
+      setConfirmMessage(error.message || '未能確認 creator matching')
+    } finally {
+      setConfirmingCreator(false)
+    }
+  }
 
   return (
     <main style={{
@@ -148,7 +204,17 @@ function CreatorMatchingContent() {
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>RECOMMENDED CREATOR ARCHETYPES</div>
               <div style={{ display: 'grid', gap: '14px' }}>
                 {creatorMatches.map((match, index) => (
-                  <section key={match.title} style={{ padding: '18px', borderRadius: '20px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                  <section
+                    key={match.title}
+                    onClick={() => setSelectedCreatorTitle(match.title)}
+                    style={{
+                      padding: '18px',
+                      borderRadius: '20px',
+                      background: selectedCreatorTitle === match.title ? '#f7f1e1' : '#fbf8f1',
+                      border: selectedCreatorTitle === match.title ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
+                      cursor: 'pointer',
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
                       <div>
                         <div style={{ fontSize: '12px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '6px' }}>MATCH {index + 1}</div>
@@ -172,7 +238,18 @@ function CreatorMatchingContent() {
                       ))}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                      <div style={{ padding: '14px', borderRadius: '16px', background: '#fff', border: '1px solid rgba(26,26,24,0.06)' }}>
+                        <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>Creator Rate</div>
+                        <div style={{ lineHeight: 1.7 }}>{match.reelRate}</div>
+                      </div>
+                      <div style={{ padding: '14px', borderRadius: '16px', background: '#fff', border: '1px solid rgba(26,26,24,0.06)' }}>
+                        <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>SOON Commission</div>
+                        <div style={{ lineHeight: 1.7 }}>{match.soonCommissionRate} · {match.soonCommissionAmount}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
                       <div style={{ padding: '14px', borderRadius: '16px', background: '#fff', border: '1px solid rgba(26,26,24,0.06)' }}>
                         <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>Best Use</div>
                         <div style={{ lineHeight: 1.7 }}>{match.bestUse}</div>
@@ -225,7 +302,29 @@ function CreatorMatchingContent() {
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
                 第一輪建議唔係同時搵最大量 creator，而係先用最 fit 嗰一至兩類組合測最有機會出結果嘅 angle，再用數據決定點樣放大。
               </div>
+              <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#d9cfbf', marginBottom: '14px' }}>
+                目前確認方向：<strong>{selectedCreatorTitle || '未選擇 creator archetype'}</strong>
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={confirmCreatorMatching}
+                  disabled={confirmingCreator}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '999px',
+                    background: creatorConfirmed ? '#dbe7d0' : '#f5efe5',
+                    color: '#1a1a18',
+                    padding: '14px 18px',
+                    fontSize: '14px',
+                    border: '1px solid rgba(245,239,229,0.4)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {confirmingCreator ? '確認中...' : creatorConfirmed ? '已確認 creator 方向' : '確認 creator 方向'}
+                </button>
                 <Link
                   href={scriptPlanningHref}
                   style={{
@@ -242,7 +341,7 @@ function CreatorMatchingContent() {
                     textDecoration: 'none',
                   }}
                 >
-                  先用 Match 1 開始生成腳本
+                  進入 script planning
                 </Link>
                 <button
                   type="button"
@@ -259,6 +358,11 @@ function CreatorMatchingContent() {
                   我想先同策略團隊確認 creator 組合
                 </button>
               </div>
+              {confirmMessage && (
+                <div style={{ marginTop: '14px', padding: '12px 14px', borderRadius: '14px', background: 'rgba(255,255,255,0.08)', color: '#f0e7da', lineHeight: 1.7 }}>
+                  {confirmMessage}
+                </div>
+              )}
             </section>
           </div>
 
@@ -270,8 +374,8 @@ function CreatorMatchingContent() {
                 {[
                   { label: '1. 填寫品牌 brief', status: '完成' },
                   { label: '2. AI 分析宣傳方向', status: '完成' },
-                  { label: '3. 系統配對合適 creator', status: '進行中' },
-                  { label: '4. 生成題材與腳本建議', status: '下一步' },
+                  { label: '3. 系統配對合適 creator', status: creatorConfirmed ? '完成' : '進行中' },
+                  { label: '4. 生成題材與腳本建議', status: creatorConfirmed ? '進行中' : '下一步' },
                   { label: '5. 整理拍攝方向與分鏡', status: '下一步' },
                   { label: '6. 跟進內容交付', status: '下一步' },
                 ].map((step) => {

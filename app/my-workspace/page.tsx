@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { buildCampaignProgress } from '@/lib/analysis'
+import { buildCampaignProgress, extractWorkflowState } from '@/lib/analysis'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 type WorkspaceCampaign = {
@@ -49,11 +49,15 @@ export default async function MyWorkspacePage() {
 
   const activeCampaign = campaigns[0]
   const activeProgress = activeCampaign
-    ? buildCampaignProgress({
-        paymentStatus: activeCampaign.payment_status,
-        hasFullAnalysis: Boolean(activeCampaign.full_analysis && Object.keys(activeCampaign.full_analysis).length),
-        hasCreatorShortlist: false,
-      })
+    ? (() => {
+        const workflow = extractWorkflowState(activeCampaign.full_analysis)
+        return buildCampaignProgress({
+          paymentStatus: activeCampaign.payment_status,
+          hasFullAnalysis: Boolean(activeCampaign.full_analysis && Object.keys(activeCampaign.full_analysis).length),
+          hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
+          hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
+        })
+      })()
     : null
 
   return (
@@ -103,10 +107,12 @@ export default async function MyWorkspacePage() {
         {campaigns.length ? (
           <section style={{ display: 'grid', gap: '16px' }}>
             {campaigns.map((item) => {
+              const workflow = extractWorkflowState(item.full_analysis)
               const progress = buildCampaignProgress({
                 paymentStatus: item.payment_status,
                 hasFullAnalysis: Boolean(item.full_analysis && Object.keys(item.full_analysis).length),
-                hasCreatorShortlist: false,
+                hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
+                hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
               })
 
               return (

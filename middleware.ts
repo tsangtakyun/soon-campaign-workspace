@@ -17,7 +17,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/login' ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/stripe') ||
-    pathname.startsWith('/api/paid-analysis')
+    pathname.startsWith('/api/paid-analysis') ||
+    pathname.startsWith('/api/campaign-workflow')
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

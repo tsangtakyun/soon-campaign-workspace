@@ -38,6 +38,9 @@ export type CreatorArchetype = {
   strengths: string[]
   bestUse: string
   deliverableShape: string
+  reelRate: string
+  soonCommissionRate: string
+  soonCommissionAmount: string
 }
 
 export type ScriptPlanningPack = {
@@ -67,6 +70,19 @@ export type CampaignProgress = {
   summary: string
   latestUpdate: string
   steps: CampaignProgressStep[]
+}
+
+export type WorkflowState = {
+  creatorMatchingConfirmed: boolean
+  scriptPlanningConfirmed: boolean
+  selectedCreatorTitle: string
+  scriptPlanningDraft: {
+    corePositioning?: string
+    strongestSellingPoint?: string
+    suitableAudience?: string
+    backgroundNotes?: string
+    testContentItems?: string[]
+  }
 }
 
 export function explainAnalysisPoint(
@@ -252,6 +268,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '第一條 hero reel + 餐牌重點 cutdown',
         deliverableShape: '1 條主 Reel + 1 條 menu / 招牌品補充短片',
+        reelRate: 'HK$15,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$4,500',
       },
       {
         title: 'Lifestyle Date Mood Creator',
@@ -264,6 +283,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '第二輪品牌感 angle / story-based reel',
         deliverableShape: '1 條情境感主片 + story / vertical cutdown',
+        reelRate: 'HK$20,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$6,000',
       },
       {
         title: 'Micro Conversion Closer',
@@ -276,6 +298,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '表現最好角度後嘅轉化加碼版本',
         deliverableShape: '1 條直入賣點轉化短片 + 1 條 CTA cutdown',
+        reelRate: 'HK$12,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$3,600',
       },
     ]
   }
@@ -293,6 +318,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: 'hero destination reel',
         deliverableShape: '1 條主片 + 1 條行程補充 cutdown',
+        reelRate: 'HK$18,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$5,400',
       },
       {
         title: 'Practical Guide Creator',
@@ -305,6 +333,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '攻略型補充內容',
         deliverableShape: '1 條 guide reel + 1 條懶人包 cutdown',
+        reelRate: 'HK$16,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$4,800',
       },
       {
         title: 'Luxury Mood Curator',
@@ -317,6 +348,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '品牌形象 / premium package angle',
         deliverableShape: '1 條品牌感主片 + story asset',
+        reelRate: 'HK$24,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$7,200',
       },
     ]
   }
@@ -334,6 +368,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '第一輪賣點證明片',
         deliverableShape: '1 條實測主片 + 1 條重點 cutdown',
+        reelRate: 'HK$14,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$4,200',
       },
       {
         title: 'Lifestyle Use-Case Creator',
@@ -346,6 +383,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '情境種草 / second angle',
         deliverableShape: '1 條情境片 + 1 條生活感補充內容',
+        reelRate: 'HK$17,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$5,100',
       },
       {
         title: 'Trust Builder Reviewer',
@@ -358,6 +398,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
         ],
         bestUse: '轉化前信任補強內容',
         deliverableShape: '1 條 review 型影片 + Q&A 型 cutdown',
+        reelRate: 'HK$19,000 / Reel',
+        soonCommissionRate: '30%',
+        soonCommissionAmount: 'HK$5,700',
       },
     ]
   }
@@ -374,6 +417,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
       ],
       bestUse: '第一條主角度內容',
       deliverableShape: '1 條主片 + 1 條 cutdown',
+      reelRate: 'HK$13,000 / Reel',
+      soonCommissionRate: '30%',
+      soonCommissionAmount: 'HK$3,900',
     },
     {
       title: 'Story-led Lifestyle Creator',
@@ -386,6 +432,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
       ],
       bestUse: '第二輪品牌形象內容',
       deliverableShape: '1 條情境片 + story asset',
+      reelRate: 'HK$16,000 / Reel',
+      soonCommissionRate: '30%',
+      soonCommissionAmount: 'HK$4,800',
     },
     {
       title: 'Conversion-focused Closer',
@@ -398,6 +447,9 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
       ],
       bestUse: '轉化補強片',
       deliverableShape: '1 條 CTA 短片 + 1 條 reminder cutdown',
+      reelRate: 'HK$12,000 / Reel',
+      soonCommissionRate: '30%',
+      soonCommissionAmount: 'HK$3,600',
     },
   ]
 }
@@ -405,12 +457,15 @@ export function buildCreatorMatches(form: CampaignFormInput): CreatorArchetype[]
 export function buildCampaignProgress(options: {
   paymentStatus?: string | null
   hasFullAnalysis?: boolean
-  hasCreatorShortlist?: boolean
+  hasCreatorMatchingConfirmed?: boolean
+  hasScriptPlanningConfirmed?: boolean
 }) : CampaignProgress {
   const currentStageIndex: number =
-    options.hasCreatorShortlist
-      ? 4
-      : options.hasFullAnalysis || options.paymentStatus === 'paid'
+    options.hasScriptPlanningConfirmed
+      ? 5
+      : options.hasCreatorMatchingConfirmed
+        ? 4
+        : options.hasFullAnalysis || options.paymentStatus === 'paid'
         ? 3
         : 2
 
@@ -434,6 +489,17 @@ export function buildCampaignProgress(options: {
     }
   }
 
+  if (currentStageIndex === 5) {
+    return {
+      currentStageLabel: 'Storyboard Planning 準備中',
+      currentStageIndex,
+      nextActionLabel: '將已確認腳本方向整理成 storyboard',
+      summary: '你已經完成 creator matching 同 script planning，下一步係將內容方向變成更具體嘅拍攝分鏡與 shot plan。',
+      latestUpdate: 'Script planning 已確認，等待進入 storyboard planning。',
+      steps,
+    }
+  }
+
   if (currentStageIndex === 3) {
     return {
       currentStageLabel: 'Creator Matching 進行中',
@@ -452,6 +518,24 @@ export function buildCampaignProgress(options: {
     summary: '品牌 brief 已經提交，下一步應該先解鎖完整 AI 分析，搵出最值得先做嘅 campaign 方向。',
     latestUpdate: '品牌 brief 已成功記錄，等待進入完整分析階段。',
     steps,
+  }
+}
+
+export function extractWorkflowState(fullAnalysis: Record<string, unknown> | null | undefined): WorkflowState {
+  const workflow = (fullAnalysis?._workflow || {}) as Record<string, unknown>
+  const draft = (workflow.scriptPlanningDraft || {}) as Record<string, unknown>
+
+  return {
+    creatorMatchingConfirmed: Boolean(workflow.creatorMatchingConfirmedAt),
+    scriptPlanningConfirmed: Boolean(workflow.scriptPlanningConfirmedAt),
+    selectedCreatorTitle: typeof workflow.selectedCreatorTitle === 'string' ? workflow.selectedCreatorTitle : '',
+    scriptPlanningDraft: {
+      corePositioning: typeof draft.corePositioning === 'string' ? draft.corePositioning : '',
+      strongestSellingPoint: typeof draft.strongestSellingPoint === 'string' ? draft.strongestSellingPoint : '',
+      suitableAudience: typeof draft.suitableAudience === 'string' ? draft.suitableAudience : '',
+      backgroundNotes: typeof draft.backgroundNotes === 'string' ? draft.backgroundNotes : '',
+      testContentItems: Array.isArray(draft.testContentItems) ? draft.testContentItems.filter((item): item is string => typeof item === 'string') : [],
+    },
   }
 }
 

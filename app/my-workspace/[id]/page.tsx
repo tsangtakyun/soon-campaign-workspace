@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 
-import { buildCampaignProgress, buildCreatorMatches, type CampaignFormInput, type FullAnalysis } from '@/lib/analysis'
+import { buildCampaignProgress, buildCreatorMatches, extractWorkflowState, type CampaignFormInput, type FullAnalysis } from '@/lib/analysis'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 type CampaignRecord = {
@@ -75,10 +75,12 @@ export default async function WorkspaceCampaignDetailPage(
     mustInclude: campaign.must_include,
   }
 
+  const workflow = extractWorkflowState(campaign.full_analysis)
   const progress = buildCampaignProgress({
     paymentStatus: campaign.payment_status,
     hasFullAnalysis: Boolean(campaign.full_analysis && Object.keys(campaign.full_analysis).length),
-    hasCreatorShortlist: false,
+    hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
+    hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
   })
   const creatorMatches = buildCreatorMatches(form)
 
@@ -121,7 +123,11 @@ export default async function WorkspaceCampaignDetailPage(
             <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>CURRENT STAGE</div>
             <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '10px' }}>{progress.currentStageLabel}</div>
             <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px' }}>
-              下一步會圍繞你最 fit 嘅 creator 組合同 campaign direction，進入內容規劃。
+              {workflow.scriptPlanningConfirmed
+                ? '你已經確認 script planning，下一步可以進入 storyboard 同拍攝方向整理。'
+                : workflow.creatorMatchingConfirmed
+                  ? 'Creator matching 已確認，下一步會圍繞選定 creator 組合同 campaign direction 進入內容規劃。'
+                  : '下一步會圍繞你最 fit 嘅 creator 組合同 campaign direction，進入內容規劃。'}
             </div>
             <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.08)' }}>
               <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#c7bdaf', marginBottom: '6px' }}>NEXT ACTION</div>
@@ -163,10 +169,23 @@ export default async function WorkspaceCampaignDetailPage(
                     <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#4f493f' }}>
                       <strong>Best use：</strong> {match.bestUse}
                     </div>
+                    <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#4f493f', marginTop: '6px' }}>
+                      <strong>Rate：</strong> {match.reelRate} · <strong>SOON commission：</strong> {match.soonCommissionRate} ({match.soonCommissionAmount})
+                    </div>
                   </div>
                 ))}
               </div>
             </section>
+
+            {workflow.selectedCreatorTitle && (
+              <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CONFIRMED DIRECTION</div>
+                <div style={{ lineHeight: 1.8, color: '#4f493f' }}>
+                  已確認 creator archetype：<strong>{workflow.selectedCreatorTitle}</strong>
+                  {workflow.scriptPlanningConfirmed ? '，script planning 亦已完成確認。' : '，等待進入並確認 script planning。'}
+                </div>
+              </section>
+            )}
 
             <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
