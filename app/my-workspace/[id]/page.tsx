@@ -87,6 +87,7 @@ export default async function WorkspaceCampaignDetailPage(
   const creatorMatches = buildCreatorMatches(form)
   const storyboardHref = `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaign.id)}`
   const deliveryConfirmationHref = `/delivery-confirmation?campaign_intake_id=${encodeURIComponent(campaign.id)}`
+  const deliveryTrackingHref = `/delivery-tracking?campaign_intake_id=${encodeURIComponent(campaign.id)}`
 
   return (
     <main style={{
@@ -270,6 +271,23 @@ export default async function WorkspaceCampaignDetailPage(
                   }}
                 >
                   確認製作與交付安排
+                </Link>
+                <Link
+                  href={deliveryTrackingHref}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '999px',
+                    background: '#f5efe5',
+                    color: '#1a1a18',
+                    padding: '14px 18px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    border: '1px solid rgba(245,239,229,0.4)',
+                  }}
+                >
+                  進入內容交付追蹤
                 </Link>
                 <Link
                   href={`/paid-analysis?campaign_intake_id=${encodeURIComponent(campaign.id)}`}

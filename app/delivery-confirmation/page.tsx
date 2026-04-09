@@ -93,6 +93,7 @@ function DeliveryConfirmationContent() {
 
   const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
   const storyboardHref = campaignIntakeId ? `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/storyboard-planning'
+  const deliveryTrackingHref = campaignIntakeId ? `/delivery-tracking?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/delivery-tracking'
 
   async function confirmDelivery() {
     if (!campaignIntakeId) {
@@ -235,6 +236,9 @@ function DeliveryConfirmationContent() {
                 <button type="button" disabled style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '999px', background: 'transparent', color: '#f5efe5', padding: '14px 18px', fontSize: '14px', border: '1px solid rgba(245,239,229,0.35)', opacity: 0.72 }}>
                   聯繫製作主任 WhatsApp（待接駁）
                 </button>
+                <Link href={deliveryTrackingHref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '999px', background: 'transparent', color: '#f5efe5', padding: '14px 18px', fontSize: '14px', border: '1px solid rgba(245,239,229,0.35)', textDecoration: 'none' }}>
+                  進入內容交付追蹤
+                </Link>
                 <Link href={dashboardHref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '999px', background: 'transparent', color: '#f5efe5', padding: '14px 18px', fontSize: '14px', border: '1px solid rgba(245,239,229,0.35)', textDecoration: 'none' }}>
                   返回 campaign dashboard
                 </Link>
