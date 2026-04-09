@@ -82,9 +82,11 @@ export default async function WorkspaceCampaignDetailPage(
     hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
     hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
     hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
+    hasDeliveryConfirmationConfirmed: workflow.deliveryConfirmationConfirmed,
   })
   const creatorMatches = buildCreatorMatches(form)
   const storyboardHref = `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaign.id)}`
+  const deliveryConfirmationHref = `/delivery-confirmation?campaign_intake_id=${encodeURIComponent(campaign.id)}`
 
   return (
     <main style={{
@@ -125,7 +127,9 @@ export default async function WorkspaceCampaignDetailPage(
             <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>CURRENT STAGE</div>
             <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '10px' }}>{progress.currentStageLabel}</div>
             <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px' }}>
-              {workflow.scriptPlanningConfirmed
+              {workflow.deliveryConfirmationConfirmed
+                ? '製作與交付安排已確認，下一步會由製作主任跟進拍攝同交付流程。'
+                : workflow.scriptPlanningConfirmed
                 ? '你已經確認 script planning，下一步可以進入 storyboard 同拍攝方向整理。'
                 : workflow.creatorMatchingConfirmed
                   ? 'Creator matching 已確認，下一步會圍繞選定 creator 組合同 campaign direction 進入內容規劃。'
@@ -184,16 +188,20 @@ export default async function WorkspaceCampaignDetailPage(
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CONFIRMED DIRECTION</div>
                 <div style={{ lineHeight: 1.8, color: '#4f493f' }}>
                   已確認 creator archetype：<strong>{workflow.selectedCreatorTitle}</strong>
-                  {workflow.scriptPlanningConfirmed ? '，script planning 亦已完成確認。' : '，等待進入並確認 script planning。'}
+                  {workflow.deliveryConfirmationConfirmed
+                    ? '，製作與交付安排亦已確認。'
+                    : workflow.scriptPlanningConfirmed
+                      ? '，script planning 亦已完成確認。'
+                      : '，等待進入並確認 script planning。'}
                 </div>
               </section>
             )}
 
             <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
-              <div style={{ fontSize: '32px', lineHeight: 1.08, marginBottom: '12px' }}>確認 creator 方向之後，就可以正式進入 script planning。</div>
+              <div style={{ fontSize: '32px', lineHeight: 1.08, marginBottom: '12px' }}>確認完 storyboard 之後，客戶仲要正式確認製作與交付安排。</div>
               <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px' }}>
-                之後你個 dashboard 會繼續更新，由 creator matching 去到題材與腳本、再到 storyboard 同交付進度。
+                之後你個 dashboard 會繼續更新，由 creator matching 去到題材與腳本、storyboard，再到 50% 訂金鎖 project 同內容交付進度。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <Link
@@ -245,6 +253,23 @@ export default async function WorkspaceCampaignDetailPage(
                   }}
                 >
                   進入 storyboard planning
+                </Link>
+                <Link
+                  href={deliveryConfirmationHref}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '999px',
+                    background: '#f5efe5',
+                    color: '#1a1a18',
+                    padding: '14px 18px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    border: '1px solid rgba(245,239,229,0.4)',
+                  }}
+                >
+                  確認製作與交付安排
                 </Link>
                 <Link
                   href={`/paid-analysis?campaign_intake_id=${encodeURIComponent(campaign.id)}`}

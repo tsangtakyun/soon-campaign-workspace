@@ -57,6 +57,7 @@ export default async function MyWorkspacePage() {
           hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
           hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
           hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
+          hasDeliveryConfirmationConfirmed: workflow.deliveryConfirmationConfirmed,
         })
       })()
     : null
@@ -115,6 +116,7 @@ export default async function MyWorkspacePage() {
                 hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
                 hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
                 hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
+                hasDeliveryConfirmationConfirmed: workflow.deliveryConfirmationConfirmed,
               })
 
               return (

@@ -76,6 +76,18 @@ export type StoryboardPlanningPack = {
   deliveryNotes: string[]
 }
 
+export type DeliveryConfirmationPack = {
+  headline: string
+  rationale: string
+  scopeSummary: string[]
+  logisticsChecklist: string[]
+  paymentRules: string[]
+  productionSteps: string[]
+  defaultDeliveryExpectation: string
+  defaultShootWindow: string
+  defaultProductionNotes: string
+}
+
 export type CampaignProgressStep = {
   label: string
   status: '完成' | '進行中' | '下一步'
@@ -94,6 +106,7 @@ export type WorkflowState = {
   creatorMatchingConfirmed: boolean
   scriptPlanningConfirmed: boolean
   storyboardPlanningConfirmed: boolean
+  deliveryConfirmationConfirmed: boolean
   selectedCreatorTitle: string
   scriptPlanningDraft: {
     corePositioning?: string
@@ -104,6 +117,14 @@ export type WorkflowState = {
   }
   storyboardDraft: {
     mustHaveShots?: string[]
+  }
+  deliveryConfirmationDraft: {
+    expectedDeliveryWindow?: string
+    expectedShootWindow?: string
+    productionNotes?: string
+    whatsappContactIntent?: string
+    depositStatus?: string
+    finalPaymentRule?: string
   }
 }
 
@@ -482,9 +503,12 @@ export function buildCampaignProgress(options: {
   hasCreatorMatchingConfirmed?: boolean
   hasScriptPlanningConfirmed?: boolean
   hasStoryboardPlanningConfirmed?: boolean
+  hasDeliveryConfirmationConfirmed?: boolean
 }) : CampaignProgress {
   const currentStageIndex: number =
-    options.hasStoryboardPlanningConfirmed
+    options.hasDeliveryConfirmationConfirmed
+      ? 7
+      : options.hasStoryboardPlanningConfirmed
       ? 6
       : options.hasScriptPlanningConfirmed
       ? 5
@@ -500,7 +524,8 @@ export function buildCampaignProgress(options: {
     { label: '3. 系統配對合適 creator', status: currentStageIndex > 3 ? '完成' : currentStageIndex === 3 ? '進行中' : '下一步' },
     { label: '4. 生成題材與腳本建議', status: currentStageIndex > 4 ? '完成' : currentStageIndex === 4 ? '進行中' : '下一步' },
     { label: '5. 整理拍攝方向與分鏡', status: currentStageIndex > 5 ? '完成' : currentStageIndex === 5 ? '進行中' : '下一步' },
-    { label: '6. 跟進內容交付', status: currentStageIndex === 6 ? '進行中' : '下一步' },
+    { label: '6. 確認製作與交付安排', status: currentStageIndex > 6 ? '完成' : currentStageIndex === 6 ? '進行中' : '下一步' },
+    { label: '7. 跟進內容交付', status: currentStageIndex === 7 ? '進行中' : '下一步' },
   ]
 
   if (currentStageIndex === 4) {
@@ -527,11 +552,22 @@ export function buildCampaignProgress(options: {
 
   if (currentStageIndex === 6) {
     return {
-      currentStageLabel: 'Content Delivery 準備中',
+      currentStageLabel: 'Delivery Confirmation 準備中',
       currentStageIndex,
-      nextActionLabel: '開始跟進交付、拍攝與 production handoff',
-      summary: '你已經完成 storyboard planning，下一步係進入真實拍攝、交付管理同內容上線前準備。',
-      latestUpdate: 'Storyboard planning 已確認，等待進入內容交付階段。',
+      nextActionLabel: '確認拍攝 / 出片時間，支付 50% 訂金鎖 project',
+      summary: '你已經完成 storyboard planning，下一步係確認製作安排、預期出片時間、50% 訂金同 production handoff。',
+      latestUpdate: 'Storyboard planning 已確認，等待 client 確認製作與交付安排。',
+      steps,
+    }
+  }
+
+  if (currentStageIndex === 7) {
+    return {
+      currentStageLabel: 'Content Delivery 進行中',
+      currentStageIndex,
+      nextActionLabel: '製作主任跟進拍攝細節、watermarked cut 同尾數交付',
+      summary: '製作與交付安排已確認，project 已鎖定。下一步會由製作主任跟進拍攝細節、出帶水印 cut，直到 full payment 後正式交片。',
+      latestUpdate: '客戶已確認製作安排，等待製作主任 WhatsApp 跟進同 production handoff。',
       steps,
     }
   }
@@ -560,11 +596,13 @@ export function buildCampaignProgress(options: {
 export function extractWorkflowState(fullAnalysis: Record<string, unknown> | null | undefined): WorkflowState {
   const workflow = (fullAnalysis?._workflow || {}) as Record<string, unknown>
   const draft = (workflow.scriptPlanningDraft || {}) as Record<string, unknown>
+  const deliveryDraft = (workflow.deliveryConfirmationDraft || {}) as Record<string, unknown>
 
   return {
     creatorMatchingConfirmed: Boolean(workflow.creatorMatchingConfirmedAt),
     scriptPlanningConfirmed: Boolean(workflow.scriptPlanningConfirmedAt),
     storyboardPlanningConfirmed: Boolean(workflow.storyboardPlanningConfirmedAt),
+    deliveryConfirmationConfirmed: Boolean(workflow.deliveryConfirmationConfirmedAt),
     selectedCreatorTitle: typeof workflow.selectedCreatorTitle === 'string' ? workflow.selectedCreatorTitle : '',
     scriptPlanningDraft: {
       corePositioning: typeof draft.corePositioning === 'string' ? draft.corePositioning : '',
@@ -576,6 +614,56 @@ export function extractWorkflowState(fullAnalysis: Record<string, unknown> | nul
     storyboardDraft: {
       mustHaveShots: Array.isArray(workflow.mustHaveShots) ? workflow.mustHaveShots.filter((item): item is string => typeof item === 'string') : [],
     },
+    deliveryConfirmationDraft: {
+      expectedDeliveryWindow: typeof deliveryDraft.expectedDeliveryWindow === 'string' ? deliveryDraft.expectedDeliveryWindow : '',
+      expectedShootWindow: typeof deliveryDraft.expectedShootWindow === 'string' ? deliveryDraft.expectedShootWindow : '',
+      productionNotes: typeof deliveryDraft.productionNotes === 'string' ? deliveryDraft.productionNotes : '',
+      whatsappContactIntent: typeof deliveryDraft.whatsappContactIntent === 'string' ? deliveryDraft.whatsappContactIntent : '',
+      depositStatus: typeof deliveryDraft.depositStatus === 'string' ? deliveryDraft.depositStatus : '',
+      finalPaymentRule: typeof deliveryDraft.finalPaymentRule === 'string' ? deliveryDraft.finalPaymentRule : '',
+    },
+  }
+}
+
+export function buildDeliveryConfirmationPack(form: CampaignFormInput): DeliveryConfirmationPack {
+  const brand = form.businessName || '你嘅品牌'
+  const creatorTone =
+    form.vertical === 'food'
+      ? '開場 hook、轉折、ending 仍然交俾 creator 按自己 audience 節奏發揮；客戶只需要確認必備資訊同實測內容。'
+      : '開場 hook、轉折、ending 仍然交俾 creator 保留個人創意；客戶主要確認內容範圍、時間同交付要求。'
+
+  return {
+    headline: `${brand} 製作與交付確認`,
+    rationale: `呢一步唔再係改 strategy，而係正式鎖定 production handoff。你之前訂閱嘅 marketing 費用，主要係俾你持續跟進 campaign 進度；而家呢個 50% 訂金，先係正式鎖 project、安排拍攝同出 cut 嘅 production deposit。`,
+    scopeSummary: [
+      `已確認 creator direction、script planning 同 storyboard planning，${brand} 可以正式進入 production 階段。`,
+      creatorTone,
+      '客戶而家應該先確認拍攝 / 出片時間、製作重點、同埋交片規則，避免之後拍攝前再大改方向。',
+    ],
+    logisticsChecklist: [
+      '預期幾時要出第一輪 watermarked cut',
+      '預期幾時拍攝 / 幾時要同製作主任對 shooting details',
+      '有冇指定日子、campaign launch deadline 或 marketing 檔期',
+      '有冇額外拍攝限制、場地限制、menu / 產品供應時間、或者必須配合嘅營運安排',
+    ],
+    paymentRules: [
+      '確認呢一頁之後，客戶需要支付 50% production deposit，project 先會正式鎖定。',
+      '製作主任之後會直接經 WhatsApp 跟進拍攝細節、時間同 production handoff。',
+      '之後收到嘅 cut 會一直帶水印，方便你用 marketing 訂閱進度頁一路跟。',
+      '直到出片前完成 full payment，我哋先會正式交付無水印版本。',
+    ],
+    productionSteps: [
+      'Step 1：客戶確認製作與交付安排',
+      'Step 2：支付 50% production deposit，SOON 正式 lock project',
+      'Step 3：製作主任 WhatsApp 跟進拍攝時間、細節、場地 / 產品準備',
+      'Step 4：交第一輪 watermarked cut，客戶可持續喺 dashboard 跟進',
+      'Step 5：full payment 完成後，正式交付 final version',
+    ],
+    defaultDeliveryExpectation: form.vertical === 'food' ? '希望 7-10 日內收到第一輪 watermarked cut' : '希望 7 日內收到第一輪 watermarked cut',
+    defaultShootWindow: form.vertical === 'food' ? '可於平日夜晚 / 週末下午安排拍攝，並希望拍攝前 2-3 日同製作主任 confirm 細節。' : '希望盡快安排 production handoff，同製作主任對拍攝 / 交付時間。',
+    defaultProductionNotes: form.vertical === 'food'
+      ? '請先確認 menu / 產品供應時間、店內最適合拍攝時段、可否保留座位 / 場景，以及有冇限定餐點必須入鏡。'
+      : '請補充拍攝限制、產品供應安排、場地規則、同任何 launch 前必須配合嘅時間線。',
   }
 }
 

@@ -92,6 +92,7 @@ function StoryboardPlanningContent() {
 
   const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
   const scriptPlanningHref = campaignIntakeId ? `/script-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/script-planning'
+  const deliveryConfirmationHref = campaignIntakeId ? `/delivery-confirmation?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/delivery-confirmation'
 
   function toggleMustHaveShot(shotId: string) {
     setMustHaveShots((prev) => (prev.includes(shotId) ? prev.filter((item) => item !== shotId) : [...prev, shotId]))
@@ -242,9 +243,9 @@ function StoryboardPlanningContent() {
 
             <section style={{ padding: '26px', borderRadius: '24px', background: '#1a1a18', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>確認 storyboard 後，就會進入內容交付同 production handoff。</div>
+              <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>確認 storyboard 後，就會進入製作與交付安排確認。</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
-                呢一步完成，即代表 client 已接受「一定要拍」嘅背景介紹同實測內容 shots。之後 creator 可以按自己風格安排 opening、轉場、ending，同 production 開始準備實拍。
+                呢一步完成，即代表 client 已接受「一定要拍」嘅背景介紹同實測內容 shots。之後 creator 可以按自己風格安排 opening、轉場、ending，而客戶下一步要確認拍攝 / 出片時間、訂金同交片規則。
               </div>
               <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#d9cfbf', marginBottom: '14px' }}>
                 已選必備 shots：<strong>{mustHaveShots.length}</strong> / 7
@@ -269,7 +270,7 @@ function StoryboardPlanningContent() {
                   {confirmingStoryboard ? '確認中...' : storyboardConfirmed ? '已確認 storyboard' : '確認 storyboard'}
                 </button>
                 <Link
-                  href={dashboardHref}
+                  href={deliveryConfirmationHref}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -283,7 +284,7 @@ function StoryboardPlanningContent() {
                     textDecoration: 'none',
                   }}
                 >
-                  返回 campaign dashboard
+                  進入製作與交付安排確認
                 </Link>
               </div>
               {confirmMessage && (
@@ -305,7 +306,8 @@ function StoryboardPlanningContent() {
                   { label: '3. 系統配對合適 creator', status: '完成' },
                   { label: '4. 生成題材與腳本建議', status: '完成' },
                   { label: '5. 整理拍攝方向與分鏡', status: storyboardConfirmed ? '完成' : '進行中' },
-                  { label: '6. 跟進內容交付', status: storyboardConfirmed ? '進行中' : '下一步' },
+                  { label: '6. 確認製作與交付安排', status: storyboardConfirmed ? '進行中' : '下一步' },
+                  { label: '7. 跟進內容交付', status: '下一步' },
                 ].map((step) => {
                   const isCurrent = step.status === '進行中'
                   const isDone = step.status === '完成'
