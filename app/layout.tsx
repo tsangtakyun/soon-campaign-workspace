@@ -2,8 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'SOON Campaign Workspace',
-  description: 'SOON campaign workspace for strategy, creator matching, and AI production workflows.',
+  title: 'SOON 廣告工作台',
+  description: 'SOON 廣告工作台，集中處理策略分析、創作者配對與 AI 內容工作流程。',
 }
 
 function NavBar() {
@@ -12,22 +12,22 @@ function NavBar() {
       <nav className="site-nav">
         <Link href="/" className="brand-mark">
           <span className="brand-dot" />
-          <span>SOON Campaign</span>
+          <span>SOON 廣告工作台</span>
         </Link>
 
         <div className="nav-links">
-          <a href="/#overview">Overview</a>
-          <a href="/#metrics">Results</a>
-          <a href="/#workflow">Workflow</a>
-          <Link href="/my-workspace">Workspace</Link>
+          <a href="/#overview">總覽</a>
+          <a href="/#metrics">成效</a>
+          <a href="/#workflow">流程</a>
+          <Link href="/my-workspace">工作台</Link>
         </div>
 
         <div className="nav-actions">
           <Link href="/my-workspace" className="nav-secondary">
-            Sign In
+            登入
           </Link>
           <Link href="/submit-brief" className="nav-primary">
-            Start Brief
+            開始填寫需求
           </Link>
         </div>
       </nav>

@@ -72,56 +72,56 @@ export default function HomePage() {
         <section id="overview" className="hero-grid">
           <section className="hero-stage">
             <div className="hero-stage__glow" />
-            <div className="hero-meta">AI campaign workspace for lean teams</div>
-            <div className="hero-rating">4-step workflow from brief to creator delivery</div>
+            <div className="hero-meta">為精簡團隊而設的 AI 廣告工作台</div>
+            <div className="hero-rating">由需求提交到創作者交付，四步完成整體流程</div>
             <h1 className="hero-title">
-              Turn campaign spend
+              將廣告預算
               <br />
-              into content that
+              轉化為真正帶來
               <br />
-              actually converts.
+              成效的內容
             </h1>
             <div className="hero-sidecopy">
-              SOON 將 brief、策略判斷、creator matching、腳本與交付流程串成同一個工作台，幫品牌以更低摩擦完成 campaign execution。
+              SOON 將需求提交、策略判斷、創作者配對、腳本規劃與交付流程串成同一個工作台，協助品牌以更低摩擦完成整體廣告專案執行。
             </div>
             <div className="hero-actions">
               <Link href="/submit-brief" style={primaryButtonStyle}>
-                Start Your Brief
+                開始填寫需求
               </Link>
               <Link href="/my-workspace" style={secondaryButtonStyle}>
-                Go to Workspace
+                前往工作台
               </Link>
             </div>
 
             <div className="hero-brands">
-              <span>SOON Ops</span>
-              <span>Creator Match</span>
-              <span>Strategy AI</span>
-              <span>Delivery Flow</span>
-              <span>Paid Analysis</span>
+              <span>營運協作</span>
+              <span>創作者配對</span>
+              <span>策略分析</span>
+              <span>交付流程</span>
+              <span>付費分析</span>
             </div>
           </section>
 
           <aside className="hero-panel">
             <div className="hero-panel__card hero-panel__card--accent">
-              <div className="mini-eyebrow">Live Campaign Signal</div>
-              <div className="mini-title">Spend less time chasing vendors</div>
+              <div className="mini-eyebrow">即時流程訊號</div>
+              <div className="mini-title">減少來回追趕供應商的時間</div>
               <p className="mini-body">
-                From brief intake to creator shortlist, SOON keeps strategy, production, and follow-up in one place.
+                由需求提交到創作者候選名單，SOON 將策略、製作與後續跟進集中在同一處理流程之中。
               </p>
             </div>
 
             <div className="hero-panel__stack">
               <div className="mini-metric">
-                <span className="mini-metric__label">Brief to plan</span>
+                <span className="mini-metric__label">由需求到方案</span>
                 <span className="mini-metric__value">24h</span>
               </div>
               <div className="mini-metric">
-                <span className="mini-metric__label">Suggested angles</span>
+                <span className="mini-metric__label">建議角度</span>
                 <span className="mini-metric__value">5</span>
               </div>
               <div className="mini-metric">
-                <span className="mini-metric__label">Creator routes</span>
+                <span className="mini-metric__label">創作者路線</span>
                 <span className="mini-metric__value">3</span>
               </div>
             </div>
@@ -131,52 +131,52 @@ export default function HomePage() {
         <section id="metrics" className="stats-grid">
           <StatCard
             value="3x"
-            label="Faster campaign setup"
-            body="由簡報、題材方向到 creator 組合，先用 AI 砌出可執行初稿。"
+            label="更快完成廣告專案設定"
+            body="由需求、題材方向到創作者組合，先用 AI 建立可執行的初稿。"
           />
           <StatCard
             value="5"
-            label="Content angles per brief"
-            body="每份 brief 先拆出 5 個值得優先測試的訊息方向與內容角度。"
+            label="每份需求的內容角度"
+            body="每份需求先拆出 5 個值得優先測試的訊息方向與內容角度。"
           />
           <StatCard
             value="0"
-            label="Middleman overhead"
+            label="中介溝通成本"
             body="品牌直接掌握策略與 creator 配對流程，減少資訊斷層與額外中介成本。"
           />
         </section>
 
         <section className="section-heading">
-          <div className="section-heading__eyebrow">Why SOON</div>
-          <h2 className="section-heading__title">A campaign system built for execution, not pitch decks.</h2>
+          <div className="section-heading__eyebrow">為何選擇 SOON</div>
+          <h2 className="section-heading__title">這是一套為執行而設的廣告工作系統，而不是只用來提案的簡報。</h2>
         </section>
 
         <section className="features-grid">
           <FeatureCard
             eyebrow="01"
-            title="Brief once, route everything"
-            body="同一份 brief 會直接承接策略分析、creator matching、腳本規劃與交付追蹤，唔使每一站重新講一次。"
+            title="一次填寫需求，串連整條流程"
+            body="同一份需求會直接承接策略分析、創作者配對、腳本規劃與交付追蹤，無須在每一站重新說明。"
           />
           <FeatureCard
             eyebrow="02"
-            title="AI-first planning layer"
-            body="先用 AI 判斷 budget shape、內容角度與 deliverable 組合，再由人調整與確認，決策會快好多。"
+            title="以 AI 為先的規劃層"
+            body="先由 AI 判斷預算形態、內容角度與 deliverable 組合，再交由人手調整與確認，決策速度會明顯更快。"
           />
           <FeatureCard
             eyebrow="03"
-            title="Built-in creator workflow"
-            body="由 candidate shortlist 到後續交付確認都喺同一個 workspace 入面，適合持續跑 campaign。"
+            title="內建創作者協作流程"
+            body="由候選名單、腳本規劃到後續交付確認都在同一個工作台中處理，適合持續運行廣告專案。"
           />
         </section>
 
         <section id="workflow" className="workflow-panel">
-          <div className="section-heading__eyebrow">Workflow</div>
+          <div className="section-heading__eyebrow">運作流程</div>
           <div className="workflow-grid">
             {[
-              '1. Submit campaign brief',
-              '2. Get AI strategy and content angles',
-              '3. Review creator shortlist and ops flow',
-              '4. Move into script, storyboard, and delivery',
+              '1. 提交需求',
+              '2. 取得 AI 策略與內容角度',
+              '3. 檢視創作者名單與營運流程',
+              '4. 進入腳本、分鏡與交付階段',
             ].map((step) => (
               <div key={step} className="workflow-step">
                 {step}
