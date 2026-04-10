@@ -21,8 +21,8 @@ const DEMO_FORM: CampaignFormInput = {
   campaignTitle: 'Panda Cafe 春季宣傳',
   vertical: 'food',
   budgetRange: '15000-30000',
-  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。',
-  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+  brief: 'Panda Cafe 是一間主打日系甜品與打卡感空間的 cafe，希望吸引 18-30 歲女性與情侶於週末專程到訪。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友或情侶到訪、最後 CTA 提醒到店或追蹤',
 }
 
 function DeliveryTrackingContent() {
@@ -88,14 +88,14 @@ function DeliveryTrackingContent() {
 
   const progressCards = useMemo(() => ([
     {
-      title: 'Project Lock',
+      title: '專案鎖定',
       status: '已鎖定',
       description: deliveryDraft.depositStatus || '50% production deposit 已確認，project 已鎖定。',
     },
     {
       title: '製作主任跟進',
       status: '下一步',
-      description: deliveryDraft.whatsappContactIntent || '確認後請盡快由製作主任 WhatsApp 跟進拍攝細節、時間同 production handoff。',
+      description: deliveryDraft.whatsappContactIntent || '確認後請盡快由製作主任透過 WhatsApp 跟進拍攝細節、時間與製作交接。',
     },
     {
       title: '拍攝安排',
@@ -103,30 +103,30 @@ function DeliveryTrackingContent() {
       description: deliveryDraft.expectedShootWindow || '等待客戶同製作主任確認 shooting window。',
     },
     {
-      title: 'Watermarked Cut',
+      title: '帶水印版本',
       status: '未開始',
-      description: deliveryDraft.expectedDeliveryWindow || '等待 production 開始後安排第一輪 watermarked cut。',
+      description: deliveryDraft.expectedDeliveryWindow || '等待正式製作開始後安排第一輪帶水印版本。',
     },
     {
-      title: '尾數 / Full Payment',
+      title: '尾款付款',
       status: '未完成',
       description: deliveryDraft.finalPaymentRule || '出片前完成 full payment，先正式交付無水印 final version。',
     },
     {
-      title: 'Final Delivery',
+      title: '最終交付',
       status: '等待交付',
       description: '完成尾數後，SOON 會正式交付 final master。',
     },
   ]), [deliveryDraft])
 
   return (
-    <main style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)', color: '#1a1a18', fontFamily: 'Georgia, Times New Roman, serif', padding: '42px 24px 90px' }}>
+    <main style={{ minHeight: '100vh', color: '#f7f8fb', padding: '42px 24px 90px' }}>
       <div style={{ maxWidth: '1120px', margin: '0 auto', display: 'grid', gap: '20px' }}>
-        <section style={{ padding: '30px', borderRadius: '28px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>STEP 7</p>
+        <section style={{ padding: '30px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>步驟 7</p>
           <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>跟進內容交付</h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '860px' }}>
-            呢頁係 client 之後一路返嚟睇進度嘅地方。Marketing 訂閱費就係俾你一路 check 住 campaign、cut 同 production handoff；真正 production 方面，會由製作主任按你確認好嘅安排跟進到最後交片。
+          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', maxWidth: '860px' }}>
+            這一頁是客戶之後持續回來查看進度的地方。Marketing 訂閱費用主要用於持續追蹤 campaign、帶水印版本與製作交接；而實際製作部分，則會由製作主任按已確認安排跟進至最終交付。
           </p>
         </section>
 
@@ -148,28 +148,28 @@ function DeliveryTrackingContent() {
 
             <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               {progressCards.map((card) => (
-                <section key={card.title} style={{ padding: '22px', borderRadius: '22px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+                <section key={card.title} style={{ padding: '22px', borderRadius: '22px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
                     <div style={{ fontSize: '24px', lineHeight: 1.1 }}>{card.title}</div>
-                    <div style={{ minWidth: '78px', textAlign: 'center', padding: '7px 10px', borderRadius: '999px', background: card.status === '已鎖定' ? '#dbe7d0' : card.status === '下一步' ? '#f7f1e1' : 'rgba(26,26,24,0.06)', color: '#4f5b41', fontSize: '11px', letterSpacing: '0.06em' }}>
+                    <div style={{ minWidth: '78px', textAlign: 'center', padding: '7px 10px', borderRadius: '999px', background: card.status === '已鎖定' ? 'rgba(134,205,144,0.18)' : card.status === '下一步' ? 'rgba(255,94,54,0.12)' : 'rgba(255,255,255,0.06)', color: '#ffffff', fontSize: '11px', letterSpacing: '0.06em' }}>
                       {card.status}
                     </div>
                   </div>
-                  <div style={{ lineHeight: 1.7, color: '#5b5348' }}>{card.description}</div>
+                  <div style={{ lineHeight: 1.7, color: 'rgba(226,230,242,0.82)' }}>{card.description}</div>
                 </section>
               ))}
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CURRENT EXPECTATIONS</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>目前期望</div>
               <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.7, color: 'rgba(226,230,242,0.82)' }}>
                   <strong>預期拍攝 / 對細節時間：</strong> {deliveryDraft.expectedShootWindow || '待確認'}
                 </div>
-                <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                  <strong>預期第一輪 watermarked cut：</strong> {deliveryDraft.expectedDeliveryWindow || '待確認'}
+                <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.7, color: 'rgba(226,230,242,0.82)' }}>
+                  <strong>預期第一輪帶水印版本：</strong> {deliveryDraft.expectedDeliveryWindow || '待確認'}
                 </div>
-                <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7, color: '#4f493f' }}>
+                <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,94,54,0.1)', border: '1px solid rgba(255,121,93,0.18)', lineHeight: 1.7, color: '#f8ddd5' }}>
                   <strong>製作備註：</strong> {deliveryDraft.productionNotes || '暫未填寫'}
                 </div>
               </div>
@@ -177,9 +177,9 @@ function DeliveryTrackingContent() {
 
             <section style={{ padding: '26px', borderRadius: '24px', background: '#1a1a18', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>之後你會一路喺呢度見到 production 進展、watermarked cut 同尾數狀態。</div>
+              <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>之後你會持續在此查看製作進度、帶水印版本與尾款狀態。</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
-                如果之後要改拍攝安排、更新預期交期，或者想重新睇 production handoff，可以隨時返上一頁調整。等你準備好真 WhatsApp 號碼之後，我可以再幫你將製作主任聯絡掣正式接上。
+                如之後需要調整拍攝安排、更新預期交期，或重新查看製作交接內容，都可以隨時返回上一頁調整。待你準備好正式 WhatsApp 號碼後，我可以再幫你接上製作主任聯絡按鈕。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <button type="button" disabled style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '999px', background: '#f5efe5', color: '#1a1a18', padding: '14px 18px', fontSize: '14px', border: '1px solid rgba(245,239,229,0.4)', opacity: 0.72 }}>
@@ -189,21 +189,21 @@ function DeliveryTrackingContent() {
                   返回製作與交付安排確認
                 </Link>
                 <Link href={dashboardHref} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '999px', background: 'transparent', color: '#f5efe5', padding: '14px 18px', fontSize: '14px', border: '1px solid rgba(245,239,229,0.35)', textDecoration: 'none' }}>
-                  返回 campaign dashboard
+                  返回專案工作台
                 </Link>
               </div>
             </section>
           </div>
 
           <aside style={{ position: 'sticky', top: '24px' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN FLOW</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '10px' }}>流程進度</div>
+              <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#f7f8fb', marginBottom: '16px' }}>運作流程</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {[
                   { label: '1. 填寫品牌 brief', status: '完成' },
                   { label: '2. AI 分析宣傳方向', status: '完成' },
-                  { label: '3. 系統配對合適 creator', status: '完成' },
+                  { label: '3. 系統配對合適創作者', status: '完成' },
                   { label: '4. 生成題材與腳本建議', status: '完成' },
                   { label: '5. 整理拍攝方向與分鏡', status: '完成' },
                   { label: '6. 確認製作與交付安排', status: '完成' },
@@ -212,10 +212,10 @@ function DeliveryTrackingContent() {
                   const isCurrent = step.status === '進行中'
                   const isDone = step.status === '完成'
                   return (
-                    <div key={step.label} style={{ padding: '18px', borderRadius: '20px', border: isCurrent ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)', background: isCurrent ? '#f7f1e1' : isDone ? '#f1f5eb' : '#fbf8f1' }}>
+                    <div key={step.label} style={{ padding: '18px', borderRadius: '20px', border: isCurrent ? '1px solid rgba(255,121,93,0.26)' : '1px solid rgba(255,255,255,0.08)', background: isCurrent ? 'rgba(255,94,54,0.12)' : isDone ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <div style={{ fontSize: '16px', lineHeight: 1.55 }}>{step.label}</div>
-                        <div style={{ minWidth: '64px', textAlign: 'center', padding: '6px 10px', borderRadius: '999px', background: isCurrent ? '#1a1a18' : isDone ? '#dbe7d0' : 'rgba(26,26,24,0.06)', color: isCurrent ? '#f5efe5' : '#4f5b41', fontSize: '11px', letterSpacing: '0.06em' }}>
+                        <div style={{ fontSize: '16px', lineHeight: 1.55, color: '#f2f5fc' }}>{step.label}</div>
+                        <div style={{ minWidth: '64px', textAlign: 'center', padding: '6px 10px', borderRadius: '999px', background: isCurrent ? '#ff5d36' : isDone ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)', color: '#ffffff', fontSize: '11px', letterSpacing: '0.06em' }}>
                           {step.status}
                         </div>
                       </div>
@@ -233,7 +233,7 @@ function DeliveryTrackingContent() {
 
 export default function DeliveryTrackingPage() {
   return (
-    <Suspense fallback={<main style={{ minHeight: '100vh', padding: '80px 24px', background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)', fontFamily: 'Georgia, Times New Roman, serif' }}>正在打開內容交付追蹤頁...</main>}>
+    <Suspense fallback={<main style={{ minHeight: '100vh', padding: '80px 24px', color: '#f7f8fb' }}>正在打開內容交付追蹤頁...</main>}>
       <DeliveryTrackingContent />
     </Suspense>
   )

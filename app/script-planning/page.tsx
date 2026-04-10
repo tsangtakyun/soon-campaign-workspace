@@ -180,19 +180,19 @@ function ScriptPlanningContent() {
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf' }}>{pack.rationale}</div>
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CREATOR CREATIVE SCOPE</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>創作者發揮範圍</div>
               <div style={{ display: 'grid', gap: '10px' }}>
                 {pack.creatorCreativeDirection.map((item) => (
-                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.7, color: 'rgba(226,230,242,0.82)' }}>
                     {item}
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 2 · 背景 VO / BACKING INFORMATION</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>第 2 部分：背景旁白資訊</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {[
                   {
@@ -207,7 +207,7 @@ function ScriptPlanningContent() {
                   },
                   {
                     key: 'suitableAudience' as const,
-                    label: `清楚講出 ${form.businessName || '品牌'} 適合咩人去`,
+                    label: `清楚說明 ${form.businessName || '品牌'} 適合哪些人`,
                     placeholder: '例如：朋友聚會、情侶約會、週末打卡',
                   },
                   {
@@ -217,7 +217,7 @@ function ScriptPlanningContent() {
                   },
                 ].map((field) => (
                   <label key={field.key} style={{ display: 'grid', gap: '8px' }}>
-                    <div style={{ fontSize: '14px', color: '#5b5348' }}>{field.label}</div>
+                    <div style={{ fontSize: '14px', color: '#d7def0' }}>{field.label}</div>
                     <textarea
                       value={backingInfo[field.key]}
                       onChange={(event) => updateBackingInfo(field.key, event.target.value)}
@@ -227,14 +227,14 @@ function ScriptPlanningContent() {
                         minHeight: field.key === 'backgroundNotes' ? '96px' : '78px',
                         resize: 'vertical',
                         borderRadius: '16px',
-                        border: '1px solid rgba(26,26,24,0.12)',
+                        border: '1px solid rgba(255,255,255,0.1)',
                         padding: '14px 16px',
                         boxSizing: 'border-box',
                         fontSize: '14px',
                         lineHeight: 1.7,
                         fontFamily: 'inherit',
-                        background: '#fbf8f1',
-                        color: '#1a1a18',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: '#f5efe5',
                       }}
                     />
                   </label>
@@ -242,12 +242,12 @@ function ScriptPlanningContent() {
               </div>
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>PART 4 · 實測內容</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>第 4 部分：實測內容</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 {testContentItems.map((item, index) => (
                   <label key={`test-content-${index}`} style={{ display: 'grid', gap: '8px' }}>
-                    <div style={{ fontSize: '14px', color: '#5b5348' }}>實測內容 {index + 1}</div>
+                    <div style={{ fontSize: '14px', color: '#d7def0' }}>實測內容 {index + 1}</div>
                     <textarea
                       value={item}
                       onChange={(event) => updateTestContent(index, event.target.value)}
@@ -257,14 +257,14 @@ function ScriptPlanningContent() {
                         minHeight: '110px',
                         resize: 'vertical',
                         borderRadius: '16px',
-                        border: '1px solid rgba(26,26,24,0.12)',
+                        border: '1px solid rgba(255,255,255,0.1)',
                         padding: '14px 16px',
                         boxSizing: 'border-box',
                         fontSize: '14px',
                         lineHeight: 1.7,
                         fontFamily: 'inherit',
-                        background: '#fbf8f1',
-                        color: '#1a1a18',
+                        background: 'rgba(255,255,255,0.04)',
+                        color: '#f5efe5',
                       }}
                     />
                   </label>
@@ -272,17 +272,17 @@ function ScriptPlanningContent() {
               </div>
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CLIENT DECISIONS + CTA</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>客戶確認事項與行動引導</div>
               <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
                 {pack.clientDecisions.map((item) => (
-                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                  <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.7, color: 'rgba(226,230,242,0.82)' }}>
                     {item}
                   </div>
                 ))}
               </div>
-              <div style={{ padding: '16px', borderRadius: '18px', background: '#f3ead7', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.8, color: '#4f493f' }}>
-                <strong>CTA Direction：</strong> {pack.ctaDirection}
+              <div style={{ padding: '16px', borderRadius: '18px', background: 'rgba(255,94,54,0.12)', border: '1px solid rgba(255,121,93,0.2)', lineHeight: 1.8, color: '#f8ddd5' }}>
+                <strong>行動方向：</strong> {pack.ctaDirection}
               </div>
             </section>
 
@@ -301,11 +301,11 @@ function ScriptPlanningContent() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: scriptPlanningConfirmed ? '#dbe7d0' : '#f5efe5',
-                    color: '#1a1a18',
+                    background: scriptPlanningConfirmed ? 'rgba(134,205,144,0.18)' : 'linear-gradient(135deg, #ff5d36, #ff3d2e)',
+                    color: '#ffffff',
                     padding: '14px 18px',
                     fontSize: '14px',
-                    border: '1px solid rgba(245,239,229,0.4)',
+                    border: scriptPlanningConfirmed ? '1px solid rgba(134,205,144,0.28)' : '1px solid rgba(255,121,93,0.26)',
                     cursor: 'pointer',
                   }}
                 >
@@ -355,9 +355,9 @@ function ScriptPlanningContent() {
           </div>
 
           <aside style={{ position: 'sticky', top: '24px' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN FLOW</div>
-              <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '10px' }}>流程進度</div>
+              <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#f7f8fb', marginBottom: '16px' }}>運作流程</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {[
                   { label: '1. 填寫品牌需求', status: '完成' },
@@ -376,19 +376,19 @@ function ScriptPlanningContent() {
                       style={{
                         padding: '18px',
                         borderRadius: '20px',
-                        border: isCurrent ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
-                        background: isCurrent ? '#f7f1e1' : isDone ? '#f1f5eb' : '#fbf8f1',
+                        border: isCurrent ? '1px solid rgba(255,121,93,0.26)' : '1px solid rgba(255,255,255,0.08)',
+                        background: isCurrent ? 'rgba(255,94,54,0.12)' : isDone ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                        <div style={{ fontSize: '16px', lineHeight: 1.55 }}>{step.label}</div>
+                        <div style={{ fontSize: '16px', lineHeight: 1.55, color: '#f2f5fc' }}>{step.label}</div>
                         <div style={{
                           minWidth: '64px',
                           textAlign: 'center',
                           padding: '6px 10px',
                           borderRadius: '999px',
-                          background: isCurrent ? '#1a1a18' : isDone ? '#dbe7d0' : 'rgba(26,26,24,0.06)',
-                          color: isCurrent ? '#f5efe5' : '#4f5b41',
+                          background: isCurrent ? '#ff5d36' : isDone ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                          color: '#ffffff',
                           fontSize: '11px',
                           letterSpacing: '0.06em',
                         }}>
@@ -400,8 +400,8 @@ function ScriptPlanningContent() {
                 })}
               </div>
             </section>
-            <div style={{ marginTop: '14px', fontSize: '14px', color: '#5b5348', lineHeight: 1.7 }}>
-              <Link href={creatorHref} style={{ color: '#1a1a18' }}>返回創作者配對</Link>
+            <div style={{ marginTop: '14px', fontSize: '14px', color: 'rgba(214,220,236,0.78)', lineHeight: 1.7 }}>
+              <Link href={creatorHref} style={{ color: '#f5efe5' }}>返回創作者配對</Link>
             </div>
           </aside>
         </section>
