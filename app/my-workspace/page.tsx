@@ -19,15 +19,45 @@ type WorkspaceCampaign = {
 }
 
 function objectiveLabel(objective: string) {
-  if (objective === 'sales') return '轉化 / Sales'
-  if (objective === 'reach') return '曝光 / Reach'
-  return '品牌 / Engagement'
+  if (objective === 'sales') return '轉換導向'
+  if (objective === 'reach') return '曝光導向'
+  return '品牌導向'
 }
+
+const shellStyle = {
+  minHeight: '100vh',
+  padding: '40px 24px 100px',
+  color: '#f7f8fb',
+} as const
+
+const containerStyle = {
+  maxWidth: '1180px',
+  margin: '0 auto',
+  display: 'grid',
+  gap: '20px',
+} as const
+
+const cardStyle = {
+  borderRadius: '30px',
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 28px 80px rgba(0,0,0,0.36)',
+} as const
+
+const eyebrowStyle = {
+  fontSize: '12px',
+  letterSpacing: '0.18em',
+  textTransform: 'uppercase' as const,
+  color: 'rgba(162,178,214,0.8)',
+  marginBottom: '10px',
+} as const
 
 export default async function MyWorkspacePage() {
   const cookieStore = await cookies()
   const supabase = createServerSupabase(cookieStore)
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user?.email) {
     redirect('/login?next=/my-workspace')
@@ -37,7 +67,9 @@ export default async function MyWorkspacePage() {
   const normalizedEmail = user.email.trim().toLowerCase()
   const { data: analyses } = await admin
     .from('campaign_intakes')
-    .select('id, business_name, campaign_title, objective, vertical, created_at, payment_status, email, stripe_customer_email, full_analysis')
+    .select(
+      'id, business_name, campaign_title, objective, vertical, created_at, payment_status, email, stripe_customer_email, full_analysis'
+    )
     .eq('payment_status', 'paid')
     .order('created_at', { ascending: false })
 
@@ -53,7 +85,10 @@ export default async function MyWorkspacePage() {
         const workflow = extractWorkflowState(activeCampaign.full_analysis)
         return buildCampaignProgress({
           paymentStatus: activeCampaign.payment_status,
-          hasFullAnalysis: Boolean(activeCampaign.full_analysis && Object.keys(activeCampaign.full_analysis).length),
+          hasFullAnalysis: Boolean(
+            activeCampaign.full_analysis &&
+              Object.keys(activeCampaign.full_analysis).length
+          ),
           hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
           hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
           hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
@@ -63,44 +98,69 @@ export default async function MyWorkspacePage() {
     : null
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
-      padding: '42px 24px 90px',
-    }}>
-      <div style={{ maxWidth: '1180px', margin: '0 auto', display: 'grid', gap: '20px' }}>
-        <section style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.1fr) 360px',
-          gap: '20px',
-          alignItems: 'stretch',
-        }}>
-          <section style={{ padding: '30px', borderRadius: '28px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-            <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>CLIENT DASHBOARD</p>
-            <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>你的 campaign dashboard</h1>
-            <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '760px' }}>
-              每次返嚟，你唔係只會見到一份分析，而係見到每個 campaign 做到邊一步、系統最新建議係咩，下一步應該點行。
+    <main style={shellStyle}>
+      <div style={containerStyle}>
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.1fr) 360px',
+            gap: '20px',
+            alignItems: 'stretch',
+          }}
+        >
+          <section style={{ ...cardStyle, padding: '30px' }}>
+            <div style={eyebrowStyle}>品牌工作台</div>
+            <h1
+              style={{
+                margin: '0 0 12px',
+                fontSize: 'clamp(2.6rem, 5vw, 4.4rem)',
+                lineHeight: 0.98,
+                letterSpacing: '-0.07em',
+                fontWeight: 350,
+              }}
+            >
+              你的廣告工作台
+            </h1>
+            <p
+              style={{
+                margin: 0,
+                fontSize: '18px',
+                lineHeight: 1.8,
+                color: 'rgba(210,217,234,0.8)',
+                maxWidth: '760px',
+              }}
+            >
+              每次返回這裡，你看到的不只是單一分析，而是每個專案目前進行到哪一步、最新建議為何，以及下一步應如何推進。
             </p>
           </section>
 
-          <section style={{ padding: '26px', borderRadius: '28px', background: '#1d1d1b', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
-            <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>ACTIVE STATUS</div>
-            <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '10px' }}>
-              {activeProgress ? activeProgress.currentStageLabel : '等待建立第一個 campaign'}
+          <section style={{ ...cardStyle, padding: '26px' }}>
+            <div style={eyebrowStyle}>目前狀態</div>
+            <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '10px', fontWeight: 350 }}>
+              {activeProgress ? activeProgress.currentStageLabel : '等待建立第一個廣告專案'}
             </div>
-            <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '16px' }}>
-              {activeProgress ? activeProgress.summary : '完成第一個 brief + analysis 後，呢度會自動變成你嘅 campaign 進度總覽。'}
+            <div
+              style={{
+                fontSize: '16px',
+                lineHeight: 1.8,
+                color: 'rgba(226,230,242,0.78)',
+                marginBottom: '16px',
+              }}
+            >
+              {activeProgress
+                ? activeProgress.summary
+                : '完成第一份需求與分析後，這裡便會自動成為你的專案進度總覽。'}
             </div>
             <div style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#c7bdaf', marginBottom: '6px' }}>ACTIVE CAMPAIGNS</div>
+              <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>進行中專案</div>
                 <div style={{ fontSize: '32px' }}>{campaigns.length}</div>
               </div>
-              <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#c7bdaf', marginBottom: '6px' }}>NEXT ACTION</div>
-                <div style={{ lineHeight: 1.7 }}>{activeProgress ? activeProgress.nextActionLabel : '建立第一個 campaign brief'}</div>
+              <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>下一步行動</div>
+                <div style={{ lineHeight: 1.7 }}>
+                  {activeProgress ? activeProgress.nextActionLabel : '建立第一份廣告需求'}
+                </div>
               </div>
             </div>
           </section>
@@ -112,53 +172,80 @@ export default async function MyWorkspacePage() {
               const workflow = extractWorkflowState(item.full_analysis)
               const progress = buildCampaignProgress({
                 paymentStatus: item.payment_status,
-                hasFullAnalysis: Boolean(item.full_analysis && Object.keys(item.full_analysis).length),
+                hasFullAnalysis: Boolean(
+                  item.full_analysis && Object.keys(item.full_analysis).length
+                ),
                 hasCreatorMatchingConfirmed: workflow.creatorMatchingConfirmed,
                 hasScriptPlanningConfirmed: workflow.scriptPlanningConfirmed,
                 hasStoryboardPlanningConfirmed: workflow.storyboardPlanningConfirmed,
-                hasDeliveryConfirmationConfirmed: workflow.deliveryConfirmationConfirmed,
+                hasDeliveryConfirmationConfirmed:
+                  workflow.deliveryConfirmationConfirmed,
               })
 
               return (
-                <section
-                  key={item.id}
-                  style={{
-                    padding: '24px',
-                    borderRadius: '26px',
-                    background: 'rgba(255,255,255,0.78)',
-                    border: '1px solid rgba(26,26,24,0.10)',
-                    boxShadow: '0 20px 50px rgba(26,26,24,0.05)',
-                  }}
-                >
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) 330px', gap: '18px', alignItems: 'start' }}>
+                <section key={item.id} style={{ ...cardStyle, padding: '24px' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1.1fr) 330px',
+                      gap: '18px',
+                      alignItems: 'start',
+                    }}
+                  >
                     <div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
-                        <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: '#8b7c69' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '10px',
+                          alignItems: 'center',
+                          marginBottom: '10px',
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: 'rgba(162,178,214,0.8)' }}>
                           {new Date(item.created_at).toLocaleDateString('zh-HK')}
                         </div>
-                        <div style={{ padding: '6px 10px', borderRadius: '999px', background: '#eef5e8', color: '#3d5b35', fontSize: '11px', letterSpacing: '0.06em' }}>
-                          已付費解鎖
+                        <div
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '999px',
+                            background: 'rgba(255,94,54,0.14)',
+                            color: '#ffd9cf',
+                            fontSize: '11px',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          已完成付款
                         </div>
-                        <div style={{ padding: '6px 10px', borderRadius: '999px', background: '#f2ecdf', color: '#665f54', fontSize: '11px', letterSpacing: '0.06em' }}>
+                        <div
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '999px',
+                            background: 'rgba(255,255,255,0.05)',
+                            color: '#d7dded',
+                            fontSize: '11px',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
                           {objectiveLabel(item.objective)}
                         </div>
                       </div>
 
-                      <div style={{ fontSize: '34px', lineHeight: 1.06, marginBottom: '8px' }}>
+                      <div style={{ fontSize: '34px', lineHeight: 1.06, marginBottom: '8px', fontWeight: 350 }}>
                         {item.business_name || '未命名品牌'}
                       </div>
-                      <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#5b5348', marginBottom: '14px' }}>
-                        {item.campaign_title || 'Campaign analysis'} · {item.vertical} · {progress.currentStageLabel}
+                      <div style={{ fontSize: '17px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', marginBottom: '14px' }}>
+                        {item.campaign_title || '廣告分析'} · {item.vertical} · {progress.currentStageLabel}
                       </div>
 
                       <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
-                        <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
-                          <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>最新更新</div>
-                          <div style={{ lineHeight: 1.7 }}>{progress.latestUpdate}</div>
+                        <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ fontSize: '12px', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>最新更新</div>
+                          <div style={{ lineHeight: 1.75 }}>{progress.latestUpdate}</div>
                         </div>
-                        <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
-                          <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>下一步</div>
-                          <div style={{ lineHeight: 1.7 }}>{progress.nextActionLabel}</div>
+                        <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ fontSize: '12px', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>下一步</div>
+                          <div style={{ lineHeight: 1.75 }}>{progress.nextActionLabel}</div>
                         </div>
                       </div>
 
@@ -170,14 +257,15 @@ export default async function MyWorkspacePage() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderRadius: '999px',
-                            background: '#1a1a18',
-                            color: '#f5efe5',
+                            background: 'linear-gradient(135deg, #ff5d36, #ff3d2e)',
+                            color: '#ffffff',
                             padding: '12px 18px',
                             textDecoration: 'none',
                             fontSize: '14px',
+                            border: '1px solid rgba(255,121,93,0.24)',
                           }}
                         >
-                          查看 campaign dashboard
+                          查看專案工作台
                         </Link>
                         <Link
                           href={`/paid-analysis?campaign_intake_id=${encodeURIComponent(item.id)}`}
@@ -186,12 +274,12 @@ export default async function MyWorkspacePage() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderRadius: '999px',
-                            background: '#fff',
-                            color: '#1a1a18',
+                            background: 'rgba(255,255,255,0.04)',
+                            color: '#f4f7ff',
                             padding: '12px 18px',
                             textDecoration: 'none',
                             fontSize: '14px',
-                            border: '1px solid rgba(26,26,24,0.12)',
+                            border: '1px solid rgba(255,255,255,0.12)',
                           }}
                         >
                           查看完整分析
@@ -210,22 +298,43 @@ export default async function MyWorkspacePage() {
                             style={{
                               padding: '16px',
                               borderRadius: '18px',
-                              border: isCurrent ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
-                              background: isCurrent ? '#f7f1e1' : isDone ? '#f1f5eb' : '#fbf8f1',
+                              border: isCurrent
+                                ? '1px solid rgba(255,121,93,0.26)'
+                                : '1px solid rgba(255,255,255,0.08)',
+                              background: isCurrent
+                                ? 'rgba(255,94,54,0.12)'
+                                : isDone
+                                  ? 'rgba(255,255,255,0.06)'
+                                  : 'rgba(255,255,255,0.03)',
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                              <div style={{ fontSize: '15px', lineHeight: 1.55 }}>{step.label}</div>
-                              <div style={{
-                                minWidth: '64px',
-                                textAlign: 'center',
-                                padding: '6px 10px',
-                                borderRadius: '999px',
-                                background: isCurrent ? '#1a1a18' : isDone ? '#dbe7d0' : 'rgba(26,26,24,0.06)',
-                                color: isCurrent ? '#f5efe5' : '#4f5b41',
-                                fontSize: '11px',
-                                letterSpacing: '0.06em',
-                              }}>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                              }}
+                            >
+                              <div style={{ fontSize: '15px', lineHeight: 1.55 }}>
+                                {step.label}
+                              </div>
+                              <div
+                                style={{
+                                  minWidth: '64px',
+                                  textAlign: 'center',
+                                  padding: '6px 10px',
+                                  borderRadius: '999px',
+                                  background: isCurrent
+                                    ? '#ff5d36'
+                                    : isDone
+                                      ? 'rgba(255,255,255,0.12)'
+                                      : 'rgba(255,255,255,0.06)',
+                                  color: '#ffffff',
+                                  fontSize: '11px',
+                                  letterSpacing: '0.06em',
+                                }}
+                              >
                                 {step.status}
                               </div>
                             </div>
@@ -239,8 +348,15 @@ export default async function MyWorkspacePage() {
             })}
           </section>
         ) : (
-          <section style={{ padding: '24px', borderRadius: '24px', background: '#fbf2df', border: '1px solid rgba(26,26,24,0.10)', color: '#5a5349' }}>
-            你而家仲未有已保存嘅 campaign。完成第一次付款後，第一個 campaign dashboard 會自動出現喺呢度。
+          <section
+            style={{
+              ...cardStyle,
+              padding: '24px',
+              color: 'rgba(210,217,234,0.8)',
+              lineHeight: 1.8,
+            }}
+          >
+            目前尚未有已保存的專案。完成第一次付款後，第一個專案工作台便會自動出現在這裡。
           </section>
         )}
       </div>
