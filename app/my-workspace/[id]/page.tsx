@@ -155,27 +155,27 @@ export default async function WorkspaceCampaignDetailPage(
               </div>
             </section>
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>RECOMMENDED CREATOR DIRECTION</div>
+            <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>建議創作者方向</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {creatorMatches.slice(0, 2).map((match, index) => (
-                  <div key={match.title} style={{ padding: '18px', borderRadius: '18px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                  <div key={match.title} style={{ padding: '18px', borderRadius: '18px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
                       <div>
-                        <div style={{ fontSize: '12px', letterSpacing: '0.12em', color: '#8b7c69', marginBottom: '4px' }}>MATCH {index + 1}</div>
+                        <div style={{ fontSize: '12px', letterSpacing: '0.12em', color: 'rgba(162,178,214,0.8)', marginBottom: '4px' }}>配對 {index + 1}</div>
                         <div style={{ fontSize: '26px', lineHeight: 1.08 }}>{match.title}</div>
                       </div>
-                      <div style={{ minWidth: '78px', textAlign: 'center', padding: '8px 10px', borderRadius: '16px', background: '#f1ebde' }}>
-                        <div style={{ fontSize: '11px', color: '#8b7c69' }}>FIT</div>
+                      <div style={{ minWidth: '78px', textAlign: 'center', padding: '8px 10px', borderRadius: '16px', background: 'rgba(255,94,54,0.12)' }}>
+                        <div style={{ fontSize: '11px', color: 'rgba(255,210,198,0.82)' }}>適配度</div>
                         <div style={{ fontSize: '24px' }}>{match.fitScore}</div>
                       </div>
                     </div>
-                    <div style={{ lineHeight: 1.7, color: '#5b5348', marginBottom: '8px' }}>{match.summary}</div>
-                    <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#4f493f' }}>
-                      <strong>Best use：</strong> {match.bestUse}
+                    <div style={{ lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', marginBottom: '8px' }}>{match.summary}</div>
+                    <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#dce2f3' }}>
+                      <strong>最佳用途：</strong> {match.bestUse}
                     </div>
-                    <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#4f493f', marginTop: '6px' }}>
-                      <strong>Rate：</strong> {match.reelRate} · <strong>SOON commission：</strong> {match.soonCommissionRate} ({match.soonCommissionAmount})
+                    <div style={{ fontSize: '14px', lineHeight: 1.7, color: '#dce2f3', marginTop: '6px' }}>
+                      <strong>報價：</strong> {match.reelRate} · <strong>SOON 佣金：</strong> {match.soonCommissionRate} ({match.soonCommissionAmount})
                     </div>
                   </div>
                 ))}
@@ -183,24 +183,24 @@ export default async function WorkspaceCampaignDetailPage(
             </section>
 
             {workflow.selectedCreatorTitle && (
-              <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>CONFIRMED DIRECTION</div>
-                <div style={{ lineHeight: 1.8, color: '#4f493f' }}>
-                  已確認 creator archetype：<strong>{workflow.selectedCreatorTitle}</strong>
+              <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>已確認方向</div>
+                <div style={{ lineHeight: 1.8, color: 'rgba(210,217,234,0.8)' }}>
+                  已確認創作者類型：<strong>{workflow.selectedCreatorTitle}</strong>
                   {workflow.deliveryConfirmationConfirmed
                     ? '，製作與交付安排亦已確認。'
                     : workflow.scriptPlanningConfirmed
-                      ? '，script planning 亦已完成確認。'
-                      : '，等待進入並確認 script planning。'}
+                      ? '，腳本規劃亦已完成確認。'
+                      : '，等待進入並確認腳本規劃。'}
                 </div>
               </section>
             )}
 
-            <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
-              <div style={{ fontSize: '32px', lineHeight: 1.08, marginBottom: '12px' }}>確認完 storyboard 之後，客戶仲要正式確認製作與交付安排。</div>
-              <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px' }}>
-                之後你個 dashboard 會繼續更新，由 creator matching 去到題材與腳本、storyboard，再到 50% 訂金鎖 project 同內容交付進度。
+            <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', color: '#f5efe5', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '10px' }}>下一步</div>
+              <div style={{ fontSize: '32px', lineHeight: 1.08, marginBottom: '12px' }}>確認分鏡之後，客戶仍需正式確認製作與交付安排。</div>
+              <div style={{ fontSize: '16px', lineHeight: 1.8, color: 'rgba(226,230,242,0.8)', marginBottom: '18px' }}>
+                之後工作台會持續更新，由創作者配對、題材與腳本、分鏡規劃，到 50% 訂金鎖定專案與內容交付進度。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <Link
@@ -210,14 +210,14 @@ export default async function WorkspaceCampaignDetailPage(
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
-                    color: '#1a1a18',
+                    background: 'linear-gradient(135deg, #ff5d36, #ff3d2e)',
+                    color: '#ffffff',
                     padding: '14px 18px',
                     textDecoration: 'none',
                     fontSize: '14px',
                   }}
                 >
-                  進入 creator matching
+                  進入創作者配對
                 </Link>
                 <Link
                   href={`/script-planning?campaign_intake_id=${encodeURIComponent(campaign.id)}`}
@@ -226,15 +226,15 @@ export default async function WorkspaceCampaignDetailPage(
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
-                    color: '#1a1a18',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#f5efe5',
                     padding: '14px 18px',
                     textDecoration: 'none',
                     fontSize: '14px',
-                    border: '1px solid rgba(245,239,229,0.4)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                   }}
                 >
-                  進入 script planning
+                  進入腳本規劃
                 </Link>
                 <Link
                   href={storyboardHref}
@@ -243,15 +243,15 @@ export default async function WorkspaceCampaignDetailPage(
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
-                    color: '#1a1a18',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#f5efe5',
                     padding: '14px 18px',
                     textDecoration: 'none',
                     fontSize: '14px',
-                    border: '1px solid rgba(245,239,229,0.4)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                   }}
                 >
-                  進入 storyboard planning
+                  進入分鏡規劃
                 </Link>
                 <Link
                   href={deliveryConfirmationHref}
@@ -260,12 +260,12 @@ export default async function WorkspaceCampaignDetailPage(
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
-                    color: '#1a1a18',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#f5efe5',
                     padding: '14px 18px',
                     textDecoration: 'none',
                     fontSize: '14px',
-                    border: '1px solid rgba(245,239,229,0.4)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                   }}
                 >
                   確認製作與交付安排
@@ -277,12 +277,12 @@ export default async function WorkspaceCampaignDetailPage(
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '999px',
-                    background: '#f5efe5',
-                    color: '#1a1a18',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: '#f5efe5',
                     padding: '14px 18px',
                     textDecoration: 'none',
                     fontSize: '14px',
-                    border: '1px solid rgba(245,239,229,0.4)',
+                    border: '1px solid rgba(255,255,255,0.12)',
                   }}
                 >
                   進入內容交付追蹤
@@ -309,8 +309,8 @@ export default async function WorkspaceCampaignDetailPage(
           </div>
 
           <aside style={{ position: 'sticky', top: '24px' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN FLOW</div>
+            <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '10px' }}>流程進度</div>
               <div style={{ fontSize: '34px', lineHeight: 1.05, marginBottom: '16px' }}>運作流程</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {progress.steps.map((step) => {
@@ -323,8 +323,8 @@ export default async function WorkspaceCampaignDetailPage(
                       style={{
                         padding: '18px',
                         borderRadius: '20px',
-                        border: isCurrent ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
-                        background: isCurrent ? '#f7f1e1' : isDone ? '#f1f5eb' : '#fbf8f1',
+                        border: isCurrent ? '1px solid rgba(255,121,93,0.26)' : '1px solid rgba(255,255,255,0.08)',
+                        background: isCurrent ? 'rgba(255,94,54,0.12)' : isDone ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
@@ -334,8 +334,8 @@ export default async function WorkspaceCampaignDetailPage(
                           textAlign: 'center',
                           padding: '6px 10px',
                           borderRadius: '999px',
-                          background: isCurrent ? '#1a1a18' : isDone ? '#dbe7d0' : 'rgba(26,26,24,0.06)',
-                          color: isCurrent ? '#f5efe5' : '#4f5b41',
+                          background: isCurrent ? '#ff5d36' : isDone ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                          color: '#ffffff',
                           fontSize: '11px',
                           letterSpacing: '0.06em',
                         }}>
