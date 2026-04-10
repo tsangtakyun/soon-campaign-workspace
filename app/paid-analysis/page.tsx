@@ -16,8 +16,8 @@ const DEMO_FORM: CampaignFormInput = {
   campaignTitle: 'Panda Cafe 春季宣傳',
   vertical: 'food',
   budgetRange: '15000-30000',
-  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。今次想做一條 social media 宣傳片，感覺唔好太似廣告，而係令人覺得呢間 cafe 真係值得去坐下、影相、食甜品。',
-  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+  brief: 'Panda Cafe 是一間主打日系甜品與打卡感空間的 cafe，希望吸引 18-30 歲女性與情侶於週末專程到訪。這次希望製作一條 social media 宣傳片，整體感覺不宜過於廣告化，而是讓人真實感受到這間 cafe 值得前往、拍照與品嚐甜品。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友或情侶到訪、最後 CTA 提醒到店或追蹤',
 }
 
 function PaidAnalysisContent() {
@@ -85,7 +85,7 @@ function PaidAnalysisContent() {
 
         const res = await fetch(`/api/stripe/checkout-session?session_id=${encodeURIComponent(sessionId)}`)
         const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Unable to verify payment')
+        if (!res.ok) throw new Error(data.error || '未能驗證付款狀態。')
         if (data.payment_status !== 'paid') throw new Error('付款尚未完成。')
         setPaid(true)
 
@@ -186,39 +186,37 @@ function PaidAnalysisContent() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
+      color: '#f7f8fb',
       padding: '42px 24px 90px',
     }}>
       <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
         <section style={{
           padding: '30px',
-          borderRadius: '28px',
-          background: 'rgba(255,255,255,0.78)',
-          border: '1px solid rgba(26,26,24,0.10)',
+          borderRadius: '30px',
+          background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))',
+          border: '1px solid rgba(255,255,255,0.08)',
           marginBottom: '20px',
         }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>PAID AI ANALYSIS</p>
-          <h1 style={{ margin: '0 0 12px', fontSize: '50px', lineHeight: 1.02, fontWeight: 500 }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>完整 AI 分析</p>
+          <h1 style={{ margin: '0 0 12px', fontSize: '50px', lineHeight: 1.02, fontWeight: 350 }}>
             完整 AI 分析宣傳方向
           </h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348' }}>
-            付款成功之後，先會解鎖完整預算打法、題材角度、交付建議同 creator fit 建議。
+          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)' }}>
+            付款成功後，系統會解鎖完整預算打法、題材角度、交付建議與創作者適配方向。
           </p>
         </section>
 
         {checking && (
-          <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+          <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
             正在確認付款狀態...
           </section>
         )}
 
         {!checking && error && (
-          <section style={{ padding: '24px', borderRadius: '24px', background: '#fbf2df', border: '1px solid rgba(26,26,24,0.10)' }}>
+          <section style={{ padding: '24px', borderRadius: '28px', background: 'rgba(181,69,69,0.16)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: '20px', marginBottom: '8px' }}>未能解鎖完整分析</div>
-            <div style={{ color: '#5a5349', marginBottom: '14px' }}>{error}</div>
-            <Link href="/submit-brief" style={{ color: '#1a1a18' }}>返回 brief 頁</Link>
+            <div style={{ color: '#ffe7e3', marginBottom: '14px' }}>{error}</div>
+            <Link href="/submit-brief" style={{ color: '#ffffff' }}>返回需求頁</Link>
           </section>
         )}
 
@@ -453,13 +451,11 @@ export default function PaidAnalysisPage() {
     <Suspense fallback={
       <main style={{
         minHeight: '100vh',
-        background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-        color: '#1a1a18',
-        fontFamily: 'Georgia, Times New Roman, serif',
+        color: '#f7f8fb',
         padding: '42px 24px 90px',
       }}>
         <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
-          <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+          <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
             正在載入付款結果...
           </section>
         </div>

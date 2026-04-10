@@ -22,8 +22,8 @@ const DEMO_FORM: CampaignFormInput = {
   campaignTitle: 'Panda Cafe 春季宣傳',
   vertical: 'food',
   budgetRange: '15000-30000',
-  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。',
-  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+  brief: 'Panda Cafe 是一間主打日系甜品與打卡感空間的 cafe，希望吸引 18-30 歲女性與情侶於週末專程到訪。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友或情侶到訪、最後 CTA 提醒到店或追蹤',
 }
 
 function ScriptPlanningContent() {
@@ -86,7 +86,7 @@ function ScriptPlanningContent() {
           }
           if (workflow?.scriptPlanningConfirmed) {
             setScriptPlanningConfirmed(true)
-            setConfirmMessage('Script planning 已確認，campaign 進度已更新。')
+            setConfirmMessage('腳本規劃已確認，專案進度已更新。')
           }
         }
       } finally {
@@ -116,7 +116,7 @@ function ScriptPlanningContent() {
 
   async function confirmScriptPlanning() {
     if (!campaignIntakeId) {
-      setConfirmMessage('呢個 demo 版本未有 campaign id，未能正式確認。')
+      setConfirmMessage('目前 demo 版本未有 campaign id，未能正式確認。')
       return
     }
 
@@ -139,13 +139,13 @@ function ScriptPlanningContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || '未能確認 script planning')
+        throw new Error(data.error || '未能確認腳本規劃。')
       }
 
       setScriptPlanningConfirmed(true)
-      setConfirmMessage('Script planning 已確認，系統知道可以進入 storyboard planning。')
+      setConfirmMessage('腳本規劃已確認，系統知道可以進入分鏡規劃階段。')
     } catch (error: any) {
-      setConfirmMessage(error.message || '未能確認 script planning')
+      setConfirmMessage(error.message || '未能確認腳本規劃。')
     } finally {
       setConfirmingScriptPlanning(false)
     }
@@ -154,23 +154,21 @@ function ScriptPlanningContent() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
+      color: '#f7f8fb',
       padding: '42px 24px 90px',
     }}>
       <div style={{ maxWidth: '1120px', margin: '0 auto', display: 'grid', gap: '20px' }}>
-        <section style={{ padding: '30px', borderRadius: '28px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>STEP 4</p>
+        <section style={{ padding: '30px', borderRadius: '30px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>步驟 4</p>
           <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>生成題材與腳本建議</h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '820px' }}>
-            呢一步唔係幫客戶寫死完整 script。真正應該由客戶先確認嘅，係 internal script system 入面最重要嘅兩塊：第 2 part【背景 VO】同第 4 part【實測內容】；至於 Hook / 轉場 / Ending，應該交返俾 creator 用自己風格去發揮。
+          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', maxWidth: '820px' }}>
+            這一步不是直接替客戶寫死完整腳本。真正需要先確認的，是內部腳本系統中最關鍵的兩部分：第 2 段【背景旁白】與第 4 段【實測內容】；至於 Hook、轉場與 Ending，應交由創作者以自身風格發揮。
           </p>
         </section>
 
         {loadingSaved && (
           <section style={{ padding: '20px 22px', borderRadius: '22px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
-            正在同步你呢個 campaign 嘅 script planning 資料...
+            正在同步此專案的腳本規劃資料...
           </section>
         )}
 
@@ -292,7 +290,7 @@ function ScriptPlanningContent() {
               <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
               <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>下一步會將腳本方向整理成 storyboard 同拍攝方向。</div>
               <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
-                你而家見到嘅係第一輪 script planning。之後再進一步，就會變成 shot plan、opening / transition / ending 分鏡同實際 production handoff。
+                你現在看到的是第一輪腳本規劃。再往下一步，便會轉化為 shot plan、opening / transition / ending 分鏡與實際製作交接內容。
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 <button
@@ -311,7 +309,7 @@ function ScriptPlanningContent() {
                     cursor: 'pointer',
                   }}
                 >
-                  {confirmingScriptPlanning ? '確認中...' : scriptPlanningConfirmed ? '已確認 script planning' : '確認 script planning'}
+                  {confirmingScriptPlanning ? '確認中...' : scriptPlanningConfirmed ? '已確認腳本規劃' : '確認腳本規劃'}
                 </button>
                 <Link
                   href={storyboardHref}
@@ -328,7 +326,7 @@ function ScriptPlanningContent() {
                     textDecoration: 'none',
                   }}
                 >
-                  進入 storyboard planning
+                  進入分鏡規劃
                 </Link>
                 <Link
                   href={dashboardHref}
@@ -345,7 +343,7 @@ function ScriptPlanningContent() {
                     textDecoration: 'none',
                   }}
                 >
-                  返回 campaign dashboard
+                  返回專案工作台
                 </Link>
               </div>
               {confirmMessage && (
@@ -362,9 +360,9 @@ function ScriptPlanningContent() {
               <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
               <div style={{ display: 'grid', gap: '12px' }}>
                 {[
-                  { label: '1. 填寫品牌 brief', status: '完成' },
+                  { label: '1. 填寫品牌需求', status: '完成' },
                   { label: '2. AI 分析宣傳方向', status: '完成' },
-                  { label: '3. 系統配對合適 creator', status: '完成' },
+                  { label: '3. 系統配對合適創作者', status: '完成' },
                   { label: '4. 生成題材與腳本建議', status: scriptPlanningConfirmed ? '完成' : '進行中' },
                   { label: '5. 整理拍攝方向與分鏡', status: scriptPlanningConfirmed ? '進行中' : '下一步' },
                   { label: '6. 跟進內容交付', status: '下一步' },
@@ -403,7 +401,7 @@ function ScriptPlanningContent() {
               </div>
             </section>
             <div style={{ marginTop: '14px', fontSize: '14px', color: '#5b5348', lineHeight: 1.7 }}>
-              <Link href={creatorHref} style={{ color: '#1a1a18' }}>返回 creator matching</Link>
+              <Link href={creatorHref} style={{ color: '#1a1a18' }}>返回創作者配對</Link>
             </div>
           </aside>
         </section>
@@ -418,14 +416,12 @@ export default function ScriptPlanningPage() {
       fallback={
         <main style={{
           minHeight: '100vh',
-          background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-          color: '#1a1a18',
-          fontFamily: 'Georgia, Times New Roman, serif',
+          color: '#f7f8fb',
           padding: '42px 24px 90px',
         }}>
           <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              正在載入 script planning...
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              正在載入腳本規劃...
             </section>
           </div>
         </main>

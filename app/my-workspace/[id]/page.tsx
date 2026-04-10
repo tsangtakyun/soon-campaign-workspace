@@ -24,9 +24,9 @@ type CampaignRecord = {
 }
 
 function objectiveLabel(objective: string) {
-  if (objective === 'sales') return '轉化 / Sales'
-  if (objective === 'reach') return '曝光 / Reach'
-  return '品牌 / Engagement'
+  if (objective === 'sales') return '轉換導向'
+  if (objective === 'reach') return '曝光導向'
+  return '品牌導向'
 }
 
 export default async function WorkspaceCampaignDetailPage(
@@ -92,9 +92,7 @@ export default async function WorkspaceCampaignDetailPage(
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
+      color: '#f7f8fb',
       padding: '42px 24px 90px',
     }}>
       <div style={{ maxWidth: '1180px', margin: '0 auto', display: 'grid', gap: '20px' }}>
@@ -104,40 +102,40 @@ export default async function WorkspaceCampaignDetailPage(
           gap: '20px',
           alignItems: 'stretch',
         }}>
-          <section style={{ padding: '30px', borderRadius: '28px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-            <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>CAMPAIGN DASHBOARD</p>
-            <h1 style={{ margin: '0 0 10px', fontSize: '50px', lineHeight: 1.02, fontWeight: 500 }}>
+          <section style={{ padding: '30px', borderRadius: '30px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>專案工作台</p>
+            <h1 style={{ margin: '0 0 10px', fontSize: '50px', lineHeight: 1.02, fontWeight: 350 }}>
               {campaign.business_name || '未命名品牌'}
             </h1>
-            <p style={{ margin: '0 0 14px', fontSize: '18px', lineHeight: 1.7, color: '#5b5348' }}>
-              {campaign.campaign_title || 'Campaign analysis'} · {campaign.vertical} · {objectiveLabel(campaign.objective)}
+            <p style={{ margin: '0 0 14px', fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)' }}>
+              {campaign.campaign_title || '廣告分析'} · {campaign.vertical} · {objectiveLabel(campaign.objective)}
             </p>
             <div style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
-                <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>Campaign summary</div>
+              <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>專案摘要</div>
                 <div style={{ lineHeight: 1.7 }}>{progress.summary}</div>
               </div>
-              <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
-                <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px' }}>Latest update</div>
+              <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>最新更新</div>
                 <div style={{ lineHeight: 1.7 }}>{progress.latestUpdate}</div>
               </div>
             </div>
           </section>
 
-          <section style={{ padding: '24px', borderRadius: '28px', background: '#1d1d1b', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
-            <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>CURRENT STAGE</div>
+          <section style={{ padding: '24px', borderRadius: '30px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', color: '#f5efe5', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>目前階段</div>
             <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '10px' }}>{progress.currentStageLabel}</div>
-            <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px' }}>
+            <div style={{ fontSize: '16px', lineHeight: 1.8, color: 'rgba(226,230,242,0.8)', marginBottom: '18px' }}>
               {workflow.deliveryConfirmationConfirmed
-                ? '製作與交付安排已確認，下一步會由製作主任跟進拍攝同交付流程。'
+                ? '製作與交付安排已確認，下一步將由製作負責人跟進拍攝與交付流程。'
                 : workflow.scriptPlanningConfirmed
-                ? '你已經確認 script planning，下一步可以進入 storyboard 同拍攝方向整理。'
+                ? '你已確認腳本規劃，下一步可以進入分鏡與拍攝方向整理。'
                 : workflow.creatorMatchingConfirmed
-                  ? 'Creator matching 已確認，下一步會圍繞選定 creator 組合同 campaign direction 進入內容規劃。'
-                  : '下一步會圍繞你最 fit 嘅 creator 組合同 campaign direction，進入內容規劃。'}
+                  ? '創作者配對已確認，下一步會圍繞已選創作者組合與專案方向進入內容規劃。'
+                  : '下一步會圍繞最合適的創作者組合與專案方向進入內容規劃。'}
             </div>
             <div style={{ padding: '14px 16px', borderRadius: '18px', background: 'rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: '#c7bdaf', marginBottom: '6px' }}>NEXT ACTION</div>
+              <div style={{ fontSize: '11px', letterSpacing: '0.12em', color: 'rgba(162,178,214,0.8)', marginBottom: '6px' }}>下一步</div>
               <div style={{ lineHeight: 1.7 }}>{progress.nextActionLabel}</div>
             </div>
           </section>
@@ -145,14 +143,14 @@ export default async function WorkspaceCampaignDetailPage(
 
         <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.04fr) 340px', gap: '20px', alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: '18px' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>BRIEF SNAPSHOT</div>
+            <section style={{ padding: '24px', borderRadius: '28px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: 'rgba(162,178,214,0.8)', marginBottom: '8px' }}>需求摘要</div>
               <div style={{ display: 'grid', gap: '10px' }}>
-                <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
+                <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.8 }}>
                   {campaign.brief}
                 </div>
-                <div style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', lineHeight: 1.7 }}>
-                  <strong>Must include：</strong> {campaign.must_include}
+                <div style={{ padding: '14px 16px', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.8 }}>
+                  <strong>必須包含：</strong> {campaign.must_include}
                 </div>
               </div>
             </section>

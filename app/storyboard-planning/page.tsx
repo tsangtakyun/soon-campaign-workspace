@@ -22,8 +22,8 @@ const DEMO_FORM: CampaignFormInput = {
   campaignTitle: 'Panda Cafe 春季宣傳',
   vertical: 'food',
   budgetRange: '15000-30000',
-  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。',
-  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+  brief: 'Panda Cafe 是一間主打日系甜品與打卡感空間的 cafe，希望吸引 18-30 歲女性與情侶於週末專程到訪。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友或情侶到訪、最後 CTA 提醒到店或追蹤',
 }
 
 function StoryboardPlanningContent() {
@@ -69,7 +69,7 @@ function StoryboardPlanningContent() {
           }
           if (workflow?.storyboardPlanningConfirmed) {
             setStoryboardConfirmed(true)
-            setConfirmMessage('Storyboard planning 已確認，campaign 已進入內容交付階段。')
+            setConfirmMessage('分鏡規劃已確認，專案已進入內容交付階段。')
           }
         }
       } finally {
@@ -100,7 +100,7 @@ function StoryboardPlanningContent() {
 
   async function confirmStoryboardPlanning() {
     if (!campaignIntakeId) {
-      setConfirmMessage('呢個 demo 版本未有 campaign id，未能正式確認。')
+      setConfirmMessage('目前 demo 版本未有 campaign id，未能正式確認。')
       return
     }
 
@@ -120,13 +120,13 @@ function StoryboardPlanningContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || '未能確認 storyboard planning')
+        throw new Error(data.error || '未能確認分鏡規劃。')
       }
 
       setStoryboardConfirmed(true)
-      setConfirmMessage('Storyboard planning 已確認，dashboard 會進入內容交付階段。')
+      setConfirmMessage('分鏡規劃已確認，工作台會進入內容交付階段。')
     } catch (error: any) {
-      setConfirmMessage(error.message || '未能確認 storyboard planning')
+      setConfirmMessage(error.message || '未能確認分鏡規劃。')
     } finally {
       setConfirmingStoryboard(false)
     }
@@ -135,23 +135,21 @@ function StoryboardPlanningContent() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
+      color: '#f7f8fb',
       padding: '42px 24px 90px',
     }}>
       <div style={{ maxWidth: '1120px', margin: '0 auto', display: 'grid', gap: '20px' }}>
-        <section style={{ padding: '30px', borderRadius: '28px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>STEP 5</p>
+        <section style={{ padding: '30px', borderRadius: '30px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>步驟 5</p>
           <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>整理拍攝方向與分鏡</h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '820px' }}>
-            呢一步唔係俾客戶定死 opening hook、轉折或者 ending。呢啲應該交俾 creator 用自己風格去發揮。客戶真正要做嘅，係揀清楚【背景介紹】同【實測內容】入面邊 7 個 shots 係一定要有。
+          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', maxWidth: '820px' }}>
+            這一步不是由客戶定死 opening hook、轉折或 ending。這些應交由創作者以自身風格發揮。客戶真正需要做的，是清楚選定【背景介紹】與【實測內容】之中哪 7 個 shots 為必備畫面。
           </p>
         </section>
 
         {loadingSaved && (
           <section style={{ padding: '20px 22px', borderRadius: '22px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
-            正在同步你呢個 campaign 嘅 storyboard planning 資料...
+            正在同步此專案的分鏡規劃資料...
           </section>
         )}
 
@@ -343,7 +341,7 @@ function StoryboardPlanningContent() {
               </div>
             </section>
             <div style={{ marginTop: '14px', fontSize: '14px', color: '#5b5348', lineHeight: 1.7 }}>
-              <Link href={scriptPlanningHref} style={{ color: '#1a1a18' }}>返回 script planning</Link>
+              <Link href={scriptPlanningHref} style={{ color: '#1a1a18' }}>返回腳本規劃</Link>
             </div>
           </aside>
         </section>
@@ -354,7 +352,7 @@ function StoryboardPlanningContent() {
 
 export default function StoryboardPlanningPage() {
   return (
-    <Suspense fallback={<main style={{ minHeight: '100vh', padding: '80px 24px', background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)', fontFamily: 'Georgia, Times New Roman, serif' }}>正在打開 storyboard planning...</main>}>
+    <Suspense fallback={<main style={{ minHeight: '100vh', padding: '80px 24px', color: '#f7f8fb' }}>正在打開分鏡規劃...</main>}>
       <StoryboardPlanningContent />
     </Suspense>
   )

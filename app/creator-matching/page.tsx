@@ -20,8 +20,8 @@ const DEMO_FORM: CampaignFormInput = {
   campaignTitle: 'Panda Cafe 春季宣傳',
   vertical: 'food',
   budgetRange: '15000-30000',
-  brief: 'Panda Cafe 係一間主打日系甜品同打卡感空間嘅 cafe，我哋想吸引 18-30 歲女仔同情侶喺週末專程過嚟。',
-  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友/情侶去、最後 CTA 提醒到店或 follow',
+  brief: 'Panda Cafe 是一間主打日系甜品與打卡感空間的 cafe，希望吸引 18-30 歲女性與情侶於週末專程到訪。',
+  mustInclude: 'Panda Cafe 店名、店內打卡位、招牌甜品 close-up、適合朋友或情侶到訪、最後 CTA 提醒到店或追蹤',
 }
 
 const STORAGE_KEY = 'soon-paid-analysis-draft-v1'
@@ -70,7 +70,7 @@ function CreatorMatchingContent() {
           }
           if (workflow?.creatorMatchingConfirmed) {
             setCreatorConfirmed(true)
-            setConfirmMessage('已確認 creator matching，dashboard 進度已更新。')
+            setConfirmMessage('已確認創作者配對，工作台進度已更新。')
           }
         }
       } finally {
@@ -106,7 +106,7 @@ function CreatorMatchingContent() {
 
   async function confirmCreatorMatching() {
     if (!campaignIntakeId) {
-      setConfirmMessage('呢個 demo 版本未有 campaign id，未能正式確認。')
+      setConfirmMessage('目前 demo 版本未有 campaign id，未能正式確認。')
       return
     }
 
@@ -126,13 +126,13 @@ function CreatorMatchingContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || '未能確認 creator matching')
+        throw new Error(data.error || '未能確認創作者配對。')
       }
 
       setCreatorConfirmed(true)
-      setConfirmMessage('Creator matching 已確認，系統知道可以進入 script planning。')
+      setConfirmMessage('創作者配對已確認，系統知道可以進入腳本規劃階段。')
     } catch (error: any) {
-      setConfirmMessage(error.message || '未能確認 creator matching')
+      setConfirmMessage(error.message || '未能確認創作者配對。')
     } finally {
       setConfirmingCreator(false)
     }
@@ -141,30 +141,28 @@ function CreatorMatchingContent() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
+      color: '#f7f8fb',
       padding: '42px 24px 90px',
     }}>
       <div style={{ maxWidth: '1120px', margin: '0 auto', display: 'grid', gap: '20px' }}>
         <section style={{
           padding: '30px',
-          borderRadius: '28px',
-          background: 'rgba(255,255,255,0.78)',
-          border: '1px solid rgba(26,26,24,0.10)',
+          borderRadius: '30px',
+          background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))',
+          border: '1px solid rgba(255,255,255,0.08)',
         }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>STEP 3</p>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>步驟 3</p>
           <h1 style={{ margin: '0 0 12px', fontSize: '52px', lineHeight: 1.02, fontWeight: 500 }}>
-            系統配對合適 creator
+            系統配對合適創作者
           </h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, color: '#5b5348', maxWidth: '780px' }}>
-            你已經確認咗 {form.businessName || '品牌'} 嘅 campaign 方向。下一步，SOON 會根據你嘅目標、budget、內容角度同品牌氣質，開始配對最合適嘅 creator 組合。
+          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)', maxWidth: '780px' }}>
+            你已確認 {form.businessName || '品牌'} 的廣告方向。下一步，SOON 會根據目標、預算、內容角度與品牌氣質，開始配對最合適的創作者組合。
           </p>
         </section>
 
         {loadingSaved && (
           <section style={{ padding: '20px 22px', borderRadius: '22px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
-            正在同步你呢個 campaign 嘅 creator matching 資料...
+            正在同步此專案的創作者配對資料...
           </section>
         )}
 
@@ -341,7 +339,7 @@ function CreatorMatchingContent() {
                     textDecoration: 'none',
                   }}
                 >
-                  進入 script planning
+                  進入腳本規劃
                 </Link>
                 <button
                   type="button"
@@ -415,7 +413,7 @@ function CreatorMatchingContent() {
             <div style={{ marginTop: '14px', fontSize: '14px', color: '#5b5348', lineHeight: 1.7 }}>
               <Link href={analysisHref} style={{ color: '#1a1a18' }}>返回完整分析</Link>
               {' · '}
-              <Link href={dashboardHref} style={{ color: '#1a1a18' }}>返回 campaign dashboard</Link>
+              <Link href={dashboardHref} style={{ color: '#1a1a18' }}>返回專案工作台</Link>
             </div>
           </aside>
         </section>
@@ -430,14 +428,12 @@ export default function CreatorMatchingPage() {
       fallback={
         <main style={{
           minHeight: '100vh',
-          background: 'linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-          color: '#1a1a18',
-          fontFamily: 'Georgia, Times New Roman, serif',
+          color: '#f7f8fb',
           padding: '42px 24px 90px',
         }}>
           <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
-            <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
-              正在載入 creator matching...
+            <section style={{ padding: '24px', borderRadius: '24px', background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))', border: '1px solid rgba(255,255,255,0.08)' }}>
+              正在載入創作者配對...
             </section>
           </div>
         </main>
