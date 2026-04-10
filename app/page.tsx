@@ -1,206 +1,479 @@
 import Link from 'next/link'
 
-function featureCard(eyebrow: string, title: string, body: string) {
+const primaryButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '56px',
+  padding: '0 22px',
+  borderRadius: '999px',
+  textDecoration: 'none',
+  background: 'linear-gradient(135deg, #ff5d36, #ff3d2e)',
+  color: '#ffffff',
+  fontSize: '15px',
+  border: '1px solid rgba(255,121,93,0.24)',
+  boxShadow: '0 0 0 1px rgba(255,121,93,0.18), 0 0 30px rgba(255,84,48,0.32)',
+} as const
+
+const secondaryButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '56px',
+  padding: '0 22px',
+  borderRadius: '999px',
+  textDecoration: 'none',
+  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'rgba(255,255,255,0.04)',
+  color: '#f4f7ff',
+  fontSize: '15px',
+} as const
+
+function StatCard({
+  value,
+  label,
+  body,
+}: {
+  value: string
+  label: string
+  body: string
+}) {
   return (
-    <div style={{
-      padding: '24px',
-      borderRadius: '24px',
-      background: 'rgba(255,255,255,0.76)',
-      border: '1px solid rgba(26,26,24,0.10)',
-      boxShadow: '0 20px 50px rgba(26,26,24,0.05)',
-    }}>
-      <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: '#8a7e6f', marginBottom: '8px' }}>{eyebrow}</div>
-      <div style={{ fontSize: '28px', lineHeight: 1.1, marginBottom: '10px' }}>{title}</div>
-      <div style={{ fontSize: '16px', lineHeight: 1.7, color: '#5a5349' }}>{body}</div>
-    </div>
+    <section className="stat-card">
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+      <div className="stat-body">{body}</div>
+    </section>
   )
 }
 
-function numberPill(label: string, value: string, note: string) {
+function FeatureCard({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string
+  title: string
+  body: string
+}) {
   return (
-    <div style={{
-      padding: '14px 16px',
-      borderRadius: '18px',
-      background: '#fbf8f1',
-      border: '1px solid rgba(26,26,24,0.08)',
-    }}>
-      <div style={{ fontSize: '12px', color: '#8b7c69', marginBottom: '6px', letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ fontSize: '34px', lineHeight: 1, marginBottom: '6px', color: '#1a1a18' }}>{value}</div>
-      <div style={{ fontSize: '13px', color: '#6f675d', lineHeight: 1.5 }}>{note}</div>
-    </div>
+    <section className="feature-card">
+      <div className="feature-eyebrow">{eyebrow}</div>
+      <h3 className="feature-title">{title}</h3>
+      <p className="feature-body">{body}</p>
+    </section>
   )
 }
 
 export default function HomePage() {
   return (
-    <main style={{
-      minHeight: '100vh',
-      background: 'radial-gradient(circle at top left, rgba(255,255,255,0.64), transparent 34%), linear-gradient(180deg, #f5efe5 0%, #e9dfcf 100%)',
-      color: '#1a1a18',
-      fontFamily: 'Georgia, Times New Roman, serif',
-      padding: '42px 24px 90px',
-    }}>
-      <div style={{ maxWidth: '1220px', margin: '0 auto' }}>
-        <section style={{
-          display: 'grid',
-          gridTemplateColumns: '1.08fr 0.92fr',
-          gap: '22px',
-          alignItems: 'stretch',
-          marginBottom: '28px',
-        }}>
-          <div style={{
-            padding: '36px',
-            borderRadius: '32px',
-            background: 'rgba(255,255,255,0.78)',
-            border: '1px solid rgba(26,26,24,0.10)',
-            boxShadow: '0 28px 60px rgba(26,26,24,0.05)',
-          }}>
-            <p style={{ margin: '0 0 10px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>
-              SOON AI SYSTEM
-            </p>
-            <h1 style={{ margin: '0 0 14px', fontSize: '68px', lineHeight: 0.92, fontWeight: 500 }}>
-              將廣告成本
+    <main className="campaign-home">
+      <div className="campaign-shell">
+        <section id="overview" className="hero-grid">
+          <section className="hero-stage">
+            <div className="hero-stage__glow" />
+            <div className="hero-meta">AI campaign workspace for lean teams</div>
+            <div className="hero-rating">4-step workflow from brief to creator delivery</div>
+            <h1 className="hero-title">
+              Turn campaign spend
               <br />
-              轉化為收益
+              into content that
+              <br />
+              actually converts.
             </h1>
-            <p style={{ margin: '0 0 24px', maxWidth: '720px', fontSize: '21px', lineHeight: 1.7, color: '#564f45' }}>
-              別讓中介人收取費用。我們用 AI 計算、配對、分析，幫你搵最適合嘅內容方向與 creator。無中介，助你業務成長。
-            </p>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
-              <Link href="/submit-brief" style={{
-                display: 'inline-flex',
-                padding: '14px 22px',
-                borderRadius: '999px',
-                textDecoration: 'none',
-                background: '#1a1a18',
-                color: '#f5efe5',
-                fontSize: '15px',
-              }}>
-                一鍵開始
+            <div className="hero-sidecopy">
+              SOON 將 brief、策略判斷、creator matching、腳本與交付流程串成同一個工作台，幫品牌以更低摩擦完成 campaign execution。
+            </div>
+            <div className="hero-actions">
+              <Link href="/submit-brief" style={primaryButtonStyle}>
+                Start Your Brief
               </Link>
-              <a href="#how-it-works" style={{
-                display: 'inline-flex',
-                padding: '14px 22px',
-                borderRadius: '999px',
-                textDecoration: 'none',
-                border: '1px solid rgba(26,26,24,0.18)',
-                color: '#1a1a18',
-                fontSize: '15px',
-                background: 'rgba(255,255,255,0.76)',
-              }}>
-                了解運作方式
-              </a>
-              <Link href="/login?next=/my-workspace" style={{
-                display: 'inline-flex',
-                padding: '14px 22px',
-                borderRadius: '999px',
-                textDecoration: 'none',
-                border: '1px solid rgba(26,26,24,0.18)',
-                color: '#1a1a18',
-                fontSize: '15px',
-                background: '#f8f4ec',
-              }}>
-                Google 登入查看已買分析
+              <Link href="/my-workspace" style={secondaryButtonStyle}>
+                Go to Workspace
               </Link>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#6a6156', fontSize: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                {['#d5b59a', '#c7d3a2', '#9db9d3'].map((color, index) => (
-                  <div
-                    key={color}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      borderRadius: '50%',
-                      background: color,
-                      border: '2px solid #f5efe5',
-                      marginLeft: index === 0 ? 0 : -8,
-                    }}
-                  />
-                ))}
-              </div>
-              <span>AI 先幫你整理方向，再決定點樣投放預算最有效。已購買客戶亦可以直接 Google 登入返自己 dashboard。</span>
+            <div className="hero-brands">
+              <span>SOON Ops</span>
+              <span>Creator Match</span>
+              <span>Strategy AI</span>
+              <span>Delivery Flow</span>
+              <span>Paid Analysis</span>
             </div>
-          </div>
+          </section>
 
-          <div style={{
-            padding: '28px',
-            borderRadius: '32px',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(249,244,236,0.92) 100%)',
-            border: '1px solid rgba(26,26,24,0.10)',
-            boxShadow: '0 28px 60px rgba(26,26,24,0.05)',
-            display: 'grid',
-            gap: '14px',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '12px' }}>
-              <div>
-                <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '8px' }}>AI STRATEGY SNAPSHOT</div>
-                <div style={{ fontSize: '18px', lineHeight: 1.6, color: '#433d35' }}>
-                  填一份 brief，先睇到最適合你嘅 budget shape、題材角度同 deliverable 建議。
-                </div>
-              </div>
-              <div style={{
-                padding: '10px 12px',
-                borderRadius: '999px',
-                background: '#eef5e8',
-                color: '#2d6a4f',
-                fontSize: '13px',
-              }}>
-                + AI 配對
-              </div>
+          <aside className="hero-panel">
+            <div className="hero-panel__card hero-panel__card--accent">
+              <div className="mini-eyebrow">Live Campaign Signal</div>
+              <div className="mini-title">Spend less time chasing vendors</div>
+              <p className="mini-body">
+                From brief intake to creator shortlist, SOON keeps strategy, production, and follow-up in one place.
+              </p>
             </div>
 
-            {numberPill('預算打法', '3', 'AI 先建議 3 種可行預算打法，唔使你盲投。')}
-            {numberPill('題材方向', '5', '按你目標拆出最值得先試嘅內容角度。')}
-            {numberPill('交付組合', '2', '建議最適合你 campaign 嘅影片與內容 package。')}
-
-            <div style={{
-              padding: '16px',
-              borderRadius: '20px',
-              background: '#1d1d1b',
-              color: '#f5efe5',
-            }}>
-              <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>WHY IT MATTERS</div>
-              <div style={{ fontSize: '15px', lineHeight: 1.7 }}>
-                唔係求其出片，而係先知道邊種 budget、邊種訊息、邊種 creator 組合最值得你花錢。
+            <div className="hero-panel__stack">
+              <div className="mini-metric">
+                <span className="mini-metric__label">Brief to plan</span>
+                <span className="mini-metric__value">24h</span>
+              </div>
+              <div className="mini-metric">
+                <span className="mini-metric__label">Suggested angles</span>
+                <span className="mini-metric__value">5</span>
+              </div>
+              <div className="mini-metric">
+                <span className="mini-metric__label">Creator routes</span>
+                <span className="mini-metric__value">3</span>
               </div>
             </div>
-          </div>
+          </aside>
         </section>
 
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '18px', marginBottom: '18px' }}>
-          {featureCard('第一步', '填寫品牌需求', '用一份簡單 brief 交代你想衝 sales、想多人睇，定係想建立品牌形象。')}
-          {featureCard('第二步', 'AI 分析方向', '系統會幫你計最適合嘅預算打法、題材 angle 同內容組合，唔使再靠估。')}
-          {featureCard('第三步', '配對 creator', '再根據 campaign 方向配對合適 creator，減少中介成本，直接進入內容生產。')}
+        <section id="metrics" className="stats-grid">
+          <StatCard
+            value="3x"
+            label="Faster campaign setup"
+            body="由簡報、題材方向到 creator 組合，先用 AI 砌出可執行初稿。"
+          />
+          <StatCard
+            value="5"
+            label="Content angles per brief"
+            body="每份 brief 先拆出 5 個值得優先測試的訊息方向與內容角度。"
+          />
+          <StatCard
+            value="0"
+            label="Middleman overhead"
+            body="品牌直接掌握策略與 creator 配對流程，減少資訊斷層與額外中介成本。"
+          />
         </section>
 
-        <section
-          id="how-it-works"
-          style={{
-            padding: '24px',
-            borderRadius: '24px',
-            background: 'rgba(255,255,255,0.76)',
-            border: '1px solid rgba(26,26,24,0.10)',
-          }}
-        >
-          <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8a7e6f', marginBottom: '10px' }}>運作方式</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px' }}>
+        <section className="section-heading">
+          <div className="section-heading__eyebrow">Why SOON</div>
+          <h2 className="section-heading__title">A campaign system built for execution, not pitch decks.</h2>
+        </section>
+
+        <section className="features-grid">
+          <FeatureCard
+            eyebrow="01"
+            title="Brief once, route everything"
+            body="同一份 brief 會直接承接策略分析、creator matching、腳本規劃與交付追蹤，唔使每一站重新講一次。"
+          />
+          <FeatureCard
+            eyebrow="02"
+            title="AI-first planning layer"
+            body="先用 AI 判斷 budget shape、內容角度與 deliverable 組合，再由人調整與確認，決策會快好多。"
+          />
+          <FeatureCard
+            eyebrow="03"
+            title="Built-in creator workflow"
+            body="由 candidate shortlist 到後續交付確認都喺同一個 workspace 入面，適合持續跑 campaign。"
+          />
+        </section>
+
+        <section id="workflow" className="workflow-panel">
+          <div className="section-heading__eyebrow">Workflow</div>
+          <div className="workflow-grid">
             {[
-              '1. 交 brief',
-              '2. AI 計算最合適方向',
-              '3. 提供預算與題材建議',
-              '4. 配對 creator',
-              '5. 開始內容製作',
+              '1. Submit campaign brief',
+              '2. Get AI strategy and content angles',
+              '3. Review creator shortlist and ops flow',
+              '4. Move into script, storyboard, and delivery',
             ].map((step) => (
-              <div key={step} style={{ padding: '14px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)', fontSize: '14px', lineHeight: 1.6 }}>
+              <div key={step} className="workflow-step">
                 {step}
               </div>
             ))}
           </div>
         </section>
       </div>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .campaign-home {
+              min-height: 100vh;
+              padding: 44px 24px 100px;
+            }
+
+            .campaign-shell {
+              width: min(1240px, 100%);
+              margin: 0 auto;
+              display: grid;
+              gap: 22px;
+            }
+
+            .hero-grid {
+              display: grid;
+              grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+              gap: 20px;
+              align-items: stretch;
+            }
+
+            .hero-stage,
+            .hero-panel,
+            .stat-card,
+            .feature-card,
+            .workflow-panel {
+              position: relative;
+              overflow: hidden;
+              border-radius: 32px;
+              border: 1px solid rgba(255,255,255,0.08);
+              background: linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94));
+              box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 28px 80px rgba(0,0,0,0.36);
+            }
+
+            .hero-stage {
+              min-height: 620px;
+              padding: 38px;
+              display: grid;
+              align-content: end;
+              gap: 18px;
+            }
+
+            .hero-stage__glow {
+              position: absolute;
+              inset: 0;
+              background:
+                radial-gradient(circle at 20% 18%, rgba(255, 84, 48, 0.28), transparent 28%),
+                radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.08), transparent 30%);
+              pointer-events: none;
+            }
+
+            .hero-meta,
+            .section-heading__eyebrow,
+            .feature-eyebrow,
+            .mini-eyebrow {
+              position: relative;
+              z-index: 1;
+              font-size: 12px;
+              letter-spacing: 0.18em;
+              text-transform: uppercase;
+              color: rgba(172, 182, 206, 0.78);
+            }
+
+            .hero-rating {
+              position: relative;
+              z-index: 1;
+              width: fit-content;
+              padding: 10px 14px;
+              border-radius: 999px;
+              background: rgba(255,255,255,0.05);
+              border: 1px solid rgba(255,255,255,0.08);
+              color: rgba(237, 241, 255, 0.92);
+              font-size: 14px;
+            }
+
+            .hero-title {
+              position: relative;
+              z-index: 1;
+              margin: 0;
+              max-width: 820px;
+              font-size: clamp(3.4rem, 7vw, 6rem);
+              line-height: 0.96;
+              letter-spacing: -0.08em;
+              font-weight: 360;
+              color: #ffffff;
+            }
+
+            .hero-sidecopy {
+              position: relative;
+              z-index: 1;
+              max-width: 560px;
+              font-size: 18px;
+              line-height: 1.8;
+              color: rgba(214, 220, 236, 0.8);
+            }
+
+            .hero-actions,
+            .hero-brands {
+              position: relative;
+              z-index: 1;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 12px;
+            }
+
+            .hero-brands {
+              gap: 18px;
+              margin-top: 8px;
+              color: rgba(255,255,255,0.64);
+              font-size: 14px;
+            }
+
+            .hero-panel {
+              padding: 24px;
+              display: grid;
+              gap: 16px;
+              align-content: start;
+            }
+
+            .hero-panel__card,
+            .workflow-step,
+            .mini-metric {
+              border-radius: 22px;
+              border: 1px solid rgba(255,255,255,0.08);
+              background: rgba(255,255,255,0.04);
+            }
+
+            .hero-panel__card {
+              padding: 18px;
+            }
+
+            .hero-panel__card--accent {
+              background: linear-gradient(180deg, rgba(255, 94, 54, 0.16), rgba(255,255,255,0.04));
+            }
+
+            .mini-title {
+              margin-top: 8px;
+              font-size: 28px;
+              line-height: 1.08;
+              color: #ffffff;
+            }
+
+            .mini-body {
+              margin: 10px 0 0;
+              line-height: 1.8;
+              color: rgba(219,224,238,0.78);
+            }
+
+            .hero-panel__stack {
+              display: grid;
+              gap: 12px;
+            }
+
+            .mini-metric {
+              padding: 16px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+            }
+
+            .mini-metric__label {
+              color: rgba(214,220,236,0.76);
+              font-size: 14px;
+            }
+
+            .mini-metric__value {
+              font-size: 34px;
+              line-height: 1;
+              letter-spacing: -0.06em;
+              color: #ffffff;
+            }
+
+            .stats-grid,
+            .features-grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 16px;
+            }
+
+            .stat-card,
+            .feature-card,
+            .workflow-panel {
+              padding: 24px;
+            }
+
+            .stat-value {
+              font-size: clamp(3rem, 5vw, 4.4rem);
+              line-height: 0.94;
+              letter-spacing: -0.08em;
+              color: #ffffff;
+            }
+
+            .stat-label {
+              margin-top: 10px;
+              font-size: 30px;
+              line-height: 1.04;
+              color: #f4f7ff;
+              letter-spacing: -0.05em;
+            }
+
+            .stat-body,
+            .feature-body {
+              margin-top: 10px;
+              font-size: 16px;
+              line-height: 1.8;
+              color: rgba(214,220,236,0.76);
+            }
+
+            .section-heading {
+              display: grid;
+              gap: 10px;
+              padding: 8px 4px 0;
+            }
+
+            .section-heading__title {
+              margin: 0;
+              max-width: 900px;
+              font-size: clamp(2.4rem, 5vw, 4.2rem);
+              line-height: 0.98;
+              letter-spacing: -0.07em;
+              font-weight: 360;
+              color: #ffffff;
+            }
+
+            .feature-title {
+              margin: 12px 0 0;
+              font-size: 30px;
+              line-height: 1.04;
+              letter-spacing: -0.05em;
+              color: #ffffff;
+            }
+
+            .workflow-grid {
+              display: grid;
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 12px;
+              margin-top: 14px;
+            }
+
+            .workflow-step {
+              padding: 16px;
+              line-height: 1.75;
+              color: rgba(226,230,242,0.8);
+            }
+
+            @media (max-width: 1080px) {
+              .hero-grid,
+              .stats-grid,
+              .features-grid,
+              .workflow-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .hero-stage {
+                min-height: auto;
+              }
+            }
+
+            @media (max-width: 640px) {
+              .campaign-home {
+                padding: 32px 16px 80px;
+              }
+
+              .hero-stage,
+              .hero-panel,
+              .stat-card,
+              .feature-card,
+              .workflow-panel {
+                border-radius: 24px;
+              }
+
+              .hero-stage,
+              .hero-panel,
+              .stat-card,
+              .feature-card,
+              .workflow-panel {
+                padding: 20px;
+              }
+
+              .hero-actions a {
+                width: 100%;
+              }
+            }
+          `,
+        }}
+      />
     </main>
   )
 }
