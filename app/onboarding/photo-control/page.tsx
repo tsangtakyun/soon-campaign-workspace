@@ -149,7 +149,7 @@ function PhotoControlContent() {
       generatedPreviewImage: generatedImage || null,
     }))
 
-    const url = new URL('/onboarding/review', window.location.origin)
+    const url = new URL('/onboarding/topic-review', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign', 'visualStyle', 'typeface'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
