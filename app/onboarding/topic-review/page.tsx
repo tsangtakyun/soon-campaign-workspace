@@ -14,16 +14,6 @@ type ContentMixState = {
   items?: ContentMixItem[]
 }
 
-type BusinessProfileState = {
-  brandName?: string
-  logoUrl?: string
-}
-
-type PhotoControlState = {
-  previewImage?: string
-  generatedPreviewImage?: string | null
-}
-
 type TopicReference = {
   id: string
   label: string
@@ -33,62 +23,63 @@ type TopicReference = {
 }
 
 const STORAGE_KEYS = {
-  businessProfile: 'soon-business-profile-v1',
   contentMix: 'soon-content-mix-v1',
-  photoControl: 'soon-photo-control-v2',
 }
+
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
 
 const FALLBACK_TOPICS: TopicReference[] = [
   {
     id: 'still-image-1',
-    label: 'Still Image 1',
+    label: '靜態圖片 1',
     type: 'image',
-    topic: 'A shared day feels bigger when your friends can watch the little moments with you',
-    image: '/soon-log-logo.png',
+    topic: '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
+    image: PLACEHOLDER_IMAGE,
   },
   {
     id: 'blog-post-1',
-    label: 'Blog Post 1',
+    label: '文章 1',
     type: 'post',
-    topic: 'The best daily stories are the ones that feel playful, messy, and real enough to send twice',
-    image: '/soon-log-logo.png',
+    topic: '最好的日常故事，往往是那些夠玩味、夠真實，而且真實到會想傳給朋友再看一次的片段',
+    image: PLACEHOLDER_IMAGE,
   },
 ]
 
 const TOPIC_COPY: Record<string, string[]> = {
   'still-images': [
-    'A shared day feels bigger when your friends can watch the little moments with you',
-    'The smallest visual detail can make an ordinary day feel worth sharing',
+    '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
+    '一個細小但有記憶點的畫面，可以令普通日常變成值得停下來看的內容',
   ],
   blogs: [
-    'The best daily stories are the ones that feel playful, messy, and real enough to send twice',
-    'A useful story becomes more memorable when it sounds like something a friend would send',
+    '最好的日常故事，往往是那些夠玩味、夠真實，而且真實到會想傳給朋友再看一次的片段',
+    '有用的故事如果聽起來像朋友會傳來的訊息，就會更容易被記住',
   ],
   carousels: [
-    'A quick sequence can turn one small moment into a story people understand immediately',
+    '用一組簡短畫面，把一個細小時刻整理成觀眾一眼明白的故事',
   ],
   'feed-videos': [
-    'A short scene can make the brand feel present in the everyday rhythm of the audience',
+    '用一段短場景，令品牌自然出現在觀眾每日會經歷的節奏裡',
   ],
   'short-form-video': [
-    'A tiny moment with movement can become the reason someone stops scrolling',
+    '一個有動態的小瞬間，可以成為觀眾停下來看的理由',
   ],
   stories: [
-    'The content should feel immediate, casual, and easy to react to in the moment',
+    '內容應該感覺即時、輕鬆，而且容易令人即刻有反應',
   ],
   emails: [
-    'A direct note works best when it feels personal enough to keep reading',
+    '直接訊息最有效的時候，是讀起來足夠個人化，令人願意繼續看下去',
   ],
 }
 
 const CONTENT_TYPE_LABELS: Record<string, { label: string; type: TopicReference['type'] }> = {
-  'still-images': { label: 'Still Image', type: 'image' },
-  blogs: { label: 'Blog Post', type: 'post' },
-  carousels: { label: 'Carousel', type: 'image' },
-  'feed-videos': { label: 'Feed Video', type: 'post' },
-  'short-form-video': { label: 'Short Form Video', type: 'post' },
-  stories: { label: 'Story', type: 'image' },
-  emails: { label: 'Email', type: 'post' },
+  'still-images': { label: '靜態圖片', type: 'image' },
+  blogs: { label: '文章', type: 'post' },
+  carousels: { label: '輪播貼文', type: 'image' },
+  'feed-videos': { label: '動態影片', type: 'post' },
+  'short-form-video': { label: '短影片', type: 'post' },
+  stories: { label: '限時動態', type: 'image' },
+  emails: { label: '電郵內容', type: 'post' },
 }
 
 function readStorage<T>(key: string): T | null {
@@ -101,19 +92,7 @@ function readStorage<T>(key: string): T | null {
   }
 }
 
-function getReferenceImage() {
-  const businessProfile = readStorage<BusinessProfileState>(STORAGE_KEYS.businessProfile)
-  const photoControl = readStorage<PhotoControlState>(STORAGE_KEYS.photoControl)
-
-  return (
-    businessProfile?.logoUrl ||
-    photoControl?.generatedPreviewImage ||
-    photoControl?.previewImage ||
-    '/soon-log-logo.png'
-  )
-}
-
-function buildTopics(referenceImage: string): TopicReference[] {
+function buildTopics(): TopicReference[] {
   const contentMix = readStorage<ContentMixState>(STORAGE_KEYS.contentMix)
   const items = contentMix?.items?.filter((item) => item.quantity > 0) || []
   const topics: TopicReference[] = []
@@ -124,7 +103,7 @@ function buildTopics(referenceImage: string): TopicReference[] {
       type: 'post' as const,
     }
     const copyOptions = TOPIC_COPY[item.id] || [
-      `A clear ${typeConfig.label.toLowerCase()} should make the brand feel easy to understand and easy to share`,
+      `清晰的${typeConfig.label}應該令品牌更容易被理解，也更容易被分享`,
     ]
 
     for (let index = 0; index < item.quantity; index += 1) {
@@ -134,20 +113,19 @@ function buildTopics(referenceImage: string): TopicReference[] {
         label: `${typeConfig.label} ${sequence}`,
         type: typeConfig.type,
         topic: copyOptions[index % copyOptions.length],
-        image: referenceImage,
+        image: PLACEHOLDER_IMAGE,
       })
     }
   })
 
   if (topics.length) return topics.slice(0, 8)
-  return FALLBACK_TOPICS.map((topic) => ({ ...topic, image: referenceImage }))
+  return FALLBACK_TOPICS
 }
 
 function TopicReviewContent() {
   const searchParams = useSearchParams()
   const [isAnalyzing, setIsAnalyzing] = useState(true)
-  const referenceImage = useMemo(() => getReferenceImage(), [])
-  const topics = useMemo(() => buildTopics(referenceImage), [referenceImage])
+  const topics = useMemo(() => buildTopics(), [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -192,8 +170,8 @@ function TopicReviewContent() {
 
   return (
     <main className="topic-review-page">
-      <div className="topic-review-steps" aria-label="Onboarding progress">
-        {['Getting started', 'Strategy', 'Campaign', 'Content', 'Finishing up'].map((step, index) => (
+      <div className="topic-review-steps" aria-label="設定進度">
+        {['開始設定', '策略', '宣傳活動', '內容', '完成設定'].map((step, index) => (
           <span className={index === 2 ? 'active' : ''} key={step}>
             {step}
             {index < 4 ? <b>›</b> : null}
@@ -203,29 +181,29 @@ function TopicReviewContent() {
 
       {isAnalyzing ? (
         <section className="topic-loading" aria-live="polite">
-          <p>In progress...</p>
-          <h1>{topics.length > 1 ? 'Generating your topics...' : 'Crafting each topic...'}</h1>
+          <p>分析中...</p>
+          <h1>{topics.length > 1 ? '正在生成你的內容主題...' : '正在整理內容主題...'}</h1>
           <h2>
-            Every post starts with two things: a topic that sets the direction, and a reference image that keeps it looking like you. Here's how it comes together:
+            每一條內容都由兩件事開始：一個決定方向的主題，以及一張保持品牌視覺一致的參考圖片。系統會先整理兩者之間的關係。
           </h2>
 
           <div className="loading-demo">
             <div className="loading-topic">
-              <span>Topic inside your campaign:</span>
+              <span>宣傳活動裡的主題：</span>
               <div className="demo-topic-card">
                 <div className="demo-image">
-                  <img src={referenceImage} alt="Reference image" />
-                  <em>Reference image</em>
+                  <img src={PLACEHOLDER_IMAGE} alt="參考圖片佔位圖" />
+                  <em>參考圖片</em>
                 </div>
                 <p>{topics[0]?.topic || FALLBACK_TOPICS[0].topic}</p>
               </div>
             </div>
             <div className="demo-arrow">→</div>
             <div className="generated-post">
-              <span>Generated post:</span>
+              <span>生成內容示意：</span>
               <div className="mock-post">
-                <img src={referenceImage} alt="Generated post preview" />
-                <strong>unlock<br />your<br />creative<br />potential</strong>
+                <img src={PLACEHOLDER_IMAGE} alt="生成內容示意" />
+                <strong>日常<br />也可以<br />更有<br />畫面</strong>
               </div>
             </div>
           </div>
@@ -233,8 +211,8 @@ function TopicReviewContent() {
       ) : (
         <section className="topic-review-content">
           <header>
-            <h1>Review your topics and their reference images.</h1>
-            <p>You can think of these as what directs the main subject and target of the content Blaze generates.</p>
+            <h1>檢查你的內容主題與參考圖片。</h1>
+            <p>你可以將這些視為之後 SOON 生成內容時，用來決定主體、方向和視覺目標的基礎。</p>
           </header>
 
           <div className="topic-list">
@@ -250,7 +228,7 @@ function TopicReviewContent() {
                     </span>
                     {topic.label}
                   </h2>
-                  <p className="topic-label">Topic:</p>
+                  <p className="topic-label">主題：</p>
                   <p className="topic-text">{topic.topic}</p>
                 </div>
               </article>
@@ -260,8 +238,8 @@ function TopicReviewContent() {
       )}
 
       <footer className="topic-review-footer">
-        <button type="button" onClick={handleBack}>Back</button>
-        {!isAnalyzing ? <button type="button" onClick={handleContinue}>Continue</button> : null}
+        <button type="button" onClick={handleBack}>返回</button>
+        {!isAnalyzing ? <button type="button" onClick={handleContinue}>繼續</button> : null}
       </footer>
 
       <style dangerouslySetInnerHTML={{ __html: styles }} />
