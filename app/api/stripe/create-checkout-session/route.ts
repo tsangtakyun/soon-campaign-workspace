@@ -4,6 +4,8 @@ import Stripe from 'stripe'
 type CreateCheckoutPayload = {
   campaignIntakeId?: string
   email?: string
+  plan?: string
+  cancelPath?: string
 }
 
 export async function POST(request: Request) {
@@ -30,6 +32,8 @@ export async function POST(request: Request) {
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'https://soon-campaign-workspace.vercel.app'
+    const safeCancelPath =
+      typeof body.cancelPath === 'string' && body.cancelPath.startsWith('/') ? body.cancelPath : '/onboarding/review'
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -39,11 +43,19 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
+      subscription_data: {
+        trial_period_days: 7,
+        metadata: {
+          campaign_intake_id: body.campaignIntakeId,
+          plan: body.plan || 'ai-strategy',
+        },
+      },
       customer_email: body.email || undefined,
       success_url: `${origin}/paid-analysis?session_id={CHECKOUT_SESSION_ID}&campaign_intake_id=${encodeURIComponent(body.campaignIntakeId)}`,
-      cancel_url: `${origin}/submit-brief`,
+      cancel_url: `${origin}${safeCancelPath}`,
       metadata: {
         campaign_intake_id: body.campaignIntakeId,
+        plan: body.plan || 'ai-strategy',
       },
     })
 

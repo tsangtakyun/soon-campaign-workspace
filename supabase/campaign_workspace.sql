@@ -1,5 +1,21 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.strategy_library (
+  id text primary key default 'default',
+  library jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.strategy_library enable row level security;
+
+create table if not exists public.content_strategy_library (
+  id text primary key default 'default',
+  items jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.content_strategy_library enable row level security;
+
 create table if not exists public.campaign_intakes (
   id uuid primary key default gen_random_uuid(),
   contact_name text not null default '',

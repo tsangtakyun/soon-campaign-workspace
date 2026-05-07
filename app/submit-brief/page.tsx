@@ -1,9 +1,9 @@
 'use client'
 
 import type { CSSProperties, FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { buildAnalysisPreview, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
+import { type AnalysisPreview, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
 import { createClient } from '@/lib/supabase'
 
 const PAID_ANALYSIS_STORAGE_KEY = 'soon-paid-analysis-draft-v1'
@@ -40,6 +40,14 @@ type FormState = {
   mustInclude: string
 }
 
+type TopicReference = {
+  id: string
+  label: string
+  labelEn: string
+  topic: string
+  image: string | null
+}
+
 const initialState: FormState = {
   contactName: '',
   objective: 'sales',
@@ -63,8 +71,65 @@ export default function SubmitBriefPage() {
   const [redirectingToCheckout, setRedirectingToCheckout] = useState(false)
   const [paidUnlockMessage, setPaidUnlockMessage] = useState('')
   const [checkoutStatus, setCheckoutStatus] = useState('')
+  const [aiPreview, setAiPreview] = useState<AnalysisPreview | null>(null)
 
-  const aiPreview = useMemo(() => buildAnalysisPreview(form as CampaignFormInput), [form])
+  useEffect(() => {
+    try {
+      const storedProfile = window.sessionStorage.getItem('soon-business-profile-v1')
+      const storedCampaign = window.sessionStorage.getItem('soon-campaign-details-v1')
+      const storedDistribution = window.sessionStorage.getItem('soon-distribution-preferences-v1')
+      const storedContentMix = window.sessionStorage.getItem('soon-content-mix-v1')
+      const storedVisualStyle = window.sessionStorage.getItem('soon-visual-style-v1')
+      const storedTypeface = window.sessionStorage.getItem('soon-typeface-v1')
+      const storedPhotoControl = window.sessionStorage.getItem('soon-photo-control-v2')
+      const storedTopicReview = window.sessionStorage.getItem('soon-topic-review-v1')
+      const profile = storedProfile ? JSON.parse(storedProfile) : {}
+      const campaign = storedCampaign ? JSON.parse(storedCampaign) : {}
+      const distribution = storedDistribution ? JSON.parse(storedDistribution) : {}
+      const contentMix = storedContentMix ? JSON.parse(storedContentMix) : {}
+      const visualStyle = storedVisualStyle ? JSON.parse(storedVisualStyle) : {}
+      const typeface = storedTypeface ? JSON.parse(storedTypeface) : {}
+      const photoControl = storedPhotoControl ? JSON.parse(storedPhotoControl) : {}
+      const topicReview = storedTopicReview ? (JSON.parse(storedTopicReview) as TopicReference[]) : []
+      const reviewedTopics = Array.isArray(topicReview) ? topicReview : []
+      const contentMixLine = Array.isArray(contentMix.items)
+        ? contentMix.items
+          .filter((item: any) => item.quantity > 0)
+          .map((item: any) => `${item.title}: ${item.quantity}/week`)
+          .join(', ')
+        : ''
+      const reviewedTopicLine = reviewedTopics
+        .map((item) => item.topic || item.label || item.labelEn)
+        .filter(Boolean)
+        .slice(0, 6)
+        .join('；')
+      const reviewedTopicImageCount = reviewedTopics.filter((item) => item.image).length
+      const nextMustInclude = [
+        campaign.callToAction ? `CTA: ${campaign.callToAction}` : '',
+        campaign.targetLink ? `Target link: ${campaign.targetLink}` : '',
+        Array.isArray(distribution.channels) && distribution.channels.length
+          ? `Distribution: ${distribution.channels.join(', ')}`
+          : '',
+        distribution.schedule ? `Schedule: ${distribution.schedule}` : '',
+        contentMixLine ? `Content mix: ${contentMixLine}` : '',
+        contentMix.totalCredits ? `Weekly credits: ${contentMix.totalCredits}` : '',
+        visualStyle.title ? `Visual style: ${visualStyle.titleZh || visualStyle.title} / ${visualStyle.title}` : '',
+        typeface.title ? `Typeface: ${typeface.title} (${typeface.moodZh || typeface.subtitle || ''})` : '',
+        photoControl.title ? `Photo control: ${photoControl.titleZh || photoControl.title} / ${photoControl.title}` : '',
+        photoControl.generationPrompt ? `Photo generation prompt: ${photoControl.generationPrompt}` : '',
+        reviewedTopicLine ? `已確認主題：${reviewedTopicLine}` : '',
+        reviewedTopicImageCount ? `已準備參考圖片數量：${reviewedTopicImageCount}` : '',
+      ].filter(Boolean).join('\n')
+
+      setForm((prev) => ({
+        ...prev,
+        businessName: profile.businessName || prev.businessName,
+        campaignTitle: campaign.campaignName || prev.campaignTitle,
+        brief: campaign.theme || prev.brief,
+        mustInclude: nextMustInclude || prev.mustInclude,
+      }))
+    } catch {}
+  }, [])
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -95,6 +160,17 @@ export default function SubmitBriefPage() {
     persistPaidAnalysisDraft()
 
     try {
+      const previewResponse = await fetch('/api/analysis-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const previewData = await previewResponse.json()
+      const nextPreview = previewData.preview as AnalysisPreview | null
+
+      if (!previewResponse.ok) throw new Error(previewData.error || 'Unable to generate analysis preview')
+      setAiPreview(nextPreview)
+
       const supabase = createClient()
       const nextCampaignIntakeId = getOrCreateCampaignIntakeId()
       const { error } = await supabase
@@ -111,10 +187,10 @@ export default function SubmitBriefPage() {
         budget_range: form.budgetRange,
         brief: form.brief.trim(),
         must_include: form.mustInclude.trim(),
-        ai_summary: aiPreview?.summary || '',
-        suggested_budget_shape: aiPreview?.budgetGuide || '',
-        suggested_angle: aiPreview?.angleA || '',
-        suggested_deliverable_shape: aiPreview?.angleB || '',
+        ai_summary: nextPreview?.summary || '',
+        suggested_budget_shape: nextPreview?.budgetGuide || '',
+        suggested_angle: nextPreview?.angleA || '',
+        suggested_deliverable_shape: nextPreview?.angleB || '',
         source_channel: 'soon-campaign-workspace',
       })
 
@@ -168,12 +244,16 @@ export default function SubmitBriefPage() {
     setCheckoutStatus('正在建立 Stripe 付款頁面...')
 
     try {
+      const selectedPlan = new URLSearchParams(window.location.search).get('plan') || 'ai-strategy'
+      const cancelPath = `${window.location.pathname}${window.location.search}`
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           campaignIntakeId: resolvedCampaignIntakeId,
           email: form.email.trim(),
+          plan: selectedPlan,
+          cancelPath,
         }),
       })
 

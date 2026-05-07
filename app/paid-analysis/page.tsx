@@ -186,23 +186,24 @@ function PaidAnalysisContent() {
   return (
     <main style={{
       minHeight: '100vh',
-      color: '#f7f8fb',
-      padding: '42px 24px 90px',
+      color: '#1a1a18',
+      padding: '28px 24px 90px',
     }}>
-      <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1180px', margin: '0 auto' }}>
         <section style={{
-          padding: '30px',
-          borderRadius: '30px',
-          background: 'linear-gradient(180deg, rgba(13,15,21,0.92), rgba(7,8,12,0.94))',
-          border: '1px solid rgba(255,255,255,0.08)',
-          marginBottom: '20px',
+          padding: '28px 32px',
+          borderRadius: '22px',
+          background: '#fbf8f1',
+          border: '1px solid rgba(245,239,229,0.18)',
+          marginBottom: '18px',
+          boxShadow: '0 24px 70px rgba(0,0,0,0.22)',
         }}>
-          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: 'rgba(162,178,214,0.8)' }}>完整 AI 分析</p>
-          <h1 style={{ margin: '0 0 12px', fontSize: '50px', lineHeight: 1.02, fontWeight: 350 }}>
+          <p style={{ margin: '0 0 8px', fontSize: '12px', letterSpacing: '0.18em', color: '#8b7c69' }}>完整 AI 分析</p>
+          <h1 style={{ margin: '0 0 10px', fontSize: '42px', lineHeight: 1.06, fontWeight: 500, letterSpacing: 0 }}>
             完整 AI 分析宣傳方向
           </h1>
-          <p style={{ margin: 0, fontSize: '18px', lineHeight: 1.8, color: 'rgba(210,217,234,0.8)' }}>
-            付款成功後，系統會解鎖完整預算打法、題材角度、交付建議與創作者適配方向。
+          <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.75, color: '#5b5348', maxWidth: '820px' }}>
+            付款成功後，系統會解鎖完整策略方向、題材角度、交付建議與創作者適配方向。
           </p>
         </section>
 
@@ -221,7 +222,7 @@ function PaidAnalysisContent() {
         )}
 
         {!checking && paid && analysis && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) 340px', gap: '22px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 310px', gap: '22px', alignItems: 'start' }}>
             <div style={{ display: 'grid', gap: '18px' }}>
               {syncMessage && (
                 <section style={{ padding: '18px 20px', borderRadius: '20px', background: '#eef6ea', border: '1px solid rgba(26,26,24,0.10)', color: '#314b2d' }}>
@@ -229,32 +230,37 @@ function PaidAnalysisContent() {
                 </section>
               )}
 
-              <section style={{ padding: '24px', borderRadius: '24px', background: '#f7f1e1', border: '1px solid rgba(26,26,24,0.08)' }}>
+              <section style={{ padding: '22px 24px', borderRadius: '18px', background: '#f7f1e1', border: '1px solid rgba(26,26,24,0.08)' }}>
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN LOGIC</div>
-                <div style={{ fontSize: '28px', lineHeight: 1.3, color: '#1a1a18' }}>
+                <div style={{ fontSize: '24px', lineHeight: 1.38, color: '#1a1a18' }}>
                   {analysis.campaignNorthStar}
                 </div>
               </section>
 
-              <section style={{ padding: '24px', borderRadius: '24px', background: '#1d1d1b', color: '#f5efe5' }}>
+              <section style={{ padding: '24px', borderRadius: '18px', background: '#1d1d1b', color: '#f5efe5' }}>
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '8px' }}>UNLOCKED</div>
-                <div style={{ fontSize: '34px', lineHeight: 1.15, marginBottom: '10px' }}>{analysis.headline}</div>
-                <div style={{ fontSize: '17px', lineHeight: 1.7 }}>{analysis.overview}</div>
+                <div style={{ fontSize: '30px', lineHeight: 1.16, marginBottom: '10px' }}>{analysis.headline}</div>
+                <div style={{ fontSize: '16px', lineHeight: 1.75, color: '#ede4d8' }}>{analysis.overview}</div>
               </section>
 
               {sections.map(({ title, kicker, items }) => (
-                <section key={title} style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.78)', border: '1px solid rgba(26,26,24,0.10)' }}>
+                <section key={title} style={{ padding: '24px', borderRadius: '18px', background: '#f4efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
                   <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '6px' }}>{kicker}</div>
-                  <div style={{ fontSize: '30px', lineHeight: 1.1, marginBottom: '14px', color: '#1a1a18' }}>{title}</div>
-                  <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ fontSize: '28px', lineHeight: 1.1, marginBottom: '16px', color: '#1a1a18' }}>{title}</div>
+                  <div style={{ display: 'grid', gap: '12px' }}>
                     {items.map((item, index) => {
                       const explanationId = `${title}-${index}`
                       const isOpen = openExplanationId === explanationId
 
                       return (
-                        <div key={item} style={{ padding: '14px 16px', borderRadius: '16px', background: '#fbf8f1', border: '1px solid rgba(26,26,24,0.08)' }}>
+                        <div key={item} style={{ padding: '16px 18px', borderRadius: '14px', background: '#fffdf8', border: '1px solid rgba(26,26,24,0.08)', color: '#1a1a18' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                            <div style={{ lineHeight: 1.7, flex: 1 }}>{item}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '12px', flex: 1 }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#efe5d3', color: '#6d6257', fontSize: '13px', flex: '0 0 auto' }}>
+                                {index + 1}
+                              </div>
+                              <div style={{ lineHeight: 1.75, fontSize: '15px', color: '#2b2824' }}>{item}</div>
+                            </div>
                             <button
                               type="button"
                               onClick={() => setOpenExplanationId(isOpen ? '' : explanationId)}
@@ -337,9 +343,9 @@ function PaidAnalysisContent() {
                 </section>
               ))}
 
-              <section style={{ padding: '26px', borderRadius: '24px', background: '#1a1a18', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
+              <section style={{ padding: '26px', borderRadius: '18px', background: '#1a1a18', color: '#f5efe5', border: '1px solid rgba(26,26,24,0.10)' }}>
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#c7bdaf', marginBottom: '10px' }}>NEXT STEP</div>
-                <div style={{ fontSize: '34px', lineHeight: 1.08, marginBottom: '12px' }}>如果你認同呢個方向，可以即刻進入下一步。</div>
+                <div style={{ fontSize: '30px', lineHeight: 1.12, marginBottom: '12px' }}>如果你認同呢個方向，可以即刻進入下一步。</div>
                 <div style={{ fontSize: '17px', lineHeight: 1.7, color: '#e8ddcf', marginBottom: '18px', maxWidth: '780px' }}>
                   你可以直接確認方向，交俾系統開始配對合適 creator；如果你想先同真人策略團隊對一對重點，我哋都可以下一步幫你承接。
                 </div>
@@ -399,11 +405,11 @@ function PaidAnalysisContent() {
               </section>
             </div>
 
-            <aside style={{ position: 'sticky', top: '24px' }}>
-              <section style={{ padding: '24px', borderRadius: '24px', background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(26,26,24,0.10)' }}>
+            <aside style={{ position: 'sticky', top: '112px' }}>
+              <section style={{ padding: '20px', borderRadius: '18px', background: '#f4efe5', border: '1px solid rgba(26,26,24,0.10)', boxShadow: '0 18px 60px rgba(0,0,0,0.16)' }}>
                 <div style={{ fontSize: '12px', letterSpacing: '0.16em', color: '#8b7c69', marginBottom: '10px' }}>CAMPAIGN FLOW</div>
-                <div style={{ fontSize: '34px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
-                <div style={{ display: 'grid', gap: '12px' }}>
+                <div style={{ fontSize: '28px', lineHeight: 1.05, color: '#1a1a18', marginBottom: '16px' }}>運作流程</div>
+                <div style={{ display: 'grid', gap: '10px' }}>
                   {campaignFlow.map((step, index) => {
                     const current = index === 1
                     const completed = index < 1
@@ -411,19 +417,19 @@ function PaidAnalysisContent() {
                       <div
                         key={step}
                         style={{
-                          padding: '18px 18px',
-                          borderRadius: '20px',
+                          padding: '14px 14px',
+                          borderRadius: '14px',
                           border: current ? '1px solid #1a1a18' : '1px solid rgba(26,26,24,0.08)',
                           background: current ? '#f7f1e1' : completed ? '#f1f5eb' : '#fbf8f1',
                           color: '#1a1a18',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                          <div style={{ fontSize: '16px', lineHeight: 1.55 }}>{step}</div>
+                          <div style={{ fontSize: '14px', lineHeight: 1.5 }}>{step}</div>
                           <div style={{
-                            minWidth: '64px',
+                            minWidth: '58px',
                             textAlign: 'center',
-                            padding: '6px 10px',
+                            padding: '6px 8px',
                             borderRadius: '999px',
                             background: current ? '#1a1a18' : completed ? '#dbe7d0' : 'rgba(26,26,24,0.06)',
                             color: current ? '#f5efe5' : '#4f5b41',
