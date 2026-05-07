@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 type ContentMixItem = {
@@ -167,7 +167,7 @@ function TopicReviewContent() {
   const searchParams = useSearchParams()
   const [isAnalyzing, setIsAnalyzing] = useState(true)
   const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null)
-  const topics = useMemo(() => buildTopics(), [])
+  const [topics, setTopics] = useState<TopicReference[]>(() => buildTopics())
   const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
   useEffect(() => {
@@ -209,6 +209,17 @@ function TopicReviewContent() {
 
   function handleBack() {
     window.history.back()
+  }
+
+  function handleInsertReferenceImage(topicId: string, image: string) {
+    setTopics((currentTopics) => {
+      const updatedTopics = currentTopics.map((topic) =>
+        topic.id === topicId ? { ...topic, image } : topic
+      )
+      window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(updatedTopics))
+      return updatedTopics
+    })
+    setActiveReferenceId(null)
   }
 
   return (
@@ -291,7 +302,11 @@ function TopicReviewContent() {
       </footer>
 
       {activeTopic ? (
-        <ReferenceImageModal topic={activeTopic} onClose={() => setActiveReferenceId(null)} />
+        <ReferenceImageModal
+          topic={activeTopic}
+          onClose={() => setActiveReferenceId(null)}
+          onInsertImage={(image) => handleInsertReferenceImage(activeTopic.id, image)}
+        />
       ) : null}
 
       <style dangerouslySetInnerHTML={{ __html: styles }} />
@@ -299,10 +314,26 @@ function TopicReviewContent() {
   )
 }
 
-function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClose: () => void }) {
+function ReferenceImageModal({
+  topic,
+  onClose,
+  onInsertImage,
+}: {
+  topic: TopicReference
+  onClose: () => void
+  onInsertImage: (image: string) => void
+}) {
   const [view, setView] = useState<'library' | 'generate'>('library')
   const [size, setSize] = useState<'正方形' | '橫向' | '直向'>('正方形')
   const [style, setStyle] = useState<'相片' | '插畫'>('相片')
+  const [selectedImage, setSelectedImage] = useState<string | null>(
+    topic.image !== PLACEHOLDER_IMAGE ? topic.image : null
+  )
+
+  function handleInsertImage() {
+    if (!selectedImage) return
+    onInsertImage(selectedImage)
+  }
 
   return (
     <div className="reference-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -350,38 +381,102 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
                 <span>自行<br />建立</span>
               </button>
               {AI_REFERENCE_IMAGES.map((image) => (
-                <button type="button" className="asset-card" key={image}>
-                  <img src={image} alt="" />
-                </button>
+                <SelectableAssetButton
+                  image={image}
+                  isSelected={selectedImage === image}
+                  key={image}
+                  onSelect={() => setSelectedImage(image)}
+                />
               ))}
             </ReferenceSection>
 
             <ReferenceSection title="你的品牌素材庫" action="SOON-LOG">
-              <button type="button" className="brand-kit-card">
-                <img src={PLACEHOLDER_IMAGE} alt="SOON-LOG" />
-              </button>
+              <SelectableAssetButton
+                className="brand-kit-card"
+                image={PLACEHOLDER_IMAGE}
+                isSelected={selectedImage === PLACEHOLDER_IMAGE}
+                label="SOON-LOG"
+                onSelect={() => setSelectedImage(PLACEHOLDER_IMAGE)}
+              />
             </ReferenceSection>
 
             <ReferenceSection title="庫存相片" action="查看全部">
               {STOCK_PHOTOS.map((image) => (
-                <button type="button" className="asset-card" key={image}>
-                  <img src={image} alt="" />
-                </button>
+                <SelectableAssetButton
+                  image={image}
+                  isSelected={selectedImage === image}
+                  key={image}
+                  onSelect={() => setSelectedImage(image)}
+                />
               ))}
             </ReferenceSection>
 
             <ReferenceSection title="庫存影片" action="查看全部">
               {STOCK_VIDEOS.map((video) => (
-                <button type="button" className="asset-card video-card" key={video.image}>
-                  <img src={video.image} alt="" />
+                <SelectableAssetButton
+                  className="video-card"
+                  image={video.image}
+                  isSelected={selectedImage === video.image}
+                  key={video.image}
+                  onSelect={() => setSelectedImage(video.image)}
+                >
                   <span>{video.duration}</span>
-                </button>
+                </SelectableAssetButton>
               ))}
             </ReferenceSection>
+
+            <div className="insert-image-bar">
+              <button
+                type="button"
+                className="deselect-button"
+                disabled={!selectedImage}
+                onClick={() => setSelectedImage(null)}
+              >
+                取消選擇
+              </button>
+              <button
+                type="button"
+                className="insert-image-button"
+                disabled={!selectedImage}
+                onClick={handleInsertImage}
+              >
+                插入圖片
+              </button>
+            </div>
           </>
         )}
       </section>
     </div>
+  )
+}
+
+function SelectableAssetButton({
+  children,
+  className = '',
+  image,
+  isSelected,
+  label = '參考圖片',
+  onSelect,
+}: {
+  children?: React.ReactNode
+  className?: string
+  image: string
+  isSelected: boolean
+  label?: string
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`asset-card selectable-asset ${className} ${isSelected ? 'selected' : ''}`}
+      aria-label={label}
+      aria-pressed={isSelected}
+      onClick={onSelect}
+    >
+      <img src={image} alt="" />
+      {isSelected ? <span className="selected-check" aria-hidden="true">✓</span> : null}
+      {children}
+    </button>
   )
 }
 
@@ -800,7 +895,7 @@ const styles = `
     border-radius: 16px;
     background: #ffffff;
     box-shadow: 0 26px 90px rgba(23, 24, 28, 0.14);
-    padding: 46px 52px 54px;
+    padding: 46px 52px 112px;
   }
 
   .reference-modal-close {
@@ -932,6 +1027,36 @@ const styles = `
     cursor: pointer;
   }
 
+  .selectable-asset {
+    outline: 0 solid transparent;
+    transition: box-shadow 160ms ease, outline-color 160ms ease, transform 160ms ease;
+  }
+
+  .selectable-asset:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.1);
+  }
+
+  .selectable-asset.selected {
+    outline: 3px solid #191a1d;
+    box-shadow: 0 0 0 5px #ffffff, 0 12px 28px rgba(0,0,0,0.12);
+  }
+
+  .selected-check {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: #111111;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    line-height: 1;
+  }
+
   .asset-card img,
   .brand-kit-card img {
     width: 100%;
@@ -972,6 +1097,51 @@ const styles = `
     color: #ffffff;
     padding: 4px 8px;
     font-size: 13px;
+  }
+
+  .insert-image-bar {
+    position: sticky;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    margin: 36px -52px -112px;
+    min-height: 84px;
+    border-top: 1px solid #ececec;
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+  }
+
+  .deselect-button,
+  .insert-image-button {
+    min-height: 48px;
+    border: 0;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 18px;
+    padding: 0 18px;
+    cursor: pointer;
+  }
+
+  .deselect-button {
+    background: transparent;
+    color: #8a8d94;
+  }
+
+  .insert-image-button {
+    background: #111111;
+    color: #ffffff;
+  }
+
+  .deselect-button:disabled,
+  .insert-image-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .generate-modal {
@@ -1166,6 +1336,10 @@ const styles = `
 
     .reference-modal {
       padding: 36px 24px 46px;
+    }
+
+    .insert-image-bar {
+      margin: 30px -24px -46px;
     }
 
     .generate-modal {
