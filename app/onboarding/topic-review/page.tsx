@@ -595,7 +595,7 @@ const styles = `
     min-height: calc(100vh - 88px);
     background: #ffffff;
     color: #191a1d;
-    padding: 24px clamp(24px, 5vw, 72px) 88px;
+    padding: 17px clamp(18px, 4vw, 50px) 64px;
     position: relative;
   }
 
@@ -603,16 +603,16 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
+    gap: 13px;
     color: #9b9b9b;
-    font-size: 15px;
+    font-size: 11px;
     line-height: 1;
   }
 
   .topic-review-steps span {
     display: inline-flex;
     align-items: center;
-    gap: 18px;
+    gap: 13px;
     white-space: nowrap;
   }
 
@@ -628,8 +628,8 @@ const styles = `
 
   .topic-loading,
   .topic-review-content {
-    width: min(100%, 930px);
-    margin: 76px auto 0;
+    width: min(100%, 760px);
+    margin: 52px auto 0;
   }
 
   .topic-loading {
@@ -637,16 +637,16 @@ const styles = `
   }
 
   .topic-loading > p {
-    margin: 0 0 18px;
+    margin: 0 0 13px;
     color: #a6a6a6;
-    font-size: 16px;
+    font-size: 11px;
   }
 
   .topic-loading h1,
   .topic-review-content h1 {
     margin: 0;
     color: #1b1c20;
-    font-size: clamp(34px, 4vw, 44px);
+    font-size: clamp(24px, 3vw, 31px);
     line-height: 1.12;
     font-weight: 500;
     letter-spacing: 0;
@@ -654,50 +654,50 @@ const styles = `
 
   .topic-loading h2,
   .topic-review-content header p {
-    margin: 16px 0 0;
+    margin: 11px 0 0;
     color: #5d6067;
-    font-size: 18px;
+    font-size: 13px;
     line-height: 1.45;
     font-weight: 400;
   }
 
   .topic-loading h2 {
-    max-width: 660px;
+    max-width: 462px;
     margin-left: auto;
     margin-right: auto;
   }
 
   .loading-demo {
-    margin-top: 48px;
-    padding-top: 34px;
+    margin-top: 34px;
+    padding-top: 24px;
     border-top: 1px solid #ececec;
     display: grid;
-    grid-template-columns: 1fr auto 250px;
+    grid-template-columns: 1fr auto 175px;
     align-items: center;
-    gap: 34px;
+    gap: 24px;
     text-align: left;
   }
 
   .loading-topic > span,
   .generated-post > span {
     display: block;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     color: #25262a;
-    font-size: 16px;
+    font-size: 11px;
   }
 
   .demo-topic-card {
     display: grid;
-    grid-template-columns: 160px 1fr;
-    gap: 14px;
+    grid-template-columns: 112px 1fr;
+    gap: 10px;
     align-items: stretch;
   }
 
   .demo-image {
     position: relative;
     overflow: hidden;
-    border-radius: 10px;
-    min-height: 160px;
+    border-radius: 8px;
+    min-height: 112px;
     background: #f1f1f1;
   }
 
@@ -715,7 +715,7 @@ const styles = `
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 10px;
+    padding: 7px;
     color: #ffffff;
     background: linear-gradient(180deg, transparent, rgba(0,0,0,0.55));
     font-style: normal;
@@ -723,31 +723,31 @@ const styles = `
   }
 
   .demo-topic-card p {
-    min-height: 160px;
+    min-height: 112px;
     margin: 0;
     border: 1px solid #e8e8e8;
-    border-radius: 8px;
-    padding: 20px;
+    border-radius: 6px;
+    padding: 14px;
     color: #24252a;
-    font-size: 18px;
+    font-size: 13px;
     line-height: 1.35;
   }
 
   .demo-arrow {
     color: #111111;
-    font-size: 48px;
+    font-size: 34px;
     font-weight: 300;
   }
 
   .mock-post {
     position: relative;
     overflow: hidden;
-    width: 250px;
+    width: 175px;
     aspect-ratio: 4 / 5;
     border: 1px solid #e8e8e8;
-    border-radius: 12px;
+    border-radius: 8px;
     background: #f5f5f5;
-    box-shadow: 0 24px 70px rgba(0,0,0,0.08);
+    box-shadow: 0 17px 49px rgba(0,0,0,0.08);
   }
 
   .mock-post img {
@@ -757,34 +757,34 @@ const styles = `
 
   .mock-post strong {
     position: absolute;
-    top: 42px;
-    right: 24px;
+    top: 29px;
+    right: 17px;
     color: #ffffff;
-    font-size: 31px;
+    font-size: 22px;
     line-height: 0.92;
     text-align: right;
   }
 
   .topic-review-content header {
-    max-width: 820px;
+    max-width: 574px;
   }
 
   .topic-list {
-    margin-top: 44px;
+    margin-top: 31px;
     display: grid;
-    gap: 56px;
+    gap: 39px;
   }
 
   .topic-row {
     display: grid;
-    grid-template-columns: 160px minmax(0, 1fr);
+    grid-template-columns: 112px minmax(0, 1fr);
     align-items: center;
-    gap: 40px;
+    gap: 28px;
   }
 
   .topic-image {
-    width: 160px;
-    height: 110px;
+    width: 112px;
+    height: 77px;
     display: grid;
     place-items: center;
     overflow: hidden;
@@ -807,20 +807,20 @@ const styles = `
     margin: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 7px;
     color: #1e1f24;
-    font-size: 22px;
+    font-size: 15px;
     font-weight: 550;
     line-height: 1.2;
   }
 
   .topic-icon {
-    width: 20px;
-    height: 20px;
+    width: 14px;
+    height: 14px;
     display: inline-grid;
     place-items: center;
-    border-radius: 5px;
-    font-size: 12px;
+    border-radius: 4px;
+    font-size: 8px;
     line-height: 1;
   }
 
@@ -835,15 +835,15 @@ const styles = `
   }
 
   .topic-label {
-    margin: 18px 0 0;
+    margin: 13px 0 0;
     color: #666970;
-    font-size: 14px;
+    font-size: 10px;
   }
 
   .topic-text {
-    margin: 18px 0 0;
+    margin: 13px 0 0;
     color: #202126;
-    font-size: 20px;
+    font-size: 14px;
     line-height: 1.45;
   }
 
@@ -853,12 +853,12 @@ const styles = `
     right: 0;
     bottom: 0;
     z-index: 20;
-    min-height: 68px;
+    min-height: 48px;
     background: rgba(255,255,255,0.96);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 24px;
+    padding: 8px 17px;
   }
 
   .topic-review-footer button {
@@ -866,16 +866,16 @@ const styles = `
     background: transparent;
     color: #17181c;
     font: inherit;
-    font-size: 20px;
+    font-size: 14px;
     cursor: pointer;
   }
 
   .topic-review-footer button:last-child {
-    border-radius: 8px;
+    border-radius: 6px;
     background: #111111;
     color: #ffffff;
-    padding: 12px 20px;
-    font-size: 18px;
+    padding: 8px 14px;
+    font-size: 13px;
   }
 
   .reference-modal-backdrop {
@@ -1332,13 +1332,13 @@ const styles = `
     }
 
     .topic-row {
-      grid-template-columns: 120px 1fr;
-      gap: 24px;
+      grid-template-columns: 84px 1fr;
+      gap: 17px;
     }
 
     .topic-image {
-      width: 120px;
-      height: 92px;
+      width: 84px;
+      height: 64px;
     }
 
     .reference-modal-body {
@@ -1364,7 +1364,7 @@ const styles = `
 
   @media (max-width: 640px) {
     .topic-review-page {
-      padding: 20px 18px 88px;
+      padding: 14px 13px 62px;
     }
 
     .topic-review-steps {
@@ -1375,17 +1375,17 @@ const styles = `
 
     .topic-loading,
     .topic-review-content {
-      margin-top: 48px;
+      margin-top: 34px;
     }
 
     .topic-row {
       grid-template-columns: 1fr;
-      gap: 16px;
+      gap: 11px;
     }
 
     .topic-image {
-      width: 160px;
-      height: 110px;
+      width: 112px;
+      height: 77px;
     }
 
     .generate-image-panel h3 {
