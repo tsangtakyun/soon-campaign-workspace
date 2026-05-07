@@ -46,6 +46,28 @@ const FALLBACK_TOPICS: TopicReference[] = [
   },
 ]
 
+const AI_REFERENCE_IMAGES = [
+  '/photo-control/coffee-full-freedom.jpg',
+  '/assets/content-strategies/photos/lifestyle-content.jpg',
+  '/assets/content-strategies/photos/offer-promotion.jpg',
+  '/visual-styles/previews/magic-hour.jpg',
+  '/assets/content-strategies/photos/community-content.jpg',
+]
+
+const STOCK_PHOTOS = [
+  '/visual-styles/previews/cold-chrome.jpg',
+  '/visual-styles/previews/blue-hour.jpg',
+  '/visual-styles/previews/soft-black-and-white.jpg',
+  '/visual-styles/previews/lush-green.jpg',
+  '/photo-control/coffee-balanced.jpg',
+]
+
+const STOCK_VIDEOS = [
+  { image: '/content-mix/content-mix-feed-videos.png', duration: '00:30' },
+  { image: '/content-mix/content-mix-short-form-video.png', duration: '00:52' },
+  { image: '/content-mix/content-mix-stories.png', duration: '00:57' },
+]
+
 const TOPIC_COPY: Record<string, string[]> = {
   'still-images': [
     '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
@@ -125,7 +147,9 @@ function buildTopics(): TopicReference[] {
 function TopicReviewContent() {
   const searchParams = useSearchParams()
   const [isAnalyzing, setIsAnalyzing] = useState(true)
+  const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null)
   const topics = useMemo(() => buildTopics(), [])
+  const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -218,9 +242,14 @@ function TopicReviewContent() {
           <div className="topic-list">
             {topics.map((topic) => (
               <article className="topic-row" key={topic.id}>
-                <div className="topic-image">
+                <button
+                  type="button"
+                  className="topic-image topic-image-button"
+                  onClick={() => setActiveReferenceId(topic.id)}
+                  aria-label={`更換${topic.label}參考圖片`}
+                >
                   <img src={topic.image} alt={`${topic.label} reference`} />
-                </div>
+                </button>
                 <div className="topic-copy">
                   <h2>
                     <span className={topic.type === 'image' ? 'topic-icon image' : 'topic-icon post'} aria-hidden="true">
@@ -242,8 +271,103 @@ function TopicReviewContent() {
         {!isAnalyzing ? <button type="button" onClick={handleContinue}>繼續</button> : null}
       </footer>
 
+      {activeTopic ? (
+        <ReferenceImageModal topic={activeTopic} onClose={() => setActiveReferenceId(null)} />
+      ) : null}
+
       <style dangerouslySetInnerHTML={{ __html: styles }} />
     </main>
+  )
+}
+
+function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClose: () => void }) {
+  return (
+    <div className="reference-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="reference-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reference-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button type="button" className="reference-modal-close" onClick={onClose} aria-label="關閉">
+          ×
+        </button>
+        <header>
+          <p>{topic.label}</p>
+          <h2 id="reference-modal-title">Change Reference Image</h2>
+        </header>
+
+        <div className="reference-search" aria-hidden="true">
+          <span>⌕</span>
+          <p>Search for images and videos</p>
+        </div>
+
+        <div className="modal-actions">
+          <label className="upload-pill">
+            <input type="file" />
+            <span>Upload</span>
+          </label>
+          <span className="file-empty">No file chosen</span>
+          <button type="button">Generate with AI</button>
+        </div>
+
+        <ReferenceSection title="Generate with AI">
+          <button type="button" className="create-card">
+            <strong>AI</strong>
+            <span>Create<br />your own</span>
+          </button>
+          {AI_REFERENCE_IMAGES.map((image) => (
+            <button type="button" className="asset-card" key={image}>
+              <img src={image} alt="" />
+            </button>
+          ))}
+        </ReferenceSection>
+
+        <ReferenceSection title="From Your Brand Kit" action="SOON-LOG">
+          <button type="button" className="brand-kit-card">
+            <img src={PLACEHOLDER_IMAGE} alt="SOON-LOG" />
+          </button>
+        </ReferenceSection>
+
+        <ReferenceSection title="Stock Photos" action="See All">
+          {STOCK_PHOTOS.map((image) => (
+            <button type="button" className="asset-card" key={image}>
+              <img src={image} alt="" />
+            </button>
+          ))}
+        </ReferenceSection>
+
+        <ReferenceSection title="Stock Videos" action="See All">
+          {STOCK_VIDEOS.map((video) => (
+            <button type="button" className="asset-card video-card" key={video.image}>
+              <img src={video.image} alt="" />
+              <span>{video.duration}</span>
+            </button>
+          ))}
+        </ReferenceSection>
+      </section>
+    </div>
+  )
+}
+
+function ReferenceSection({
+  title,
+  action,
+  children,
+}: {
+  title: string
+  action?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="reference-section">
+      <div className="reference-section-header">
+        <h3>{title}</h3>
+        {action ? <span>{action}</span> : null}
+      </div>
+      <div className="reference-grid">{children}</div>
+    </section>
   )
 }
 
@@ -448,6 +572,18 @@ const styles = `
     background: #ffffff;
   }
 
+  .topic-image-button {
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 160ms ease, opacity 160ms ease;
+  }
+
+  .topic-image-button:hover {
+    transform: translateY(-1px);
+    opacity: 0.88;
+  }
+
   .topic-copy h2 {
     margin: 0;
     display: flex;
@@ -523,6 +659,199 @@ const styles = `
     font-size: 18px;
   }
 
+  .reference-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(241, 243, 245, 0.74);
+    backdrop-filter: blur(7px);
+    display: grid;
+    place-items: center;
+    padding: 36px 20px;
+  }
+
+  .reference-modal {
+    position: relative;
+    width: min(100%, 1120px);
+    max-height: calc(100vh - 72px);
+    overflow: auto;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 26px 90px rgba(23, 24, 28, 0.14);
+    padding: 46px 52px 54px;
+  }
+
+  .reference-modal-close {
+    position: absolute;
+    top: 24px;
+    right: 28px;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #282a30;
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .reference-modal header p {
+    margin: 0 0 8px;
+    color: #8b91a0;
+    font-size: 14px;
+  }
+
+  .reference-modal h2 {
+    margin: 0;
+    color: #1c1d21;
+    font-size: 34px;
+    line-height: 1.15;
+    font-weight: 500;
+  }
+
+  .reference-search {
+    margin-top: 34px;
+    min-height: 64px;
+    border: 1px solid #e6e8ec;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 22px;
+    color: #8e95a3;
+    font-size: 20px;
+  }
+
+  .reference-search p {
+    margin: 0;
+  }
+
+  .modal-actions {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .modal-actions button,
+  .upload-pill {
+    min-height: 44px;
+    border: 1px solid #e4e6eb;
+    border-radius: 10px;
+    background: #f9fafb;
+    color: #1d1f24;
+    padding: 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-size: 17px;
+    cursor: pointer;
+  }
+
+  .upload-pill input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .file-empty {
+    color: #747986;
+    font-size: 16px;
+  }
+
+  .reference-section {
+    margin-top: 44px;
+  }
+
+  .reference-section-header {
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .reference-section-header h3 {
+    margin: 0;
+    color: #202126;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .reference-section-header span {
+    color: #202126;
+    font-size: 18px;
+  }
+
+  .reference-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 142px;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .asset-card,
+  .create-card,
+  .brand-kit-card {
+    position: relative;
+    height: 112px;
+    border: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #f1f1f1;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .asset-card img,
+  .brand-kit-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .create-card {
+    display: grid;
+    place-items: center;
+    color: #1f2025;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.22;
+  }
+
+  .create-card strong {
+    font-size: 16px;
+  }
+
+  .brand-kit-card {
+    width: 172px;
+    height: 118px;
+    background: #ffffff;
+  }
+
+  .brand-kit-card img {
+    object-fit: contain;
+  }
+
+  .video-card span {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.72);
+    color: #ffffff;
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+
   @media (max-width: 900px) {
     .loading-demo {
       grid-template-columns: 1fr;
@@ -549,6 +878,10 @@ const styles = `
     .topic-image {
       width: 120px;
       height: 92px;
+    }
+
+    .reference-modal {
+      padding: 36px 24px 46px;
     }
   }
 
