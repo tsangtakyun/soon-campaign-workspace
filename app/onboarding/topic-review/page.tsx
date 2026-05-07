@@ -356,74 +356,76 @@ function ReferenceImageModal({
           />
         ) : (
           <>
-            <header>
-              <p>{topic.label}</p>
-              <h2 id="reference-modal-title">更換參考圖片</h2>
-            </header>
+            <div className="reference-modal-body">
+              <header>
+                <p>{topic.label}</p>
+                <h2 id="reference-modal-title">更換參考圖片</h2>
+              </header>
 
-            <div className="reference-search" aria-hidden="true">
-              <span>⌕</span>
-              <p>搜尋圖片和影片</p>
-            </div>
+              <div className="reference-search" aria-hidden="true">
+                <span>⌕</span>
+                <p>搜尋圖片和影片</p>
+              </div>
 
-            <div className="modal-actions">
-              <label className="upload-pill">
-                <input type="file" />
-                <span>上載</span>
-              </label>
-              <span className="file-empty">未選擇檔案</span>
-              <button type="button" onClick={() => setView('generate')}>用 AI 生成</button>
-            </div>
+              <div className="modal-actions">
+                <label className="upload-pill">
+                  <input type="file" />
+                  <span>上載</span>
+                </label>
+                <span className="file-empty">未選擇檔案</span>
+                <button type="button" onClick={() => setView('generate')}>用 AI 生成</button>
+              </div>
 
-            <ReferenceSection title="用 AI 生成">
-              <button type="button" className="create-card" onClick={() => setView('generate')}>
-                <strong>AI</strong>
-                <span>自行<br />建立</span>
-              </button>
-              {AI_REFERENCE_IMAGES.map((image) => (
+              <ReferenceSection title="用 AI 生成">
+                <button type="button" className="create-card" onClick={() => setView('generate')}>
+                  <strong>AI</strong>
+                  <span>自行<br />建立</span>
+                </button>
+                {AI_REFERENCE_IMAGES.map((image) => (
+                  <SelectableAssetButton
+                    image={image}
+                    isSelected={selectedImage === image}
+                    key={image}
+                    onSelect={() => setSelectedImage(image)}
+                  />
+                ))}
+              </ReferenceSection>
+
+              <ReferenceSection title="你的品牌素材庫" action="SOON-LOG">
                 <SelectableAssetButton
-                  image={image}
-                  isSelected={selectedImage === image}
-                  key={image}
-                  onSelect={() => setSelectedImage(image)}
+                  className="brand-kit-card"
+                  image={PLACEHOLDER_IMAGE}
+                  isSelected={selectedImage === PLACEHOLDER_IMAGE}
+                  label="SOON-LOG"
+                  onSelect={() => setSelectedImage(PLACEHOLDER_IMAGE)}
                 />
-              ))}
-            </ReferenceSection>
+              </ReferenceSection>
 
-            <ReferenceSection title="你的品牌素材庫" action="SOON-LOG">
-              <SelectableAssetButton
-                className="brand-kit-card"
-                image={PLACEHOLDER_IMAGE}
-                isSelected={selectedImage === PLACEHOLDER_IMAGE}
-                label="SOON-LOG"
-                onSelect={() => setSelectedImage(PLACEHOLDER_IMAGE)}
-              />
-            </ReferenceSection>
+              <ReferenceSection title="庫存相片" action="查看全部">
+                {STOCK_PHOTOS.map((image) => (
+                  <SelectableAssetButton
+                    image={image}
+                    isSelected={selectedImage === image}
+                    key={image}
+                    onSelect={() => setSelectedImage(image)}
+                  />
+                ))}
+              </ReferenceSection>
 
-            <ReferenceSection title="庫存相片" action="查看全部">
-              {STOCK_PHOTOS.map((image) => (
-                <SelectableAssetButton
-                  image={image}
-                  isSelected={selectedImage === image}
-                  key={image}
-                  onSelect={() => setSelectedImage(image)}
-                />
-              ))}
-            </ReferenceSection>
-
-            <ReferenceSection title="庫存影片" action="查看全部">
-              {STOCK_VIDEOS.map((video) => (
-                <SelectableAssetButton
-                  className="video-card"
-                  image={video.image}
-                  isSelected={selectedImage === video.image}
-                  key={video.image}
-                  onSelect={() => setSelectedImage(video.image)}
-                >
-                  <span>{video.duration}</span>
-                </SelectableAssetButton>
-              ))}
-            </ReferenceSection>
+              <ReferenceSection title="庫存影片" action="查看全部">
+                {STOCK_VIDEOS.map((video) => (
+                  <SelectableAssetButton
+                    className="video-card"
+                    image={video.image}
+                    isSelected={selectedImage === video.image}
+                    key={video.image}
+                    onSelect={() => setSelectedImage(video.image)}
+                  >
+                    <span>{video.duration}</span>
+                  </SelectableAssetButton>
+                ))}
+              </ReferenceSection>
+            </div>
 
             <div className="insert-image-bar">
               <button
@@ -889,55 +891,63 @@ const styles = `
 
   .reference-modal {
     position: relative;
-    width: min(100%, 1120px);
+    width: min(100%, 1020px);
     max-height: calc(100vh - 72px);
-    overflow: auto;
-    border-radius: 16px;
+    overflow: hidden;
+    border-radius: 14px;
     background: #ffffff;
     box-shadow: 0 26px 90px rgba(23, 24, 28, 0.14);
-    padding: 46px 52px 112px;
+    display: flex;
+    flex-direction: column;
   }
 
   .reference-modal-close {
     position: absolute;
-    top: 24px;
-    right: 28px;
-    width: 32px;
-    height: 32px;
+    top: 18px;
+    right: 20px;
+    z-index: 5;
+    width: 26px;
+    height: 26px;
     border: 0;
     border-radius: 999px;
     background: transparent;
     color: #282a30;
-    font-size: 30px;
+    font-size: 24px;
     line-height: 1;
     cursor: pointer;
   }
 
+  .reference-modal-body {
+    min-height: 0;
+    overflow: auto;
+    padding: 32px 36px 26px;
+  }
+
   .reference-modal header p {
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     color: #8b91a0;
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .reference-modal h2 {
     margin: 0;
     color: #1c1d21;
-    font-size: 34px;
+    font-size: 24px;
     line-height: 1.15;
     font-weight: 500;
   }
 
   .reference-search {
-    margin-top: 34px;
-    min-height: 64px;
+    margin-top: 24px;
+    min-height: 46px;
     border: 1px solid #e6e8ec;
-    border-radius: 12px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 0 22px;
+    gap: 10px;
+    padding: 0 16px;
     color: #8e95a3;
-    font-size: 20px;
+    font-size: 15px;
   }
 
   .reference-search p {
@@ -945,26 +955,26 @@ const styles = `
   }
 
   .modal-actions {
-    margin-top: 14px;
+    margin-top: 10px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
   }
 
   .modal-actions button,
   .upload-pill {
-    min-height: 44px;
+    min-height: 32px;
     border: 1px solid #e4e6eb;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #f9fafb;
     color: #1d1f24;
-    padding: 0 18px;
+    padding: 0 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font: inherit;
-    font-size: 17px;
+    font-size: 13px;
     cursor: pointer;
   }
 
@@ -978,15 +988,15 @@ const styles = `
 
   .file-empty {
     color: #747986;
-    font-size: 16px;
+    font-size: 12px;
   }
 
   .reference-section {
-    margin-top: 44px;
+    margin-top: 30px;
   }
 
   .reference-section-header {
-    margin-bottom: 18px;
+    margin-bottom: 13px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -996,31 +1006,31 @@ const styles = `
   .reference-section-header h3 {
     margin: 0;
     color: #202126;
-    font-size: 22px;
+    font-size: 16px;
     font-weight: 600;
   }
 
   .reference-section-header span {
     color: #202126;
-    font-size: 18px;
+    font-size: 13px;
   }
 
   .reference-grid {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 142px;
-    gap: 16px;
+    grid-auto-columns: 100px;
+    gap: 12px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
   }
 
   .asset-card,
   .create-card,
   .brand-kit-card {
     position: relative;
-    height: 112px;
+    height: 78px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     background: #f1f1f1;
     padding: 0;
@@ -1034,26 +1044,26 @@ const styles = `
 
   .selectable-asset:hover {
     transform: translateY(-1px);
-    box-shadow: 0 10px 26px rgba(0,0,0,0.1);
+    box-shadow: 0 7px 18px rgba(0,0,0,0.1);
   }
 
   .selectable-asset.selected {
-    outline: 3px solid #191a1d;
-    box-shadow: 0 0 0 5px #ffffff, 0 12px 28px rgba(0,0,0,0.12);
+    outline: 2px solid #191a1d;
+    box-shadow: 0 0 0 4px #ffffff, 0 8px 20px rgba(0,0,0,0.12);
   }
 
   .selected-check {
     position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 28px;
-    height: 28px;
-    border-radius: 7px;
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
     background: #111111;
     color: #ffffff;
     display: grid;
     place-items: center;
-    font-size: 22px;
+    font-size: 17px;
     line-height: 1;
   }
 
@@ -1069,18 +1079,18 @@ const styles = `
     display: grid;
     place-items: center;
     color: #1f2025;
-    font-size: 20px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 1.22;
   }
 
   .create-card strong {
-    font-size: 16px;
+    font-size: 12px;
   }
 
   .brand-kit-card {
-    width: 172px;
-    height: 118px;
+    width: 120px;
+    height: 82px;
     background: #ffffff;
   }
 
@@ -1090,41 +1100,36 @@ const styles = `
 
   .video-card span {
     position: absolute;
-    right: 8px;
-    bottom: 8px;
+    right: 6px;
+    bottom: 6px;
     border-radius: 999px;
     background: rgba(0,0,0,0.72);
     color: #ffffff;
-    padding: 4px 8px;
-    font-size: 13px;
+    padding: 3px 6px;
+    font-size: 10px;
   }
 
   .insert-image-bar {
-    position: sticky;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 3;
-    margin: 36px -52px -112px;
-    min-height: 84px;
+    flex: 0 0 auto;
+    min-height: 62px;
     border-top: 1px solid #ececec;
     background: rgba(255,255,255,0.96);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 24px;
+    gap: 10px;
+    padding: 12px 20px;
   }
 
   .deselect-button,
   .insert-image-button {
-    min-height: 48px;
+    min-height: 36px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     font: inherit;
-    font-size: 18px;
-    padding: 0 18px;
+    font-size: 14px;
+    padding: 0 14px;
     cursor: pointer;
   }
 
@@ -1146,7 +1151,9 @@ const styles = `
 
   .generate-modal {
     width: min(100%, 1240px);
-    padding: 46px 52px 42px;
+    overflow: auto;
+    display: block;
+    padding: 32px 36px 30px;
   }
 
   .generate-image-panel header {
@@ -1334,16 +1341,16 @@ const styles = `
       height: 92px;
     }
 
-    .reference-modal {
-      padding: 36px 24px 46px;
+    .reference-modal-body {
+      padding: 28px 24px 22px;
     }
 
     .insert-image-bar {
-      margin: 30px -24px -46px;
+      padding: 12px 16px;
     }
 
     .generate-modal {
-      padding: 36px 24px 42px;
+      padding: 28px 24px 34px;
     }
 
     .prompt-composer {
