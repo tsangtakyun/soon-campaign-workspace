@@ -68,6 +68,25 @@ const STOCK_VIDEOS = [
   { image: '/content-mix/content-mix-stories.png', duration: '00:57' },
 ]
 
+const TRENDING_EXAMPLES = [
+  {
+    image: '/assets/content-strategies/photos/lifestyle-content.jpg',
+    prompt: 'Happy customer holding a product',
+  },
+  {
+    image: '/assets/content-strategies/photos/behind-the-scenes.jpg',
+    prompt: "Overhead shot of artist's worktable",
+  },
+  {
+    image: '/assets/content-strategies/photos/offer-promotion.jpg',
+    prompt: 'E-commerce summer sale promotion',
+  },
+  {
+    image: '/photo-control/coffee-balanced.jpg',
+    prompt: 'Happy hour at a restaurant',
+  },
+]
+
 const TOPIC_COPY: Record<string, string[]> = {
   'still-images': [
     '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
@@ -281,10 +300,16 @@ function TopicReviewContent() {
 }
 
 function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClose: () => void }) {
+  const [view, setView] = useState<'library' | 'generate'>('library')
+  const [size, setSize] = useState<'Square' | 'Landscape' | 'Portrait'>('Square')
+  const [style, setStyle] = useState<'Photo' | 'Illustration'>('Photo')
+  const [priority, setPriority] = useState<'Speed' | 'Quality'>('Speed')
+  const creditCost = priority === 'Speed' ? 5 : 10
+
   return (
     <div className="reference-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className="reference-modal"
+        className={view === 'generate' ? 'reference-modal generate-modal' : 'reference-modal'}
         role="dialog"
         aria-modal="true"
         aria-labelledby="reference-modal-title"
@@ -293,60 +318,175 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
         <button type="button" className="reference-modal-close" onClick={onClose} aria-label="關閉">
           ×
         </button>
-        <header>
-          <p>{topic.label}</p>
-          <h2 id="reference-modal-title">Change Reference Image</h2>
-        </header>
+        {view === 'generate' ? (
+          <GenerateImagePanel
+            creditCost={creditCost}
+            priority={priority}
+            setPriority={setPriority}
+            setSize={setSize}
+            setStyle={setStyle}
+            size={size}
+            style={style}
+          />
+        ) : (
+          <>
+            <header>
+              <p>{topic.label}</p>
+              <h2 id="reference-modal-title">Change Reference Image</h2>
+            </header>
 
-        <div className="reference-search" aria-hidden="true">
-          <span>⌕</span>
-          <p>Search for images and videos</p>
-        </div>
+            <div className="reference-search" aria-hidden="true">
+              <span>⌕</span>
+              <p>Search for images and videos</p>
+            </div>
 
-        <div className="modal-actions">
-          <label className="upload-pill">
-            <input type="file" />
-            <span>Upload</span>
-          </label>
-          <span className="file-empty">No file chosen</span>
-          <button type="button">Generate with AI</button>
-        </div>
+            <div className="modal-actions">
+              <label className="upload-pill">
+                <input type="file" />
+                <span>Upload</span>
+              </label>
+              <span className="file-empty">No file chosen</span>
+              <button type="button" onClick={() => setView('generate')}>Generate with AI</button>
+            </div>
 
-        <ReferenceSection title="Generate with AI">
-          <button type="button" className="create-card">
-            <strong>AI</strong>
-            <span>Create<br />your own</span>
-          </button>
-          {AI_REFERENCE_IMAGES.map((image) => (
-            <button type="button" className="asset-card" key={image}>
-              <img src={image} alt="" />
-            </button>
-          ))}
-        </ReferenceSection>
+            <ReferenceSection title="Generate with AI">
+              <button type="button" className="create-card" onClick={() => setView('generate')}>
+                <strong>AI</strong>
+                <span>Create<br />your own</span>
+              </button>
+              {AI_REFERENCE_IMAGES.map((image) => (
+                <button type="button" className="asset-card" key={image}>
+                  <img src={image} alt="" />
+                </button>
+              ))}
+            </ReferenceSection>
 
-        <ReferenceSection title="From Your Brand Kit" action="SOON-LOG">
-          <button type="button" className="brand-kit-card">
-            <img src={PLACEHOLDER_IMAGE} alt="SOON-LOG" />
-          </button>
-        </ReferenceSection>
+            <ReferenceSection title="From Your Brand Kit" action="SOON-LOG">
+              <button type="button" className="brand-kit-card">
+                <img src={PLACEHOLDER_IMAGE} alt="SOON-LOG" />
+              </button>
+            </ReferenceSection>
 
-        <ReferenceSection title="Stock Photos" action="See All">
-          {STOCK_PHOTOS.map((image) => (
-            <button type="button" className="asset-card" key={image}>
-              <img src={image} alt="" />
-            </button>
-          ))}
-        </ReferenceSection>
+            <ReferenceSection title="Stock Photos" action="See All">
+              {STOCK_PHOTOS.map((image) => (
+                <button type="button" className="asset-card" key={image}>
+                  <img src={image} alt="" />
+                </button>
+              ))}
+            </ReferenceSection>
 
-        <ReferenceSection title="Stock Videos" action="See All">
-          {STOCK_VIDEOS.map((video) => (
-            <button type="button" className="asset-card video-card" key={video.image}>
-              <img src={video.image} alt="" />
-              <span>{video.duration}</span>
-            </button>
-          ))}
-        </ReferenceSection>
+            <ReferenceSection title="Stock Videos" action="See All">
+              {STOCK_VIDEOS.map((video) => (
+                <button type="button" className="asset-card video-card" key={video.image}>
+                  <img src={video.image} alt="" />
+                  <span>{video.duration}</span>
+                </button>
+              ))}
+            </ReferenceSection>
+          </>
+        )}
       </section>
+    </div>
+  )
+}
+
+function GenerateImagePanel({
+  creditCost,
+  priority,
+  setPriority,
+  setSize,
+  setStyle,
+  size,
+  style,
+}: {
+  creditCost: number
+  priority: 'Speed' | 'Quality'
+  setPriority: (priority: 'Speed' | 'Quality') => void
+  setSize: (size: 'Square' | 'Landscape' | 'Portrait') => void
+  setStyle: (style: 'Photo' | 'Illustration') => void
+  size: 'Square' | 'Landscape' | 'Portrait'
+  style: 'Photo' | 'Illustration'
+}) {
+  return (
+    <div className="generate-image-panel">
+      <header>
+        <h2 id="reference-modal-title">Generate an Image</h2>
+        <p>Powered by ChatGPT image generation</p>
+      </header>
+
+      <h3>Describe the image you want to generate—or try an example</h3>
+
+      <div className="prompt-composer">
+        <textarea placeholder="Describe an image" aria-label="Describe an image" />
+        <div className="prompt-controls">
+          <OptionPicker
+            label="Size"
+            options={['Square', 'Landscape', 'Portrait']}
+            value={size}
+            onSelect={setSize}
+          />
+          <OptionPicker
+            label="Style"
+            options={['Photo', 'Illustration']}
+            value={style}
+            onSelect={setStyle}
+          />
+          <OptionPicker
+            label="Priority"
+            options={['Speed', 'Quality']}
+            value={priority}
+            onSelect={setPriority}
+          />
+          <button type="button" className="generate-submit">
+            Generate ✨{creditCost}
+          </button>
+        </div>
+      </div>
+
+      <div className="credit-note">
+        <span>Speed uses 5 credits</span>
+        <span>Quality uses 10 credits</span>
+      </div>
+
+      <section className="trending-examples" aria-label="Trending Examples">
+        <h3>Trending Examples</h3>
+        <div className="trending-grid">
+          {TRENDING_EXAMPLES.map((example) => (
+            <article className="trending-card" key={example.prompt}>
+              <img src={example.image} alt="" />
+              <p>{example.prompt}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function OptionPicker<T extends string>({
+  label,
+  onSelect,
+  options,
+  value,
+}: {
+  label: string
+  onSelect: (value: T) => void
+  options: T[]
+  value: T
+}) {
+  return (
+    <div className="option-picker" aria-label={label}>
+      <span>{label}</span>
+      {options.map((option) => (
+        <button
+          type="button"
+          className={option === value ? 'selected' : ''}
+          key={option}
+          onClick={() => onSelect(option)}
+        >
+          {option}
+        </button>
+      ))}
     </div>
   )
 }
@@ -852,6 +992,168 @@ const styles = `
     font-size: 13px;
   }
 
+  .generate-modal {
+    width: min(100%, 1240px);
+    padding: 46px 52px 42px;
+  }
+
+  .generate-image-panel header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .generate-image-panel header p {
+    margin: 10px 44px 0 0;
+    color: #6b717c;
+    font-size: 15px;
+  }
+
+  .generate-image-panel h3 {
+    margin: 58px 0 0;
+    color: #2a2d35;
+    font-size: 29px;
+    line-height: 1.22;
+    font-weight: 600;
+  }
+
+  .prompt-composer {
+    margin-top: 66px;
+    border: 1px solid #d7d7d7;
+    border-radius: 22px;
+    padding: 26px 24px 24px;
+  }
+
+  .prompt-composer textarea {
+    width: 100%;
+    min-height: 76px;
+    resize: vertical;
+    border: 0;
+    outline: 0;
+    color: #1f2127;
+    font: inherit;
+    font-size: 27px;
+    line-height: 1.35;
+  }
+
+  .prompt-composer textarea::placeholder {
+    color: #98a0ae;
+  }
+
+  .prompt-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .option-picker {
+    min-height: 54px;
+    border-radius: 999px;
+    background: #f6f6f6;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px 7px 18px;
+  }
+
+  .option-picker span {
+    color: #8c8f96;
+    font-size: 23px;
+  }
+
+  .option-picker button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #222329;
+    font: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0 12px;
+    cursor: pointer;
+  }
+
+  .option-picker button.selected {
+    background: #ffffff;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+  }
+
+  .generate-submit {
+    min-height: 56px;
+    border: 0;
+    border-radius: 12px;
+    background: #b9b9bb;
+    color: #ffffff;
+    font: inherit;
+    font-size: 24px;
+    margin-left: auto;
+    padding: 0 22px;
+    cursor: pointer;
+  }
+
+  .credit-note {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: #747986;
+    font-size: 14px;
+  }
+
+  .credit-note span {
+    border-radius: 999px;
+    background: #f6f6f6;
+    padding: 7px 11px;
+  }
+
+  .trending-examples {
+    margin-top: 38px;
+  }
+
+  .trending-examples h3 {
+    margin: 0;
+    color: #17181c;
+    font-size: 31px;
+    font-weight: 500;
+  }
+
+  .trending-grid {
+    margin-top: 28px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 290px;
+    gap: 28px;
+    overflow-x: auto;
+    padding: 0 0 12px 8px;
+  }
+
+  .trending-card {
+    border: 1px solid #e4e4e4;
+    border-radius: 14px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .trending-card img {
+    width: calc(100% - 32px);
+    height: 260px;
+    margin: 16px 16px 0;
+    border-radius: 7px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .trending-card p {
+    min-height: 72px;
+    margin: 14px 16px 18px;
+    color: #1f2025;
+    font-size: 22px;
+    line-height: 1.24;
+  }
+
   @media (max-width: 900px) {
     .loading-demo {
       grid-template-columns: 1fr;
@@ -883,6 +1185,18 @@ const styles = `
     .reference-modal {
       padding: 36px 24px 46px;
     }
+
+    .generate-modal {
+      padding: 36px 24px 42px;
+    }
+
+    .prompt-composer {
+      margin-top: 34px;
+    }
+
+    .generate-submit {
+      margin-left: 0;
+    }
   }
 
   @media (max-width: 640px) {
@@ -909,6 +1223,33 @@ const styles = `
     .topic-image {
       width: 160px;
       height: 110px;
+    }
+
+    .generate-image-panel h3 {
+      margin-top: 36px;
+      font-size: 24px;
+    }
+
+    .prompt-composer textarea {
+      font-size: 22px;
+    }
+
+    .option-picker {
+      width: 100%;
+      justify-content: flex-start;
+      overflow-x: auto;
+    }
+
+    .generate-submit {
+      width: 100%;
+    }
+
+    .trending-grid {
+      grid-auto-columns: 250px;
+    }
+
+    .trending-card img {
+      height: 220px;
     }
   }
 `
