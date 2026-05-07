@@ -230,7 +230,7 @@ function PhotoControlContent() {
         <button type="button" onClick={handleContinue}>確認偏好</button>
       </footer>
 
-      <style jsx>{styles}</style>
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
     </main>
   )
 }
