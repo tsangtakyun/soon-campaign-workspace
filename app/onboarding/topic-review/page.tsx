@@ -202,7 +202,7 @@ function TopicReviewContent() {
   function handleContinue() {
     if (typeof window === 'undefined') return
     window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(topics))
-    const url = new URL('/onboarding/review', window.location.origin)
+    const url = new URL('/onboarding/source-materials', window.location.origin)
     preserveParams(url)
     window.location.href = `${url.pathname}${url.search}`
   }
