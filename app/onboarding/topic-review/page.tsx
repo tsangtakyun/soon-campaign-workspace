@@ -71,19 +71,19 @@ const STOCK_VIDEOS = [
 const TRENDING_EXAMPLES = [
   {
     image: '/assets/content-strategies/photos/lifestyle-content.jpg',
-    prompt: 'Happy customer holding a product',
+    prompt: '開心顧客手持產品',
   },
   {
     image: '/assets/content-strategies/photos/behind-the-scenes.jpg',
-    prompt: "Overhead shot of artist's worktable",
+    prompt: '俯拍創作者的工作桌',
   },
   {
     image: '/assets/content-strategies/photos/offer-promotion.jpg',
-    prompt: 'E-commerce summer sale promotion',
+    prompt: '電商夏季優惠宣傳',
   },
   {
     image: '/photo-control/coffee-balanced.jpg',
-    prompt: 'Happy hour at a restaurant',
+    prompt: '餐廳歡樂時光場景',
   },
 ]
 
@@ -301,10 +301,8 @@ function TopicReviewContent() {
 
 function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClose: () => void }) {
   const [view, setView] = useState<'library' | 'generate'>('library')
-  const [size, setSize] = useState<'Square' | 'Landscape' | 'Portrait'>('Square')
-  const [style, setStyle] = useState<'Photo' | 'Illustration'>('Photo')
-  const [priority, setPriority] = useState<'Speed' | 'Quality'>('Speed')
-  const creditCost = priority === 'Speed' ? 5 : 10
+  const [size, setSize] = useState<'正方形' | '橫向' | '直向'>('正方形')
+  const [style, setStyle] = useState<'相片' | '插畫'>('相片')
 
   return (
     <div className="reference-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -320,9 +318,6 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
         </button>
         {view === 'generate' ? (
           <GenerateImagePanel
-            creditCost={creditCost}
-            priority={priority}
-            setPriority={setPriority}
             setSize={setSize}
             setStyle={setStyle}
             size={size}
@@ -332,27 +327,27 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
           <>
             <header>
               <p>{topic.label}</p>
-              <h2 id="reference-modal-title">Change Reference Image</h2>
+              <h2 id="reference-modal-title">更換參考圖片</h2>
             </header>
 
             <div className="reference-search" aria-hidden="true">
               <span>⌕</span>
-              <p>Search for images and videos</p>
+              <p>搜尋圖片和影片</p>
             </div>
 
             <div className="modal-actions">
               <label className="upload-pill">
                 <input type="file" />
-                <span>Upload</span>
+                <span>上載</span>
               </label>
-              <span className="file-empty">No file chosen</span>
-              <button type="button" onClick={() => setView('generate')}>Generate with AI</button>
+              <span className="file-empty">未選擇檔案</span>
+              <button type="button" onClick={() => setView('generate')}>用 AI 生成</button>
             </div>
 
-            <ReferenceSection title="Generate with AI">
+            <ReferenceSection title="用 AI 生成">
               <button type="button" className="create-card" onClick={() => setView('generate')}>
                 <strong>AI</strong>
-                <span>Create<br />your own</span>
+                <span>自行<br />建立</span>
               </button>
               {AI_REFERENCE_IMAGES.map((image) => (
                 <button type="button" className="asset-card" key={image}>
@@ -361,13 +356,13 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
               ))}
             </ReferenceSection>
 
-            <ReferenceSection title="From Your Brand Kit" action="SOON-LOG">
+            <ReferenceSection title="你的品牌素材庫" action="SOON-LOG">
               <button type="button" className="brand-kit-card">
                 <img src={PLACEHOLDER_IMAGE} alt="SOON-LOG" />
               </button>
             </ReferenceSection>
 
-            <ReferenceSection title="Stock Photos" action="See All">
+            <ReferenceSection title="庫存相片" action="查看全部">
               {STOCK_PHOTOS.map((image) => (
                 <button type="button" className="asset-card" key={image}>
                   <img src={image} alt="" />
@@ -375,7 +370,7 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
               ))}
             </ReferenceSection>
 
-            <ReferenceSection title="Stock Videos" action="See All">
+            <ReferenceSection title="庫存影片" action="查看全部">
               {STOCK_VIDEOS.map((video) => (
                 <button type="button" className="asset-card video-card" key={video.image}>
                   <img src={video.image} alt="" />
@@ -391,65 +386,52 @@ function ReferenceImageModal({ topic, onClose }: { topic: TopicReference; onClos
 }
 
 function GenerateImagePanel({
-  creditCost,
-  priority,
-  setPriority,
   setSize,
   setStyle,
   size,
   style,
 }: {
-  creditCost: number
-  priority: 'Speed' | 'Quality'
-  setPriority: (priority: 'Speed' | 'Quality') => void
-  setSize: (size: 'Square' | 'Landscape' | 'Portrait') => void
-  setStyle: (style: 'Photo' | 'Illustration') => void
-  size: 'Square' | 'Landscape' | 'Portrait'
-  style: 'Photo' | 'Illustration'
+  setSize: (size: '正方形' | '橫向' | '直向') => void
+  setStyle: (style: '相片' | '插畫') => void
+  size: '正方形' | '橫向' | '直向'
+  style: '相片' | '插畫'
 }) {
   return (
     <div className="generate-image-panel">
       <header>
-        <h2 id="reference-modal-title">Generate an Image</h2>
-        <p>Powered by ChatGPT image generation</p>
+        <h2 id="reference-modal-title">生成圖片</h2>
+        <p>由 ChatGPT 圖像生成支援</p>
       </header>
 
-      <h3>Describe the image you want to generate—or try an example</h3>
+      <h3>描述你想生成的圖片，或者參考以下例子</h3>
 
       <div className="prompt-composer">
-        <textarea placeholder="Describe an image" aria-label="Describe an image" />
+        <textarea placeholder="描述圖片" aria-label="描述圖片" />
         <div className="prompt-controls">
           <OptionPicker
-            label="Size"
-            options={['Square', 'Landscape', 'Portrait']}
+            label="尺寸"
+            options={['正方形', '橫向', '直向']}
             value={size}
             onSelect={setSize}
           />
           <OptionPicker
-            label="Style"
-            options={['Photo', 'Illustration']}
+            label="風格"
+            options={['相片', '插畫']}
             value={style}
             onSelect={setStyle}
           />
-          <OptionPicker
-            label="Priority"
-            options={['Speed', 'Quality']}
-            value={priority}
-            onSelect={setPriority}
-          />
           <button type="button" className="generate-submit">
-            Generate ✨{creditCost}
+            生成 ✨5
           </button>
         </div>
       </div>
 
       <div className="credit-note">
-        <span>Speed uses 5 credits</span>
-        <span>Quality uses 10 credits</span>
+        <span>每次生成需要 5 credits</span>
       </div>
 
-      <section className="trending-examples" aria-label="Trending Examples">
-        <h3>Trending Examples</h3>
+      <section className="trending-examples" aria-label="熱門例子">
+        <h3>熱門例子</h3>
         <div className="trending-grid">
           {TRENDING_EXAMPLES.map((example) => (
             <article className="trending-card" key={example.prompt}>
