@@ -75,6 +75,152 @@ function buildScheduledPosts(images: string[]): ScheduledPost[] {
 export default function ScheduledPostsPage() {
   const [compact, setCompact] = useState(false)
   const scheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
+  const [previewChannel, setPreviewChannel] = useState<'Instagram' | 'Facebook' | 'LinkedIn' | 'X' | 'Google'>('Instagram')
+
+  if (selectedPost) {
+    return (
+      <main className="post-editor-page">
+        <header className="editor-topbar">
+          <div className="editor-post-title">
+            <button type="button" onClick={() => setSelectedPost(null)} aria-label="返回日曆">
+              ←
+            </button>
+            <span className={selectedPost.type === '文章' ? 'post-type article' : 'post-type image'}>
+              {selectedPost.title}
+            </span>
+            <strong>需要連接帳戶</strong>
+          </div>
+
+          <div className="editor-top-actions">
+            <button type="button" disabled>
+              上一個
+            </button>
+            <button type="button">下一個 ›</button>
+            <span>✦ 180 Credits</span>
+            <button type="button" className="upgrade-button">升級</button>
+          </div>
+        </header>
+
+        <section className="editor-shell">
+          <aside className="ai-improve-panel">
+            <div className="improve-copy">
+              <p>SOON 可以這樣改善這則貼文：</p>
+              <ol>
+                <li><strong>更改相片內容：</strong>「在背景加入人物，令場景更豐富」</li>
+                <li><strong>調整背景：</strong>「將背景換成現代辦公室」</li>
+                <li><strong>更改文字疊加：</strong>「將標題放大並移到頂部」</li>
+                <li><strong>修改顏色：</strong>「令整體配色更鮮明」</li>
+                <li><strong>修改品牌：</strong>「將我的 logo 加到右下角」</li>
+              </ol>
+              <p>你想怎樣調整？</p>
+            </div>
+
+            <form className="ai-command-box">
+              <textarea placeholder="要求 SOON 修改這則貼文..." />
+              <div>
+                <label aria-label="附加檔案">
+                  <input type="file" />
+                  <span>附件</span>
+                </label>
+                <button type="button" aria-label="送出要求">↑</button>
+              </div>
+            </form>
+          </aside>
+
+          <section className="preview-stage" aria-label="貼文預覽">
+            <div className="view-switcher" aria-label="預覽平台">
+              <span>預覽</span>
+              {[
+                ['Instagram', 'IG'],
+                ['Facebook', 'FB'],
+                ['LinkedIn', 'in'],
+                ['X', 'X'],
+                ['Google', 'G'],
+              ].map(([channel, label]) => (
+                <button
+                  className={previewChannel === channel ? 'active' : ''}
+                  key={channel}
+                  onClick={() => setPreviewChannel(channel as typeof previewChannel)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <article className={`phone-preview ${previewChannel.toLowerCase()}`}>
+              <header>
+                <div className="avatar">S</div>
+                <strong>{previewChannel === 'Instagram' ? 'soon_log' : 'SOON-LOG'}</strong>
+                <span>尚未連接帳戶</span>
+              </header>
+              <div className="phone-image">
+                <img src={selectedPost.image} alt="" />
+                <div className="phone-overlay">
+                  <strong>{selectedPost.title}</strong>
+                  <span>{selectedPost.type}</span>
+                </div>
+              </div>
+              <div className="phone-actions">
+                <span>♡</span>
+                <span>○</span>
+                <span>⌲</span>
+                <button type="button">編輯 caption</button>
+              </div>
+              <p>
+                <strong>SOON-LOG</strong> {selectedPost.body}
+              </p>
+            </article>
+
+            <div className="result-actions">
+              <span>你喜歡這個結果嗎？</span>
+              <button type="button">不喜歡</button>
+              <button type="button">喜歡</button>
+              <button type="button" onClick={() => setSelectedPost(null)}>關閉</button>
+            </div>
+          </section>
+
+          <aside className="post-settings-panel">
+            <section>
+              <p>發布時間</p>
+              <button type="button">2026年5月8日 {selectedPost.time} ⌄</button>
+            </section>
+
+            <section>
+              <p>發布到</p>
+              {['Instagram', 'Facebook', 'LinkedIn', 'X / Twitter', 'Google Business'].map((channel) => (
+                <button className={channel === 'Instagram' ? 'connected-channel' : ''} key={channel} type="button">
+                  <span>{channel}</span>
+                  <em>{channel === 'Instagram' ? '連接' : '＋'}</em>
+                </button>
+              ))}
+            </section>
+
+            <section>
+              <p>宣傳活動</p>
+              <strong>分享你的日常，建立真實連繫</strong>
+              <span>生活內容</span>
+            </section>
+
+            <section>
+              <p>快速編輯</p>
+              <button type="button">調整 caption</button>
+              <button type="button">編輯設計</button>
+            </section>
+
+            <section>
+              <p>重新設計</p>
+              <button type="button">重新生成設計</button>
+              <button type="button">更換媒體</button>
+            </section>
+          </aside>
+        </section>
+
+        <style dangerouslySetInnerHTML={{ __html: styles }} />
+      </main>
+    )
+  }
 
   return (
     <main className="dashboard-page">
@@ -148,7 +294,7 @@ export default function ScheduledPostsPage() {
 
         <section className={compact ? 'schedule-column compact' : 'schedule-column'} aria-label="今日排程">
           {scheduledPosts.map((post) => (
-            <article className="post-card" key={post.id}>
+            <article className="post-card" key={post.id} onClick={() => setSelectedPost(post)}>
               <div className="post-card-head">
                 <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
                 <strong>{post.time}</strong>
@@ -173,6 +319,10 @@ export default function ScheduledPostsPage() {
 }
 
 const styles = `
+  .site-nav {
+    display: none;
+  }
+
   .dashboard-page {
     min-height: 100vh;
     background: #f7f7f8;
@@ -375,6 +525,13 @@ const styles = `
     border-radius: 8px;
     background: #ffffff;
     overflow: hidden;
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .post-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 34px rgba(32, 33, 38, 0.12);
   }
 
   .post-card-head {
@@ -466,6 +623,401 @@ const styles = `
     display: none;
   }
 
+  .post-editor-page {
+    min-height: 100vh;
+    background: #f7f7f8;
+    color: #202126;
+  }
+
+  .editor-topbar {
+    height: 58px;
+    border-bottom: 1px solid #e7e8eb;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 14px;
+  }
+
+  .editor-post-title,
+  .editor-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .editor-post-title button,
+  .editor-top-actions button,
+  .post-settings-panel button,
+  .result-actions button {
+    border: 1px solid #e2e3e7;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 13px;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+
+  .editor-post-title .post-type {
+    max-width: min(42vw, 420px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 650;
+  }
+
+  .editor-post-title strong {
+    border-radius: 7px;
+    background: #fee2e2;
+    color: #c2410c;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .editor-top-actions button:disabled {
+    color: #b9bbc2;
+    cursor: default;
+  }
+
+  .editor-top-actions .upgrade-button {
+    color: #7c3aed;
+    border-color: #e3d8ff;
+  }
+
+  .editor-shell {
+    min-height: calc(100vh - 58px);
+    display: grid;
+    grid-template-columns: 340px minmax(420px, 1fr) 300px;
+  }
+
+  .ai-improve-panel,
+  .post-settings-panel {
+    background: #ffffff;
+    border-right: 1px solid #e7e8eb;
+    padding: 24px 18px;
+  }
+
+  .post-settings-panel {
+    border-right: 0;
+    border-left: 1px solid #e7e8eb;
+    display: grid;
+    align-content: start;
+    gap: 18px;
+  }
+
+  .improve-copy {
+    min-height: calc(100vh - 230px);
+    display: grid;
+    align-content: center;
+    gap: 22px;
+  }
+
+  .improve-copy p {
+    margin: 0;
+    color: #292b31;
+    font-size: 17px;
+    line-height: 1.45;
+  }
+
+  .improve-copy ol {
+    margin: 0;
+    padding-left: 22px;
+    display: grid;
+    gap: 14px;
+    color: #292b31;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .improve-copy strong {
+    font-weight: 780;
+  }
+
+  .ai-command-box {
+    border: 1px solid #e1e3e8;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 16px 36px rgba(32, 33, 38, 0.08);
+    overflow: hidden;
+  }
+
+  .ai-command-box textarea {
+    width: 100%;
+    min-height: 82px;
+    border: 0;
+    resize: none;
+    padding: 16px;
+    color: #202126;
+    background: transparent;
+    font: inherit;
+    font-size: 14px;
+    outline: 0;
+  }
+
+  .ai-command-box div {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 10px;
+  }
+
+  .ai-command-box input {
+    display: none;
+  }
+
+  .ai-command-box label span,
+  .ai-command-box button {
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #5f636d;
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+
+  .ai-command-box button {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #202126;
+    color: #ffffff;
+    padding: 0;
+  }
+
+  .preview-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 42px 24px 92px;
+  }
+
+  .view-switcher {
+    position: absolute;
+    left: max(20px, calc(50% - 310px));
+    top: 50%;
+    transform: translateY(-50%);
+    display: grid;
+    gap: 9px;
+    justify-items: center;
+  }
+
+  .view-switcher span {
+    color: #979aa2;
+    font-size: 13px;
+  }
+
+  .view-switcher button {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid #e1e3e8;
+    background: #ffffff;
+    color: #3f424a;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .view-switcher button.active {
+    border-color: #202126;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #202126;
+  }
+
+  .phone-preview {
+    width: 280px;
+    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    box-shadow: 0 24px 60px rgba(32, 33, 38, 0.16);
+    overflow: hidden;
+  }
+
+  .phone-preview header {
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    column-gap: 9px;
+    align-items: center;
+    padding: 10px 14px;
+  }
+
+  .phone-preview header strong,
+  .phone-preview header span {
+    grid-column: 2;
+    line-height: 1.1;
+  }
+
+  .phone-preview header strong {
+    font-size: 13px;
+    font-weight: 750;
+  }
+
+  .phone-preview header span {
+    color: #979aa2;
+    font-size: 11px;
+  }
+
+  .avatar {
+    grid-row: 1 / 3;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #f0eef7;
+    color: #9f7aea;
+    display: grid;
+    place-items: center;
+    font-weight: 850;
+  }
+
+  .phone-image {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: #eceef2;
+  }
+
+  .phone-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .phone-overlay {
+    position: absolute;
+    inset: auto 18px 18px;
+    color: #ffffff;
+    text-shadow: 0 3px 16px rgba(0, 0, 0, 0.45);
+    display: grid;
+    gap: 6px;
+  }
+
+  .phone-overlay strong {
+    max-width: 210px;
+    font-size: 25px;
+    line-height: 0.95;
+    font-weight: 900;
+  }
+
+  .phone-overlay span {
+    width: fit-content;
+    border-radius: 6px;
+    background: #d946ef;
+    padding: 4px 7px;
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .phone-actions {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 8px 14px;
+  }
+
+  .phone-actions span {
+    font-size: 23px;
+    line-height: 1;
+  }
+
+  .phone-actions button {
+    margin-left: auto;
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 12px;
+    padding: 7px 9px;
+  }
+
+  .phone-preview p {
+    margin: 0;
+    padding: 0 14px 18px;
+    color: #464952;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .phone-preview.facebook,
+  .phone-preview.linkedin {
+    width: 360px;
+    border-radius: 14px;
+  }
+
+  .phone-preview.x,
+  .phone-preview.google {
+    width: 330px;
+    border-radius: 18px;
+  }
+
+  .result-actions {
+    position: absolute;
+    left: 50%;
+    bottom: 26px;
+    transform: translateX(-50%);
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 20px 50px rgba(32, 33, 38, 0.14);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .result-actions span {
+    font-size: 14px;
+  }
+
+  .post-settings-panel section {
+    border-bottom: 1px solid #e7e8eb;
+    padding-bottom: 16px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .post-settings-panel p {
+    margin: 0;
+    color: #9a9da4;
+    font-size: 14px;
+  }
+
+  .post-settings-panel section > strong {
+    color: #2f3138;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .post-settings-panel section > span {
+    color: #7b7f88;
+    font-size: 13px;
+  }
+
+  .post-settings-panel button {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .post-settings-panel .connected-channel {
+    background: #f6f7f9;
+    border-color: #dee0e5;
+  }
+
+  .post-settings-panel em {
+    color: #8a8d95;
+    font-style: normal;
+  }
+
   @media (max-width: 700px) {
     .dashboard-page {
       grid-template-columns: 1fr;
@@ -478,6 +1030,21 @@ const styles = `
     .calendar-topbar,
     .calendar-actions {
       flex-wrap: wrap;
+    }
+
+    .editor-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .view-switcher {
+      position: static;
+      transform: none;
+      display: flex;
+      margin-bottom: 16px;
+    }
+
+    .post-settings-panel {
+      border-left: 0;
     }
   }
 `
