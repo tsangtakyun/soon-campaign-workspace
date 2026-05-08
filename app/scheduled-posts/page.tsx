@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from 'react'
 
 type ScheduledPost = {
   id: string
@@ -29,6 +29,21 @@ type ChannelCaption = {
 
 type DesignTool = '元素' | '媒體' | '文字' | '模板' | '背景' | '尺寸' | '品牌' | '發布'
 type ElementSection = 'shapes' | 'frames' | 'icons'
+type DesignElementKind = 'shape' | 'frame' | 'icon'
+
+type DesignElement = {
+  id: string
+  kind: DesignElementKind
+  item: string
+  label: string
+  x: number
+  y: number
+  size: number
+  rotation: number
+  opacity: number
+  color: string
+  zIndex: number
+}
 
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
@@ -127,12 +142,14 @@ function ElementShelf({
   expanded,
   items,
   kind,
+  onPick,
   onToggle,
   title,
 }: {
   expanded: boolean
   items: string[]
   kind: 'shape' | 'frame' | 'icon'
+  onPick: (kind: DesignElementKind, item: string) => void
   onToggle: () => void
   title: string
 }) {
@@ -149,7 +166,12 @@ function ElementShelf({
 
       <div className={`element-grid ${kind}`}>
         {visibleItems.map((item, index) => (
-          <button className={`element-tile ${kind}-${item}`} key={`${kind}-${item}-${index}`} type="button">
+          <button
+            className={`element-tile ${kind}-${item}`}
+            key={`${kind}-${item}-${index}`}
+            onClick={() => onPick(kind, item)}
+            type="button"
+          >
             {kind === 'icon' ? <span>{item}</span> : <span />}
           </button>
         ))}
@@ -169,6 +191,9 @@ export default function ScheduledPostsPage() {
   const [designMode, setDesignMode] = useState(false)
   const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>('品牌')
   const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
+  const [designElements, setDesignElements] = useState<DesignElement[]>([])
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const canvasRef = useRef<HTMLElement | null>(null)
 
   const openCaptionModal = (post: ScheduledPost) => {
     const currentCaptions = captions[post.id] || {}
@@ -195,6 +220,164 @@ export default function ScheduledPostsPage() {
 
   const selectedCaption =
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
+  const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
+
+  const addDesignElement = (kind: DesignElementKind, item: string) => {
+    const id = `${kind}-${item}-${Date.now()}`
+    const nextElement: DesignElement = {
+      id,
+      kind,
+      item,
+      label: kind === 'shape' ? '形狀' : kind === 'frame' ? '相框' : '圖示',
+      x: 50,
+      y: 48,
+      size: kind === 'icon' ? 58 : 132,
+      rotation: 0,
+      opacity: 100,
+      color: '#111111',
+      zIndex: 5 + designElements.length,
+    }
+    setDesignElements((current) => [...current, nextElement])
+    setSelectedElementId(id)
+    setActiveDesignTool('元素')
+  }
+
+  const updateSelectedElement = (updates: Partial<DesignElement>) => {
+    if (!selectedElementId) return
+    setDesignElements((current) =>
+      current.map((element) => (element.id === selectedElementId ? { ...element, ...updates } : element))
+    )
+  }
+
+  const deleteSelectedElement = () => {
+    if (!selectedElementId) return
+    setDesignElements((current) => current.filter((element) => element.id !== selectedElementId))
+    setSelectedElementId(null)
+    setActiveDesignTool('元素')
+  }
+
+  const duplicateSelectedElement = () => {
+    if (!selectedElement) return
+    const id = `${selectedElement.kind}-${selectedElement.item}-${Date.now()}`
+    const clone = {
+      ...selectedElement,
+      id,
+      x: Math.min(74, selectedElement.x + 6),
+      y: Math.min(74, selectedElement.y + 6),
+      zIndex: selectedElement.zIndex + 1,
+    }
+    setDesignElements((current) => [...current, clone])
+    setSelectedElementId(id)
+  }
+
+  const moveSelectedLayer = (direction: 'forward' | 'front' | 'backward' | 'back') => {
+    if (!selectedElement) return
+    const zValues = designElements.map((element) => element.zIndex)
+    const minZ = Math.min(...zValues, 2)
+    const maxZ = Math.max(...zValues, 7)
+    const nextZ = {
+      forward: selectedElement.zIndex + 1,
+      front: maxZ + 1,
+      backward: selectedElement.zIndex - 1,
+      back: minZ - 1,
+    }[direction]
+    updateSelectedElement({ zIndex: Math.max(1, Math.min(20, nextZ)) })
+  }
+
+  const startElementMove = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
+    if (!canvasRef.current) return
+    event.preventDefault()
+    setSelectedElementId(element.id)
+    const rect = canvasRef.current.getBoundingClientRect()
+    const startX = event.clientX
+    const startY = event.clientY
+    const initialX = element.x
+    const initialY = element.y
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextX = initialX + ((moveEvent.clientX - startX) / rect.width) * 100
+      const nextY = initialY + ((moveEvent.clientY - startY) / rect.height) * 100
+      setDesignElements((current) =>
+        current.map((item) =>
+          item.id === element.id
+            ? {
+                ...item,
+                x: Math.min(94, Math.max(6, nextX)),
+                y: Math.min(94, Math.max(6, nextY)),
+              }
+            : item
+        )
+      )
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  const startElementResize = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
+    if (!canvasRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    setSelectedElementId(element.id)
+    const rect = canvasRef.current.getBoundingClientRect()
+    const centerX = rect.left + (element.x / 100) * rect.width
+    const centerY = rect.top + (element.y / 100) * rect.height
+    const initialSize = element.size
+    const initialDistance = Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY))
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextDistance = Math.hypot(moveEvent.clientX - centerX, moveEvent.clientY - centerY)
+      setDesignElements((current) =>
+        current.map((item) =>
+          item.id === element.id
+            ? {
+                ...item,
+                size: Math.min(260, Math.max(34, Math.round(initialSize * (nextDistance / initialDistance)))),
+              }
+            : item
+        )
+      )
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  const startElementRotate = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
+    if (!canvasRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    setSelectedElementId(element.id)
+    const rect = canvasRef.current.getBoundingClientRect()
+    const centerX = rect.left + (element.x / 100) * rect.width
+    const centerY = rect.top + (element.y / 100) * rect.height
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const radians = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX)
+      const degrees = Math.round((radians * 180) / Math.PI + 90)
+      setDesignElements((current) =>
+        current.map((item) => (item.id === element.id ? { ...item, rotation: degrees } : item))
+      )
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   if (selectedPost && designMode) {
     return (
@@ -249,8 +432,53 @@ export default function ScheduledPostsPage() {
 
         <section className="design-workbench">
           <section className="design-canvas-area">
-            <article className="design-canvas">
+            <article className="design-canvas" ref={canvasRef}>
               <img src={selectedPost.image} alt="" />
+              {designElements.map((element) => (
+                <div
+                  className={`canvas-element ${element.kind} ${selectedElementId === element.id ? 'selected' : ''} ${element.kind}-${element.item}`}
+                  key={element.id}
+                  onClick={() => setSelectedElementId(element.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      setSelectedElementId(element.id)
+                    }
+                  }}
+                  onPointerDown={(event) => startElementMove(event, element)}
+                  role="button"
+                  style={{
+                    left: `${element.x}%`,
+                    top: `${element.y}%`,
+                    width: `${element.size}px`,
+                    height: `${element.size}px`,
+                    opacity: element.opacity / 100,
+                    transform: `translate(-50%, -50%) rotate(${element.rotation}deg)`,
+                    zIndex: element.zIndex,
+                    color: element.color,
+                  }}
+                  tabIndex={0}
+                >
+                  {element.kind === 'icon' ? (
+                    <span>{element.item}</span>
+                  ) : (
+                    <span style={element.kind === 'shape' ? { background: element.color } : undefined} />
+                  )}
+                  {selectedElementId === element.id ? (
+                    <>
+                      <i className="handle nw" onPointerDown={(event) => startElementResize(event, element)} />
+                      <i className="handle ne" onPointerDown={(event) => startElementResize(event, element)} />
+                      <i className="handle sw" onPointerDown={(event) => startElementResize(event, element)} />
+                      <i className="handle se" onPointerDown={(event) => startElementResize(event, element)} />
+                      <i className="rotate-handle" onPointerDown={(event) => startElementRotate(event, element)}>↻</i>
+                      <div className="element-mini-toolbar" onPointerDown={(event) => event.stopPropagation()}>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); duplicateSelectedElement() }}>Copy</button>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); deleteSelectedElement() }}>Delete</button>
+                        <button type="button" onClick={(event) => event.stopPropagation()}>...</button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              ))}
               <div className="design-canvas-copy">
                 <strong>{selectedPost.title}</strong>
                 <span>is the one friends replay most.</span>
@@ -274,7 +502,110 @@ export default function ScheduledPostsPage() {
             <div className="zoom-control">1 / 1 重新排序頁面　⌕ 33%</div>
           </section>
 
-          {activeDesignTool === '元素' ? (
+          {selectedElement ? (
+            <aside className="element-settings-panel">
+              <div className="brand-panel-head">
+                <button type="button" onClick={() => { setSelectedElementId(null); setActiveDesignTool('元素') }}>←</button>
+                <h2>{selectedElement.kind === 'shape' ? 'Circle Shape' : selectedElement.label}</h2>
+              </div>
+
+              <section className="property-list">
+                <label>
+                  <span><i style={{ background: selectedElement.color }} />顏色</span>
+                  <input
+                    aria-label="元素顏色"
+                    type="color"
+                    value={selectedElement.color}
+                    onChange={(event) => updateSelectedElement({ color: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>邊框</span>
+                  <button type="button">關</button>
+                </label>
+                <label>
+                  <span>圓角</span>
+                  <button type="button">關</button>
+                </label>
+                <label>
+                  <span>陰影</span>
+                  <button type="button">關</button>
+                </label>
+                <label>
+                  <span>透明度</span>
+                  <input
+                    max="100"
+                    min="20"
+                    type="range"
+                    value={selectedElement.opacity}
+                    onChange={(event) => updateSelectedElement({ opacity: Number(event.target.value) })}
+                  />
+                  <em>{selectedElement.opacity}%</em>
+                </label>
+              </section>
+
+              <section className="alignment-panel">
+                <h3>對齊畫布</h3>
+                <div>
+                  <button type="button" onClick={() => updateSelectedElement({ x: 50 })}>↔</button>
+                  <button type="button" onClick={() => updateSelectedElement({ y: 50 })}>↕</button>
+                  <button type="button" onClick={() => updateSelectedElement({ y: 18 })}>↑</button>
+                  <button type="button" onClick={() => updateSelectedElement({ y: 82 })}>↓</button>
+                  <button type="button" onClick={() => updateSelectedElement({ x: 18 })}>←</button>
+                  <button type="button" onClick={() => updateSelectedElement({ x: 82 })}>→</button>
+                </div>
+              </section>
+
+              <section className="transform-panel">
+                <h3>旋轉</h3>
+                <div>
+                  <input
+                    max="180"
+                    min="-180"
+                    type="range"
+                    value={selectedElement.rotation}
+                    onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value) })}
+                  />
+                  <input
+                    aria-label="旋轉角度"
+                    type="number"
+                    value={selectedElement.rotation}
+                    onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value || 0) })}
+                  />
+                </div>
+                <h3>大小</h3>
+                <div>
+                  <input
+                    max="240"
+                    min="32"
+                    type="range"
+                    value={selectedElement.size}
+                    onChange={(event) => updateSelectedElement({ size: Number(event.target.value) })}
+                  />
+                  <input
+                    aria-label="元素大小"
+                    type="number"
+                    value={selectedElement.size}
+                    onChange={(event) => updateSelectedElement({ size: Number(event.target.value || 32) })}
+                  />
+                </div>
+              </section>
+
+              <section className="order-panel">
+                <h3>圖層順序</h3>
+                <div>
+                  <button type="button" onClick={() => moveSelectedLayer('forward')}>向上一層</button>
+                  <button type="button" onClick={() => moveSelectedLayer('front')}>移到最上</button>
+                  <button type="button" onClick={() => moveSelectedLayer('backward')}>向下一層</button>
+                  <button type="button" onClick={() => moveSelectedLayer('back')}>移到最底</button>
+                </div>
+              </section>
+
+              <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
+                刪除 {selectedElement.label}
+              </button>
+            </aside>
+          ) : activeDesignTool === '元素' ? (
             <aside className="elements-panel">
               <div className="brand-panel-head">
                 <button type="button" onClick={() => setActiveDesignTool('品牌')}>←</button>
@@ -286,6 +617,7 @@ export default function ScheduledPostsPage() {
                 expanded={expandedElementSection === 'shapes'}
                 items={['circle', 'square', 'rounded', 'triangle', 'diamond', 'pentagon', 'hexagon', 'octagon', 'parallelogram', 'trapezoid', 'semicircle', 'pill', 'spark', 'star', 'starAlt', 'burst', 'plus', 'arrowLeft', 'arrowRight', 'arrowUp', 'arrowDown', 'moon', 'cloud', 'bookmark']}
                 kind="shape"
+                onPick={addDesignElement}
                 onToggle={() => setExpandedElementSection(expandedElementSection === 'shapes' ? null : 'shapes')}
                 title="形狀"
               />
@@ -294,6 +626,7 @@ export default function ScheduledPostsPage() {
                 expanded={expandedElementSection === 'frames'}
                 items={['frameCircle', 'frameSquare', 'frameRound', 'frameTriangle', 'frameDiamond', 'framePentagon', 'frameHexagon', 'frameOctagon', 'frameSlant', 'frameArch', 'framePill', 'frameStar', 'frameBurst', 'frameCross', 'frameArrowLeft', 'frameArrowRight', 'frameArrowUp', 'frameArrowDown']}
                 kind="frame"
+                onPick={addDesignElement}
                 onToggle={() => setExpandedElementSection(expandedElementSection === 'frames' ? null : 'frames')}
                 title="相框"
               />
@@ -302,6 +635,7 @@ export default function ScheduledPostsPage() {
                 expanded={expandedElementSection === 'icons'}
                 items={['◉', '▣', '♡', '◌', '▤', '⚙', '▧', '◍', '●', '◐', '▥', '▦', '⌘', '✦', '▰', '⌁', '✎', '▮', '◼', '⬢', '✣', '☀', '◑', '❄', '☕', '⌂', '✕', '◒', '−', '⌄', '⌃', '▶', '◷', '⚑', '🔗', '↻', '⬇']}
                 kind="icon"
+                onPick={addDesignElement}
                 onToggle={() => setExpandedElementSection(expandedElementSection === 'icons' ? null : 'icons')}
                 title="圖示"
               />
@@ -1764,11 +2098,128 @@ const styles = `
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 42%, rgba(0, 0, 0, 0.2));
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .canvas-element {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: move;
+    transform-origin: center;
+  }
+
+  .canvas-element > span:first-child {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+  }
+
+  .canvas-element.frame > span:first-child,
+  .canvas-element[class*="frame-"] > span:first-child {
+    background-image: url('/assets/content-strategies/photos/lifestyle-content.jpg');
+    background-size: cover;
+    background-position: center;
+  }
+
+  .canvas-element.icon > span:first-child {
+    display: grid;
+    place-items: center;
+    background: transparent;
+    font-size: 0.82em;
+    line-height: 1;
+    color: currentColor;
+  }
+
+  .canvas-element.selected {
+    outline: 2px solid #101114;
+    outline-offset: 3px;
+  }
+
+  .handle {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #101114;
+    border-radius: 5px;
+    background: #ffffff;
+    box-shadow: 0 3px 9px rgba(0, 0, 0, 0.18);
+  }
+
+  .handle.nw {
+    left: -9px;
+    top: -9px;
+  }
+
+  .handle.ne {
+    right: -9px;
+    top: -9px;
+  }
+
+  .handle.sw {
+    left: -9px;
+    bottom: -9px;
+  }
+
+  .handle.se {
+    right: -9px;
+    bottom: -9px;
+  }
+
+  .rotate-handle {
+    position: absolute;
+    left: 50%;
+    bottom: -52px;
+    transform: translateX(-50%);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #101114;
+    display: grid;
+    place-items: center;
+    font-style: normal;
+    font-size: 22px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
+  }
+
+  .element-mini-toolbar {
+    position: absolute;
+    left: 50%;
+    top: -58px;
+    transform: translateX(-50%);
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .element-mini-toolbar button {
+    border: 0;
+    background: transparent;
+    color: #202126;
+    font: inherit;
+    font-size: 13px;
+    padding: 9px 11px;
+    cursor: pointer;
+  }
+
+  .element-mini-toolbar button:hover {
+    background: #f2f3f5;
   }
 
   .design-canvas-copy {
     position: absolute;
-    z-index: 1;
+    z-index: 8;
     left: 28px;
     top: 32px;
     width: 72%;
@@ -1791,7 +2242,7 @@ const styles = `
 
   .soon-logo-stub {
     position: absolute;
-    z-index: 1;
+    z-index: 9;
     left: 30px;
     bottom: 24px;
     color: #ffffff;
@@ -1961,6 +2412,151 @@ const styles = `
     padding: 24px 30px 32px;
     max-height: calc(100vh - 124px);
     overflow-y: auto;
+  }
+
+  .element-settings-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    padding: 22px;
+    display: grid;
+    align-content: start;
+    gap: 24px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
+  }
+
+  .property-list {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .property-list label {
+    min-height: 48px;
+    border-bottom: 1px solid #eef0f3;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    color: #202126;
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .property-list label:last-child {
+    border-bottom: 0;
+  }
+
+  .property-list span {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .property-list i {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .property-list input[type="color"] {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .property-list input[type="range"] {
+    width: 104px;
+  }
+
+  .property-list button {
+    border: 0;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #5f636d;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 12px;
+  }
+
+  .property-list em {
+    color: #6f737d;
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .alignment-panel,
+  .transform-panel,
+  .order-panel {
+    display: grid;
+    gap: 12px;
+  }
+
+  .alignment-panel h3,
+  .transform-panel h3,
+  .order-panel h3 {
+    margin: 0;
+    color: #202126;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .alignment-panel div {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+
+  .alignment-panel button {
+    height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: #f4f5f7;
+    color: #202126;
+    font-size: 17px;
+    cursor: pointer;
+  }
+
+  .transform-panel div {
+    display: grid;
+    grid-template-columns: 1fr 58px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .transform-panel input[type="number"] {
+    width: 58px;
+    height: 34px;
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    text-align: center;
+    font: inherit;
+  }
+
+  .order-panel div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .order-panel button,
+  .delete-element-button {
+    min-height: 38px;
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .delete-element-button {
+    color: #b42318;
   }
 
   .elements-panel input {
