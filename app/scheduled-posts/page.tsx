@@ -1,6 +1,6 @@
 'use client'
 
-import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from 'react'
 
 type ScheduledPost = {
   id: string
@@ -29,7 +29,8 @@ type ChannelCaption = {
 
 type DesignTool = '元素' | '媒體' | '文字' | '模板' | '背景' | '尺寸' | '品牌' | '發布'
 type ElementSection = 'shapes' | 'frames' | 'icons'
-type DesignElementKind = 'shape' | 'frame' | 'icon'
+type DesignElementKind = 'shape' | 'frame' | 'icon' | 'text'
+type TextPreset = 'heading' | 'subheading' | 'body' | 'caption'
 
 type DesignElement = {
   id: string
@@ -43,6 +44,15 @@ type DesignElement = {
   opacity: number
   color: string
   zIndex: number
+  textContent?: string
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: 'normal' | 'bold'
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: 'none' | 'underline'
+  textAlign?: 'left' | 'center' | 'right'
+  width?: number
+  lineHeight?: number
 }
 
 const PLACEHOLDER_IMAGE =
@@ -89,6 +99,43 @@ const CHANNELS: ChannelCaption[] = [
     icon: 'G',
     note: '清晰、在地、偏向更新消息和行動提示。',
     limit: 1500,
+  },
+]
+
+const TEXT_STYLE_PRESETS: Array<{
+  label: string
+  textContent: string
+  style: CSSProperties
+}> = [
+  {
+    label: 'Pop-Up',
+    textContent: '重點提示',
+    style: { background: '#111111', borderRadius: 8, color: '#ffffff', fontWeight: 'bold', padding: '5px 10px' },
+  },
+  {
+    label: 'Story',
+    textContent: '今日故事',
+    style: { background: '#0ea5e9', color: '#ffffff', fontWeight: 'bold', padding: '5px 10px' },
+  },
+  {
+    label: 'Offering',
+    textContent: '精選內容',
+    style: { color: '#2f3239', fontFamily: 'Georgia, serif' },
+  },
+  {
+    label: 'Bold',
+    textContent: '大膽標題',
+    style: { color: '#111111', fontSize: 26, fontWeight: 900 },
+  },
+  {
+    label: 'Minimal',
+    textContent: '簡約文字',
+    style: { color: '#555555', fontWeight: 300, letterSpacing: 2 },
+  },
+  {
+    label: 'Release',
+    textContent: '透明描邊',
+    style: { color: 'transparent', fontWeight: 'bold', WebkitTextStroke: '1px #111111' },
   },
 ]
 
@@ -149,7 +196,7 @@ function ElementShelf({
   expanded: boolean
   items: string[]
   kind: 'shape' | 'frame' | 'icon'
-  onPick: (kind: DesignElementKind, item: string) => void
+  onPick: (kind: Exclude<DesignElementKind, 'text'>, item: string) => void
   onToggle: () => void
   title: string
 }) {
@@ -222,7 +269,7 @@ export default function ScheduledPostsPage() {
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
 
-  const addDesignElement = (kind: DesignElementKind, item: string) => {
+  const addDesignElement = (kind: Exclude<DesignElementKind, 'text'>, item: string) => {
     const id = `${kind}-${item}-${Date.now()}`
     const nextElement: DesignElement = {
       id,
@@ -240,6 +287,99 @@ export default function ScheduledPostsPage() {
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
     setActiveDesignTool('元素')
+  }
+
+  const addTextElement = (preset: TextPreset) => {
+    const presets: Record<
+      TextPreset,
+      Pick<DesignElement, 'color' | 'fontSize' | 'fontWeight' | 'textContent' | 'width'>
+    > = {
+      heading: {
+        color: '#ffffff',
+        fontSize: 46,
+        fontWeight: 'bold',
+        textContent: '標題文字',
+        width: 360,
+      },
+      subheading: {
+        color: '#ffffff',
+        fontSize: 30,
+        fontWeight: 'bold',
+        textContent: '副標題',
+        width: 330,
+      },
+      body: {
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: 'normal',
+        textContent: '內文文字，點擊右邊編輯',
+        width: 300,
+      },
+      caption: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: 'normal',
+        textContent: '說明文字',
+        width: 240,
+      },
+    }
+    const config = presets[preset]
+    const id = `text-${preset}-${Date.now()}`
+    const nextElement: DesignElement = {
+      id,
+      kind: 'text',
+      item: preset,
+      label: '文字',
+      x: 50,
+      y: 46,
+      size: config.fontSize || 24,
+      rotation: 0,
+      opacity: 100,
+      color: config.color || '#ffffff',
+      zIndex: 10 + designElements.length,
+      textContent: config.textContent,
+      fontFamily: 'inherit',
+      fontSize: config.fontSize,
+      fontWeight: config.fontWeight,
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'center',
+      width: config.width,
+      lineHeight: 1.25,
+    }
+    setDesignElements((current) => [...current, nextElement])
+    setSelectedElementId(id)
+    setActiveDesignTool('文字')
+  }
+
+  const addTextStyleElement = (preset: (typeof TEXT_STYLE_PRESETS)[number]) => {
+    const id = `text-style-${preset.label}-${Date.now()}`
+    const fontWeight = preset.style.fontWeight === 'bold' || preset.style.fontWeight === 900 ? 'bold' : 'normal'
+    const nextElement: DesignElement = {
+      id,
+      kind: 'text',
+      item: preset.label,
+      label: '文字',
+      x: 50,
+      y: 46,
+      size: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
+      rotation: 0,
+      opacity: 100,
+      color: typeof preset.style.color === 'string' ? preset.style.color : '#111111',
+      zIndex: 10 + designElements.length,
+      textContent: preset.textContent,
+      fontFamily: typeof preset.style.fontFamily === 'string' ? preset.style.fontFamily : 'inherit',
+      fontSize: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
+      fontWeight,
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'center',
+      width: 300,
+      lineHeight: 1.25,
+    }
+    setDesignElements((current) => [...current, nextElement])
+    setSelectedElementId(id)
+    setActiveDesignTool('文字')
   }
 
   const updateSelectedElement = (updates: Partial<DesignElement>) => {
@@ -337,7 +477,15 @@ export default function ScheduledPostsPage() {
           item.id === element.id
             ? {
                 ...item,
-                size: Math.min(260, Math.max(34, Math.round(initialSize * (nextDistance / initialDistance)))),
+                ...(item.kind === 'text'
+                  ? {
+                      fontSize: Math.min(200, Math.max(8, Math.round((initialSize || 24) * (nextDistance / initialDistance)))),
+                      size: Math.min(200, Math.max(8, Math.round((initialSize || 24) * (nextDistance / initialDistance)))),
+                      width: Math.min(520, Math.max(140, Math.round((element.width || 300) * (nextDistance / initialDistance)))),
+                    }
+                  : {
+                      size: Math.min(260, Math.max(34, Math.round(initialSize * (nextDistance / initialDistance)))),
+                    }),
               }
             : item
         )
@@ -449,8 +597,8 @@ export default function ScheduledPostsPage() {
                   style={{
                     left: `${element.x}%`,
                     top: `${element.y}%`,
-                    width: `${element.size}px`,
-                    height: `${element.size}px`,
+                    width: element.kind === 'text' ? `${element.width || 300}px` : `${element.size}px`,
+                    height: element.kind === 'text' ? 'auto' : `${element.size}px`,
                     opacity: element.opacity / 100,
                     transform: `translate(-50%, -50%) rotate(${element.rotation}deg)`,
                     zIndex: element.zIndex,
@@ -458,7 +606,24 @@ export default function ScheduledPostsPage() {
                   }}
                   tabIndex={0}
                 >
-                  {element.kind === 'icon' ? (
+                  {element.kind === 'text' ? (
+                    <div
+                      className="canvas-text-layer"
+                      style={{
+                        color: element.color,
+                        fontFamily: element.fontFamily || 'inherit',
+                        fontSize: element.fontSize || element.size || 24,
+                        fontStyle: element.fontStyle || 'normal',
+                        fontWeight: element.fontWeight || 'normal',
+                        lineHeight: element.lineHeight || 1.35,
+                        textAlign: element.textAlign || 'center',
+                        textDecoration: element.textDecoration || 'none',
+                        width: element.width || 300,
+                      }}
+                    >
+                      {element.textContent}
+                    </div>
+                  ) : element.kind === 'icon' ? (
                     <span>{element.item}</span>
                   ) : (
                     <span style={element.kind === 'shape' ? { background: element.color } : undefined} />
@@ -505,10 +670,180 @@ export default function ScheduledPostsPage() {
           {selectedElement ? (
             <aside className="element-settings-panel">
               <div className="brand-panel-head">
-                <button type="button" onClick={() => { setSelectedElementId(null); setActiveDesignTool('元素') }}>←</button>
-                <h2>{selectedElement.kind === 'shape' ? 'Circle Shape' : selectedElement.label}</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedElementId(null)
+                    setActiveDesignTool(selectedElement.kind === 'text' ? '文字' : '元素')
+                  }}
+                >
+                  ←
+                </button>
+                <h2>{selectedElement.kind === 'text' ? '文字設定' : selectedElement.kind === 'shape' ? '形狀設定' : selectedElement.label}</h2>
               </div>
 
+              {selectedElement.kind === 'text' ? (
+                <>
+                  <section className="settings-section">
+                    <label className="settings-label" htmlFor="selected-text-content">文字內容</label>
+                    <textarea
+                      className="settings-textarea"
+                      id="selected-text-content"
+                      onChange={(event) => updateSelectedElement({ textContent: event.target.value })}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      rows={4}
+                      value={selectedElement.textContent || ''}
+                    />
+                  </section>
+
+                  <section className="settings-section settings-row">
+                    <label className="settings-label" htmlFor="selected-text-size">字體大小</label>
+                    <div className="settings-stepper">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSelectedElement({
+                            fontSize: Math.max(8, (selectedElement.fontSize || selectedElement.size || 24) - 2),
+                            size: Math.max(8, (selectedElement.fontSize || selectedElement.size || 24) - 2),
+                          })
+                        }
+                      >
+                        −
+                      </button>
+                      <input
+                        id="selected-text-size"
+                        max="200"
+                        min="8"
+                        onChange={(event) => {
+                          const nextSize = Number(event.target.value || 8)
+                          updateSelectedElement({ fontSize: nextSize, size: nextSize })
+                        }}
+                        type="number"
+                        value={selectedElement.fontSize || selectedElement.size || 24}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSelectedElement({
+                            fontSize: Math.min(200, (selectedElement.fontSize || selectedElement.size || 24) + 2),
+                            size: Math.min(200, (selectedElement.fontSize || selectedElement.size || 24) + 2),
+                          })
+                        }
+                      >
+                        ＋
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="settings-section settings-row">
+                    <span className="settings-label">字體樣式</span>
+                    <div className="settings-toggle-group">
+                      <button
+                        className={selectedElement.fontWeight === 'bold' ? 'active' : ''}
+                        onClick={() =>
+                          updateSelectedElement({
+                            fontWeight: selectedElement.fontWeight === 'bold' ? 'normal' : 'bold',
+                          })
+                        }
+                        type="button"
+                      >
+                        <b>B</b>
+                      </button>
+                      <button
+                        className={selectedElement.fontStyle === 'italic' ? 'active' : ''}
+                        onClick={() =>
+                          updateSelectedElement({
+                            fontStyle: selectedElement.fontStyle === 'italic' ? 'normal' : 'italic',
+                          })
+                        }
+                        type="button"
+                      >
+                        <i>I</i>
+                      </button>
+                      <button
+                        className={selectedElement.textDecoration === 'underline' ? 'active' : ''}
+                        onClick={() =>
+                          updateSelectedElement({
+                            textDecoration: selectedElement.textDecoration === 'underline' ? 'none' : 'underline',
+                          })
+                        }
+                        type="button"
+                      >
+                        <u>U</u>
+                      </button>
+                    </div>
+                  </section>
+
+                  <section className="settings-section settings-row">
+                    <span className="settings-label">對齊</span>
+                    <div className="settings-toggle-group">
+                      {(['left', 'center', 'right'] as const).map((align) => (
+                        <button
+                          className={selectedElement.textAlign === align ? 'active' : ''}
+                          key={align}
+                          onClick={() => updateSelectedElement({ textAlign: align })}
+                          type="button"
+                        >
+                          {align === 'left' ? '左' : align === 'center' ? '中' : '右'}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="settings-section settings-row">
+                    <label className="settings-label" htmlFor="selected-text-color">顏色</label>
+                    <input
+                      id="selected-text-color"
+                      onChange={(event) => updateSelectedElement({ color: event.target.value })}
+                      type="color"
+                      value={selectedElement.color}
+                    />
+                  </section>
+
+                  <section className="settings-section">
+                    <label className="settings-label" htmlFor="selected-text-opacity">
+                      透明度 {selectedElement.opacity}%
+                    </label>
+                    <input
+                      id="selected-text-opacity"
+                      max="100"
+                      min="10"
+                      onChange={(event) => updateSelectedElement({ opacity: Number(event.target.value) })}
+                      type="range"
+                      value={selectedElement.opacity}
+                    />
+                  </section>
+
+                  <section className="settings-section">
+                    <label className="settings-label" htmlFor="selected-text-rotation">
+                      旋轉 {selectedElement.rotation}°
+                    </label>
+                    <input
+                      id="selected-text-rotation"
+                      max="180"
+                      min="-180"
+                      onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value) })}
+                      type="range"
+                      value={selectedElement.rotation}
+                    />
+                  </section>
+
+                  <section className="order-panel">
+                    <h3>圖層順序</h3>
+                    <div>
+                      <button type="button" onClick={() => moveSelectedLayer('forward')}>向上一層</button>
+                      <button type="button" onClick={() => moveSelectedLayer('front')}>移到最上</button>
+                      <button type="button" onClick={() => moveSelectedLayer('backward')}>向下一層</button>
+                      <button type="button" onClick={() => moveSelectedLayer('back')}>移到最底</button>
+                    </div>
+                  </section>
+
+                  <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
+                    刪除文字
+                  </button>
+                </>
+              ) : (
+                <>
               <section className="property-list">
                 <label>
                   <span><i style={{ background: selectedElement.color }} />顏色</span>
@@ -604,6 +939,8 @@ export default function ScheduledPostsPage() {
               <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
                 刪除 {selectedElement.label}
               </button>
+                </>
+              )}
             </aside>
           ) : activeDesignTool === '元素' ? (
             <aside className="elements-panel">
@@ -639,6 +976,51 @@ export default function ScheduledPostsPage() {
                 onToggle={() => setExpandedElementSection(expandedElementSection === 'icons' ? null : 'icons')}
                 title="圖示"
               />
+            </aside>
+          ) : activeDesignTool === '文字' ? (
+            <aside className="text-panel">
+              <div className="brand-panel-head">
+                <button type="button" onClick={() => setActiveDesignTool('品牌')}>←</button>
+                <h2>加入文字</h2>
+              </div>
+
+              <section className="text-panel-section">
+                <h3>文字</h3>
+                <div className="text-preset-list">
+                  <button className="text-preset-btn" onClick={() => addTextElement('heading')} type="button">
+                    <span className="text-preset-preview heading">標題</span>
+                    <span className="text-preset-label">大標題</span>
+                  </button>
+                  <button className="text-preset-btn" onClick={() => addTextElement('subheading')} type="button">
+                    <span className="text-preset-preview subheading">副標題</span>
+                    <span className="text-preset-label">副標題</span>
+                  </button>
+                  <button className="text-preset-btn" onClick={() => addTextElement('body')} type="button">
+                    <span className="text-preset-preview body">內文文字</span>
+                    <span className="text-preset-label">內文</span>
+                  </button>
+                  <button className="text-preset-btn" onClick={() => addTextElement('caption')} type="button">
+                    <span className="text-preset-preview caption">說明文字</span>
+                    <span className="text-preset-label">說明</span>
+                  </button>
+                </div>
+              </section>
+
+              <section className="text-panel-section">
+                <h3>文字樣式</h3>
+                <div className="text-style-grid">
+                  {TEXT_STYLE_PRESETS.map((preset) => (
+                    <button
+                      className="text-style-card"
+                      key={preset.label}
+                      onClick={() => addTextStyleElement(preset)}
+                      type="button"
+                    >
+                      <span style={preset.style}>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
             </aside>
           ) : (
             <aside className="brand-panel">
@@ -2136,6 +2518,22 @@ const styles = `
     color: currentColor;
   }
 
+  .canvas-element.text {
+    place-items: center;
+  }
+
+  .canvas-text-layer {
+    display: block;
+    background: transparent;
+    cursor: move;
+    min-height: 1em;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+    user-select: none;
+    white-space: pre-wrap;
+  }
+
   .canvas-element.selected {
     outline: 2px solid #101114;
     outline-offset: 3px;
@@ -2414,6 +2812,104 @@ const styles = `
     overflow-y: auto;
   }
 
+  .text-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
+    padding: 24px 30px 32px;
+  }
+
+  .text-panel-section {
+    display: grid;
+    gap: 14px;
+  }
+
+  .text-panel-section h3 {
+    color: #202126;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .text-preset-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .text-preset-btn {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    min-height: 58px;
+    padding: 10px 14px;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .text-preset-btn:hover,
+  .text-style-card:hover {
+    background: #f6f7f8;
+    border-color: #b9bdc6;
+    transform: translateY(-1px);
+  }
+
+  .text-preset-preview {
+    flex: 1;
+    text-align: left;
+  }
+
+  .text-preset-preview.heading {
+    font-size: 24px;
+    font-weight: 850;
+  }
+
+  .text-preset-preview.subheading {
+    font-size: 18px;
+    font-weight: 760;
+  }
+
+  .text-preset-preview.body {
+    font-size: 15px;
+  }
+
+  .text-preset-preview.caption,
+  .text-preset-label {
+    color: #828690;
+    font-size: 12px;
+  }
+
+  .text-style-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .text-style-card {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    display: grid;
+    min-height: 82px;
+    overflow: hidden;
+    padding: 10px;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .text-style-card span {
+    justify-self: center;
+  }
+
   .element-settings-panel {
     border-left: 1px solid #e0e2e6;
     background: #ffffff;
@@ -2557,6 +3053,88 @@ const styles = `
 
   .delete-element-button {
     color: #b42318;
+  }
+
+  .settings-section {
+    border-bottom: 1px solid #eef0f3;
+    display: grid;
+    gap: 8px;
+    padding: 0 0 16px;
+  }
+
+  .settings-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .settings-label {
+    color: #60646f;
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .settings-textarea {
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    color: #202126;
+    font: inherit;
+    font-size: 14px;
+    min-height: 96px;
+    outline: 0;
+    padding: 10px 12px;
+    resize: vertical;
+    width: 100%;
+  }
+
+  .settings-textarea:focus {
+    border-color: #202126;
+    box-shadow: 0 0 0 3px rgba(32, 33, 38, 0.08);
+  }
+
+  .settings-stepper,
+  .settings-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .settings-stepper button,
+  .settings-toggle-group button {
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    background: #f6f7f8;
+    color: #202126;
+    cursor: pointer;
+    font: inherit;
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+
+  .settings-toggle-group button.active {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+  }
+
+  .settings-stepper input {
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    color: #202126;
+    font: inherit;
+    height: 32px;
+    text-align: center;
+    width: 58px;
+  }
+
+  .settings-section input[type="color"] {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    height: 34px;
+    padding: 0;
+    width: 42px;
   }
 
   .elements-panel input {
