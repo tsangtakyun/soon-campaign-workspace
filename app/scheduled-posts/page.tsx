@@ -412,16 +412,20 @@ export default function ScheduledPostsPage() {
 
   const moveSelectedLayer = (direction: 'forward' | 'front' | 'backward' | 'back') => {
     if (!selectedElement) return
-    const zValues = designElements.map((element) => element.zIndex)
-    const minZ = Math.min(...zValues, 2)
-    const maxZ = Math.max(...zValues, 7)
-    const nextZ = {
-      forward: selectedElement.zIndex + 1,
-      front: maxZ + 1,
-      backward: selectedElement.zIndex - 1,
-      back: minZ - 1,
-    }[direction]
-    updateSelectedElement({ zIndex: Math.max(1, Math.min(20, nextZ)) })
+    setDesignElements((current) => {
+      const zValues = current.map((element) => element.zIndex)
+      const maxZ = Math.max(...zValues, 12)
+      return current.map((element) => {
+        if (element.id !== selectedElement.id) return element
+        const nextZ = {
+          forward: element.zIndex + 5,
+          front: maxZ + 5,
+          backward: element.zIndex - 5,
+          back: 2,
+        }[direction]
+        return { ...element, zIndex: Math.max(2, Math.min(80, nextZ)) }
+      })
+    })
   }
 
   const startElementMove = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
@@ -638,6 +642,7 @@ export default function ScheduledPostsPage() {
                       <div className="element-mini-toolbar" onPointerDown={(event) => event.stopPropagation()}>
                         <button type="button" onClick={(event) => { event.stopPropagation(); duplicateSelectedElement() }}>Copy</button>
                         <button type="button" onClick={(event) => { event.stopPropagation(); deleteSelectedElement() }}>Delete</button>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedElementId(null) }}>完成</button>
                         <button type="button" onClick={(event) => event.stopPropagation()}>...</button>
                       </div>
                     </>
@@ -836,7 +841,12 @@ export default function ScheduledPostsPage() {
                       <button type="button" onClick={() => moveSelectedLayer('backward')}>向下一層</button>
                       <button type="button" onClick={() => moveSelectedLayer('back')}>移到最底</button>
                     </div>
+                    <p>現時層級：{selectedElement.zIndex}</p>
                   </section>
+
+                  <button className="finish-selection-button" type="button" onClick={() => setSelectedElementId(null)}>
+                    完成並確認位置
+                  </button>
 
                   <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
                     刪除文字
@@ -934,7 +944,12 @@ export default function ScheduledPostsPage() {
                   <button type="button" onClick={() => moveSelectedLayer('backward')}>向下一層</button>
                   <button type="button" onClick={() => moveSelectedLayer('back')}>移到最底</button>
                 </div>
+                <p>現時層級：{selectedElement.zIndex}</p>
               </section>
+
+              <button className="finish-selection-button" type="button" onClick={() => setSelectedElementId(null)}>
+                完成並確認位置
+              </button>
 
               <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
                 刪除 {selectedElement.label}
@@ -2921,6 +2936,12 @@ const styles = `
     overflow-y: auto;
   }
 
+  .element-settings-panel input,
+  .element-settings-panel textarea,
+  .element-settings-panel button {
+    color-scheme: light;
+  }
+
   .property-list {
     border: 1px solid #e5e7eb;
     border-radius: 10px;
@@ -3040,8 +3061,16 @@ const styles = `
     gap: 8px;
   }
 
+  .order-panel p {
+    margin: -2px 0 0;
+    color: #747884;
+    font-size: 12px;
+    font-weight: 650;
+  }
+
   .order-panel button,
-  .delete-element-button {
+  .delete-element-button,
+  .finish-selection-button {
     min-height: 38px;
     border: 1px solid #e1e3e8;
     border-radius: 9px;
@@ -3053,6 +3082,18 @@ const styles = `
 
   .delete-element-button {
     color: #b42318;
+  }
+
+  .finish-selection-button {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+    font-weight: 760;
+  }
+
+  .finish-selection-button:hover {
+    background: #2b2b2f;
+    border-color: #2b2b2f;
   }
 
   .settings-section {
@@ -3076,9 +3117,12 @@ const styles = `
   }
 
   .settings-textarea {
+    background: #ffffff !important;
     border: 1px solid #e1e3e8;
     border-radius: 10px;
-    color: #202126;
+    color: #202126 !important;
+    caret-color: #202126;
+    color-scheme: light;
     font: inherit;
     font-size: 14px;
     min-height: 96px;
@@ -3119,9 +3163,11 @@ const styles = `
   }
 
   .settings-stepper input {
+    background: #ffffff;
     border: 1px solid #e1e3e8;
     border-radius: 8px;
     color: #202126;
+    color-scheme: light;
     font: inherit;
     height: 32px;
     text-align: center;
