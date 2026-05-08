@@ -67,7 +67,7 @@ function SourceMaterialsContent() {
   }
 
   function handleContinue() {
-    const url = new URL('/onboarding/review', window.location.origin)
+    const url = new URL('/onboarding/campaigns-ready', window.location.origin)
     preserveParams(url)
     window.location.href = `${url.pathname}${url.search}`
   }
