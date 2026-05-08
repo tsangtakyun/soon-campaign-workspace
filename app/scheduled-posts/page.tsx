@@ -29,7 +29,7 @@ type ChannelCaption = {
 
 type DesignTool = '元素' | '媒體' | '文字' | '模板' | '背景' | '尺寸' | '品牌' | '發布'
 type ElementSection = 'shapes' | 'frames' | 'icons'
-type DesignElementKind = 'shape' | 'frame' | 'icon' | 'text'
+type DesignElementKind = 'shape' | 'frame' | 'icon' | 'text' | 'image'
 type TextPreset = 'heading' | 'subheading' | 'body' | 'caption'
 
 type DesignElement = {
@@ -52,7 +52,9 @@ type DesignElement = {
   textDecoration?: 'none' | 'underline'
   textAlign?: 'left' | 'center' | 'right'
   width?: number
+  height?: number
   lineHeight?: number
+  imageUrl?: string
 }
 
 const PLACEHOLDER_IMAGE =
@@ -185,6 +187,93 @@ function buildScheduledPosts(images: string[]): ScheduledPost[] {
   ]
 }
 
+function createPostDesignElements(post: ScheduledPost): DesignElement[] {
+  return [
+    {
+      id: `image-background-${post.id}`,
+      kind: 'image',
+      item: 'background',
+      label: '背景圖片',
+      x: 50,
+      y: 50,
+      size: 430,
+      width: 430,
+      height: 538,
+      rotation: 0,
+      opacity: 100,
+      color: '#ffffff',
+      zIndex: 1,
+      imageUrl: post.image,
+    },
+    {
+      id: `text-title-${post.id}`,
+      kind: 'text',
+      item: 'headline',
+      label: '標題文字',
+      x: 34,
+      y: 13,
+      size: 36,
+      rotation: 0,
+      opacity: 100,
+      color: '#ffffff',
+      zIndex: 10,
+      textContent: post.title,
+      fontFamily: 'Georgia, serif',
+      fontSize: 36,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'left',
+      width: 330,
+      lineHeight: 0.96,
+    },
+    {
+      id: `text-subtitle-${post.id}`,
+      kind: 'text',
+      item: 'subtitle',
+      label: '副標題文字',
+      x: 33,
+      y: 25,
+      size: 21,
+      rotation: 0,
+      opacity: 100,
+      color: '#ffffff',
+      zIndex: 11,
+      textContent: 'is the one friends replay most.',
+      fontFamily: 'inherit',
+      fontSize: 21,
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'left',
+      width: 310,
+      lineHeight: 1.08,
+    },
+    {
+      id: `text-logo-${post.id}`,
+      kind: 'text',
+      item: 'logo',
+      label: '品牌 Logo',
+      x: 18,
+      y: 91,
+      size: 21,
+      rotation: -4,
+      opacity: 100,
+      color: '#ffffff',
+      zIndex: 12,
+      textContent: 'SOON\nLOG',
+      fontFamily: 'inherit',
+      fontSize: 21,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'center',
+      width: 86,
+      lineHeight: 0.8,
+    },
+  ]
+}
+
 function ElementShelf({
   expanded,
   items,
@@ -196,7 +285,7 @@ function ElementShelf({
   expanded: boolean
   items: string[]
   kind: 'shape' | 'frame' | 'icon'
-  onPick: (kind: Exclude<DesignElementKind, 'text'>, item: string) => void
+  onPick: (kind: Exclude<DesignElementKind, 'text' | 'image'>, item: string) => void
   onToggle: () => void
   title: string
 }) {
@@ -239,8 +328,18 @@ export default function ScheduledPostsPage() {
   const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>('品牌')
   const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
   const [designElements, setDesignElements] = useState<DesignElement[]>([])
+  const [designElementsPostId, setDesignElementsPostId] = useState<string | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
+
+  const openDesignEditor = (post: ScheduledPost) => {
+    if (designElementsPostId !== post.id) {
+      setDesignElements(createPostDesignElements(post))
+      setDesignElementsPostId(post.id)
+      setSelectedElementId(null)
+    }
+    setDesignMode(true)
+  }
 
   const openCaptionModal = (post: ScheduledPost) => {
     const currentCaptions = captions[post.id] || {}
@@ -269,7 +368,7 @@ export default function ScheduledPostsPage() {
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
 
-  const addDesignElement = (kind: Exclude<DesignElementKind, 'text'>, item: string) => {
+  const addDesignElement = (kind: Exclude<DesignElementKind, 'text' | 'image'>, item: string) => {
     const id = `${kind}-${item}-${Date.now()}`
     const nextElement: DesignElement = {
       id,
@@ -282,7 +381,7 @@ export default function ScheduledPostsPage() {
       rotation: 0,
       opacity: 100,
       color: '#111111',
-      zIndex: 5 + designElements.length,
+      zIndex: 15 + designElements.length,
     }
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
@@ -336,7 +435,7 @@ export default function ScheduledPostsPage() {
       rotation: 0,
       opacity: 100,
       color: config.color || '#ffffff',
-      zIndex: 10 + designElements.length,
+      zIndex: 20 + designElements.length,
       textContent: config.textContent,
       fontFamily: 'inherit',
       fontSize: config.fontSize,
@@ -366,7 +465,7 @@ export default function ScheduledPostsPage() {
       rotation: 0,
       opacity: 100,
       color: typeof preset.style.color === 'string' ? preset.style.color : '#111111',
-      zIndex: 10 + designElements.length,
+      zIndex: 20 + designElements.length,
       textContent: preset.textContent,
       fontFamily: typeof preset.style.fontFamily === 'string' ? preset.style.fontFamily : 'inherit',
       fontSize: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
@@ -487,6 +586,12 @@ export default function ScheduledPostsPage() {
                       size: Math.min(200, Math.max(8, Math.round((initialSize || 24) * (nextDistance / initialDistance)))),
                       width: Math.min(520, Math.max(140, Math.round((element.width || 300) * (nextDistance / initialDistance)))),
                     }
+                  : item.kind === 'image'
+                    ? {
+                        height: Math.min(760, Math.max(180, Math.round((element.height || 538) * (nextDistance / initialDistance)))),
+                        size: Math.min(760, Math.max(180, Math.round((initialSize || 430) * (nextDistance / initialDistance)))),
+                        width: Math.min(640, Math.max(150, Math.round((element.width || 430) * (nextDistance / initialDistance)))),
+                      }
                   : {
                       size: Math.min(260, Math.max(34, Math.round(initialSize * (nextDistance / initialDistance)))),
                     }),
@@ -585,7 +690,6 @@ export default function ScheduledPostsPage() {
         <section className="design-workbench">
           <section className="design-canvas-area">
             <article className="design-canvas" ref={canvasRef}>
-              <img src={selectedPost.image} alt="" />
               {designElements.map((element) => (
                 <div
                   className={`canvas-element ${element.kind} ${selectedElementId === element.id ? 'selected' : ''} ${element.kind}-${element.item}`}
@@ -601,8 +705,8 @@ export default function ScheduledPostsPage() {
                   style={{
                     left: `${element.x}%`,
                     top: `${element.y}%`,
-                    width: element.kind === 'text' ? `${element.width || 300}px` : `${element.size}px`,
-                    height: element.kind === 'text' ? 'auto' : `${element.size}px`,
+                    width: element.kind === 'text' || element.kind === 'image' ? `${element.width || 300}px` : `${element.size}px`,
+                    height: element.kind === 'text' ? 'auto' : element.kind === 'image' ? `${element.height || element.size}px` : `${element.size}px`,
                     opacity: element.opacity / 100,
                     transform: `translate(-50%, -50%) rotate(${element.rotation}deg)`,
                     zIndex: element.zIndex,
@@ -627,6 +731,8 @@ export default function ScheduledPostsPage() {
                     >
                       {element.textContent}
                     </div>
+                  ) : element.kind === 'image' ? (
+                    <img className="canvas-image-layer" src={element.imageUrl || selectedPost.image} alt="" />
                   ) : element.kind === 'icon' ? (
                     <span>{element.item}</span>
                   ) : (
@@ -640,6 +746,7 @@ export default function ScheduledPostsPage() {
                       <i className="handle se" onPointerDown={(event) => startElementResize(event, element)} />
                       <i className="rotate-handle" onPointerDown={(event) => startElementRotate(event, element)}>↻</i>
                       <div className="element-mini-toolbar" onPointerDown={(event) => event.stopPropagation()}>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); setActiveDesignTool(element.kind === 'image' ? '媒體' : element.kind === 'text' ? '文字' : '元素') }}>Edit</button>
                         <button type="button" onClick={(event) => { event.stopPropagation(); duplicateSelectedElement() }}>Copy</button>
                         <button type="button" onClick={(event) => { event.stopPropagation(); deleteSelectedElement() }}>Delete</button>
                         <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedElementId(null) }}>完成</button>
@@ -649,11 +756,6 @@ export default function ScheduledPostsPage() {
                   ) : null}
                 </div>
               ))}
-              <div className="design-canvas-copy">
-                <strong>{selectedPost.title}</strong>
-                <span>is the one friends replay most.</span>
-              </div>
-              <div className="soon-logo-stub">SOON<br />LOG</div>
             </article>
 
             <div className="canvas-side-actions">
@@ -679,15 +781,109 @@ export default function ScheduledPostsPage() {
                   type="button"
                   onClick={() => {
                     setSelectedElementId(null)
-                    setActiveDesignTool(selectedElement.kind === 'text' ? '文字' : '元素')
+                    setActiveDesignTool(selectedElement.kind === 'text' ? '文字' : selectedElement.kind === 'image' ? '媒體' : '元素')
                   }}
                 >
                   ←
                 </button>
-                <h2>{selectedElement.kind === 'text' ? '文字設定' : selectedElement.kind === 'shape' ? '形狀設定' : selectedElement.label}</h2>
+                <h2>{selectedElement.kind === 'text' ? '文字設定' : selectedElement.kind === 'image' ? '圖片設定' : selectedElement.kind === 'shape' ? '形狀設定' : selectedElement.label}</h2>
               </div>
 
-              {selectedElement.kind === 'text' ? (
+              {selectedElement.kind === 'image' ? (
+                <>
+                  <section className="property-list">
+                    <label>
+                      <span>更換圖片</span>
+                      <button type="button" onClick={() => setActiveDesignTool('媒體')}>Replace</button>
+                    </label>
+                    <label>
+                      <span>透明度</span>
+                      <input
+                        max="100"
+                        min="20"
+                        type="range"
+                        value={selectedElement.opacity}
+                        onChange={(event) => updateSelectedElement({ opacity: Number(event.target.value) })}
+                      />
+                      <em>{selectedElement.opacity}%</em>
+                    </label>
+                  </section>
+
+                  <section className="alignment-panel">
+                    <h3>對齊畫布</h3>
+                    <div>
+                      <button type="button" onClick={() => updateSelectedElement({ x: 50 })}>↔</button>
+                      <button type="button" onClick={() => updateSelectedElement({ y: 50 })}>↕</button>
+                      <button type="button" onClick={() => updateSelectedElement({ y: 18 })}>↑</button>
+                      <button type="button" onClick={() => updateSelectedElement({ y: 82 })}>↓</button>
+                      <button type="button" onClick={() => updateSelectedElement({ x: 18 })}>←</button>
+                      <button type="button" onClick={() => updateSelectedElement({ x: 82 })}>→</button>
+                    </div>
+                  </section>
+
+                  <section className="transform-panel">
+                    <h3>旋轉</h3>
+                    <div>
+                      <input
+                        max="180"
+                        min="-180"
+                        type="range"
+                        value={selectedElement.rotation}
+                        onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value) })}
+                      />
+                      <input
+                        aria-label="旋轉角度"
+                        type="number"
+                        value={selectedElement.rotation}
+                        onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value || 0) })}
+                      />
+                    </div>
+                    <h3>圖片闊度</h3>
+                    <div>
+                      <input
+                        max="640"
+                        min="150"
+                        type="range"
+                        value={selectedElement.width || selectedElement.size}
+                        onChange={(event) => {
+                          const nextWidth = Number(event.target.value)
+                          const ratio = (selectedElement.height || 538) / (selectedElement.width || 430)
+                          updateSelectedElement({ width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
+                        }}
+                      />
+                      <input
+                        aria-label="圖片闊度"
+                        type="number"
+                        value={selectedElement.width || selectedElement.size}
+                        onChange={(event) => {
+                          const nextWidth = Number(event.target.value || 150)
+                          const ratio = (selectedElement.height || 538) / (selectedElement.width || 430)
+                          updateSelectedElement({ width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
+                        }}
+                      />
+                    </div>
+                  </section>
+
+                  <section className="order-panel">
+                    <h3>圖層順序</h3>
+                    <div>
+                      <button type="button" onClick={() => moveSelectedLayer('forward')}>向上一層</button>
+                      <button type="button" onClick={() => moveSelectedLayer('front')}>移到最上</button>
+                      <button type="button" onClick={() => moveSelectedLayer('backward')}>向下一層</button>
+                      <button type="button" onClick={() => moveSelectedLayer('back')}>移到最底</button>
+                    </div>
+                    <p>現時層級：{selectedElement.zIndex}</p>
+                  </section>
+
+                  <button className="finish-selection-button" type="button" onClick={() => setSelectedElementId(null)}>
+                    完成並確認位置
+                  </button>
+
+                  <button className="delete-element-button" type="button" onClick={deleteSelectedElement}>
+                    刪除圖片
+                  </button>
+                </>
+              ) : selectedElement.kind === 'text' ? (
                 <>
                   <section className="settings-section">
                     <label className="settings-label" htmlFor="selected-text-content">文字內容</label>
@@ -1162,7 +1358,7 @@ export default function ScheduledPostsPage() {
                   <strong>{selectedPost.title}</strong>
                   <span>{selectedPost.type}</span>
                 </div>
-                <button className="edit-design-overlay" type="button" onClick={() => setDesignMode(true)}>
+                <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
                   ✎ 編輯設計
                 </button>
               </div>
@@ -1210,7 +1406,7 @@ export default function ScheduledPostsPage() {
             <section>
               <p>快速編輯</p>
               <button type="button" onClick={() => openCaptionModal(selectedPost)}>調整 caption</button>
-              <button type="button" onClick={() => setDesignMode(true)}>編輯設計</button>
+              <button type="button" onClick={() => openDesignEditor(selectedPost)}>編輯設計</button>
             </section>
 
             <section>
@@ -2483,11 +2679,17 @@ const styles = `
     box-shadow: 0 16px 44px rgba(32, 33, 38, 0.12);
   }
 
-  .design-canvas img {
+  .canvas-image-layer {
     width: 100%;
     height: 100%;
     display: block;
     object-fit: cover;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .canvas-element.image {
+    place-items: stretch;
   }
 
   .design-canvas::after {
