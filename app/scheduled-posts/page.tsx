@@ -17,6 +17,16 @@ type TopicReference = {
   image: string
 }
 
+type PreviewChannel = 'Instagram' | 'Facebook' | 'LinkedIn' | 'X' | 'Google'
+
+type ChannelCaption = {
+  id: PreviewChannel
+  label: string
+  icon: string
+  note: string
+  limit: number
+}
+
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
 
@@ -24,6 +34,44 @@ const FALLBACK_IMAGES = [
   '/photo-control/coffee-full-freedom.jpg',
   '/assets/content-strategies/photos/behind-the-scenes.jpg',
   '/assets/content-strategies/photos/lifestyle-content.jpg',
+]
+
+const CHANNELS: ChannelCaption[] = [
+  {
+    id: 'Instagram',
+    label: 'Instagram',
+    icon: 'IG',
+    note: '輕鬆、口語、有畫面感，適合加 emoji 和短句。',
+    limit: 2200,
+  },
+  {
+    id: 'Facebook',
+    label: 'Facebook',
+    icon: 'f',
+    note: '較完整、親切，適合補充故事背景並鼓勵留言。',
+    limit: 33000,
+  },
+  {
+    id: 'LinkedIn',
+    label: 'LinkedIn',
+    icon: 'in',
+    note: '專業但有人味，聚焦品牌觀點、價值和啟發。',
+    limit: 3000,
+  },
+  {
+    id: 'X',
+    label: 'X / Twitter',
+    icon: 'X',
+    note: '短促、有 hook，可以更直接或帶一點玩味。',
+    limit: 280,
+  },
+  {
+    id: 'Google',
+    label: 'Google Business',
+    icon: 'G',
+    note: '清晰、在地、偏向更新消息和行動提示。',
+    limit: 1500,
+  },
 ]
 
 function readTopicImages() {
@@ -76,7 +124,36 @@ export default function ScheduledPostsPage() {
   const [compact, setCompact] = useState(false)
   const scheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
-  const [previewChannel, setPreviewChannel] = useState<'Instagram' | 'Facebook' | 'LinkedIn' | 'X' | 'Google'>('Instagram')
+  const [previewChannel, setPreviewChannel] = useState<PreviewChannel>('Instagram')
+  const [captions, setCaptions] = useState<Record<string, Partial<Record<PreviewChannel, string>>>>({})
+  const [draftCaptions, setDraftCaptions] = useState<Partial<Record<PreviewChannel, string>>>({})
+  const [captionModalOpen, setCaptionModalOpen] = useState(false)
+
+  const openCaptionModal = (post: ScheduledPost) => {
+    const currentCaptions = captions[post.id] || {}
+    setDraftCaptions(
+      CHANNELS.reduce<Partial<Record<PreviewChannel, string>>>((draft, channel) => {
+        draft[channel.id] = currentCaptions[channel.id] || post.body
+        return draft
+      }, {})
+    )
+    setCaptionModalOpen(true)
+  }
+
+  const saveCaptionDrafts = () => {
+    if (!selectedPost) return
+    setCaptions((current) => ({
+      ...current,
+      [selectedPost.id]: {
+        ...current[selectedPost.id],
+        ...draftCaptions,
+      },
+    }))
+    setCaptionModalOpen(false)
+  }
+
+  const selectedCaption =
+    selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
 
   if (selectedPost) {
     return (
@@ -141,7 +218,7 @@ export default function ScheduledPostsPage() {
                 <button
                   className={previewChannel === channel ? 'active' : ''}
                   key={channel}
-                  onClick={() => setPreviewChannel(channel as typeof previewChannel)}
+                  onClick={() => setPreviewChannel(channel as PreviewChannel)}
                   type="button"
                 >
                   {label}
@@ -166,10 +243,10 @@ export default function ScheduledPostsPage() {
                 <span>♡</span>
                 <span>○</span>
                 <span>⌲</span>
-                <button type="button">編輯 caption</button>
+                <button type="button" onClick={() => openCaptionModal(selectedPost)}>編輯 caption</button>
               </div>
               <p>
-                <strong>SOON-LOG</strong> {selectedPost.body}
+                <strong>SOON-LOG</strong> {selectedCaption}
               </p>
             </article>
 
@@ -205,7 +282,7 @@ export default function ScheduledPostsPage() {
 
             <section>
               <p>快速編輯</p>
-              <button type="button">調整 caption</button>
+              <button type="button" onClick={() => openCaptionModal(selectedPost)}>調整 caption</button>
               <button type="button">編輯設計</button>
             </section>
 
@@ -216,6 +293,62 @@ export default function ScheduledPostsPage() {
             </section>
           </aside>
         </section>
+
+        {captionModalOpen ? (
+          <div className="caption-modal-backdrop" role="presentation">
+            <section className="caption-modal" role="dialog" aria-modal="true" aria-label="編輯 caption">
+              <header>
+                <div>
+                  <h2>編輯 Caption</h2>
+                  <p>為不同平台調整同一則貼文的語氣。儲存後，預覽會即時更新。</p>
+                </div>
+                <button type="button" onClick={() => setCaptionModalOpen(false)} aria-label="關閉">
+                  ×
+                </button>
+              </header>
+
+              <div className="caption-grid">
+                {CHANNELS.map((channel) => {
+                  const value = draftCaptions[channel.id] || ''
+                  return (
+                    <article className="caption-column" key={channel.id}>
+                      <div className="caption-channel-head">
+                        <span>{channel.icon}</span>
+                        <strong>{channel.label}</strong>
+                        <button type="button">連接</button>
+                      </div>
+                      <p>{channel.note}</p>
+                      <button className="caption-regenerate" type="button" aria-label={`重新生成 ${channel.label} caption`}>
+                        ↻
+                      </button>
+                      <textarea
+                        value={value}
+                        onChange={(event) =>
+                          setDraftCaptions((current) => ({
+                            ...current,
+                            [channel.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <small>
+                        字數：{value.length}/{channel.limit}
+                      </small>
+                    </article>
+                  )
+                })}
+              </div>
+
+              <footer>
+                <button type="button" onClick={() => setCaptionModalOpen(false)}>
+                  取消
+                </button>
+                <button type="button" onClick={saveCaptionDrafts}>
+                  儲存 Caption
+                </button>
+              </footer>
+            </section>
+          </div>
+        ) : null}
 
         <style dangerouslySetInnerHTML={{ __html: styles }} />
       </main>
@@ -1016,6 +1149,208 @@ const styles = `
   .post-settings-panel em {
     color: #8a8d95;
     font-style: normal;
+  }
+
+  .caption-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(247, 248, 250, 0.72);
+    backdrop-filter: blur(10px);
+    display: grid;
+    place-items: center;
+    padding: 28px;
+  }
+
+  .caption-modal {
+    width: min(1180px, 100%);
+    max-height: min(760px, calc(100vh - 56px));
+    border-radius: 18px;
+    background: #ffffff;
+    color: #202126;
+    box-shadow: 0 28px 90px rgba(32, 33, 38, 0.24);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+  }
+
+  .caption-modal header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 32px 36px 18px;
+  }
+
+  .caption-modal h2 {
+    margin: 0;
+    color: #17181c;
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 650;
+  }
+
+  .caption-modal header p {
+    margin: 10px 0 0;
+    color: #70737c;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .caption-modal header > button {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #202126;
+    font: inherit;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .caption-grid {
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 1fr);
+    gap: 18px;
+    padding: 10px 36px 24px;
+  }
+
+  .caption-column {
+    min-width: 260px;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(260px, 1fr) auto;
+    gap: 10px;
+  }
+
+  .caption-channel-head {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .caption-channel-head span {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: #f2f3f6;
+    color: #2864dc;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 850;
+  }
+
+  .caption-column:nth-child(1) .caption-channel-head span {
+    color: #ffffff;
+    background: linear-gradient(135deg, #f97316, #ec4899, #7c3aed);
+  }
+
+  .caption-column:nth-child(4) .caption-channel-head span {
+    color: #ffffff;
+    background: #111111;
+  }
+
+  .caption-column:nth-child(5) .caption-channel-head span {
+    color: #4285f4;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+  }
+
+  .caption-channel-head strong {
+    font-size: 17px;
+    font-weight: 650;
+  }
+
+  .caption-channel-head button {
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+    cursor: pointer;
+  }
+
+  .caption-column p {
+    min-height: 44px;
+    margin: 0;
+    color: #676a73;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .caption-regenerate {
+    justify-self: end;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #202126;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  .caption-column textarea {
+    width: 100%;
+    min-height: 280px;
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #2b2d34;
+    padding: 14px;
+    resize: none;
+    outline: 0;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .caption-column textarea:focus {
+    border-color: #202126;
+    box-shadow: 0 0 0 3px rgba(32, 33, 38, 0.08);
+  }
+
+  .caption-column small {
+    justify-self: end;
+    color: #70737c;
+    font-size: 12px;
+  }
+
+  .caption-modal footer {
+    min-height: 66px;
+    border-top: 1px solid #eef0f3;
+    background: rgba(255, 255, 255, 0.96);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 24px;
+  }
+
+  .caption-modal footer button {
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 15px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+
+  .caption-modal footer button:last-child {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
   }
 
   @media (max-width: 700px) {
