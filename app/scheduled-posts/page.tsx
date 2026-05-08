@@ -66,6 +66,17 @@ const FALLBACK_IMAGES = [
   '/assets/content-strategies/photos/lifestyle-content.jpg',
 ]
 
+const STOCK_MEDIA = [
+  { url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&q=80', label: '山景' },
+  { url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&q=80', label: '人物' },
+  { url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80', label: '美食' },
+  { url: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&q=80', label: '購物' },
+  { url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&q=80', label: '科技' },
+  { url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=500&q=80', label: '自然' },
+]
+
+const BRAND_COLORS = ['#1A1A1A', '#7A655B', '#8B4513', '#A0522D', '#F5F0EB']
+
 const CHANNELS: ChannelCaption[] = [
   {
     id: 'Instagram',
@@ -329,6 +340,8 @@ export default function ScheduledPostsPage() {
   const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
   const [designElements, setDesignElements] = useState<DesignElement[]>([])
   const [designElementsPostId, setDesignElementsPostId] = useState<string | null>(null)
+  const [uploadedImages, setUploadedImages] = useState<{ url: string; label: string }[]>([])
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
 
@@ -479,6 +492,103 @@ export default function ScheduledPostsPage() {
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
     setActiveDesignTool('文字')
+  }
+
+  const addImageElement = (imageUrl: string, label = '圖片') => {
+    const nextElement: DesignElement = {
+      id: crypto.randomUUID(),
+      kind: 'image',
+      item: 'photo',
+      label,
+      x: 50,
+      y: 50,
+      size: 220,
+      width: 300,
+      height: 220,
+      rotation: 0,
+      opacity: 100,
+      color: 'transparent',
+      zIndex: 20 + designElements.length,
+      imageUrl,
+    }
+    setDesignElements((current) => [...current, nextElement])
+    setSelectedElementId(nextElement.id)
+    setActiveDesignTool('媒體')
+  }
+
+  const updateImageElement = (id: string, changes: Partial<DesignElement>) => {
+    setDesignElements((current) =>
+      current.map((element) => (element.id === id ? { ...element, ...changes } : element))
+    )
+  }
+
+  const addBrandTextElement = (
+    label: string,
+    textContent: string,
+    fontSize: number,
+    fontWeight: DesignElement['fontWeight'],
+    color: string
+  ) => {
+    const nextElement: DesignElement = {
+      id: crypto.randomUUID(),
+      kind: 'text',
+      item: label,
+      label,
+      x: 50,
+      y: fontWeight === 'bold' ? 40 : 60,
+      size: fontSize,
+      rotation: 0,
+      opacity: 100,
+      color,
+      zIndex: 20 + designElements.length,
+      textContent,
+      fontFamily: 'inherit',
+      fontSize,
+      fontWeight,
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'center',
+      width: fontWeight === 'bold' ? 400 : 360,
+      lineHeight: fontWeight === 'bold' ? 1.12 : 1.45,
+    }
+    setDesignElements((current) => [...current, nextElement])
+    setSelectedElementId(nextElement.id)
+    setActiveDesignTool('品牌')
+  }
+
+  const applyBrandColor = (color: string) => {
+    if (!selectedElementId) {
+      const nextElement: DesignElement = {
+        id: crypto.randomUUID(),
+        kind: 'shape',
+        item: 'rounded',
+        label: '品牌色塊',
+        x: 50,
+        y: 50,
+        size: 132,
+        rotation: 0,
+        opacity: 100,
+        color,
+        zIndex: 20 + designElements.length,
+      }
+      setDesignElements((current) => [...current, nextElement])
+      setSelectedElementId(nextElement.id)
+      return
+    }
+    setDesignElements((current) =>
+      current.map((element) => (element.id === selectedElementId ? { ...element, color } : element))
+    )
+  }
+
+  const handleImageUpload = (files: FileList | null) => {
+    if (!files) return
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) return
+      const url = URL.createObjectURL(file)
+      const label = file.name.replace(/\.[^.]+$/, '') || '圖片'
+      setUploadedImages((current) => [{ url, label }, ...current])
+      addImageElement(url, label)
+    })
   }
 
   const updateSelectedElement = (updates: Partial<DesignElement>) => {
@@ -791,10 +901,42 @@ export default function ScheduledPostsPage() {
 
               {selectedElement.kind === 'image' ? (
                 <>
+                  <section className="settings-section">
+                    <label className="settings-label">圖片預覽</label>
+                    <img
+                      alt=""
+                      className="settings-image-preview"
+                      src={selectedElement.imageUrl || selectedPost.image}
+                    />
+                  </section>
+
                   <section className="property-list">
                     <label>
                       <span>更換圖片</span>
-                      <button type="button" onClick={() => setActiveDesignTool('媒體')}>Replace</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const input = document.createElement('input')
+                          input.type = 'file'
+                          input.accept = 'image/*'
+                          input.onchange = (event) => {
+                            const file = (event.target as HTMLInputElement).files?.[0]
+                            if (!file) return
+                            const url = URL.createObjectURL(file)
+                            updateImageElement(selectedElement.id, {
+                              imageUrl: url,
+                              label: file.name.replace(/\.[^.]+$/, '') || '圖片',
+                            })
+                            setUploadedImages((current) => [
+                              { url, label: file.name.replace(/\.[^.]+$/, '') || '圖片' },
+                              ...current,
+                            ])
+                          }
+                          input.click()
+                        }}
+                      >
+                        替換圖片
+                      </button>
                     </label>
                     <label>
                       <span>透明度</span>
@@ -803,7 +945,7 @@ export default function ScheduledPostsPage() {
                         min="20"
                         type="range"
                         value={selectedElement.opacity}
-                        onChange={(event) => updateSelectedElement({ opacity: Number(event.target.value) })}
+                        onChange={(event) => updateImageElement(selectedElement.id, { opacity: Number(event.target.value) })}
                       />
                       <em>{selectedElement.opacity}%</em>
                     </label>
@@ -812,12 +954,12 @@ export default function ScheduledPostsPage() {
                   <section className="alignment-panel">
                     <h3>對齊畫布</h3>
                     <div>
-                      <button type="button" onClick={() => updateSelectedElement({ x: 50 })}>↔</button>
-                      <button type="button" onClick={() => updateSelectedElement({ y: 50 })}>↕</button>
-                      <button type="button" onClick={() => updateSelectedElement({ y: 18 })}>↑</button>
-                      <button type="button" onClick={() => updateSelectedElement({ y: 82 })}>↓</button>
-                      <button type="button" onClick={() => updateSelectedElement({ x: 18 })}>←</button>
-                      <button type="button" onClick={() => updateSelectedElement({ x: 82 })}>→</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { x: 50 })}>↔</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { y: 50 })}>↕</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { y: 18 })}>↑</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { y: 82 })}>↓</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { x: 18 })}>←</button>
+                      <button type="button" onClick={() => updateImageElement(selectedElement.id, { x: 82 })}>→</button>
                     </div>
                   </section>
 
@@ -829,13 +971,13 @@ export default function ScheduledPostsPage() {
                         min="-180"
                         type="range"
                         value={selectedElement.rotation}
-                        onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value) })}
+                        onChange={(event) => updateImageElement(selectedElement.id, { rotation: Number(event.target.value) })}
                       />
                       <input
                         aria-label="旋轉角度"
                         type="number"
                         value={selectedElement.rotation}
-                        onChange={(event) => updateSelectedElement({ rotation: Number(event.target.value || 0) })}
+                        onChange={(event) => updateImageElement(selectedElement.id, { rotation: Number(event.target.value || 0) })}
                       />
                     </div>
                     <h3>圖片闊度</h3>
@@ -848,7 +990,7 @@ export default function ScheduledPostsPage() {
                         onChange={(event) => {
                           const nextWidth = Number(event.target.value)
                           const ratio = (selectedElement.height || 538) / (selectedElement.width || 430)
-                          updateSelectedElement({ width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
+                          updateImageElement(selectedElement.id, { width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
                         }}
                       />
                       <input
@@ -858,8 +1000,24 @@ export default function ScheduledPostsPage() {
                         onChange={(event) => {
                           const nextWidth = Number(event.target.value || 150)
                           const ratio = (selectedElement.height || 538) / (selectedElement.width || 430)
-                          updateSelectedElement({ width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
+                          updateImageElement(selectedElement.id, { width: nextWidth, height: Math.round(nextWidth * ratio), size: nextWidth })
                         }}
+                      />
+                    </div>
+                    <h3>圖片高度</h3>
+                    <div>
+                      <input
+                        max="760"
+                        min="120"
+                        type="range"
+                        value={selectedElement.height || selectedElement.size}
+                        onChange={(event) => updateImageElement(selectedElement.id, { height: Number(event.target.value) })}
+                      />
+                      <input
+                        aria-label="圖片高度"
+                        type="number"
+                        value={selectedElement.height || selectedElement.size}
+                        onChange={(event) => updateImageElement(selectedElement.id, { height: Number(event.target.value || 120) })}
                       />
                     </div>
                   </section>
@@ -1233,7 +1391,85 @@ export default function ScheduledPostsPage() {
                 </div>
               </section>
             </aside>
-          ) : (
+          ) : activeDesignTool === '媒體' ? (
+            <aside className="media-panel">
+              <div className="brand-panel-head">
+                <button type="button" onClick={() => setActiveDesignTool('品牌')}>←</button>
+                <h2>媒體</h2>
+              </div>
+
+              <div
+                className={`media-upload-zone ${isDraggingOver ? 'dragging' : ''}`}
+                onClick={() => document.getElementById('media-file-input')?.click()}
+                onDragLeave={() => setIsDraggingOver(false)}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setIsDraggingOver(true)
+                }}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  setIsDraggingOver(false)
+                  handleImageUpload(event.dataTransfer.files)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    document.getElementById('media-file-input')?.click()
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <span className="media-upload-icon">↑</span>
+                <span className="media-upload-label">拖放或點擊上載圖片</span>
+                <span className="media-upload-hint">JPG、PNG、WEBP、GIF</span>
+              </div>
+
+              <input
+                accept="image/*"
+                id="media-file-input"
+                multiple
+                onChange={(event) => handleImageUpload(event.target.files)}
+                style={{ display: 'none' }}
+                type="file"
+              />
+
+              {uploadedImages.length > 0 ? (
+                <section className="media-panel-section">
+                  <h3>已上載</h3>
+                  <div className="media-grid">
+                    {uploadedImages.map((image, index) => (
+                      <button
+                        className="media-thumb-btn"
+                        key={`${image.url}-${index}`}
+                        onClick={() => addImageElement(image.url, image.label)}
+                        title={image.label}
+                        type="button"
+                      >
+                        <img alt={image.label} className="media-thumb" src={image.url} />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="media-panel-section">
+                <h3>示例圖片</h3>
+                <div className="media-grid">
+                  {STOCK_MEDIA.map((stock) => (
+                    <button
+                      className="media-thumb-btn"
+                      key={stock.url}
+                      onClick={() => addImageElement(stock.url, stock.label)}
+                      title={stock.label}
+                      type="button"
+                    >
+                      <img alt={stock.label} className="media-thumb" loading="lazy" src={stock.url} />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </aside>
+          ) : activeDesignTool === '品牌' ? (
             <aside className="brand-panel">
               <div className="brand-panel-head">
                 <button type="button" onClick={() => setDesignMode(false)}>←</button>
@@ -1242,30 +1478,67 @@ export default function ScheduledPostsPage() {
 
               <section>
                 <h3>Logo</h3>
-                <div className="logo-card">SOON<br />LOG</div>
-              </section>
-
-              <section>
-                <h3>顏色</h3>
-                <p>品牌素材庫</p>
-                <div className="color-row">
-                  {['#7a655b', '#211d1b', '#6b5a52', '#ffffff'].map((color) => (
-                    <span style={{ background: color }} key={color} />
-                  ))}
-                  <button type="button">↻ 更換配色</button>
+                <div className="brand-logo-row">
+                  <button
+                    className="brand-logo-placeholder"
+                    onClick={() => addBrandTextElement('品牌 Logo', 'SOON\nLOG', 30, 'bold', '#8B4513')}
+                    type="button"
+                  >
+                    <span>SOON</span>
+                    <span>LOG</span>
+                  </button>
                 </div>
               </section>
 
               <section>
-                <h3>字體</h3>
-                <button type="button">標題</button>
-                <button type="button">內文</button>
+                <h3>品牌顏色</h3>
+                <div className="brand-colors-row">
+                  {BRAND_COLORS.map((color) => (
+                    <button
+                      aria-label={`套用品牌顏色 ${color}`}
+                      className="brand-color-swatch"
+                      key={color}
+                      onClick={() => applyBrandColor(color)}
+                      style={{ background: color }}
+                      title={color}
+                      type="button"
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3>品牌字體</h3>
+                <div className="brand-fonts-list">
+                  <button
+                    className="brand-font-btn"
+                    onClick={() => addBrandTextElement('品牌標題', 'SOON LOG', 48, 'bold', '#1A1A1A')}
+                    type="button"
+                  >
+                    <span style={{ fontSize: 20, fontWeight: 'bold' }}>Title</span>
+                    <span className="brand-font-label">大標題樣式</span>
+                  </button>
+                  <button
+                    className="brand-font-btn"
+                    onClick={() => addBrandTextElement('品牌內文', '品牌內文文字', 20, 'normal', '#444444')}
+                    type="button"
+                  >
+                    <span style={{ fontSize: 15 }}>Body</span>
+                    <span className="brand-font-label">內文樣式</span>
+                  </button>
+                </div>
               </section>
 
               <section>
                 <h3>媒體</h3>
-                <button type="button">查看全部</button>
+                <button type="button" onClick={() => setActiveDesignTool('媒體')}>查看全部</button>
               </section>
+
+              <p className="panel-coming-soon">品牌素材庫將於下一版本開放上載</p>
+            </aside>
+          ) : (
+            <aside className="placeholder-panel">
+              <p className="panel-coming-soon">即將推出</p>
             </aside>
           )}
         </section>
@@ -2938,6 +3211,8 @@ const styles = `
     display: grid;
     align-content: start;
     gap: 24px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
   }
 
   .brand-panel-head {
@@ -3016,6 +3291,191 @@ const styles = `
     min-height: 46px;
     text-align: left;
     padding: 0 12px;
+  }
+
+  .media-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
+    padding: 24px 30px 32px;
+  }
+
+  .media-upload-zone {
+    align-items: center;
+    border: 2px dashed #d3d6dc;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 138px;
+    justify-content: center;
+    padding: 22px 16px;
+    text-align: center;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+
+  .media-upload-zone:hover,
+  .media-upload-zone.dragging {
+    background: #f7f8fa;
+    border-color: #858a95;
+  }
+
+  .media-upload-icon {
+    color: #8d929d;
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .media-upload-label {
+    color: #202126;
+    font-size: 14px;
+    font-weight: 760;
+  }
+
+  .media-upload-hint {
+    color: #8a8f99;
+    font-size: 12px;
+  }
+
+  .media-panel-section {
+    display: grid;
+    gap: 12px;
+  }
+
+  .media-panel-section h3 {
+    color: #202126;
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .media-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .media-thumb-btn {
+    aspect-ratio: 1;
+    background: #f4f5f7;
+    border: 1px solid #e1e3e8;
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    padding: 0;
+    transition: border-color 160ms ease, transform 160ms ease;
+  }
+
+  .media-thumb-btn:hover {
+    border-color: #9297a1;
+    transform: translateY(-1px);
+  }
+
+  .media-thumb {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .settings-image-preview {
+    background: #f4f5f7;
+    border-radius: 10px;
+    display: block;
+    max-height: 128px;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .brand-logo-row,
+  .brand-colors-row,
+  .brand-fonts-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand-fonts-list {
+    flex-direction: column;
+  }
+
+  .brand-logo-placeholder {
+    align-items: center;
+    background: #f4f4f5;
+    border: 1px solid #e3e5e8;
+    border-radius: 10px;
+    color: #80645e;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    font: inherit;
+    font-size: 22px;
+    font-weight: 900;
+    justify-content: center;
+    line-height: 0.86;
+    min-height: 88px;
+    min-width: 132px;
+    padding: 12px 18px;
+    transform: rotate(-2deg);
+    transition: border-color 160ms ease, transform 160ms ease;
+  }
+
+  .brand-logo-placeholder:hover {
+    border-color: #9297a1;
+    transform: rotate(-2deg) translateY(-1px);
+  }
+
+  .brand-color-swatch {
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px #c8ccd3;
+    cursor: pointer;
+    height: 34px;
+    padding: 0;
+    width: 34px;
+  }
+
+  .brand-color-swatch:hover {
+    box-shadow: 0 0 0 2px #202126;
+  }
+
+  .brand-font-btn {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: 10px 14px;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+
+  .brand-font-btn:hover {
+    background: #f7f8fa;
+    border-color: #9297a1;
+  }
+
+  .brand-font-label,
+  .panel-coming-soon {
+    color: #8a8f99;
+    font-size: 12px;
+  }
+
+  .placeholder-panel {
+    align-items: center;
+    background: #ffffff;
+    border-left: 1px solid #e0e2e6;
+    display: flex;
+    justify-content: center;
+    padding: 32px;
   }
 
   .elements-panel {
