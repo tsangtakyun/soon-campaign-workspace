@@ -128,6 +128,7 @@ export default function ScheduledPostsPage() {
   const [captions, setCaptions] = useState<Record<string, Partial<Record<PreviewChannel, string>>>>({})
   const [draftCaptions, setDraftCaptions] = useState<Partial<Record<PreviewChannel, string>>>({})
   const [captionModalOpen, setCaptionModalOpen] = useState(false)
+  const [designMode, setDesignMode] = useState(false)
 
   const openCaptionModal = (post: ScheduledPost) => {
     const currentCaptions = captions[post.id] || {}
@@ -154,6 +155,119 @@ export default function ScheduledPostsPage() {
 
   const selectedCaption =
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
+
+  if (selectedPost && designMode) {
+    return (
+      <main className="design-editor-page">
+        <header className="design-topbar">
+          <div className="design-nav">
+            <button type="button" aria-label="選單">☰</button>
+            <button type="button" onClick={() => setDesignMode(false)} aria-label="返回貼文">
+              ←
+            </button>
+            <button type="button" aria-label="日期">▣</button>
+          </div>
+
+          <div className="design-title">
+            <span>▱</span>
+            <strong>{selectedPost.title}</strong>
+            <em>草稿</em>
+          </div>
+
+          <div className="design-account">
+            <span>✦ 180 Credits</span>
+            <button type="button">升級</button>
+          </div>
+        </header>
+
+        <nav className="design-toolbar" aria-label="設計工具">
+          <div className="history-tools">
+            <button type="button">↶</button>
+            <button type="button">↷</button>
+          </div>
+          {[
+            ['⌘', '元素'],
+            ['▧', '媒體'],
+            ['A', '文字'],
+            ['▦', '模板'],
+            ['▨', '背景'],
+            ['▣', '尺寸'],
+            ['◇', '品牌'],
+            ['⌲', '發布'],
+          ].map(([icon, label]) => (
+            <button className={label === '品牌' ? 'active' : ''} key={label} type="button">
+              <span>{icon}</span>
+              <strong>{label}</strong>
+            </button>
+          ))}
+        </nav>
+
+        <section className="design-workbench">
+          <section className="design-canvas-area">
+            <article className="design-canvas">
+              <img src={selectedPost.image} alt="" />
+              <div className="design-canvas-copy">
+                <strong>{selectedPost.title}</strong>
+                <span>is the one friends replay most.</span>
+              </div>
+              <div className="soon-logo-stub">SOON<br />LOG</div>
+            </article>
+
+            <div className="canvas-side-actions">
+              <button type="button">▣</button>
+              <button type="button">＋</button>
+            </div>
+
+            <div className="design-result-bar">
+              <span>你喜歡這個結果嗎？</span>
+              <button type="button">不喜歡</button>
+              <button type="button">喜歡</button>
+              <button type="button" onClick={() => setDesignMode(false)}>關閉</button>
+            </div>
+
+            <div className="ask-soon-button">AI Ask SOON</div>
+            <div className="zoom-control">1 / 1 重新排序頁面　⌕ 33%</div>
+          </section>
+
+          <aside className="brand-panel">
+            <div className="brand-panel-head">
+              <button type="button" onClick={() => setDesignMode(false)}>←</button>
+              <h2>品牌樣式</h2>
+            </div>
+
+            <section>
+              <h3>Logo</h3>
+              <div className="logo-card">SOON<br />LOG</div>
+            </section>
+
+            <section>
+              <h3>顏色</h3>
+              <p>品牌素材庫</p>
+              <div className="color-row">
+                {['#7a655b', '#211d1b', '#6b5a52', '#ffffff'].map((color) => (
+                  <span style={{ background: color }} key={color} />
+                ))}
+                <button type="button">↻ 更換配色</button>
+              </div>
+            </section>
+
+            <section>
+              <h3>字體</h3>
+              <button type="button">標題</button>
+              <button type="button">內文</button>
+            </section>
+
+            <section>
+              <h3>媒體</h3>
+              <button type="button">查看全部</button>
+            </section>
+          </aside>
+        </section>
+
+        <style dangerouslySetInnerHTML={{ __html: styles }} />
+      </main>
+    )
+  }
 
   if (selectedPost) {
     return (
@@ -238,6 +352,9 @@ export default function ScheduledPostsPage() {
                   <strong>{selectedPost.title}</strong>
                   <span>{selectedPost.type}</span>
                 </div>
+                <button className="edit-design-overlay" type="button" onClick={() => setDesignMode(true)}>
+                  ✎ 編輯設計
+                </button>
               </div>
               <div className="phone-actions">
                 <span>♡</span>
@@ -283,7 +400,7 @@ export default function ScheduledPostsPage() {
             <section>
               <p>快速編輯</p>
               <button type="button" onClick={() => openCaptionModal(selectedPost)}>調整 caption</button>
-              <button type="button">編輯設計</button>
+              <button type="button" onClick={() => setDesignMode(true)}>編輯設計</button>
             </section>
 
             <section>
@@ -1013,6 +1130,7 @@ const styles = `
     aspect-ratio: 1 / 1;
     overflow: hidden;
     background: #eceef2;
+    cursor: pointer;
   }
 
   .phone-image img {
@@ -1020,6 +1138,12 @@ const styles = `
     height: 100%;
     object-fit: cover;
     display: block;
+    transition: transform 180ms ease, filter 180ms ease;
+  }
+
+  .phone-image:hover img {
+    transform: scale(1.015);
+    filter: brightness(0.62);
   }
 
   .phone-overlay {
@@ -1047,6 +1171,34 @@ const styles = `
     font-weight: 750;
   }
 
+  .edit-design-overlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) translateY(4px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: 10px;
+    background: #ffffff;
+    color: #202126;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    pointer-events: none;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 14px;
+    white-space: nowrap;
+    transition: opacity 160ms ease, transform 160ms ease;
+    cursor: pointer;
+  }
+
+  .phone-image:hover .edit-design-overlay,
+  .edit-design-overlay:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+  }
+
   .phone-actions {
     min-height: 42px;
     display: flex;
@@ -1069,6 +1221,15 @@ const styles = `
     font: inherit;
     font-size: 12px;
     padding: 7px 9px;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .phone-actions button:hover,
+  .phone-actions button:focus-visible {
+    border-color: #202126;
+    background: #f8f8f9;
+    box-shadow: 0 6px 18px rgba(32, 33, 38, 0.1);
   }
 
   .phone-preview p {
@@ -1351,6 +1512,365 @@ const styles = `
     background: #111111;
     border-color: #111111;
     color: #ffffff;
+  }
+
+  .design-editor-page {
+    min-height: 100vh;
+    background: #f4f5f7;
+    color: #202126;
+  }
+
+  .design-topbar {
+    height: 58px;
+    border-bottom: 1px solid #e3e5e8;
+    background: #ffffff;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 260px;
+    align-items: center;
+    gap: 18px;
+    padding: 0 14px;
+  }
+
+  .design-nav,
+  .design-title,
+  .design-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .design-nav button,
+  .design-account button,
+  .design-toolbar button,
+  .brand-panel button,
+  .design-result-bar button {
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .design-nav button {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .design-title {
+    justify-content: center;
+  }
+
+  .design-title strong {
+    max-width: min(48vw, 520px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .design-title em {
+    border-radius: 999px;
+    background: #eef0f4;
+    color: #6f737d;
+    font-size: 13px;
+    font-style: normal;
+    padding: 5px 10px;
+  }
+
+  .design-account {
+    justify-content: flex-end;
+  }
+
+  .design-account span {
+    font-size: 14px;
+  }
+
+  .design-account button {
+    color: #7c3aed;
+    border-color: #e3d8ff;
+    padding: 8px 13px;
+  }
+
+  .design-toolbar {
+    height: 66px;
+    border-bottom: 1px solid #e3e5e8;
+    background: #ffffff;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .history-tools {
+    position: absolute;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 66px;
+  }
+
+  .design-toolbar button {
+    min-width: 92px;
+    border: 0;
+    border-left: 1px solid #eceef2;
+    border-radius: 0;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 4px;
+    color: #4d5058;
+  }
+
+  .history-tools button {
+    min-width: 34px;
+    width: 34px;
+    border: 0;
+    color: #afb2ba;
+    font-size: 20px;
+  }
+
+  .design-toolbar button.active {
+    background: #f0f1f4;
+    color: #202126;
+    border-radius: 8px;
+    margin: 8px 0;
+  }
+
+  .design-toolbar button span {
+    font-size: 19px;
+    line-height: 1;
+  }
+
+  .design-toolbar button strong {
+    font-size: 13px;
+    font-weight: 520;
+  }
+
+  .design-workbench {
+    min-height: calc(100vh - 124px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  .design-canvas-area {
+    position: relative;
+    display: grid;
+    place-items: center;
+    padding: 48px 32px 84px;
+  }
+
+  .design-canvas {
+    position: relative;
+    width: min(430px, 62vh);
+    aspect-ratio: 4 / 5;
+    background: #ddd;
+    overflow: hidden;
+    box-shadow: 0 16px 44px rgba(32, 33, 38, 0.12);
+  }
+
+  .design-canvas img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
+
+  .design-canvas::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 42%, rgba(0, 0, 0, 0.2));
+  }
+
+  .design-canvas-copy {
+    position: absolute;
+    z-index: 1;
+    left: 28px;
+    top: 32px;
+    width: 72%;
+    color: #ffffff;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    display: grid;
+    gap: 12px;
+  }
+
+  .design-canvas-copy strong {
+    font-size: 36px;
+    line-height: 0.94;
+    font-weight: 900;
+  }
+
+  .design-canvas-copy span {
+    font-size: 21px;
+    line-height: 1.08;
+  }
+
+  .soon-logo-stub {
+    position: absolute;
+    z-index: 1;
+    left: 30px;
+    bottom: 24px;
+    color: #ffffff;
+    font-size: 21px;
+    line-height: 0.8;
+    font-weight: 900;
+    transform: rotate(-4deg);
+    text-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+  }
+
+  .canvas-side-actions {
+    position: absolute;
+    left: calc(50% - min(430px, 62vh) / 2 - 44px);
+    top: 50%;
+    display: grid;
+    gap: 10px;
+  }
+
+  .canvas-side-actions button {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    background: transparent;
+    color: #3f424a;
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  .design-result-bar,
+  .zoom-control,
+  .ask-soon-button {
+    position: absolute;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 12px 34px rgba(32, 33, 38, 0.1);
+  }
+
+  .design-result-bar {
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .design-result-bar span {
+    font-size: 14px;
+  }
+
+  .design-result-bar button {
+    padding: 8px 10px;
+  }
+
+  .zoom-control {
+    right: 18px;
+    bottom: 24px;
+    padding: 12px 16px;
+    color: #2f3239;
+    font-size: 13px;
+  }
+
+  .ask-soon-button {
+    left: 16px;
+    bottom: 24px;
+    background: #111111;
+    color: #ffffff;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .brand-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    padding: 22px;
+    display: grid;
+    align-content: start;
+    gap: 24px;
+  }
+
+  .brand-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-panel-head button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-panel h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 650;
+  }
+
+  .brand-panel section {
+    display: grid;
+    gap: 10px;
+  }
+
+  .brand-panel h3,
+  .brand-panel p {
+    margin: 0;
+  }
+
+  .brand-panel h3 {
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .brand-panel p {
+    color: #777b84;
+    font-size: 13px;
+  }
+
+  .logo-card {
+    height: 96px;
+    border: 1px solid #e3e5e8;
+    border-radius: 10px;
+    background: #f4f4f5;
+    color: #80645e;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    font-size: 26px;
+    line-height: 0.82;
+    font-weight: 900;
+    transform: rotate(-2deg);
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .color-row span {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid #dfe1e5;
+  }
+
+  .color-row button {
+    margin-left: auto;
+    border: 0;
+    padding: 8px 0;
+  }
+
+  .brand-panel section > button {
+    min-height: 46px;
+    text-align: left;
+    padding: 0 12px;
   }
 
   @media (max-width: 700px) {
