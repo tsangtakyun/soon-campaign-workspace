@@ -1733,7 +1733,7 @@ const styles = `
   .design-workbench {
     min-height: calc(100vh - 124px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 390px;
   }
 
   .design-canvas-area {
@@ -1955,26 +1955,26 @@ const styles = `
   .elements-panel {
     border-left: 1px solid #e0e2e6;
     background: #ffffff;
-    display: grid;
-    grid-template-rows: auto auto minmax(0, auto);
-    align-content: start;
-    gap: 18px;
-    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 24px 30px 32px;
     max-height: calc(100vh - 124px);
     overflow-y: auto;
   }
 
   .elements-panel input {
     width: 100%;
-    height: 42px;
+    height: 54px;
     border: 1px solid #e1e3e8;
-    border-radius: 9px;
+    border-radius: 12px;
     background: #ffffff;
     color: #202126;
     font: inherit;
-    font-size: 14px;
-    padding: 0 12px;
+    font-size: 19px;
+    padding: 0 16px;
     outline: 0;
+    margin: 22px 0 34px;
   }
 
   .elements-panel input:focus {
@@ -1983,8 +1983,8 @@ const styles = `
   }
 
   .element-shelf {
-    display: grid;
-    gap: 14px;
+    display: block;
+    margin: 0 0 38px;
   }
 
   .element-shelf-head {
@@ -1992,11 +1992,13 @@ const styles = `
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    margin: 0 0 18px;
   }
 
   .element-shelf h3 {
     margin: 0;
-    font-size: 15px;
+    font-size: 20px;
+    line-height: 1.2;
     font-weight: 650;
   }
 
@@ -2005,7 +2007,8 @@ const styles = `
     background: transparent;
     color: #2f3239;
     font: inherit;
-    font-size: 13px;
+    font-size: 18px;
+    line-height: 1.2;
     cursor: pointer;
     padding: 4px 0;
   }
@@ -2013,12 +2016,14 @@ const styles = `
   .element-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px 18px;
+    grid-auto-rows: 112px;
+    gap: 22px 24px;
   }
 
   .element-grid.icon {
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 14px;
+    grid-auto-rows: 40px;
+    gap: 16px 14px;
   }
 
   .element-shelf.expanded .element-grid.icon {
@@ -2027,7 +2032,8 @@ const styles = `
 
   .element-tile {
     position: relative;
-    aspect-ratio: 1 / 1;
+    width: 100%;
+    height: 100%;
     border: 0;
     border-radius: 12px;
     background: transparent;
@@ -2062,8 +2068,8 @@ const styles = `
   }
 
   .element-grid.icon .element-tile {
-    aspect-ratio: 1 / 1;
-    font-size: 25px;
+    height: 40px;
+    font-size: 27px;
     color: #111111;
   }
 
