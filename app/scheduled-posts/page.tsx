@@ -27,6 +27,9 @@ type ChannelCaption = {
   limit: number
 }
 
+type DesignTool = '元素' | '媒體' | '文字' | '模板' | '背景' | '尺寸' | '品牌' | '發布'
+type ElementSection = 'shapes' | 'frames' | 'icons'
+
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
 
@@ -120,6 +123,41 @@ function buildScheduledPosts(images: string[]): ScheduledPost[] {
   ]
 }
 
+function ElementShelf({
+  expanded,
+  items,
+  kind,
+  onToggle,
+  title,
+}: {
+  expanded: boolean
+  items: string[]
+  kind: 'shape' | 'frame' | 'icon'
+  onToggle: () => void
+  title: string
+}) {
+  const visibleItems = expanded ? items : items.slice(0, 6)
+
+  return (
+    <section className={`element-shelf ${expanded ? 'expanded' : ''}`}>
+      <div className="element-shelf-head">
+        <h3>{title}</h3>
+        <button type="button" onClick={onToggle}>
+          {expanded ? '收起' : '查看全部'}
+        </button>
+      </div>
+
+      <div className={`element-grid ${kind}`}>
+        {visibleItems.map((item, index) => (
+          <button className={`element-tile ${kind}-${item}`} key={`${kind}-${item}-${index}`} type="button">
+            {kind === 'icon' ? <span>{item}</span> : <span />}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function ScheduledPostsPage() {
   const [compact, setCompact] = useState(false)
   const scheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
@@ -129,6 +167,8 @@ export default function ScheduledPostsPage() {
   const [draftCaptions, setDraftCaptions] = useState<Partial<Record<PreviewChannel, string>>>({})
   const [captionModalOpen, setCaptionModalOpen] = useState(false)
   const [designMode, setDesignMode] = useState(false)
+  const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>('品牌')
+  const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
 
   const openCaptionModal = (post: ScheduledPost) => {
     const currentCaptions = captions[post.id] || {}
@@ -195,7 +235,12 @@ export default function ScheduledPostsPage() {
             ['◇', '品牌'],
             ['⌲', '發布'],
           ].map(([icon, label]) => (
-            <button className={label === '品牌' ? 'active' : ''} key={label} type="button">
+            <button
+              className={activeDesignTool === label ? 'active' : ''}
+              key={label}
+              onClick={() => setActiveDesignTool(label as DesignTool)}
+              type="button"
+            >
               <span>{icon}</span>
               <strong>{label}</strong>
             </button>
@@ -229,39 +274,73 @@ export default function ScheduledPostsPage() {
             <div className="zoom-control">1 / 1 重新排序頁面　⌕ 33%</div>
           </section>
 
-          <aside className="brand-panel">
-            <div className="brand-panel-head">
-              <button type="button" onClick={() => setDesignMode(false)}>←</button>
-              <h2>品牌樣式</h2>
-            </div>
-
-            <section>
-              <h3>Logo</h3>
-              <div className="logo-card">SOON<br />LOG</div>
-            </section>
-
-            <section>
-              <h3>顏色</h3>
-              <p>品牌素材庫</p>
-              <div className="color-row">
-                {['#7a655b', '#211d1b', '#6b5a52', '#ffffff'].map((color) => (
-                  <span style={{ background: color }} key={color} />
-                ))}
-                <button type="button">↻ 更換配色</button>
+          {activeDesignTool === '元素' ? (
+            <aside className="elements-panel">
+              <div className="brand-panel-head">
+                <button type="button" onClick={() => setActiveDesignTool('品牌')}>←</button>
+                <h2>加入元素</h2>
               </div>
-            </section>
+              <input aria-label="搜尋元素" placeholder="搜尋所有元素..." />
 
-            <section>
-              <h3>字體</h3>
-              <button type="button">標題</button>
-              <button type="button">內文</button>
-            </section>
+              <ElementShelf
+                expanded={expandedElementSection === 'shapes'}
+                items={['circle', 'square', 'rounded', 'triangle', 'diamond', 'pentagon', 'hexagon', 'octagon', 'parallelogram', 'trapezoid', 'semicircle', 'pill', 'spark', 'star', 'starAlt', 'burst', 'plus', 'arrowLeft', 'arrowRight', 'arrowUp', 'arrowDown', 'moon', 'cloud', 'bookmark']}
+                kind="shape"
+                onToggle={() => setExpandedElementSection(expandedElementSection === 'shapes' ? null : 'shapes')}
+                title="形狀"
+              />
 
-            <section>
-              <h3>媒體</h3>
-              <button type="button">查看全部</button>
-            </section>
-          </aside>
+              <ElementShelf
+                expanded={expandedElementSection === 'frames'}
+                items={['frameCircle', 'frameSquare', 'frameRound', 'frameTriangle', 'frameDiamond', 'framePentagon', 'frameHexagon', 'frameOctagon', 'frameSlant', 'frameArch', 'framePill', 'frameStar', 'frameBurst', 'frameCross', 'frameArrowLeft', 'frameArrowRight', 'frameArrowUp', 'frameArrowDown']}
+                kind="frame"
+                onToggle={() => setExpandedElementSection(expandedElementSection === 'frames' ? null : 'frames')}
+                title="相框"
+              />
+
+              <ElementShelf
+                expanded={expandedElementSection === 'icons'}
+                items={['◉', '▣', '♡', '◌', '▤', '⚙', '▧', '◍', '●', '◐', '▥', '▦', '⌘', '✦', '▰', '⌁', '✎', '▮', '◼', '⬢', '✣', '☀', '◑', '❄', '☕', '⌂', '✕', '◒', '−', '⌄', '⌃', '▶', '◷', '⚑', '🔗', '↻', '⬇']}
+                kind="icon"
+                onToggle={() => setExpandedElementSection(expandedElementSection === 'icons' ? null : 'icons')}
+                title="圖示"
+              />
+            </aside>
+          ) : (
+            <aside className="brand-panel">
+              <div className="brand-panel-head">
+                <button type="button" onClick={() => setDesignMode(false)}>←</button>
+                <h2>品牌樣式</h2>
+              </div>
+
+              <section>
+                <h3>Logo</h3>
+                <div className="logo-card">SOON<br />LOG</div>
+              </section>
+
+              <section>
+                <h3>顏色</h3>
+                <p>品牌素材庫</p>
+                <div className="color-row">
+                  {['#7a655b', '#211d1b', '#6b5a52', '#ffffff'].map((color) => (
+                    <span style={{ background: color }} key={color} />
+                  ))}
+                  <button type="button">↻ 更換配色</button>
+                </div>
+              </section>
+
+              <section>
+                <h3>字體</h3>
+                <button type="button">標題</button>
+                <button type="button">內文</button>
+              </section>
+
+              <section>
+                <h3>媒體</h3>
+                <button type="button">查看全部</button>
+              </section>
+            </aside>
+          )}
         </section>
 
         <style dangerouslySetInnerHTML={{ __html: styles }} />
@@ -1871,6 +1950,238 @@ const styles = `
     min-height: 46px;
     text-align: left;
     padding: 0 12px;
+  }
+
+  .elements-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, auto);
+    align-content: start;
+    gap: 18px;
+    padding: 22px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
+  }
+
+  .elements-panel input {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #e1e3e8;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 14px;
+    padding: 0 12px;
+    outline: 0;
+  }
+
+  .elements-panel input:focus {
+    border-color: #202126;
+    box-shadow: 0 0 0 3px rgba(32, 33, 38, 0.08);
+  }
+
+  .element-shelf {
+    display: grid;
+    gap: 14px;
+  }
+
+  .element-shelf-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .element-shelf h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .element-shelf-head button {
+    border: 0;
+    background: transparent;
+    color: #2f3239;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+
+  .element-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 18px;
+  }
+
+  .element-grid.icon {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .element-shelf.expanded .element-grid.icon {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .element-tile {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 150ms ease, transform 150ms ease;
+  }
+
+  .element-tile:hover {
+    background: #f2f3f6;
+    transform: translateY(-1px);
+  }
+
+  .element-tile > span {
+    display: block;
+  }
+
+  .element-grid.shape .element-tile > span,
+  .element-grid.frame .element-tile > span {
+    width: 78%;
+    height: 78%;
+    background: #111111;
+    box-shadow: 0 10px 22px rgba(32, 33, 38, 0.08);
+  }
+
+  .element-grid.frame .element-tile > span {
+    background-image: url('/assets/content-strategies/photos/lifestyle-content.jpg');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.82;
+  }
+
+  .element-grid.icon .element-tile {
+    aspect-ratio: 1 / 1;
+    font-size: 25px;
+    color: #111111;
+  }
+
+  .shape-circle > span,
+  .frame-frameCircle > span {
+    border-radius: 50%;
+  }
+
+  .shape-square > span,
+  .frame-frameSquare > span {
+    border-radius: 0;
+  }
+
+  .shape-rounded > span,
+  .frame-frameRound > span {
+    border-radius: 18px;
+  }
+
+  .shape-triangle > span,
+  .frame-frameTriangle > span {
+    clip-path: polygon(50% 4%, 96% 92%, 4% 92%);
+  }
+
+  .shape-diamond > span,
+  .frame-frameDiamond > span {
+    clip-path: polygon(50% 4%, 96% 50%, 50% 96%, 4% 50%);
+  }
+
+  .shape-pentagon > span,
+  .frame-framePentagon > span {
+    clip-path: polygon(50% 3%, 96% 36%, 78% 96%, 22% 96%, 4% 36%);
+  }
+
+  .shape-hexagon > span,
+  .frame-frameHexagon > span {
+    clip-path: polygon(25% 5%, 75% 5%, 98% 50%, 75% 95%, 25% 95%, 2% 50%);
+  }
+
+  .shape-octagon > span,
+  .frame-frameOctagon > span {
+    clip-path: polygon(30% 4%, 70% 4%, 96% 30%, 96% 70%, 70% 96%, 30% 96%, 4% 70%, 4% 30%);
+  }
+
+  .shape-parallelogram > span,
+  .frame-frameSlant > span {
+    clip-path: polygon(22% 5%, 96% 5%, 78% 95%, 4% 95%);
+  }
+
+  .shape-trapezoid > span {
+    clip-path: polygon(22% 5%, 78% 5%, 96% 95%, 4% 95%);
+  }
+
+  .shape-semicircle > span,
+  .frame-frameArch > span {
+    clip-path: inset(0 0 0 0 round 999px 999px 0 0);
+  }
+
+  .shape-pill > span,
+  .frame-framePill > span {
+    border-radius: 999px;
+    height: 48%;
+  }
+
+  .shape-spark > span {
+    clip-path: polygon(50% 0, 61% 35%, 98% 36%, 68% 58%, 79% 96%, 50% 73%, 21% 96%, 32% 58%, 2% 36%, 39% 35%);
+  }
+
+  .shape-star > span,
+  .frame-frameStar > span {
+    clip-path: polygon(50% 2%, 61% 34%, 95% 34%, 68% 54%, 79% 88%, 50% 68%, 21% 88%, 32% 54%, 5% 34%, 39% 34%);
+  }
+
+  .shape-starAlt > span {
+    clip-path: polygon(50% 0, 58% 34%, 90% 16%, 72% 48%, 100% 58%, 66% 64%, 84% 96%, 52% 78%, 36% 100%, 36% 66%, 2% 74%, 28% 50%, 4% 24%, 40% 36%);
+  }
+
+  .shape-burst > span,
+  .frame-frameBurst > span {
+    clip-path: polygon(50% 0, 57% 19%, 74% 8%, 75% 29%, 96% 25%, 84% 43%, 100% 55%, 79% 62%, 88% 82%, 66% 78%, 58% 100%, 45% 82%, 27% 96%, 27% 74%, 4% 78%, 17% 58%, 0 45%, 22% 39%, 12% 18%, 34% 24%);
+  }
+
+  .shape-plus > span,
+  .frame-frameCross > span {
+    clip-path: polygon(38% 0, 62% 0, 62% 38%, 100% 38%, 100% 62%, 62% 62%, 62% 100%, 38% 100%, 38% 62%, 0 62%, 0 38%, 38% 38%);
+  }
+
+  .shape-arrowLeft > span,
+  .frame-frameArrowLeft > span {
+    clip-path: polygon(0 50%, 40% 8%, 40% 32%, 100% 32%, 100% 68%, 40% 68%, 40% 92%);
+  }
+
+  .shape-arrowRight > span,
+  .frame-frameArrowRight > span {
+    clip-path: polygon(100% 50%, 60% 8%, 60% 32%, 0 32%, 0 68%, 60% 68%, 60% 92%);
+  }
+
+  .shape-arrowUp > span,
+  .frame-frameArrowUp > span {
+    clip-path: polygon(50% 0, 92% 40%, 68% 40%, 68% 100%, 32% 100%, 32% 40%, 8% 40%);
+  }
+
+  .shape-arrowDown > span,
+  .frame-frameArrowDown > span {
+    clip-path: polygon(50% 100%, 92% 60%, 68% 60%, 68% 0, 32% 0, 32% 60%, 8% 60%);
+  }
+
+  .shape-moon > span {
+    border-radius: 50%;
+    box-shadow: inset 22px 0 0 #ffffff;
+  }
+
+  .shape-cloud > span {
+    border-radius: 42% 42% 30% 30%;
+    clip-path: polygon(8% 55%, 17% 39%, 35% 39%, 45% 20%, 65% 24%, 72% 42%, 88% 43%, 96% 58%, 88% 78%, 10% 78%);
+  }
+
+  .shape-bookmark > span {
+    clip-path: polygon(16% 0, 84% 0, 84% 100%, 50% 78%, 16% 100%);
   }
 
   @media (max-width: 700px) {
