@@ -76,7 +76,7 @@ function CampaignsReadyContent() {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('soon-campaign-themes-v1', JSON.stringify(themes))
     }
-    const url = new URL('/onboarding/review', window.location.origin)
+    const url = new URL('/onboarding/scheduled-posts', window.location.origin)
     preserveParams(url)
     window.location.href = `${url.pathname}${url.search}`
   }
