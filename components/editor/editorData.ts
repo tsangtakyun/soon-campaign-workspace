@@ -1,4 +1,4 @@
-import type { ChannelCaption, DesignTool, TextStylePreset } from '@/components/editor/editorTypes'
+import type { ChannelCaption, DesignTool, PostPlatform, TemplatePreset, TextStylePreset } from '@/components/editor/editorTypes'
 
 export const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
@@ -55,6 +55,41 @@ export const CHANNELS: ChannelCaption[] = [
     icon: 'G',
     note: '清晰、在地、偏向更新消息和行動提示。',
     limit: 1500,
+  },
+]
+
+export const POST_PLATFORMS: PostPlatform[] = [
+  { id: 'Instagram', icon: 'IG', label: 'Instagram', status: '未連接' },
+  { id: 'Facebook', icon: 'f', label: 'Facebook', status: '未連接' },
+  { id: 'LinkedIn', icon: 'in', label: 'LinkedIn', status: '未連接' },
+  { id: 'X', icon: 'X', label: 'X / Twitter', status: '未連接' },
+  { id: 'Google', icon: 'G', label: 'Google Business', status: '未連接' },
+]
+
+export const TEMPLATE_PRESETS: TemplatePreset[] = [
+  {
+    id: 'warm-story',
+    title: '溫暖日常',
+    description: '保留大相片作主角，用柔和文字建立親近感。',
+    previewTitle: '日常片段',
+    previewBody: '像朋友分享的一刻',
+    accent: '#7A655B',
+  },
+  {
+    id: 'bold-focus',
+    title: '大字焦點',
+    description: '用深色區塊托起 headline，適合強 hook 貼文。',
+    previewTitle: '值得重播',
+    previewBody: '把一句說話變成視覺中心',
+    accent: '#111111',
+  },
+  {
+    id: 'clean-brand',
+    title: '品牌簡約',
+    description: '文字、Logo、留白較平均，適合正式品牌內容。',
+    previewTitle: 'SOON LOG',
+    previewBody: '簡潔、清晰、有品牌感',
+    accent: '#F5F0EB',
   },
 ]
 

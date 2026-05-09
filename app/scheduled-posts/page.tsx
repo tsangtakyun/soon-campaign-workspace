@@ -13,6 +13,7 @@ import type {
   ElementSection,
   PreviewChannel,
   ScheduledPost,
+  TemplatePresetId,
   TextPreset,
   TextStylePreset,
   TopicReference,
@@ -149,6 +150,210 @@ function createPostDesignElements(post: ScheduledPost): DesignElement[] {
       lineHeight: 0.8,
     },
   ]
+}
+
+function createTemplateDesignElements(post: ScheduledPost, templateId: TemplatePresetId, imageUrl: string): DesignElement[] {
+  if (templateId === 'bold-focus') {
+    return [
+      {
+        id: `image-background-${post.id}-${templateId}`,
+        kind: 'image',
+        item: 'background',
+        label: '背景圖片',
+        x: 50,
+        y: 50,
+        size: 430,
+        width: 430,
+        height: 538,
+        rotation: 0,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 1,
+        imageUrl,
+      },
+      {
+        id: `shape-focus-${post.id}-${templateId}`,
+        kind: 'shape',
+        item: 'rounded',
+        label: '焦點色塊',
+        x: 43,
+        y: 23,
+        size: 210,
+        rotation: -4,
+        opacity: 82,
+        color: '#111111',
+        zIndex: 6,
+      },
+      {
+        id: `text-title-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'headline',
+        label: '標題文字',
+        x: 42,
+        y: 20,
+        size: 42,
+        rotation: 0,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 12,
+        textContent: post.title,
+        fontFamily: 'inherit',
+        fontSize: 42,
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'left',
+        width: 330,
+        lineHeight: 0.98,
+      },
+      {
+        id: `text-subtitle-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'subtitle',
+        label: '副標題文字',
+        x: 44,
+        y: 36,
+        size: 18,
+        rotation: 0,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 13,
+        textContent: '平凡一刻，也可以變成朋友想重播的故事。',
+        fontFamily: 'inherit',
+        fontSize: 18,
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'left',
+        width: 300,
+        lineHeight: 1.2,
+      },
+      {
+        id: `text-logo-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'logo',
+        label: '品牌 Logo',
+        x: 18,
+        y: 91,
+        size: 21,
+        rotation: -4,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 14,
+        textContent: 'SOON\nLOG',
+        fontFamily: 'inherit',
+        fontSize: 21,
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        width: 86,
+        lineHeight: 0.8,
+      },
+    ]
+  }
+
+  if (templateId === 'clean-brand') {
+    return [
+      {
+        id: `image-background-${post.id}-${templateId}`,
+        kind: 'image',
+        item: 'background',
+        label: '背景圖片',
+        x: 50,
+        y: 47,
+        size: 390,
+        width: 390,
+        height: 488,
+        rotation: 0,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 1,
+        imageUrl,
+      },
+      {
+        id: `shape-caption-${post.id}-${templateId}`,
+        kind: 'shape',
+        item: 'rounded',
+        label: '文字底板',
+        x: 50,
+        y: 79,
+        size: 250,
+        rotation: 0,
+        opacity: 88,
+        color: '#F5F0EB',
+        zIndex: 7,
+      },
+      {
+        id: `text-title-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'headline',
+        label: '標題文字',
+        x: 50,
+        y: 75,
+        size: 28,
+        rotation: 0,
+        opacity: 100,
+        color: '#1A1A1A',
+        zIndex: 12,
+        textContent: post.title,
+        fontFamily: 'inherit',
+        fontSize: 28,
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        width: 340,
+        lineHeight: 1.05,
+      },
+      {
+        id: `text-subtitle-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'subtitle',
+        label: '副標題文字',
+        x: 50,
+        y: 86,
+        size: 15,
+        rotation: 0,
+        opacity: 100,
+        color: '#5f534e',
+        zIndex: 13,
+        textContent: '由 SOON LOG 幫你把日常整理成更有節奏的內容。',
+        fontFamily: 'inherit',
+        fontSize: 15,
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        width: 310,
+        lineHeight: 1.28,
+      },
+      {
+        id: `text-logo-${post.id}-${templateId}`,
+        kind: 'text',
+        item: 'logo',
+        label: '品牌 Logo',
+        x: 18,
+        y: 11,
+        size: 19,
+        rotation: -4,
+        opacity: 100,
+        color: '#ffffff',
+        zIndex: 14,
+        textContent: 'SOON\nLOG',
+        fontFamily: 'inherit',
+        fontSize: 19,
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        textAlign: 'center',
+        width: 82,
+        lineHeight: 0.8,
+      },
+    ]
+  }
+
+  return createPostDesignElements({ ...post, image: imageUrl })
 }
 
 export default function ScheduledPostsPage() {
@@ -404,6 +609,15 @@ export default function ScheduledPostsPage() {
     )
   }
 
+  const applyTemplatePreset = (templateId: TemplatePresetId) => {
+    if (!selectedPost) return
+    const currentImage =
+      designElements.find((element) => element.kind === 'image' && element.imageUrl)?.imageUrl || selectedPost.image
+    setDesignElements(createTemplateDesignElements(selectedPost, templateId, currentImage))
+    setSelectedElementId(null)
+    setActiveDesignTool('模板')
+  }
+
   const handleImageUpload = (files: FileList | null) => {
     if (!files) return
     Array.from(files).forEach((file) => {
@@ -623,10 +837,12 @@ export default function ScheduledPostsPage() {
             onAddText={addTextElement}
             onAddTextStyle={addTextStyleElement}
             onApplyBrandColor={applyBrandColor}
+            onApplyTemplate={applyTemplatePreset}
             onCloseDesignMode={() => setDesignMode(false)}
             onDelete={deleteSelectedElement}
             onDeselectElement={() => setSelectedElementId(null)}
             onImageUpload={handleImageUpload}
+            onOpenCaptionEditor={() => openCaptionModal(selectedPost)}
             onMoveLayer={moveSelectedLayer}
             onSetActiveTool={setActiveDesignTool}
             onSetDraggingOver={setIsDraggingOver}
@@ -638,6 +854,7 @@ export default function ScheduledPostsPage() {
               )
             }}
             selectedElement={selectedElement}
+            selectedCaption={selectedCaption}
             selectedPost={selectedPost}
             uploadedImages={uploadedImages}
           />
@@ -2481,6 +2698,223 @@ const styles = `
     height: 100%;
     object-fit: cover;
     width: 100%;
+  }
+
+  .templates-panel,
+  .post-panel {
+    border-left: 1px solid #e0e2e6;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: calc(100vh - 124px);
+    overflow-y: auto;
+    padding: 24px 30px 32px;
+  }
+
+  .panel-helper-copy {
+    color: #737782;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .template-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .template-card {
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 12px;
+    color: #202126;
+    cursor: pointer;
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    text-align: left;
+    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .template-card:hover {
+    border-color: #9aa0aa;
+    box-shadow: 0 10px 24px rgba(18, 20, 24, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .template-preview {
+    aspect-ratio: 4 / 3;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--template-accent) 70%, #ffffff), #f3f4f6),
+      #f3f4f6;
+    border-radius: 10px;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    padding: 14px;
+    position: relative;
+  }
+
+  .template-preview::before {
+    background: rgba(17, 17, 17, 0.26);
+    border-radius: 999px;
+    content: "";
+    height: 88px;
+    position: absolute;
+    right: -22px;
+    top: -24px;
+    width: 88px;
+  }
+
+  .template-preview strong {
+    font-size: 20px;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .template-preview em {
+    font-size: 12px;
+    font-style: normal;
+    margin-top: 6px;
+    opacity: 0.88;
+    position: relative;
+    z-index: 1;
+  }
+
+  .template-card-copy {
+    display: grid;
+    gap: 4px;
+  }
+
+  .template-card-copy strong {
+    font-size: 14px;
+  }
+
+  .template-card-copy small {
+    color: #777b84;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .post-panel-section {
+    display: grid;
+    gap: 10px;
+  }
+
+  .post-panel-section h3 {
+    color: #202126;
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .post-schedule-button,
+  .post-platform-row,
+  .post-panel-actions button,
+  .post-primary-action {
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .post-schedule-button {
+    min-height: 44px;
+    padding: 0 12px;
+    text-align: left;
+  }
+
+  .post-platform-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .post-platform-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .post-platform-row span {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+  }
+
+  .post-platform-row i {
+    align-items: center;
+    background: #f4f5f7;
+    border-radius: 8px;
+    display: inline-flex;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 800;
+    height: 26px;
+    justify-content: center;
+    width: 26px;
+  }
+
+  .post-platform-row em {
+    color: #858a95;
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .post-panel-preview {
+    border: 1px solid #e1e3e8;
+    border-radius: 12px;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    overflow: hidden;
+    padding: 12px;
+  }
+
+  .post-panel-preview img {
+    aspect-ratio: 1;
+    border-radius: 9px;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .post-panel-preview strong {
+    color: #202126;
+    font-size: 14px;
+    line-height: 1.25;
+  }
+
+  .post-panel-preview p {
+    color: #656a74;
+    display: -webkit-box;
+    font-size: 12px;
+    line-height: 1.42;
+    margin: 0;
+    overflow: hidden;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+  }
+
+  .post-panel-actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .post-panel-actions button {
+    min-height: 42px;
+  }
+
+  .post-primary-action {
+    background: #111111;
+    color: #ffffff;
+    min-height: 46px;
   }
 
   .settings-image-preview {

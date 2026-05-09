@@ -1,11 +1,15 @@
 'use client'
 
+import type { CSSProperties } from 'react'
+
 import {
   BRAND_COLORS,
   FRAME_ITEMS,
   ICON_ITEMS,
+  POST_PLATFORMS,
   SHAPE_ITEMS,
   STOCK_MEDIA,
+  TEMPLATE_PRESETS,
   TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
 import type {
@@ -14,6 +18,7 @@ import type {
   DesignTool,
   ElementSection,
   ScheduledPost,
+  TemplatePresetId,
   TextPreset,
   TextStylePreset,
 } from '@/components/editor/editorTypes'
@@ -22,6 +27,7 @@ type EditorSidePanelProps = {
   activeDesignTool: DesignTool
   selectedElement: DesignElement | null
   selectedPost: ScheduledPost
+  selectedCaption: string
   uploadedImages: { url: string; label: string }[]
   isDraggingOver: boolean
   expandedElementSection: ElementSection | null
@@ -32,6 +38,7 @@ type EditorSidePanelProps = {
   onAddImage: (url: string, label: string) => void
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
+  onApplyTemplate: (templateId: TemplatePresetId) => void
   onSetDraggingOver: (value: boolean) => void
   onUpdateElement: (id: string, changes: Partial<DesignElement>) => void
   onMoveLayer: (direction: 'forward' | 'front' | 'backward' | 'back') => void
@@ -46,6 +53,7 @@ type EditorSidePanelProps = {
     color: string
   ) => void
   onApplyBrandColor: (color: string) => void
+  onOpenCaptionEditor: () => void
   onCloseDesignMode: () => void
 }
 
@@ -95,6 +103,7 @@ export function EditorSidePanel({
   activeDesignTool,
   selectedElement,
   selectedPost,
+  selectedCaption,
   uploadedImages,
   isDraggingOver,
   expandedElementSection,
@@ -105,6 +114,7 @@ export function EditorSidePanel({
   onAddImage,
   onImageUpload,
   onTrackUploadedImage,
+  onApplyTemplate,
   onSetDraggingOver,
   onUpdateElement,
   onMoveLayer,
@@ -113,6 +123,7 @@ export function EditorSidePanel({
   onSetActiveTool,
   onAddBrandText,
   onApplyBrandColor,
+  onOpenCaptionEditor,
   onCloseDesignMode,
 }: EditorSidePanelProps) {
   if (selectedElement) {
@@ -710,6 +721,91 @@ export function EditorSidePanel({
             ))}
           </div>
         </section>
+      </aside>
+    )
+  }
+
+  if (activeDesignTool === '模板') {
+    return (
+      <aside className="templates-panel">
+        <div className="brand-panel-head">
+          <button type="button" onClick={() => onSetActiveTool('品牌')}>←</button>
+          <h2>模板</h2>
+        </div>
+
+        <p className="panel-helper-copy">套用模板會保留目前貼文相片，並重新排列文字、Logo 和視覺層次。</p>
+
+        <div className="template-grid">
+          {TEMPLATE_PRESETS.map((template) => (
+            <button
+              className="template-card"
+              key={template.id}
+              onClick={() => onApplyTemplate(template.id)}
+              type="button"
+            >
+              <span className="template-preview" style={{ '--template-accent': template.accent } as CSSProperties}>
+                <strong>{template.previewTitle}</strong>
+                <em>{template.previewBody}</em>
+              </span>
+              <span className="template-card-copy">
+                <strong>{template.title}</strong>
+                <small>{template.description}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    )
+  }
+
+  if (activeDesignTool === '發布') {
+    return (
+      <aside className="post-panel">
+        <div className="brand-panel-head">
+          <button type="button" onClick={() => onSetActiveTool('品牌')}>←</button>
+          <h2>發布設定</h2>
+        </div>
+
+        <section className="post-panel-section">
+          <h3>排程時間</h3>
+          <button className="post-schedule-button" type="button">
+            2026年5月8日 {selectedPost.time} ⌄
+          </button>
+        </section>
+
+        <section className="post-panel-section">
+          <h3>發布到</h3>
+          <div className="post-platform-list">
+            {POST_PLATFORMS.map((platform) => (
+              <button className="post-platform-row" key={platform.id} type="button">
+                <span>
+                  <i>{platform.icon}</i>
+                  {platform.label}
+                </span>
+                <em>{platform.status}</em>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="post-panel-section">
+          <h3>貼文預覽</h3>
+          <article className="post-panel-preview">
+            <img alt="" src={selectedPost.image} />
+            <strong>{selectedPost.title}</strong>
+            <p>{selectedCaption}</p>
+          </article>
+        </section>
+
+        <section className="post-panel-actions">
+          <button type="button" onClick={onOpenCaptionEditor}>調整 Caption</button>
+          <button type="button" onClick={() => onSetActiveTool('媒體')}>更換媒體</button>
+          <button type="button" onClick={onCloseDesignMode}>返回排程</button>
+        </section>
+
+        <button className="post-primary-action" type="button">
+          確認排程
+        </button>
       </aside>
     )
   }

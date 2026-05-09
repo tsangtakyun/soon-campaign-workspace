@@ -29,6 +29,7 @@ export type DesignTool = '元素' | '媒體' | '文字' | '模板' | '背景' | 
 export type ElementSection = 'shapes' | 'frames' | 'icons'
 export type DesignElementKind = 'shape' | 'frame' | 'icon' | 'text' | 'image'
 export type TextPreset = 'heading' | 'subheading' | 'body' | 'caption'
+export type TemplatePresetId = 'warm-story' | 'bold-focus' | 'clean-brand'
 
 export type DesignElement = {
   id: string
@@ -59,4 +60,20 @@ export type TextStylePreset = {
   label: string
   textContent: string
   style: CSSProperties
+}
+
+export type TemplatePreset = {
+  id: TemplatePresetId
+  title: string
+  description: string
+  previewTitle: string
+  previewBody: string
+  accent: string
+}
+
+export type PostPlatform = {
+  id: PreviewChannel
+  label: string
+  icon: string
+  status: '未連接' | '準備中'
 }
