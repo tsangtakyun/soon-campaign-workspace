@@ -24,6 +24,8 @@ import type {
 
 type EditorSidePanelProps = {
   activeDesignTool: DesignTool
+  brandLogoUrl: string
+  brandName: string
   selectedElement: DesignElement | null
   selectedPost: ScheduledPost
   uploadedImages: { url: string; label: string }[]
@@ -134,6 +136,8 @@ function ElementShelf({
 
 export function EditorSidePanel({
   activeDesignTool,
+  brandLogoUrl,
+  brandName,
   selectedElement,
   selectedPost,
   uploadedImages,
@@ -792,14 +796,17 @@ export function EditorSidePanel({
         <section className="media-panel-section">
           <h3>品牌素材庫</h3>
           <div className="media-brand-kit-card">
-            <button
-              className="media-brand-logo-button"
-              onClick={() => onAddBrandText('SOON LOG Logo', 'SOON\nLOG', 30, 'bold', '#8B4513')}
-              type="button"
-            >
-              <span>SOON</span>
-              <span>LOG</span>
-            </button>
+            {brandLogoUrl ? (
+              <button
+                className="media-brand-logo-button"
+                onClick={() => onAddImage(brandLogoUrl, `${brandName || '品牌'} Logo`)}
+                type="button"
+              >
+                <img alt={`${brandName || '品牌'} logo`} className="brand-logo-image" src={brandLogoUrl} />
+              </button>
+            ) : (
+              <div className="brand-logo-empty">未偵測到 logo</div>
+            )}
 
             <div className="media-brand-kit-row" aria-label="品牌顏色">
               {BRAND_COLORS.map((color) => (
@@ -1181,14 +1188,17 @@ export function EditorSidePanel({
         <section>
           <h3>Logo</h3>
           <div className="brand-logo-row">
-            <button
-              className="brand-logo-placeholder"
-              onClick={() => onAddBrandText('品牌 Logo', 'SOON\nLOG', 30, 'bold', '#8B4513')}
-              type="button"
-            >
-              <span>SOON</span>
-              <span>LOG</span>
-            </button>
+            {brandLogoUrl ? (
+              <button
+                className="brand-logo-placeholder"
+                onClick={() => onAddImage(brandLogoUrl, `${brandName || '品牌'} Logo`)}
+                type="button"
+              >
+                <img alt={`${brandName || '品牌'} logo`} className="brand-logo-image" src={brandLogoUrl} />
+              </button>
+            ) : (
+              <div className="brand-logo-empty">未偵測到 logo</div>
+            )}
           </div>
         </section>
 

@@ -33,6 +33,44 @@ function readTopicImages() {
   }
 }
 
+function resolveLogoSrc(value: string) {
+  if (!value) return ''
+  if (value.startsWith('blob:') || value.startsWith('data:')) return value
+  return `/api/logo-image?url=${encodeURIComponent(value)}`
+}
+
+function readBrandKit() {
+  if (typeof window === 'undefined') return { businessName: '品牌', logoUrl: '' }
+
+  try {
+    const rawProfile = window.sessionStorage.getItem('soon-business-profile-v1')
+    if (rawProfile) {
+      const profile = JSON.parse(rawProfile) as { businessName?: string; logoUrl?: string }
+      return {
+        businessName: profile.businessName || '品牌',
+        logoUrl: resolveLogoSrc(profile.logoUrl || ''),
+      }
+    }
+  } catch {
+    // Fall through to website analysis fallback.
+  }
+
+  try {
+    const rawAnalysis = window.sessionStorage.getItem('soon-website-analysis-v1')
+    if (rawAnalysis) {
+      const parsed = JSON.parse(rawAnalysis) as { analysis?: { businessName?: string; logoUrl?: string } }
+      return {
+        businessName: parsed.analysis?.businessName || '品牌',
+        logoUrl: resolveLogoSrc(parsed.analysis?.logoUrl || ''),
+      }
+    }
+  } catch {
+    // Ignore malformed session data.
+  }
+
+  return { businessName: '品牌', logoUrl: '' }
+}
+
 function buildScheduledPosts(images: string[]): ScheduledPost[] {
   return [
     {
@@ -370,6 +408,7 @@ export default function ScheduledPostsPage() {
   const [designElements, setDesignElements] = useState<DesignElement[]>([])
   const [designElementsPostId, setDesignElementsPostId] = useState<string | null>(null)
   const [uploadedImages, setUploadedImages] = useState<{ url: string; label: string }[]>([])
+  const [brandKit, setBrandKit] = useState({ businessName: '品牌', logoUrl: '' })
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
@@ -415,6 +454,10 @@ export default function ScheduledPostsPage() {
   const selectedCaption =
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
+
+  useEffect(() => {
+    setBrandKit(readBrandKit())
+  }, [])
 
   useEffect(() => {
     const snapshot = JSON.stringify(designElements)
@@ -910,6 +953,8 @@ export default function ScheduledPostsPage() {
 
           <EditorSidePanel
             activeDesignTool={activeDesignTool}
+            brandLogoUrl={brandKit.logoUrl}
+            brandName={brandKit.businessName}
             expandedElementSection={expandedElementSection}
             isDraggingOver={isDraggingOver}
             onAddBrandText={addBrandTextElement}
@@ -2849,11 +2894,33 @@ const styles = `
     font-size: 16px;
     font-weight: 900;
     justify-content: center;
-    letter-spacing: 0.04em;
-    line-height: 0.9;
     min-height: 72px;
     padding: 10px 18px;
     width: 112px;
+  }
+
+  .brand-logo-image {
+    display: block;
+    height: 56px;
+    max-width: 100%;
+    object-fit: contain;
+    width: 96px;
+  }
+
+  .brand-logo-empty {
+    align-items: center;
+    background: #f7f8fa;
+    border: 1px dashed #d8dce4;
+    border-radius: 12px;
+    color: #8a909b;
+    display: flex;
+    font-size: 12px;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 72px;
+    padding: 10px 14px;
+    text-align: center;
+    width: 132px;
   }
 
   .media-brand-kit-row {
@@ -3515,28 +3582,23 @@ const styles = `
 
   .brand-logo-placeholder {
     align-items: center;
-    background: #f4f4f5;
+    background: #ffffff;
     border: 1px solid #e3e5e8;
     border-radius: 10px;
-    color: #80645e;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     font: inherit;
-    font-size: 22px;
-    font-weight: 900;
     justify-content: center;
-    line-height: 0.86;
     min-height: 88px;
     min-width: 132px;
     padding: 12px 18px;
-    transform: rotate(-2deg);
     transition: border-color 160ms ease, transform 160ms ease;
   }
 
   .brand-logo-placeholder:hover {
     border-color: #9297a1;
-    transform: rotate(-2deg) translateY(-1px);
+    transform: translateY(-1px);
   }
 
   .brand-color-swatch {
