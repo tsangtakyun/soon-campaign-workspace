@@ -711,7 +711,6 @@ export default function ScheduledPostsPage() {
     if (!selectedElementId) return
     setDesignElements((current) => current.filter((element) => element.id !== selectedElementId))
     setSelectedElementId(null)
-    setActiveDesignTool('元素')
   }
 
   const duplicateSelectedElement = () => {
@@ -2752,10 +2751,132 @@ const styles = `
     margin: 0;
   }
 
+  .media-ai-card,
+  .media-brand-kit-card {
+    background: #fafbfc;
+    border: 1px solid #e1e3e8;
+    border-radius: 14px;
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .media-ai-input {
+    background: #ffffff;
+    border: 1px solid #dfe2e8;
+    border-radius: 10px;
+    color: #1f2329;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+    min-height: 84px;
+    padding: 10px 12px;
+    resize: vertical;
+    width: 100%;
+  }
+
+  .media-ai-input::placeholder {
+    color: #999faa;
+  }
+
+  .media-control-row {
+    display: grid;
+    gap: 7px;
+  }
+
+  .media-control-label {
+    color: #606672;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .media-segment-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .media-segment-button {
+    background: #ffffff;
+    border: 1px solid #dfe2e8;
+    border-radius: 999px;
+    color: #3a3f47;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    min-height: 32px;
+    padding: 0 12px;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .media-segment-button.active {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+  }
+
+  .media-generate-button {
+    background: #111111;
+    border: 0;
+    border-radius: 10px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 800;
+    min-height: 40px;
+    padding: 0 14px;
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+
+  .media-generate-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .media-generate-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.36;
+  }
+
+  .media-brand-logo-button {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e1e3e8;
+    border-radius: 12px;
+    color: #8B4513;
+    cursor: pointer;
+    display: inline-flex;
+    flex-direction: column;
+    font-size: 16px;
+    font-weight: 900;
+    justify-content: center;
+    letter-spacing: 0.04em;
+    line-height: 0.9;
+    min-height: 72px;
+    padding: 10px 18px;
+    width: 112px;
+  }
+
+  .media-brand-kit-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .media-brand-kit-copy {
+    color: #7a808b;
+    font-size: 12px;
+    line-height: 1.45;
+    margin: 0;
+  }
+
   .media-grid {
     display: grid;
     gap: 8px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .media-grid.compact {
+    gap: 6px;
   }
 
   .media-thumb-btn {

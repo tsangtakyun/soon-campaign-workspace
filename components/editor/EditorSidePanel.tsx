@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import {
   BRAND_COLORS,
   FRAME_ITEMS,
@@ -51,6 +53,41 @@ type EditorSidePanelProps = {
   onApplyBrandColor: (color: string) => void
   onOpenCaptionEditor: () => void
   onCloseDesignMode: () => void
+}
+
+function escapeSvgText(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildAiMediaPlaceholder(prompt: string, size: string, style: string) {
+  const width = size === 'landscape' ? 1200 : size === 'portrait' ? 900 : 1080
+  const height = size === 'landscape' ? 800 : size === 'portrait' ? 1200 : 1080
+  const safePrompt = escapeSvgText(prompt.trim().slice(0, 82) || 'AI 生成圖片')
+  const styleLabel = style === 'illustration' ? '插畫風格' : '照片風格'
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#f5f0eb"/>
+          <stop offset="48%" stop-color="#c8b6a8"/>
+          <stop offset="100%" stop-color="#1a1a1a"/>
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)"/>
+      <rect x="${width * 0.08}" y="${height * 0.1}" width="${width * 0.84}" height="${height * 0.8}" rx="36" fill="rgba(255,255,255,0.22)"/>
+      <text x="${width * 0.5}" y="${height * 0.42}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${Math.round(width * 0.052)}" font-weight="800" fill="#ffffff">AI IMAGE</text>
+      <text x="${width * 0.5}" y="${height * 0.5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${Math.round(width * 0.03)}" fill="#ffffff">${styleLabel}</text>
+      <foreignObject x="${width * 0.18}" y="${height * 0.56}" width="${width * 0.64}" height="${height * 0.22}">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; color: white; font-size: ${Math.round(width * 0.03)}px; line-height: 1.25; text-align: center; font-weight: 700;">${safePrompt}</div>
+      </foreignObject>
+    </svg>
+  `
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
 function ElementShelf({
@@ -121,6 +158,17 @@ export function EditorSidePanel({
   onOpenCaptionEditor,
   onCloseDesignMode,
 }: EditorSidePanelProps) {
+  const [aiImagePrompt, setAiImagePrompt] = useState('')
+  const [aiImageSize, setAiImageSize] = useState<'square' | 'landscape' | 'portrait'>('square')
+  const [aiImageStyle, setAiImageStyle] = useState<'photo' | 'illustration'>('photo')
+
+  const generateAiImage = () => {
+    const label = aiImagePrompt.trim() ? `AI：${aiImagePrompt.trim().slice(0, 18)}` : 'AI 生成圖片'
+    const url = buildAiMediaPlaceholder(aiImagePrompt, aiImageSize, aiImageStyle)
+    onTrackUploadedImage({ url, label })
+    onAddImage(url, label)
+  }
+
   if (selectedElement) {
     return (
       <aside className="element-settings-panel">
@@ -680,6 +728,111 @@ export function EditorSidePanel({
           style={{ display: 'none' }}
           type="file"
         />
+
+        <section className="media-panel-section">
+          <h3>AI 生成圖片</h3>
+          <div className="media-ai-card">
+            <textarea
+              className="media-ai-input"
+              onChange={(event) => setAiImagePrompt(event.target.value)}
+              placeholder="描述你想生成嘅圖片，例如：日光咖啡店入面兩個朋友開心分享短片"
+              value={aiImagePrompt}
+            />
+
+            <div className="media-control-row">
+              <span className="media-control-label">尺寸</span>
+              <div className="media-segment-row">
+                {[
+                  { label: '方形', value: 'square' },
+                  { label: '橫向', value: 'landscape' },
+                  { label: '直向', value: 'portrait' },
+                ].map((option) => (
+                  <button
+                    className={`media-segment-button ${aiImageSize === option.value ? 'active' : ''}`}
+                    key={option.value}
+                    onClick={() => setAiImageSize(option.value as typeof aiImageSize)}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="media-control-row">
+              <span className="media-control-label">風格</span>
+              <div className="media-segment-row">
+                {[
+                  { label: '照片', value: 'photo' },
+                  { label: '插畫', value: 'illustration' },
+                ].map((option) => (
+                  <button
+                    className={`media-segment-button ${aiImageStyle === option.value ? 'active' : ''}`}
+                    key={option.value}
+                    onClick={() => setAiImageStyle(option.value as typeof aiImageStyle)}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              className="media-generate-button"
+              disabled={!aiImagePrompt.trim()}
+              onClick={generateAiImage}
+              type="button"
+            >
+              生成並插入 · 5 credits
+            </button>
+          </div>
+        </section>
+
+        <section className="media-panel-section">
+          <h3>品牌素材庫</h3>
+          <div className="media-brand-kit-card">
+            <button
+              className="media-brand-logo-button"
+              onClick={() => onAddBrandText('SOON LOG Logo', 'SOON\nLOG', 30, 'bold', '#8B4513')}
+              type="button"
+            >
+              <span>SOON</span>
+              <span>LOG</span>
+            </button>
+
+            <div className="media-brand-kit-row" aria-label="品牌顏色">
+              {BRAND_COLORS.map((color) => (
+                <button
+                  className="brand-color-swatch"
+                  key={`media-brand-${color}`}
+                  onClick={() => onApplyBrandColor(color)}
+                  style={{ background: color }}
+                  title={color}
+                  type="button"
+                />
+              ))}
+            </div>
+
+            {uploadedImages.length > 0 ? (
+              <div className="media-grid compact">
+                {uploadedImages.slice(0, 6).map((image, index) => (
+                  <button
+                    className="media-thumb-btn"
+                    key={`brand-kit-${image.url}-${index}`}
+                    onClick={() => onAddImage(image.url, image.label)}
+                    title={image.label}
+                    type="button"
+                  >
+                    <img alt={image.label} className="media-thumb" src={image.url} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="media-brand-kit-copy">已上載嘅 logo、品牌圖片同參考素材會同步顯示喺呢度。</p>
+            )}
+          </div>
+        </section>
 
         {uploadedImages.length > 0 ? (
           <section className="media-panel-section">
