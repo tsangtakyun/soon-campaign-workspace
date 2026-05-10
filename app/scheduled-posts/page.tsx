@@ -3804,7 +3804,7 @@ const styles = `
   .element-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-auto-rows: 112px;
+    grid-auto-rows: auto;
     gap: 22px 24px;
   }
 
@@ -3820,8 +3820,8 @@ const styles = `
 
   .element-tile {
     position: relative;
+    aspect-ratio: 1;
     width: 100%;
-    height: 100%;
     border: 0;
     border-radius: 12px;
     background: transparent;
@@ -3856,6 +3856,7 @@ const styles = `
   }
 
   .element-grid.icon .element-tile {
+    aspect-ratio: auto;
     height: 40px;
     font-size: 27px;
     color: #111111;
