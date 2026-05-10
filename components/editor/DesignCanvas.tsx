@@ -35,8 +35,14 @@ export function DesignCanvas({
   onCloseDesignMode,
   canvasRef,
 }: DesignCanvasProps) {
+  const confirmSelectionFromBlankArea = (event: ReactPointerEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('.canvas-element, .element-mini-toolbar, button, input, textarea, select, a')) return
+    onDeselectElement()
+  }
+
   return (
-    <section className="design-canvas-area">
+    <section className="design-canvas-area" onPointerDown={confirmSelectionFromBlankArea}>
       <article className="design-canvas" ref={canvasRef}>
         {designElements.map((element) => (
           <div

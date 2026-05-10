@@ -1,6 +1,6 @@
 'use client'
 
-import { type PointerEvent as ReactPointerEvent, useMemo, useRef, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DesignCanvas } from '@/components/editor/DesignCanvas'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
@@ -409,6 +409,23 @@ export default function ScheduledPostsPage() {
   const selectedCaption =
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
+
+  useEffect(() => {
+    if (!designMode || !selectedElementId) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return
+
+      if (event.key === 'Enter' || event.key === 'Escape') {
+        event.preventDefault()
+        setSelectedElementId(null)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [designMode, selectedElementId])
 
   const addDesignElement = (kind: Exclude<DesignElementKind, 'text' | 'image'>, item: string) => {
     const id = `${kind}-${item}-${Date.now()}`
