@@ -1,7 +1,5 @@
 'use client'
 
-import type { CSSProperties } from 'react'
-
 import {
   BRAND_COLORS,
   FRAME_ITEMS,
@@ -9,7 +7,6 @@ import {
   POST_PLATFORMS,
   SHAPE_ITEMS,
   STOCK_MEDIA,
-  TEMPLATE_PRESETS,
   TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
 import type {
@@ -27,7 +24,6 @@ type EditorSidePanelProps = {
   activeDesignTool: DesignTool
   selectedElement: DesignElement | null
   selectedPost: ScheduledPost
-  selectedCaption: string
   uploadedImages: { url: string; label: string }[]
   isDraggingOver: boolean
   expandedElementSection: ElementSection | null
@@ -103,7 +99,6 @@ export function EditorSidePanel({
   activeDesignTool,
   selectedElement,
   selectedPost,
-  selectedCaption,
   uploadedImages,
   isDraggingOver,
   expandedElementSection,
@@ -726,6 +721,17 @@ export function EditorSidePanel({
   }
 
   if (activeDesignTool === '模板') {
+    const placeholderTemplates = [
+      { label: '簡約白底', bg: '#ffffff', color: '#000000', templateId: 'clean-brand' as TemplatePresetId },
+      { label: '深色時尚', bg: '#1a1a1a', color: '#ffffff', templateId: 'bold-focus' as TemplatePresetId },
+      { label: '暖橙活力', bg: '#ff6b35', color: '#ffffff', templateId: 'warm-story' as TemplatePresetId },
+      { label: '粉藍清新', bg: '#a8d8ea', color: '#333333', templateId: 'clean-brand' as TemplatePresetId },
+      { label: '墨綠高級', bg: '#2d5016', color: '#ffffff', templateId: 'bold-focus' as TemplatePresetId },
+      { label: '玫瑰金', bg: '#b76e79', color: '#ffffff', templateId: 'warm-story' as TemplatePresetId },
+      { label: '天空藍', bg: '#87ceeb', color: '#333333', templateId: 'clean-brand' as TemplatePresetId },
+      { label: '奶油黃', bg: '#fff9c4', color: '#333333', templateId: 'warm-story' as TemplatePresetId },
+    ]
+
     return (
       <aside className="templates-panel">
         <div className="brand-panel-head">
@@ -733,32 +739,242 @@ export function EditorSidePanel({
           <h2>模板</h2>
         </div>
 
-        <p className="panel-helper-copy">套用模板會保留目前貼文相片，並重新排列文字、Logo 和視覺層次。</p>
+        <div className="panel-search-row">
+          <input className="panel-search-input" placeholder="搜尋模板..." type="search" />
+        </div>
 
-        <div className="template-grid">
-          {TEMPLATE_PRESETS.map((template) => (
+        <div className="templates-filter-row">
+          <select className="templates-filter-select" defaultValue="">
+            <option value="">類型</option>
+            <option value="post">貼文</option>
+            <option value="story">Story</option>
+            <option value="reel">Reel</option>
+            <option value="banner">橫幅</option>
+          </select>
+          <select className="templates-filter-select" defaultValue="">
+            <option value="">分類</option>
+            <option value="business">商業</option>
+            <option value="fashion">時裝</option>
+            <option value="food">飲食</option>
+            <option value="travel">旅遊</option>
+            <option value="lifestyle">生活</option>
+          </select>
+          <select className="templates-filter-select" defaultValue="">
+            <option value="">風格</option>
+            <option value="minimal">簡約</option>
+            <option value="bold">大膽</option>
+            <option value="elegant">優雅</option>
+          </select>
+        </div>
+
+        <div className="templates-grid">
+          {placeholderTemplates.map((template) => (
             <button
-              className="template-card"
-              key={template.id}
-              onClick={() => onApplyTemplate(template.id)}
+              className="template-thumb-btn"
+              key={template.label}
+              onClick={() => onApplyTemplate(template.templateId)}
+              title={template.label}
               type="button"
             >
-              <span className="template-preview" style={{ '--template-accent': template.accent } as CSSProperties}>
-                <strong>{template.previewTitle}</strong>
-                <em>{template.previewBody}</em>
-              </span>
-              <span className="template-card-copy">
-                <strong>{template.title}</strong>
-                <small>{template.description}</small>
-              </span>
+              <div
+                className="template-thumb-preview"
+                style={{ background: template.bg, color: template.color }}
+              >
+                <span className="template-thumb-label">{template.label}</span>
+              </div>
+              <span className="template-thumb-name">{template.label}</span>
             </button>
           ))}
         </div>
+
+        <p className="panel-coming-soon">更多模板即將推出</p>
+      </aside>
+    )
+  }
+
+  if (activeDesignTool === '背景') {
+    const backgroundColors = [
+      '#FFFFFF',
+      '#000000',
+      '#F5F5F5',
+      '#E8E8E8',
+      '#FFA500',
+      '#FF0000',
+      '#FF69B4',
+      '#9C27B0',
+      '#2196F3',
+      '#1565C0',
+      '#4CAF50',
+      '#8B4513',
+    ]
+    const gradients = [
+      'linear-gradient(135deg, #000000, #ffffff)',
+      'linear-gradient(135deg, #667eea, #764ba2)',
+      'linear-gradient(135deg, #f093fb, #f5576c)',
+      'linear-gradient(135deg, #4facfe, #00f2fe)',
+      'linear-gradient(135deg, #f6d365, #fda085)',
+      'linear-gradient(135deg, #ffecd2, #fcb69f)',
+      'linear-gradient(135deg, #d4fc79, #96e6a1)',
+      'linear-gradient(135deg, #fbc2eb, #a6c1ee)',
+      'linear-gradient(135deg, #0c3483, #a2b6df)',
+      'linear-gradient(135deg, #434343, #000000)',
+    ]
+
+    return (
+      <aside className="backgrounds-panel">
+        <div className="brand-panel-head">
+          <button type="button" onClick={() => onSetActiveTool('品牌')}>←</button>
+          <h2>背景</h2>
+        </div>
+
+        <input className="panel-search-input" placeholder="搜尋背景..." type="search" />
+
+        <h3 className="panel-section-title">顏色</h3>
+        <div className="bg-color-grid">
+          {backgroundColors.map((hex) => (
+            <button
+              className="bg-swatch"
+              key={hex}
+              style={{ background: hex, border: hex === '#FFFFFF' ? '1px solid #e0e0e0' : 'none' }}
+              title={hex}
+              type="button"
+            />
+          ))}
+          <label className="bg-swatch custom-color-swatch" title="自定義">
+            <span>＋</span>
+            <input aria-label="自定義背景色" type="color" />
+          </label>
+        </div>
+
+        <h3 className="panel-section-title">漸層</h3>
+        <div className="bg-gradient-grid">
+          {gradients.map((gradient) => (
+            <button
+              className="bg-gradient-swatch"
+              key={gradient}
+              style={{ background: gradient }}
+              type="button"
+            />
+          ))}
+        </div>
+
+        <h3 className="panel-section-title">材質</h3>
+        <div className="bg-texture-grid">
+          {['Wood', 'Marble', 'Concrete', 'Flatlays'].map((name) => (
+            <button className="bg-texture-btn" key={name} type="button">
+              <div className="bg-texture-preview" />
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+
+        <h3 className="panel-section-title">場景</h3>
+        <div className="bg-scene-grid">
+          {['Podiums', 'Nature', 'Cosmetics', 'Studio', 'Drinks', 'Food'].map((name) => (
+            <button className="bg-texture-btn" key={name} type="button">
+              <div className="bg-texture-preview" />
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="panel-coming-soon">材質及場景圖片即將推出</p>
+      </aside>
+    )
+  }
+
+  if (activeDesignTool === '尺寸') {
+    const resizeGroups = [
+      {
+        category: 'Instagram',
+        sizes: [
+          { name: 'Instagram 方形貼文', w: 1080, h: 1080 },
+          { name: 'Instagram Story', w: 1080, h: 1920 },
+          { name: 'Instagram Reel', w: 1080, h: 1920 },
+          { name: 'Instagram 直向貼文', w: 1080, h: 1350 },
+          { name: 'Instagram 橫向貼文', w: 1200, h: 630 },
+        ],
+      },
+      {
+        category: 'TikTok',
+        sizes: [
+          { name: 'TikTok 貼文', w: 1080, h: 1920 },
+          { name: 'TikTok 縮圖', w: 1080, h: 1920 },
+        ],
+      },
+      {
+        category: 'YouTube',
+        sizes: [
+          { name: 'YouTube Short', w: 1080, h: 1920 },
+          { name: 'YouTube 頻道橫幅', w: 2560, h: 1440 },
+          { name: 'YouTube 縮圖', w: 1280, h: 720 },
+        ],
+      },
+      {
+        category: 'Facebook',
+        sizes: [
+          { name: 'Facebook Story', w: 1080, h: 1920 },
+          { name: 'Facebook 封面', w: 820, h: 312 },
+          { name: 'Facebook 貼文', w: 1200, h: 630 },
+        ],
+      },
+      {
+        category: 'X / Twitter',
+        sizes: [
+          { name: 'X 封面圖', w: 1500, h: 500 },
+          { name: 'X 貼文圖片', w: 1200, h: 675 },
+        ],
+      },
+      {
+        category: 'LinkedIn',
+        sizes: [
+          { name: 'LinkedIn 封面', w: 1584, h: 396 },
+          { name: 'LinkedIn 貼文', w: 1200, h: 627 },
+        ],
+      },
+    ]
+
+    return (
+      <aside className="resize-panel">
+        <div className="brand-panel-head">
+          <button type="button" onClick={() => onSetActiveTool('品牌')}>←</button>
+          <h2>尺寸</h2>
+        </div>
+
+        <div className="resize-current">
+          <span className="resize-current-label">目前</span>
+          <span className="resize-current-value">Instagram 方形貼文</span>
+          <span className="resize-current-dims">1080 × 1080</span>
+        </div>
+
+        <div className="resize-custom">
+          <label className="settings-label">自定義（像素）</label>
+          <div className="resize-custom-inputs">
+            <input defaultValue={1080} max={5000} min={100} placeholder="寬" type="number" />
+            <span>×</span>
+            <input defaultValue={1080} max={5000} min={100} placeholder="高" type="number" />
+            <button className="resize-apply-btn" type="button">套用</button>
+          </div>
+        </div>
+
+        {resizeGroups.map((group) => (
+          <div className="resize-group" key={group.category}>
+            <h3 className="panel-section-title">{group.category}</h3>
+            {group.sizes.map((size) => (
+              <button className="resize-size-row" key={size.name} type="button">
+                <span className="resize-size-name">{size.name}</span>
+                <span className="resize-size-dims">{size.w} × {size.h}</span>
+              </button>
+            ))}
+          </div>
+        ))}
       </aside>
     )
   }
 
   if (activeDesignTool === '發布') {
+    const defaultPublishTime = new Date(Date.now() + 3600000).toISOString().slice(0, 16)
+
     return (
       <aside className="post-panel">
         <div className="brand-panel-head">
@@ -766,46 +982,37 @@ export function EditorSidePanel({
           <h2>發布設定</h2>
         </div>
 
-        <section className="post-panel-section">
-          <h3>排程時間</h3>
-          <button className="post-schedule-button" type="button">
-            2026年5月8日 {selectedPost.time} ⌄
-          </button>
-        </section>
+        <div className="post-section">
+          <label className="settings-label">發布時間</label>
+          <div className="post-datetime-row">
+            <input className="post-datetime-input" defaultValue={defaultPublishTime} type="datetime-local" />
+          </div>
+          <div className="post-action-row">
+            <button className="post-btn-secondary" type="button">預覽</button>
+            <button className="post-btn-secondary" type="button">日曆</button>
+          </div>
+        </div>
 
-        <section className="post-panel-section">
-          <h3>發布到</h3>
-          <div className="post-platform-list">
-            {POST_PLATFORMS.map((platform) => (
-              <button className="post-platform-row" key={platform.id} type="button">
-                <span>
-                  <i>{platform.icon}</i>
-                  {platform.label}
-                </span>
-                <em>{platform.status}</em>
-              </button>
+        <div className="post-section">
+          <label className="settings-label">Crosspost</label>
+          <div className="post-platforms">
+            {POST_PLATFORMS.filter((platform) => platform.id !== 'Google').map((platform) => (
+              <div className="post-platform-row" key={platform.id}>
+                <span className="post-platform-icon">{platform.icon}</span>
+                <span className="post-platform-name">{platform.label}</span>
+                <button className="post-connect-btn" type="button">連接</button>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section className="post-panel-section">
-          <h3>貼文預覽</h3>
-          <article className="post-panel-preview">
-            <img alt="" src={selectedPost.image} />
-            <strong>{selectedPost.title}</strong>
-            <p>{selectedCaption}</p>
-          </article>
-        </section>
+        <div className="post-section">
+          <button className="post-btn-primary" type="button">立即發布</button>
+          <button className="post-btn-secondary" onClick={onOpenCaptionEditor} type="button">調整 Caption</button>
+          <button className="post-btn-secondary" onClick={onCloseDesignMode} type="button">返回排程</button>
+        </div>
 
-        <section className="post-panel-actions">
-          <button type="button" onClick={onOpenCaptionEditor}>調整 Caption</button>
-          <button type="button" onClick={() => onSetActiveTool('媒體')}>更換媒體</button>
-          <button type="button" onClick={onCloseDesignMode}>返回排程</button>
-        </section>
-
-        <button className="post-primary-action" type="button">
-          確認排程
-        </button>
+        <p className="panel-coming-soon">發布功能即將正式開放</p>
       </aside>
     )
   }
