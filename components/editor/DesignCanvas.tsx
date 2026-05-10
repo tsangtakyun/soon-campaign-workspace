@@ -61,7 +61,16 @@ export function DesignCanvas({
                 onSelectElement(element.id)
               }
             }}
-            onPointerDown={(event) => onStartMove(event, element)}
+            onPointerDown={(event) => {
+              if (event.detail >= 2) {
+                event.preventDefault()
+                event.stopPropagation()
+                onSelectElement(element.id)
+                onEditElement(element)
+                return
+              }
+              onStartMove(event, element)
+            }}
             role="button"
             style={{
               left: `${element.x}%`,
