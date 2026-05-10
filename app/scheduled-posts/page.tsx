@@ -373,10 +373,16 @@ export default function ScheduledPostsPage() {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
+  const designHistoryIndexRef = useRef(-1)
+  const designHistoryRef = useRef<string[]>([])
+  const isRestoringDesignHistoryRef = useRef(false)
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
-      setDesignElements(createPostDesignElements(post))
+      const nextElements = createPostDesignElements(post)
+      designHistoryRef.current = [JSON.stringify(nextElements)]
+      designHistoryIndexRef.current = 0
+      setDesignElements(nextElements)
       setDesignElementsPostId(post.id)
       setSelectedElementId(null)
     }
@@ -411,11 +417,59 @@ export default function ScheduledPostsPage() {
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
 
   useEffect(() => {
-    if (!designMode || !selectedElementId) return
+    const snapshot = JSON.stringify(designElements)
+    if (isRestoringDesignHistoryRef.current) {
+      isRestoringDesignHistoryRef.current = false
+      return
+    }
+
+    const history = designHistoryRef.current
+    const currentIndex = designHistoryIndexRef.current
+    if (history[currentIndex] === snapshot) return
+
+    const nextHistory = history.slice(0, currentIndex + 1)
+    nextHistory.push(snapshot)
+    if (nextHistory.length > 50) {
+      nextHistory.shift()
+    }
+
+    designHistoryRef.current = nextHistory
+    designHistoryIndexRef.current = nextHistory.length - 1
+  }, [designElements])
+
+  const restoreDesignHistory = (direction: 'undo' | 'redo') => {
+    const history = designHistoryRef.current
+    const currentIndex = designHistoryIndexRef.current
+    const nextIndex = direction === 'undo' ? currentIndex - 1 : currentIndex + 1
+    if (nextIndex < 0 || nextIndex >= history.length) return
+
+    const nextElements = JSON.parse(history[nextIndex]) as DesignElement[]
+    designHistoryIndexRef.current = nextIndex
+    isRestoringDesignHistoryRef.current = true
+    setDesignElements(nextElements)
+    setSelectedElementId((current) =>
+      current && nextElements.some((element) => element.id === current) ? current : null
+    )
+  }
+
+  useEffect(() => {
+    if (!designMode) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        restoreDesignHistory(event.shiftKey ? 'redo' : 'undo')
+        return
+      }
+
+      if ((event.key === 'Backspace' || event.key === 'Delete') && selectedElementId) {
+        event.preventDefault()
+        deleteSelectedElement()
+        return
+      }
 
       if (event.key === 'Enter' || event.key === 'Escape') {
         event.preventDefault()
@@ -674,6 +728,11 @@ export default function ScheduledPostsPage() {
     setSelectedElementId(id)
   }
 
+  const openElementEditor = (element: DesignElement) => {
+    setSelectedElementId(element.id)
+    setActiveDesignTool(element.kind === 'image' ? '媒體' : element.kind === 'text' ? '文字' : '元素')
+  }
+
   const moveSelectedLayer = (direction: 'forward' | 'front' | 'backward' | 'back') => {
     if (!selectedElement) return
     setDesignElements((current) => {
@@ -825,7 +884,12 @@ export default function ScheduledPostsPage() {
           </div>
         </header>
 
-        <DesignToolbar activeDesignTool={activeDesignTool} onToolChange={setActiveDesignTool} />
+        <DesignToolbar
+          activeDesignTool={activeDesignTool}
+          onRedo={() => restoreDesignHistory('redo')}
+          onToolChange={setActiveDesignTool}
+          onUndo={() => restoreDesignHistory('undo')}
+        />
 
         <section className="design-workbench">
           <DesignCanvas
@@ -835,6 +899,7 @@ export default function ScheduledPostsPage() {
             onDelete={deleteSelectedElement}
             onDeselectElement={() => setSelectedElementId(null)}
             onDuplicate={duplicateSelectedElement}
+            onEditElement={openElementEditor}
             onSelectElement={setSelectedElementId}
             onSetActiveTool={setActiveDesignTool}
             onStartMove={startElementMove}

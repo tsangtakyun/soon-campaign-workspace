@@ -15,6 +15,7 @@ type DesignCanvasProps = {
   onStartRotate: (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => void
   onDuplicate: () => void
   onDelete: () => void
+  onEditElement: (element: DesignElement) => void
   onSetActiveTool: (tool: DesignTool) => void
   onCloseDesignMode: () => void
   canvasRef: RefObject<HTMLElement | null>
@@ -31,6 +32,7 @@ export function DesignCanvas({
   onStartRotate,
   onDuplicate,
   onDelete,
+  onEditElement,
   onSetActiveTool,
   onCloseDesignMode,
   canvasRef,
@@ -49,6 +51,11 @@ export function DesignCanvas({
             className={`canvas-element ${element.kind} ${selectedElementId === element.id ? 'selected' : ''} ${element.kind}-${element.item}`}
             key={element.id}
             onClick={() => onSelectElement(element.id)}
+            onDoubleClick={(event) => {
+              event.stopPropagation()
+              onSelectElement(element.id)
+              onEditElement(element)
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 onSelectElement(element.id)

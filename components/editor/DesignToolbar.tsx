@@ -5,15 +5,17 @@ import type { DesignTool } from '@/components/editor/editorTypes'
 
 type DesignToolbarProps = {
   activeDesignTool: DesignTool
+  onRedo?: () => void
   onToolChange: (tool: DesignTool) => void
+  onUndo?: () => void
 }
 
-export function DesignToolbar({ activeDesignTool, onToolChange }: DesignToolbarProps) {
+export function DesignToolbar({ activeDesignTool, onRedo, onToolChange, onUndo }: DesignToolbarProps) {
   return (
     <nav className="design-toolbar" aria-label="設計工具">
       <div className="history-tools">
-        <button type="button">↶</button>
-        <button type="button">↷</button>
+        <button type="button" onClick={onUndo}>↶</button>
+        <button type="button" onClick={onRedo}>↷</button>
       </div>
       {DESIGN_TOOL_ITEMS.map(([icon, label]) => (
         <button
