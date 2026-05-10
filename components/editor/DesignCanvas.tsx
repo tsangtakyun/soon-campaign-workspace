@@ -2,9 +2,10 @@
 
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 
-import type { DesignElement, DesignTool, ScheduledPost } from '@/components/editor/editorTypes'
+import type { CanvasSize, DesignElement, DesignTool, ScheduledPost } from '@/components/editor/editorTypes'
 
 type DesignCanvasProps = {
+  canvasSize: CanvasSize
   selectedPost: ScheduledPost
   designElements: DesignElement[]
   selectedElementId: string | null
@@ -22,6 +23,7 @@ type DesignCanvasProps = {
 }
 
 export function DesignCanvas({
+  canvasSize,
   selectedPost,
   designElements,
   selectedElementId,
@@ -37,6 +39,9 @@ export function DesignCanvas({
   onCloseDesignMode,
   canvasRef,
 }: DesignCanvasProps) {
+  const aspectRatio = canvasSize.w / canvasSize.h
+  const displayWidth = aspectRatio >= 1.55 ? 620 : aspectRatio >= 1 ? 500 : aspectRatio <= 0.6 ? 360 : 430
+
   const confirmSelectionFromBlankArea = (event: ReactPointerEvent<HTMLElement>) => {
     const target = event.target as HTMLElement
     if (target.closest('.canvas-element, .element-mini-toolbar, button, input, textarea, select, a')) return
@@ -45,7 +50,14 @@ export function DesignCanvas({
 
   return (
     <section className="design-canvas-area" onPointerDown={confirmSelectionFromBlankArea}>
-      <article className="design-canvas" ref={canvasRef}>
+      <article
+        className="design-canvas"
+        ref={canvasRef}
+        style={{
+          aspectRatio: `${canvasSize.w} / ${canvasSize.h}`,
+          width: `min(${displayWidth}px, 62vh)`,
+        }}
+      >
         {designElements.map((element) => (
           <div
             className={`canvas-element ${element.kind} ${selectedElementId === element.id ? 'selected' : ''} ${element.kind}-${element.item}`}
@@ -75,8 +87,20 @@ export function DesignCanvas({
             style={{
               left: `${element.x}%`,
               top: `${element.y}%`,
-              width: element.kind === 'text' || element.kind === 'image' ? `${element.width || 300}px` : `${element.size}px`,
-              height: element.kind === 'text' ? 'auto' : element.kind === 'image' ? `${element.height || element.size}px` : `${element.size}px`,
+              width:
+                element.kind === 'image' && element.item === 'background'
+                  ? '100%'
+                  : element.kind === 'text' || element.kind === 'image'
+                    ? `${element.width || 300}px`
+                    : `${element.size}px`,
+              height:
+                element.kind === 'image' && element.item === 'background'
+                  ? '100%'
+                  : element.kind === 'text'
+                    ? 'auto'
+                    : element.kind === 'image'
+                      ? `${element.height || element.size}px`
+                      : `${element.size}px`,
               opacity: element.opacity / 100,
               transform: `translate(-50%, -50%) rotate(${element.rotation}deg)`,
               zIndex: element.zIndex,

@@ -31,6 +31,12 @@ export type DesignElementKind = 'shape' | 'frame' | 'icon' | 'text' | 'image'
 export type TextPreset = 'heading' | 'subheading' | 'body' | 'caption'
 export type TemplatePresetId = 'warm-story' | 'bold-focus' | 'clean-brand'
 
+export type CanvasSize = {
+  label: string
+  w: number
+  h: number
+}
+
 export type DesignElement = {
   id: string
   kind: DesignElementKind

@@ -12,6 +12,7 @@ import {
   TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
 import type {
+  CanvasSize,
   DesignElement,
   DesignElementKind,
   DesignTool,
@@ -26,6 +27,7 @@ type EditorSidePanelProps = {
   activeDesignTool: DesignTool
   brandLogoUrl: string
   brandName: string
+  canvasSize: CanvasSize
   selectedElement: DesignElement | null
   selectedPost: ScheduledPost
   uploadedImages: { url: string; label: string }[]
@@ -39,6 +41,7 @@ type EditorSidePanelProps = {
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
   onApplyTemplate: (templateId: TemplatePresetId) => void
+  onResizeCanvas: (size: CanvasSize) => void
   onSetDraggingOver: (value: boolean) => void
   onUpdateElement: (id: string, changes: Partial<DesignElement>) => void
   onMoveLayer: (direction: 'forward' | 'front' | 'backward' | 'back') => void
@@ -138,6 +141,7 @@ export function EditorSidePanel({
   activeDesignTool,
   brandLogoUrl,
   brandName,
+  canvasSize,
   selectedElement,
   selectedPost,
   uploadedImages,
@@ -151,6 +155,7 @@ export function EditorSidePanel({
   onImageUpload,
   onTrackUploadedImage,
   onApplyTemplate,
+  onResizeCanvas,
   onSetDraggingOver,
   onUpdateElement,
   onMoveLayer,
@@ -1103,25 +1108,40 @@ export function EditorSidePanel({
 
         <div className="resize-current">
           <span className="resize-current-label">目前</span>
-          <span className="resize-current-value">Instagram 方形貼文</span>
-          <span className="resize-current-dims">1080 × 1080</span>
+          <span className="resize-current-value">{canvasSize.label}</span>
+          <span className="resize-current-dims">{canvasSize.w} × {canvasSize.h}</span>
         </div>
 
-        <div className="resize-custom">
+        <form
+          className="resize-custom"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const formData = new FormData(event.currentTarget)
+            const width = Number(formData.get('width'))
+            const height = Number(formData.get('height'))
+            if (!Number.isFinite(width) || !Number.isFinite(height) || width < 100 || height < 100) return
+            onResizeCanvas({ label: '自定義尺寸', w: width, h: height })
+          }}
+        >
           <label className="settings-label">自定義（像素）</label>
           <div className="resize-custom-inputs">
-            <input defaultValue={1080} max={5000} min={100} placeholder="寬" type="number" />
+            <input defaultValue={canvasSize.w} max={5000} min={100} name="width" placeholder="寬" type="number" />
             <span>×</span>
-            <input defaultValue={1080} max={5000} min={100} placeholder="高" type="number" />
-            <button className="resize-apply-btn" type="button">套用</button>
+            <input defaultValue={canvasSize.h} max={5000} min={100} name="height" placeholder="高" type="number" />
+            <button className="resize-apply-btn" type="submit">套用</button>
           </div>
-        </div>
+        </form>
 
         {resizeGroups.map((group) => (
           <div className="resize-group" key={group.category}>
             <h3 className="panel-section-title">{group.category}</h3>
             {group.sizes.map((size) => (
-              <button className="resize-size-row" key={size.name} type="button">
+              <button
+                className={`resize-size-row ${canvasSize.w === size.w && canvasSize.h === size.h ? 'active' : ''}`}
+                key={size.name}
+                onClick={() => onResizeCanvas({ label: size.name, w: size.w, h: size.h })}
+                type="button"
+              >
                 <span className="resize-size-name">{size.name}</span>
                 <span className="resize-size-dims">{size.w} × {size.h}</span>
               </button>

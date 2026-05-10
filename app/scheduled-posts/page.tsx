@@ -7,6 +7,7 @@ import { DesignToolbar } from '@/components/editor/DesignToolbar'
 import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
 import type {
+  CanvasSize,
   DesignElement,
   DesignElementKind,
   DesignTool,
@@ -404,6 +405,11 @@ export default function ScheduledPostsPage() {
   const [captionModalOpen, setCaptionModalOpen] = useState(false)
   const [designMode, setDesignMode] = useState(false)
   const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>('品牌')
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>({
+    label: 'Instagram 直向貼文',
+    w: 1080,
+    h: 1350,
+  })
   const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
   const [designElements, setDesignElements] = useState<DesignElement[]>([])
   const [designElementsPostId, setDesignElementsPostId] = useState<string | null>(null)
@@ -793,6 +799,17 @@ export default function ScheduledPostsPage() {
     })
   }
 
+  const resizeCanvas = (size: CanvasSize) => {
+    const nextSize = {
+      label: size.label,
+      w: Math.max(100, Math.round(size.w)),
+      h: Math.max(100, Math.round(size.h)),
+    }
+    setCanvasSize(nextSize)
+    setSelectedElementId(null)
+    setActiveDesignTool('尺寸')
+  }
+
   const startElementMove = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
     if (!canvasRef.current) return
     event.preventDefault()
@@ -935,6 +952,7 @@ export default function ScheduledPostsPage() {
 
         <section className="design-workbench">
           <DesignCanvas
+            canvasSize={canvasSize}
             canvasRef={canvasRef}
             designElements={designElements}
             onCloseDesignMode={() => setDesignMode(false)}
@@ -955,6 +973,7 @@ export default function ScheduledPostsPage() {
             activeDesignTool={activeDesignTool}
             brandLogoUrl={brandKit.logoUrl}
             brandName={brandKit.businessName}
+            canvasSize={canvasSize}
             expandedElementSection={expandedElementSection}
             isDraggingOver={isDraggingOver}
             onAddBrandText={addBrandTextElement}
@@ -970,6 +989,7 @@ export default function ScheduledPostsPage() {
             onImageUpload={handleImageUpload}
             onOpenCaptionEditor={() => openCaptionModal(selectedPost)}
             onMoveLayer={moveSelectedLayer}
+            onResizeCanvas={resizeCanvas}
             onSetActiveTool={setActiveDesignTool}
             onSetDraggingOver={setIsDraggingOver}
             onSetExpandedSection={setExpandedElementSection}
