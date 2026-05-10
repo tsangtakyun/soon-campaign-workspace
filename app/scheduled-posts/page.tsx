@@ -3924,8 +3924,9 @@ const styles = `
 
   .element-grid.shape .element-tile > span,
   .element-grid.frame .element-tile > span {
+    aspect-ratio: 1 / 1;
     width: 78%;
-    height: 78%;
+    height: auto;
     background: #111111;
     box-shadow: 0 10px 22px rgba(32, 33, 38, 0.08);
   }
@@ -4000,6 +4001,7 @@ const styles = `
 
   .shape-pill > span,
   .frame-framePill > span {
+    aspect-ratio: auto;
     border-radius: 999px;
     height: 48%;
   }
