@@ -1,5 +1,7 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 
 const upcomingPosts = [
@@ -78,6 +80,8 @@ const upNext = [
 ]
 
 export default function OnboardingHomePage() {
+  const router = useRouter()
+
   return (
     <main className="dashboard-page">
       <DashboardSidebar activeItem="首頁" />
@@ -106,7 +110,9 @@ export default function OnboardingHomePage() {
               <div className="home-section-head">
                 <h2>即將發布</h2>
                 <div className="home-section-actions">
-                  <button type="button">查看全部內容</button>
+                  <button type="button" onClick={() => router.push('/onboarding/scheduled-posts')}>
+                    查看全部內容
+                  </button>
                   <button type="button" className="home-create-btn">
                     ＋ 建立
                   </button>
@@ -115,7 +121,11 @@ export default function OnboardingHomePage() {
 
               <div className="upcoming-posts-list">
                 {upcomingPosts.map((post) => (
-                  <article key={post.id} className="upcoming-post-row">
+                  <article
+                    key={post.id}
+                    className="upcoming-post-row"
+                    onClick={() => router.push('/onboarding/scheduled-posts')}
+                  >
                     <div className="upcoming-post-img">
                       <img src={post.image} alt="" />
                     </div>
@@ -131,8 +141,16 @@ export default function OnboardingHomePage() {
                       <p>{post.body}</p>
                     </div>
                     <div className="upcoming-post-actions">
-                      <button type="button">編輯</button>
-                      <button type="button" aria-label="更多操作">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          router.push('/onboarding/scheduled-posts')
+                        }}
+                      >
+                        編輯
+                      </button>
+                      <button type="button" aria-label="更多操作" onClick={(event) => event.stopPropagation()}>
                         ⋯
                       </button>
                     </div>
@@ -144,7 +162,9 @@ export default function OnboardingHomePage() {
             <section className="home-section">
               <div className="home-section-head">
                 <h2>宣傳活動</h2>
-                <button type="button">查看全部活動</button>
+                <button type="button" onClick={() => router.push('/onboarding/scheduled-posts')}>
+                  查看全部活動
+                </button>
               </div>
               <div className="campaigns-table">
                 <div className="campaigns-table-head">
@@ -154,7 +174,11 @@ export default function OnboardingHomePage() {
                   <span />
                 </div>
                 {campaigns.map((campaign) => (
-                  <div key={campaign.id} className="campaign-row">
+                  <div
+                    key={campaign.id}
+                    className="campaign-row"
+                    onClick={() => router.push('/onboarding/scheduled-posts')}
+                  >
                     <div className="campaign-info">
                       <img src={campaign.image} alt="" className="campaign-thumb" />
                       <div>
@@ -164,7 +188,15 @@ export default function OnboardingHomePage() {
                     </div>
                     <span className="campaign-timing">{campaign.timing}</span>
                     <span className={`campaign-status ${campaign.statusKind}`}>{campaign.status}</span>
-                    <button type="button" className="campaign-arrow" aria-label="查看活動">
+                    <button
+                      type="button"
+                      className="campaign-arrow"
+                      aria-label="查看活動"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        router.push('/onboarding/scheduled-posts')
+                      }}
+                    >
                       ›
                     </button>
                   </div>
@@ -194,7 +226,7 @@ export default function OnboardingHomePage() {
                     <div className="up-next-content">
                       <strong>{item.title}</strong>
                       <p>{item.desc}</p>
-                      <button type="button">{item.cta} →</button>
+                      <a href="#">{item.cta} →</a>
                     </div>
                   </div>
                 ))}
@@ -685,7 +717,7 @@ const homeStyles = `
     line-height: 1.4;
   }
 
-  .up-next-content button {
+  .up-next-content a {
     width: fit-content;
     border: 0;
     background: transparent;
@@ -696,6 +728,7 @@ const homeStyles = `
     padding: 0;
     cursor: pointer;
     margin-top: 2px;
+    text-decoration: none;
   }
 
   @media (max-width: 980px) {
