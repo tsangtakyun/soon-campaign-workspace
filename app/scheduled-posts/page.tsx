@@ -469,6 +469,37 @@ export default function ScheduledPostsPage() {
     selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
   const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
 
+  const getToolForElement = (element: DesignElement): DesignTool => {
+    if (element.kind === 'text') return '文字'
+    if (element.kind === 'image') return '媒體'
+    return '元素'
+  }
+
+  const clearFabricSelection = () => {
+    const canvas = fabricControlsRef.current?.fabricRef.current
+    if (!canvas) return
+    canvas.discardActiveObject()
+    canvas.renderAll()
+  }
+
+  const deselectDesignElement = () => {
+    clearFabricSelection()
+    setSelectedElementId(null)
+  }
+
+  const selectDesignElement = (id: string) => {
+    setSelectedElementId(id)
+    const element = designElements.find((item) => item.id === id)
+    if (element) {
+      setActiveDesignTool(getToolForElement(element))
+    }
+  }
+
+  const switchDesignTool = (tool: DesignTool) => {
+    deselectDesignElement()
+    setActiveDesignTool(tool)
+  }
+
   useEffect(() => {
     setBrandKit(readBrandKit())
   }, [])
@@ -535,7 +566,7 @@ export default function ScheduledPostsPage() {
 
       if (event.key === 'Enter' || event.key === 'Escape') {
         event.preventDefault()
-        setSelectedElementId(null)
+        deselectDesignElement()
       }
     }
 
@@ -977,7 +1008,7 @@ export default function ScheduledPostsPage() {
         <DesignToolbar
           activeDesignTool={activeDesignTool}
           onRedo={() => restoreDesignHistory('redo')}
-          onToolChange={setActiveDesignTool}
+          onToolChange={switchDesignTool}
           onUndo={() => restoreDesignHistory('undo')}
         />
 
@@ -991,10 +1022,10 @@ export default function ScheduledPostsPage() {
             }}
             onCloseDesignMode={() => setDesignMode(false)}
             onDelete={deleteSelectedElement}
-            onDeselectElement={() => setSelectedElementId(null)}
+            onDeselectElement={deselectDesignElement}
             onDuplicate={duplicateSelectedElement}
             onEditElement={openElementEditor}
-            onSelectElement={setSelectedElementId}
+            onSelectElement={selectDesignElement}
             onSetActiveTool={setActiveDesignTool}
             onStartMove={startElementMove}
             onStartResize={startElementResize}
@@ -1019,7 +1050,7 @@ export default function ScheduledPostsPage() {
             onApplyTemplate={applyTemplatePreset}
             onCloseDesignMode={() => setDesignMode(false)}
             onDelete={deleteSelectedElement}
-            onDeselectElement={() => setSelectedElementId(null)}
+            onDeselectElement={deselectDesignElement}
             onImageUpload={handleImageUpload}
             onOpenCaptionEditor={() => openCaptionModal(selectedPost)}
             onMoveLayer={moveSelectedLayer}
