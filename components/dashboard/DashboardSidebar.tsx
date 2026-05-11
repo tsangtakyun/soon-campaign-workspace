@@ -124,6 +124,12 @@ export const dashboardSidebarStyles = `
     padding: 0 10px;
     text-decoration: none;
     font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .sidebar-group a,
+  .sidebar-footer a {
+    display: flex;
   }
 
   .sidebar-nav a.active {

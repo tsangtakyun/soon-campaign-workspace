@@ -210,6 +210,10 @@ export default function OnboardingHomePage() {
 }
 
 const homeStyles = `
+  .site-nav {
+    display: none;
+  }
+
   .dashboard-page {
     min-height: 100vh;
     background: #f7f7f8;
