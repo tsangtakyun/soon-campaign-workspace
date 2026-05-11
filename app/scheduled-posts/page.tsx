@@ -1,11 +1,12 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
-import { DesignCanvas } from '@/components/editor/DesignCanvas'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
 import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
+import type { FabricControls } from '@/components/editor/DesignCanvas'
 import type {
   CanvasSize,
   DesignElement,
@@ -19,6 +20,11 @@ import type {
   TextStylePreset,
   TopicReference,
 } from '@/components/editor/editorTypes'
+
+const DesignCanvas = dynamic(
+  () => import('@/components/editor/DesignCanvas').then((module) => module.DesignCanvas),
+  { ssr: false }
+)
 
 function readTopicImages() {
   if (typeof window === 'undefined') return FALLBACK_IMAGES
@@ -418,6 +424,7 @@ export default function ScheduledPostsPage() {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
+  const fabricControlsRef = useRef<FabricControls | null>(null)
   const designHistoryIndexRef = useRef(-1)
   const designHistoryRef = useRef<string[]>([])
   const isRestoringDesignHistoryRef = useRef(false)
@@ -428,6 +435,7 @@ export default function ScheduledPostsPage() {
       designHistoryRef.current = [JSON.stringify(nextElements)]
       designHistoryIndexRef.current = 0
       setDesignElements(nextElements)
+      void fabricControlsRef.current?.loadDesignElements(nextElements)
       setDesignElementsPostId(post.id)
       setSelectedElementId(null)
     }
@@ -487,6 +495,11 @@ export default function ScheduledPostsPage() {
   }, [designElements])
 
   const restoreDesignHistory = (direction: 'undo' | 'redo') => {
+    if (fabricControlsRef.current) {
+      void (direction === 'undo' ? fabricControlsRef.current.undo() : fabricControlsRef.current.redo())
+      return
+    }
+
     const history = designHistoryRef.current
     const currentIndex = designHistoryIndexRef.current
     const nextIndex = direction === 'undo' ? currentIndex - 1 : currentIndex + 1
@@ -545,6 +558,7 @@ export default function ScheduledPostsPage() {
       color: '#111111',
       zIndex: 15 + designElements.length,
     }
+    void fabricControlsRef.current?.addDesignElement(nextElement)
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
     setActiveDesignTool('元素')
@@ -608,6 +622,7 @@ export default function ScheduledPostsPage() {
       width: config.width,
       lineHeight: 1.25,
     }
+    void fabricControlsRef.current?.addDesignElement(nextElement)
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
     setActiveDesignTool('文字')
@@ -638,6 +653,7 @@ export default function ScheduledPostsPage() {
       width: 300,
       lineHeight: 1.25,
     }
+    void fabricControlsRef.current?.addDesignElement(nextElement)
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(id)
     setActiveDesignTool('文字')
@@ -660,12 +676,14 @@ export default function ScheduledPostsPage() {
       zIndex: 20 + designElements.length,
       imageUrl,
     }
+    void fabricControlsRef.current?.addDesignElement(nextElement)
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(nextElement.id)
     setActiveDesignTool('媒體')
   }
 
   const updateImageElement = (id: string, changes: Partial<DesignElement>) => {
+    void fabricControlsRef.current?.updateDesignElement(id, changes)
     setDesignElements((current) =>
       current.map((element) => (element.id === id ? { ...element, ...changes } : element))
     )
@@ -700,6 +718,7 @@ export default function ScheduledPostsPage() {
       width: fontWeight === 'bold' ? 400 : 360,
       lineHeight: fontWeight === 'bold' ? 1.12 : 1.45,
     }
+    void fabricControlsRef.current?.addDesignElement(nextElement)
     setDesignElements((current) => [...current, nextElement])
     setSelectedElementId(nextElement.id)
     setActiveDesignTool('品牌')
@@ -720,10 +739,12 @@ export default function ScheduledPostsPage() {
         color,
         zIndex: 20 + designElements.length,
       }
+      void fabricControlsRef.current?.addDesignElement(nextElement)
       setDesignElements((current) => [...current, nextElement])
       setSelectedElementId(nextElement.id)
       return
     }
+    void fabricControlsRef.current?.updateDesignElement(selectedElementId, { color })
     setDesignElements((current) =>
       current.map((element) => (element.id === selectedElementId ? { ...element, color } : element))
     )
@@ -733,7 +754,9 @@ export default function ScheduledPostsPage() {
     if (!selectedPost) return
     const currentImage =
       designElements.find((element) => element.kind === 'image' && element.imageUrl)?.imageUrl || selectedPost.image
-    setDesignElements(createTemplateDesignElements(selectedPost, templateId, currentImage))
+    const nextElements = createTemplateDesignElements(selectedPost, templateId, currentImage)
+    setDesignElements(nextElements)
+    void fabricControlsRef.current?.loadDesignElements(nextElements)
     setSelectedElementId(null)
     setActiveDesignTool('模板')
   }
@@ -751,12 +774,14 @@ export default function ScheduledPostsPage() {
 
   const updateSelectedElement = (updates: Partial<DesignElement>) => {
     if (!selectedElementId) return
+    void fabricControlsRef.current?.updateDesignElement(selectedElementId, updates)
     setDesignElements((current) =>
       current.map((element) => (element.id === selectedElementId ? { ...element, ...updates } : element))
     )
   }
 
   const deleteSelectedElement = () => {
+    void fabricControlsRef.current?.deleteSelected()
     if (!selectedElementId) return
     setDesignElements((current) => current.filter((element) => element.id !== selectedElementId))
     setSelectedElementId(null)
@@ -772,6 +797,7 @@ export default function ScheduledPostsPage() {
       y: Math.min(74, selectedElement.y + 6),
       zIndex: selectedElement.zIndex + 1,
     }
+    void fabricControlsRef.current?.addDesignElement(clone)
     setDesignElements((current) => [...current, clone])
     setSelectedElementId(id)
   }
@@ -783,6 +809,11 @@ export default function ScheduledPostsPage() {
 
   const moveSelectedLayer = (direction: 'forward' | 'front' | 'backward' | 'back') => {
     if (!selectedElement) return
+    if (direction === 'forward' || direction === 'front') {
+      fabricControlsRef.current?.bringForward()
+    } else {
+      fabricControlsRef.current?.sendBackward()
+    }
     setDesignElements((current) => {
       const zValues = current.map((element) => element.zIndex)
       const maxZ = Math.max(...zValues, 12)
@@ -955,6 +986,9 @@ export default function ScheduledPostsPage() {
             canvasSize={canvasSize}
             canvasRef={canvasRef}
             designElements={designElements}
+            onFabricReady={(controls) => {
+              fabricControlsRef.current = controls
+            }}
             onCloseDesignMode={() => setDesignMode(false)}
             onDelete={deleteSelectedElement}
             onDeselectElement={() => setSelectedElementId(null)}
@@ -995,6 +1029,7 @@ export default function ScheduledPostsPage() {
             onSetExpandedSection={setExpandedElementSection}
             onTrackUploadedImage={(image) => setUploadedImages((current) => [image, ...current])}
             onUpdateElement={(id, changes) => {
+              void fabricControlsRef.current?.updateDesignElement(id, changes)
               setDesignElements((current) =>
                 current.map((element) => (element.id === id ? { ...element, ...changes } : element))
               )
@@ -2412,6 +2447,46 @@ const styles = `
     background: #ddd;
     overflow: hidden;
     box-shadow: 0 16px 44px rgba(32, 33, 38, 0.12);
+  }
+
+  .fabric-design-canvas-shell .canvas-container,
+  .fabric-design-canvas-shell canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .fabric-design-canvas-shell .canvas-container {
+    position: relative !important;
+    z-index: 2;
+  }
+
+  .fabric-context-menu {
+    position: fixed;
+    z-index: 2000;
+    min-width: 150px;
+    border: 1px solid #e0e2e6;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 14px 36px rgba(32, 33, 38, 0.18);
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .fabric-context-menu button {
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #202126;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    padding: 9px 10px;
+    text-align: left;
+  }
+
+  .fabric-context-menu button:hover {
+    background: #f2f3f5;
   }
 
   .canvas-image-layer {
