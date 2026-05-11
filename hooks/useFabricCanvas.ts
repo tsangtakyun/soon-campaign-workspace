@@ -285,7 +285,13 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
   const updateDesignElement = useCallback(async (id: string, changes: Partial<DesignElement>) => {
     const canvas = fabricRef.current
     if (!canvas) return
-    const object = canvas.getObjects().find((candidate) => (candidate as FabricElementObject).data?.id === id) as FabricElementObject | undefined
+    const activeObject = canvas.getActiveObject() as FabricElementObject | undefined
+    const object =
+      (canvas.getObjects().find((candidate) => (candidate as FabricElementObject).data?.id === id) as
+        | FabricElementObject
+        | undefined) ||
+      (activeObject?.data?.id === id ? activeObject : undefined) ||
+      (changes.textContent !== undefined && activeObject && 'text' in activeObject ? activeObject : undefined)
     if (!object) return
 
     if (changes.imageUrl && object.type === 'image') {
@@ -320,14 +326,16 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
     if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
     if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current)
 
-    if (changes.textContent !== undefined && object instanceof IText) {
-      object.set('text', changes.textContent)
-      object.initDimensions()
+    if (changes.textContent !== undefined && 'text' in object) {
+      object.set({ text: changes.textContent })
+      if (object instanceof IText) {
+        object.initDimensions()
+      }
     }
 
     object.set(nextProps)
     object.setCoords()
-    canvas.renderAll()
+    canvas.requestRenderAll()
   }, [])
 
   const deleteSelected = useCallback(() => {
