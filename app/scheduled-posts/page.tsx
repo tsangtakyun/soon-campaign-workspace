@@ -1185,6 +1185,22 @@ export default function ScheduledPostsPage() {
 
           <aside className="post-settings-panel">
             <section>
+              <p>宣傳活動</p>
+              <strong>分享你的日常，建立真實連繫</strong>
+              <span>生活內容</span>
+            </section>
+
+            <section>
+              <p>快速編輯</p>
+              <button type="button" onClick={() => openCaptionModal(selectedPost)}>
+                調整 caption <em>›</em>
+              </button>
+              <button type="button" onClick={() => openDesignEditor(selectedPost)}>
+                編輯設計 <em>›</em>
+              </button>
+            </section>
+
+            <section>
               <p>發布時間</p>
               <button type="button">2026年5月8日 {selectedPost.time} ⌄</button>
             </section>
@@ -1197,22 +1213,6 @@ export default function ScheduledPostsPage() {
                   <em>{channel === 'Instagram' ? '連接' : '＋'}</em>
                 </button>
               ))}
-            </section>
-
-            <section>
-              <p>宣傳活動</p>
-              <strong>分享你的日常，建立真實連繫</strong>
-              <span>生活內容</span>
-            </section>
-
-            <section>
-              <p className="quick-edit-title">快速編輯</p>
-              <button type="button" onClick={() => openCaptionModal(selectedPost)}>
-                調整 caption <span>›</span>
-              </button>
-              <button type="button" onClick={() => openDesignEditor(selectedPost)}>
-                編輯設計 <span>›</span>
-              </button>
             </section>
 
             <section>
@@ -2054,29 +2054,49 @@ const styles = `
     gap: 8px;
   }
 
-  .post-settings-panel p {
-    margin: 0;
+  .post-settings-panel section > p {
+    margin: 0 0 4px;
     color: #9a9da4;
-    font-size: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
 
   .post-settings-panel section > strong {
-    color: #2f3138;
+    display: block;
+    color: #202126;
     font-size: 14px;
     font-weight: 650;
     line-height: 1.35;
   }
 
   .post-settings-panel section > span {
-    color: #7b7f88;
+    display: block;
+    color: #6f737d;
     font-size: 13px;
+    margin-top: 2px;
   }
 
-  .post-settings-panel button {
+  .post-settings-panel section > button {
     width: 100%;
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid #e2e3e7;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #202126;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
     gap: 10px;
+    transition: background 150ms ease;
+  }
+
+  .post-settings-panel section > button:hover {
+    background: #f5f5f7;
   }
 
   .post-settings-panel .connected-channel {
@@ -2089,12 +2109,9 @@ const styles = `
     font-style: normal;
   }
 
-  .post-settings-panel .quick-edit-title {
+  .post-settings-panel section > button em {
     color: #9a9da4;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-style: normal;
   }
 
   .caption-modal-backdrop {
