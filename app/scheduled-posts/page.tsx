@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
 import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
@@ -1205,9 +1206,13 @@ export default function ScheduledPostsPage() {
             </section>
 
             <section>
-              <p>快速編輯</p>
-              <button type="button" onClick={() => openCaptionModal(selectedPost)}>調整 caption</button>
-              <button type="button" onClick={() => openDesignEditor(selectedPost)}>編輯設計</button>
+              <p className="quick-edit-title">快速編輯</p>
+              <button type="button" onClick={() => openCaptionModal(selectedPost)}>
+                調整 caption <span>›</span>
+              </button>
+              <button type="button" onClick={() => openDesignEditor(selectedPost)}>
+                編輯設計 <span>›</span>
+              </button>
             </section>
 
             <section>
@@ -1281,44 +1286,7 @@ export default function ScheduledPostsPage() {
 
   return (
     <main className="dashboard-page">
-      <aside className="sidebar">
-        <div className="workspace-switcher">
-          <div className="workspace-mark">S</div>
-          <strong>Tommy 的工作台</strong>
-          <span>⌄</span>
-        </div>
-
-        <nav className="sidebar-nav" aria-label="工作台導覽">
-          {[
-            ['⌂', '首頁'],
-            ['▣', '日曆'],
-            ['▱', '宣傳活動'],
-            ['↯', '整合', '0/4'],
-            ['✤', '品牌素材庫'],
-            ['☷', '內容偏好'],
-            ['✓', '審批'],
-            ['▥', '洞察'],
-          ].map(([icon, label, meta]) => (
-            <a className={label === '日曆' ? 'active' : ''} href="#" key={label}>
-              <span>{icon}</span>
-              <strong>{label}</strong>
-              {meta ? <em>{meta}</em> : null}
-            </a>
-          ))}
-        </nav>
-
-        <div className="sidebar-group">
-          <p>觸及</p>
-          <a href="#">Ⓜ Meta Ads</a>
-          <a href="#">SEO</a>
-        </div>
-
-        <div className="sidebar-footer">
-          <a href="#">＋ 建立新項目</a>
-          <a href="#">邀請團隊成員</a>
-          <a href="#">幫助與學習</a>
-        </div>
-      </aside>
+      <DashboardSidebar activeItem="日曆" />
 
       <section className="calendar-shell">
         <header className="calendar-topbar">
@@ -1578,17 +1546,18 @@ const styles = `
   }
 
   .post-card {
-    border: 2px solid #d946ef;
-    border-radius: 8px;
+    border: 1px solid #e8e9ec;
+    border-radius: 10px;
     background: #ffffff;
     overflow: hidden;
     cursor: pointer;
-    transition: transform 160ms ease, box-shadow 160ms ease;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
 
   .post-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 34px rgba(32, 33, 38, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(32, 33, 38, 0.09);
+    border-color: #c8c9ce;
   }
 
   .post-card-head {
@@ -1650,7 +1619,7 @@ const styles = `
     left: 8px;
     bottom: 8px;
     border-radius: 6px;
-    background: #d946ef;
+    background: #7c3aed;
     color: #ffffff;
     padding: 3px 7px;
     font-size: 12px;
@@ -2094,6 +2063,7 @@ const styles = `
   .post-settings-panel section > strong {
     color: #2f3138;
     font-size: 14px;
+    font-weight: 650;
     line-height: 1.35;
   }
 
@@ -2117,6 +2087,14 @@ const styles = `
   .post-settings-panel em {
     color: #8a8d95;
     font-style: normal;
+  }
+
+  .post-settings-panel .quick-edit-title {
+    color: #9a9da4;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
   }
 
   .caption-modal-backdrop {
