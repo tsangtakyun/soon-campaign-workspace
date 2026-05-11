@@ -309,18 +309,23 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
       return
     }
 
-    object.set({
-      angle: changes.rotation ?? object.angle,
-      fill: changes.kind === 'image' ? undefined : changes.color ?? object.fill,
-      fontSize: changes.fontSize,
-      fontStyle: changes.fontStyle,
-      fontWeight: changes.fontWeight,
-      lineHeight: changes.lineHeight,
-      opacity: changes.opacity === undefined ? object.opacity : changes.opacity / 100,
-      text: changes.textContent,
-      textAlign: changes.textAlign,
-      width: changes.width ? changes.width * elementScale(sizeRef.current) : object.width,
-    })
+    const nextProps: Record<string, unknown> = {}
+    if (changes.rotation !== undefined) nextProps.angle = changes.rotation
+    if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
+    if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
+    if (changes.fontStyle !== undefined) nextProps.fontStyle = changes.fontStyle
+    if (changes.fontWeight !== undefined) nextProps.fontWeight = changes.fontWeight
+    if (changes.lineHeight !== undefined) nextProps.lineHeight = changes.lineHeight
+    if (changes.opacity !== undefined) nextProps.opacity = changes.opacity / 100
+    if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
+    if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current)
+
+    if (changes.textContent !== undefined && object instanceof IText) {
+      object.set('text', changes.textContent)
+      object.initDimensions()
+    }
+
+    object.set(nextProps)
     object.setCoords()
     canvas.renderAll()
   }, [])
