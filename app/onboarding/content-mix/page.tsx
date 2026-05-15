@@ -16,21 +16,27 @@ type DistributionPreferences = {
 }
 
 const fallbackMix = fallbackContentMix({})
+const defaultVisibleContentTypes = ['still-images', 'carousels', 'feed-videos', 'stories', 'short-form-video', 'emails']
 
 function ContentMixContent() {
   const searchParams = useSearchParams()
   const selectedPlan = useMemo(() => getPricingPlan(searchParams.get('plan')), [searchParams])
   const [items, setItems] = useState<ContentMixItem[]>(fallbackMix.items)
+  const [visibleContentTypes, setVisibleContentTypes] = useState<string[]>(defaultVisibleContentTypes)
   const [weeklyCreditLimit, setWeeklyCreditLimit] = useState(selectedPlan.weeklyPlanningCredits)
   const [reason, setReason] = useState(fallbackMix.reason)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const visibleContentTypeSet = useMemo(() => new Set(visibleContentTypes), [visibleContentTypes])
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => visibleContentTypeSet.has(item.id))
+  }, [items, visibleContentTypeSet])
   const totalCredits = useMemo(() => {
-    return items.reduce((sum, item) => sum + item.quantity * item.creditsEach, 0)
-  }, [items])
+    return visibleItems.reduce((sum, item) => sum + item.quantity * item.creditsEach, 0)
+  }, [visibleItems])
 
-  const activeItems = items.filter((item) => item.quantity > 0)
+  const activeItems = visibleItems.filter((item) => item.quantity > 0)
 
   useEffect(() => {
     let isActive = true
@@ -40,9 +46,14 @@ function ContentMixContent() {
       const strategy = readSession<ContentStrategyOption>('soon-content-strategy-v1') || null
       const campaign = readSession<CampaignTheme>('soon-campaign-details-v1') || null
       const distribution = readSession<DistributionPreferences>('soon-distribution-preferences-v1') || {}
+      const selectedChannels = [
+        ...(distribution.channels || []),
+        ...(distribution.channelIds || []),
+      ]
       const language = profile.language || searchParams.get('language') || '繁體中文'
       const plan = searchParams.get('plan') || undefined
 
+      setVisibleContentTypes(getVisibleContentTypes(selectedChannels))
       setLoading(true)
       setError('')
 
@@ -115,10 +126,16 @@ function ContentMixContent() {
           {error ? <p className="notice">{error} 已先使用預設組合，你可以自行加減。</p> : null}
 
           <div className="item-grid">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <article className={`mix-card ${item.quantity === 0 ? 'muted' : ''}`} key={item.id}>
                 <div className={`preview preview-${item.id}`}>
-                  <img src={getContentMixImage(item.id)} alt={`${item.titleZh} / ${item.title}`} />
+                  <img
+                    src={getContentMixImage(item.id)}
+                    alt={`${item.titleZh} / ${item.title}`}
+                    onError={(event) => {
+                      event.currentTarget.src = `/content-mix/content-mix-${item.id}.png`
+                    }}
+                  />
                   {['feed-videos', 'short-form-video'].includes(item.id) ? <span className="play">▶</span> : null}
                 </div>
                 <h2>{item.titleZh} / {item.title}</h2>
@@ -201,6 +218,48 @@ function readSession<T>(key: string): T | null {
   }
 }
 
+function getVisibleContentTypes(channels: string[]) {
+  const visible = new Set<string>()
+  const ch = channels.map((channel) => channel.toLowerCase())
+
+  if (ch.some((channel) => (
+    ['instagram', 'facebook', 'threads', 'xiaohongshu', 'wechat'].includes(channel)
+    || channel.includes('instagram-feed')
+    || channel.includes('facebook-feed')
+    || channel.includes('threads-feed')
+    || channel.includes('rednote')
+    || channel.includes('小紅書')
+    || channel.includes('wechat-feed')
+  ))) {
+    visible.add('still-images')
+    visible.add('carousels')
+    visible.add('feed-videos')
+  }
+
+  if (ch.some((channel) => (
+    channel.includes('stories')
+    || channel.includes('instagram-stories')
+    || channel.includes('facebook-stories')
+  ))) {
+    visible.add('stories')
+  }
+
+  if (ch.some((channel) => (
+    ['reels', 'tiktok', 'youtube', 'instagram-reels', 'short-form-video'].includes(channel)
+    || channel.includes('youtube-shorts')
+  ))) {
+    visible.add('short-form-video')
+  }
+
+  if (ch.some((channel) => ['newsletter', 'email', 'emails'].includes(channel))) {
+    visible.add('emails')
+  }
+
+  if (visible.size === 0) return defaultVisibleContentTypes
+
+  return Array.from(visible)
+}
+
 function normalizeItems(items: ContentMixItem[] | undefined) {
   const byId = new Map((items || []).map((item) => [item.id, item]))
   return contentMixCatalog.map((base) => {
@@ -215,7 +274,7 @@ function normalizeItems(items: ContentMixItem[] | undefined) {
 }
 
 function getContentMixImage(id: string) {
-  return `/content-mix/content-mix-${id}.png`
+  return `https://wmpipimxqsnjwztuijbp.supabase.co/storage/v1/object/public/public-assets/content-strategies/content-mix-${id}.png`
 }
 
 const styles = `
