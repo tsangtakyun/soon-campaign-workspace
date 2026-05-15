@@ -391,7 +391,8 @@ const styles = `
   .preview {
     height: 180px;
     border-radius: 8px;
-    background: #1a1a1a;
+    background: #ffffff;
+    border: 1px solid #f0f0f0;
     display: grid;
     place-items: center;
     position: relative;
@@ -404,6 +405,13 @@ const styles = `
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  .preview-short-form-video img,
+  .preview-stories img {
+    object-fit: contain;
+    padding: 8px;
+    background: #ffffff;
   }
 
   .play {
