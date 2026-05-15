@@ -54,7 +54,7 @@ function VisualStyleContent() {
                   onClick={() => selectStyle(style)}
                   type="button"
                 >
-                  <img src={style.thumbPath} alt={`${style.titleZh} / ${style.title}`} />
+                  <img src={style.previewImage} alt={`${style.titleZh} / ${style.title}`} />
                   <span className="option-body">
                     <strong>{style.titleZh} / {style.title}</strong>
                     <em>{style.description}</em>
@@ -75,7 +75,7 @@ function VisualStyleContent() {
           <div className="preview-frame">
             <img className="before-image" src={visualStyleBeforePath} alt="Before preview" />
             <div className="after-layer" style={{ clipPath: `inset(0 0 0 ${split}%)` }}>
-              <img src={selectedStyle.previewPath} alt={`${selectedStyle.titleZh} after preview`} />
+              <img src={selectedStyle.previewImage} alt={`${selectedStyle.titleZh} after preview`} />
             </div>
 
             <span className="badge before">Before</span>

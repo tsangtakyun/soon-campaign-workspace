@@ -18,7 +18,7 @@ export type VisualStylePreset = {
   thumbPath: string
 }
 
-export const visualStyleBeforePath = '/visual-styles/sample/visual-style-before.jpg'
+export const visualStyleBeforePath = '/visual-styles/orignial.jpg'
 
 export const visualStylePresets: VisualStylePreset[] = [
   {
