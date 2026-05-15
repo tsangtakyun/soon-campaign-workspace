@@ -274,6 +274,10 @@ function normalizeItems(items: ContentMixItem[] | undefined) {
 }
 
 function getContentMixImage(id: string) {
+  if (id === 'carousels') {
+    return 'https://auth.sooncreator.network/storage/v1/object/public/public-assets/content-strategies/content-mix-carousels.png'
+  }
+
   return `https://wmpipimxqsnjwztuijbp.supabase.co/storage/v1/object/public/public-assets/content-strategies/content-mix-${id}.png`
 }
 
