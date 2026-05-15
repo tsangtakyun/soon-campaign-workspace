@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
+import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
 import { createClient } from '@/lib/supabase'
 
 function SignupContent() {
@@ -78,15 +79,12 @@ function SignupContent() {
 
   return (
     <main className="signup-page">
+      <ClaimOnboardingSession />
       <section className="signup-shell">
         <div className="signup-panel">
-          <div className="brand">
-            <span />
-            <strong>SOON</strong>
-          </div>
-
-          {step === 'account' ? (
-            <>
+          <div className="auth-form-stack">
+            {step === 'account' ? (
+              <>
               <h1>開始使用 SOON</h1>
               <p className="login-line">
                 已有帳戶？<Link href={`/login?next=${encodeURIComponent(next)}`}>登入</Link>
@@ -94,18 +92,18 @@ function SignupContent() {
 
               <div className="social-buttons">
                 <button type="button" onClick={handleGoogleSignup} disabled={loading === 'google'}>
-                  <span className="google">G</span>
+                  <span className="google" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" role="img">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06L5.84 9.9c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                  </span>
                   {loading === 'google' ? '正在前往 Google...' : '使用 Google 繼續'}
                 </button>
-                <button type="button" disabled>
-                  <span className="facebook">f</span>
-                  使用 Facebook 繼續
-                </button>
-                <button type="button" disabled>
-                  <span className="apple">●</span>
-                  使用 Apple 繼續
-                </button>
               </div>
+              <p className="more-login-options">更多登入方式即將推出</p>
 
               <div className="divider">
                 <span />
@@ -145,9 +143,9 @@ function SignupContent() {
               <p className="terms">
                 建立帳戶即表示你同意 SOON 根據提交資料跟進你的試用與宣傳需求。
               </p>
-            </>
-          ) : (
-            <>
+              </>
+            ) : (
+              <>
               <Link className="sign-out-link" href="/">
                 離開
               </Link>
@@ -200,117 +198,86 @@ function SignupContent() {
                   繼續
                 </button>
               </form>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="preview-panel" aria-hidden="true">
-          <div className="preview-window">
-            <aside>
-              <div className="mini-logo" />
-              {['首頁', '內容日曆', '廣告分析', '審批', 'Campaigns', 'Brand Kit'].map((item, index) => (
-                <div className={index === 1 ? 'side-item active' : 'side-item'} key={item}>{item}</div>
-              ))}
-            </aside>
-            <section className="calendar">
-              <div className="calendar-head">
-                <strong>Content Calendar</strong>
-                <span>Today</span>
-              </div>
-              <div className="post-grid">
-                {[
-                  ['Real stories turn attention into enquiries.', '12:15pm'],
-                  ['Create content people want to save.', '10:00am'],
-                  ['Turn one campaign into reusable angles.', '2:30pm'],
-                  ['Spend less time guessing what to post.', '4:45pm'],
-                ].map(([copy, time], index) => (
-                  <div className={`post-card post-card-${index + 1}`} key={copy}>
-                    <div className="post-meta">Post · {time}</div>
-                    <strong>{copy}</strong>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
+          <img src="https://auth.sooncreator.network/storage/v1/object/public/public-assets/dashboard-preview.png" alt="" />
         </div>
       </section>
 
       <style jsx>{`
         .signup-page {
-          min-height: calc(100vh - 88px);
-          background: #f4f4f2;
+          min-height: 100vh;
+          background: #ffffff;
           color: #161719;
-          padding: 32px 7vw 64px;
+          padding: 0;
         }
 
         .signup-shell {
-          min-height: calc(100vh - 184px);
+          min-height: 100vh;
           display: grid;
-          grid-template-columns: minmax(360px, 0.78fr) minmax(520px, 1.22fr);
-          gap: clamp(48px, 8vw, 116px);
-          align-items: center;
-          max-width: 1420px;
-          margin: 0 auto;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 0;
+          align-items: stretch;
+          width: 100%;
         }
 
         .signup-panel {
-          width: min(100%, 460px);
-          justify-self: center;
-        }
-
-        .brand {
-          display: inline-flex;
+          width: 100%;
+          min-height: 100vh;
+          padding: 0 32px 0 64px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
           align-items: center;
-          gap: 10px;
-          margin-bottom: 34px;
-          font-size: 1rem;
-          letter-spacing: 0.06em;
-          font-weight: 850;
+          background: #ffffff;
         }
 
-        .brand span {
-          width: 12px;
-          height: 12px;
-          border-radius: 999px;
-          background: #ef3f2f;
+        .auth-form-stack {
+          width: min(100%, 420px);
         }
 
         h1 {
           margin: 0 0 8px;
-          font-size: clamp(2.45rem, 4vw, 3.5rem);
-          line-height: 1;
+          font-size: 1.5rem;
+          line-height: 1.18;
           letter-spacing: 0;
-          font-weight: 650;
+          font-weight: 700;
         }
 
         .login-line {
-          margin: 0 0 34px;
+          margin: 0 0 24px;
           color: #71737a;
-          font-size: 1.06rem;
+          font-size: 0.875rem;
         }
 
         .login-line a {
-          color: #161719;
+          color: #ef4444;
           text-underline-offset: 4px;
+          text-decoration: underline;
         }
 
         .social-buttons,
         form {
           display: grid;
-          gap: 12px;
+          gap: 16px;
+          width: 100%;
         }
 
         .social-buttons button,
         .submit {
           width: 100%;
-          min-height: 58px;
+          min-height: 48px;
           border-radius: 8px;
-          border: 1px solid #dedede;
+          border: 1px solid #e5e7eb;
           background: #ffffff;
           color: #171717;
           font: inherit;
-          font-size: 1.05rem;
-          font-weight: 650;
+          font-size: 0.95rem;
+          font-weight: 600;
           display: grid;
           grid-template-columns: 36px 1fr 36px;
           align-items: center;
@@ -322,50 +289,53 @@ function SignupContent() {
           cursor: not-allowed;
         }
 
-        .google,
-        .facebook,
-        .apple {
+        .google {
           justify-self: center;
-          font-size: 1.4rem;
-          font-weight: 850;
+          display: grid;
+          place-items: center;
         }
 
-        .google { color: #4285f4; }
-        .facebook { color: #1877f2; }
-        .apple { color: #111111; }
+        .more-login-options {
+          margin: 12px 0 0;
+          color: #9ca3af;
+          font-size: 0.75rem;
+          text-align: center;
+        }
 
         .divider {
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          gap: 18px;
-          margin: 30px 0 22px;
-          color: #9a9a9a;
-          font-size: 0.95rem;
+          gap: 14px;
+          margin: 24px 0 20px;
+          color: #9ca3af;
+          font-size: 0.75rem;
+          width: 100%;
         }
 
         .divider span {
           height: 1px;
-          background: #dedede;
+          background: #e5e7eb;
         }
 
         label {
           display: grid;
           gap: 8px;
-          color: #595b60;
-          font-size: 0.98rem;
-          font-weight: 650;
+          color: #161719;
+          font-size: 0.875rem;
+          font-weight: 500;
         }
 
         input,
         select {
           width: 100%;
-          min-height: 58px;
+          min-height: 44px;
           border-radius: 8px;
-          border: 1px solid #d9d9d9;
+          border: 1px solid #e5e7eb;
           background: #ffffff;
-          padding: 0 18px;
+          padding: 0 14px;
           font: inherit;
+          font-size: 0.95rem;
           color: #161719;
           outline: none;
         }
@@ -384,9 +354,12 @@ function SignupContent() {
           margin-top: 4px;
           display: flex;
           justify-content: center;
-          border-color: #ef3f2f;
-          background: #ef3f2f;
+          min-height: 44px;
+          border-color: #ef4444;
+          background: #ef4444;
           color: #ffffff;
+          font-size: 0.95rem;
+          font-weight: 500;
         }
 
         .submit:disabled {
@@ -404,12 +377,11 @@ function SignupContent() {
         }
 
         .terms {
-          max-width: 360px;
-          margin: 42px auto 0;
+          margin: 28px 0 0;
           text-align: center;
-          color: #9a9a9a;
+          color: #9ca3af;
           line-height: 1.55;
-          font-size: 0.9rem;
+          font-size: 0.75rem;
         }
 
         .sign-out-link {
@@ -442,125 +414,35 @@ function SignupContent() {
         }
 
         .preview-panel {
-          min-height: 680px;
-          border-radius: 26px;
-          background: #ececea;
-          display: grid;
-          place-items: end center;
+          min-height: 100vh;
+          border-radius: 0;
+          background: #f3f3f3;
+          position: relative;
           overflow: hidden;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
         }
 
-        .preview-window {
-          width: min(92%, 820px);
-          height: 610px;
-          margin-bottom: -16px;
-          border: 14px solid #111111;
-          border-bottom-width: 22px;
-          border-radius: 24px 24px 12px 12px;
-          background: #f8f8f6;
-          display: grid;
-          grid-template-columns: 190px 1fr;
-          overflow: hidden;
-          box-shadow: 0 34px 70px rgba(0,0,0,0.18);
-        }
-
-        aside {
-          padding: 26px 18px;
-          background: #eeeeec;
-          border-right: 1px solid #ddddda;
-          display: grid;
-          align-content: start;
-          gap: 10px;
-        }
-
-        .mini-logo {
-          width: 32px;
-          height: 32px;
-          border-radius: 10px;
-          background: linear-gradient(135deg, #ef3f2f, #ffd84d);
-          margin-bottom: 22px;
-        }
-
-        .side-item {
-          padding: 10px 12px;
-          border-radius: 8px;
-          color: #777a7f;
-          font-size: 0.9rem;
-          font-weight: 700;
-        }
-
-        .side-item.active {
-          background: #dededb;
-          color: #161719;
-        }
-
-        .calendar {
-          padding: 28px;
-          background: #fbfbfa;
-        }
-
-        .calendar-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 24px;
-          color: #232428;
-        }
-
-        .calendar-head strong {
-          font-size: 1.35rem;
-        }
-
-        .calendar-head span {
-          color: #777a7f;
-          font-weight: 700;
-        }
-
-        .post-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
-        }
-
-        .post-card {
-          min-height: 220px;
-          border-radius: 14px;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          color: #ffffff;
-          overflow: hidden;
-          background:
-            linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.68)),
-            linear-gradient(135deg, #315d4f, #1b1d20);
-        }
-
-        .post-card-2 { background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.68)), linear-gradient(135deg, #b7654a, #22252c); }
-        .post-card-3 { background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.68)), linear-gradient(135deg, #7057d8, #202229); }
-        .post-card-4 { background: linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.68)), linear-gradient(135deg, #d08b31, #1e2026); }
-
-        .post-meta {
-          color: rgba(255,255,255,0.8);
-          font-size: 0.82rem;
-          font-weight: 800;
-        }
-
-        .post-card strong {
-          max-width: 240px;
-          font-size: 1.45rem;
-          line-height: 1.06;
-          letter-spacing: 0;
+        .preview-panel img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center center;
+          display: block;
         }
 
         @media (max-width: 980px) {
           .signup-page {
-            padding: 28px 20px 56px;
+            padding: 0;
           }
 
           .signup-shell {
             grid-template-columns: 1fr;
+          }
+
+          .signup-panel {
+            min-height: auto;
+            padding: 96px 24px 48px;
+            max-width: none;
+            align-items: center;
           }
 
           .preview-panel {
