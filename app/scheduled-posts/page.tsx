@@ -723,6 +723,7 @@ function ScheduledPostsPageContent() {
   const [improveProgress, setImproveProgress] = useState({ current: 0, total: 0 })
   const [aiCommand, setAiCommand] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiStatus, setAiStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle')
   const [showAttachModal, setShowAttachModal] = useState(false)
   const [attachAssets, setAttachAssets] = useState<AttachAsset[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -747,6 +748,7 @@ function ScheduledPostsPageContent() {
     if (!autoPostId || !postsLoaded || scheduledPosts.length === 0) return
     const target = scheduledPosts.find((post) => post.id === autoPostId)
     if (target) {
+      setAiStatus('idle')
       setAttachedImage(null)
       setSelectedPost(target)
       router.replace('/scheduled-posts', { scroll: false })
@@ -967,8 +969,9 @@ function ScheduledPostsPageContent() {
     if (!aiCommand.trim() || !selectedPost || aiLoading) return
 
     setAiLoading(true)
+    setAiStatus('processing')
     try {
-      await fetch('/api/scheduled-posts/improve', {
+      const response = await fetch('/api/scheduled-posts/improve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -979,9 +982,15 @@ function ScheduledPostsPageContent() {
           attachedImageUrl: attachedImage?.url ?? null,
         }),
       })
+      if (!response.ok) throw new Error('Failed')
       setAiCommand('')
       setAttachedImage(null)
+      setAiStatus('done')
       router.refresh()
+      window.setTimeout(() => setAiStatus('idle'), 4000)
+    } catch {
+      setAiStatus('error')
+      window.setTimeout(() => setAiStatus('idle'), 4000)
     } finally {
       setAiLoading(false)
     }
@@ -1141,6 +1150,7 @@ function ScheduledPostsPageContent() {
     const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
     const nextPost = scheduledPosts[index + 1]
     if (nextPost) {
+      setAiStatus('idle')
       setAttachedImage(null)
       setSelectedPost(nextPost)
     }
@@ -1151,6 +1161,7 @@ function ScheduledPostsPageContent() {
     const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
     const prevPost = scheduledPosts[index - 1]
     if (prevPost) {
+      setAiStatus('idle')
       setAttachedImage(null)
       setSelectedPost(prevPost)
     }
@@ -1936,6 +1947,7 @@ function ScheduledPostsPageContent() {
               aria-label="返回日曆"
               className="post-editor-back-btn"
               onClick={() => {
+                setAiStatus('idle')
                 setAttachedImage(null)
                 setSelectedPost(null)
               }}
@@ -2196,6 +2208,7 @@ function ScheduledPostsPageContent() {
                   onClick={() => {
                     const asset = attachAssets.find((item) => item.id === selectedAttach)
                     if (asset) {
+                      setAiStatus('idle')
                       setAttachedImage({ url: asset.url, filename: asset.filename || '已選圖片' })
                     }
                     setShowAttachModal(false)
@@ -2341,12 +2354,53 @@ function ScheduledPostsPageContent() {
                   type="submit"
                   aria-label="送出要求"
                   disabled={!aiCommand.trim() || aiLoading}
-                  style={{ opacity: aiCommand.trim() && !aiLoading ? 1 : 0.4 }}
+                  style={{
+                    alignItems: 'center',
+                    background: aiLoading ? '#e5e7eb' : (!aiCommand.trim() ? '#e5e7eb' : '#111827'),
+                    border: 'none',
+                    borderRadius: '50%',
+                    color: aiLoading ? '#9ca3af' : 'white',
+                    cursor: !aiCommand.trim() || aiLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    fontSize: 16,
+                    height: 32,
+                    justifyContent: 'center',
+                    padding: 0,
+                    transition: 'background 200ms',
+                    width: 32,
+                  }}
                 >
-                  {aiLoading ? '...' : '↑'}
+                  {aiLoading ? (
+                    <span
+                      style={{
+                        animation: 'spin 0.8s linear infinite',
+                        border: '2px solid #9ca3af',
+                        borderRadius: '50%',
+                        borderTopColor: '#374151',
+                        display: 'inline-block',
+                        height: 14,
+                        width: 14,
+                      }}
+                    />
+                  ) : '↑'}
                 </button>
               </div>
             </form>
+            {aiStatus === 'processing' && (
+              <p style={{ color: '#6b7280', fontSize: 12, margin: '6px 0 0' }}>
+                ⏳ SOON 正在處理你的指令...
+              </p>
+            )}
+            {aiStatus === 'done' && (
+              <p style={{ color: '#16a34a', fontSize: 12, margin: '6px 0 0' }}>
+                ✅ 已更新！請查看最新版本。
+              </p>
+            )}
+            {aiStatus === 'error' && (
+              <p style={{ color: '#dc2626', fontSize: 12, margin: '6px 0 0' }}>
+                ❌ 出現問題，請重試。
+              </p>
+            )}
           </aside>
 
           <section className="preview-stage" aria-label="貼文預覽">
@@ -2587,6 +2641,7 @@ function ScheduledPostsPageContent() {
               <button
                 type="button"
                 onClick={() => {
+                  setAiStatus('idle')
                   setAttachedImage(null)
                   setSelectedPost(null)
                 }}
@@ -2784,6 +2839,7 @@ function ScheduledPostsPageContent() {
                   className="post-card"
                   key={post.id}
                   onClick={() => {
+                    setAiStatus('idle')
                     setAttachedImage(null)
                     setSelectedPost(post)
                   }}
@@ -3401,6 +3457,10 @@ const styles = `
   .post-editor-action-btn:disabled {
     cursor: not-allowed;
     opacity: 0.58;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   .post-editor-topbar-right {
