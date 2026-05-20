@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Canvas, Circle, FabricImage, FabricObject, IText, Polygon, Rect, Triangle } from 'fabric'
 
 import type { CanvasSize, DesignElement } from '@/components/editor/editorTypes'
+import { createClient } from '@/lib/supabase'
 
 type FabricElementObject = FabricObject & {
   data?: {
@@ -14,6 +15,8 @@ type FabricElementObject = FabricObject & {
 }
 
 type UseFabricCanvasOptions = {
+  autosaveKey?: string
+  autosaveName?: string
   canvasId: string
   height: number
   width: number
@@ -173,7 +176,10 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   return attachElementData(shape, element)
 }
 
-export function useFabricCanvas({ canvasId, height, onSelectElement, width }: UseFabricCanvasOptions) {
+export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, onSelectElement, width }: UseFabricCanvasOptions) {
+  const autosaveKeyRef = useRef(autosaveKey)
+  const autosaveNameRef = useRef(autosaveName)
+  const autosaveTimerRef = useRef<number | null>(null)
   const fabricRef = useRef<Canvas | null>(null)
   const historyIndexRef = useRef(-1)
   const historyRef = useRef<string[]>([])
@@ -185,6 +191,59 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
     onSelectElementRef.current = onSelectElement
   }, [onSelectElement])
 
+  useEffect(() => {
+    autosaveKeyRef.current = autosaveKey
+    autosaveNameRef.current = autosaveName
+  }, [autosaveKey, autosaveName])
+
+  const scheduleAutosave = useCallback((canvas: Canvas) => {
+    if (typeof window === 'undefined') return
+    const key = autosaveKeyRef.current
+    if (!key) return
+
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current)
+    }
+
+    const canvasJson = canvas.toObject(['data'])
+    const canvasWidth = canvas.width || width
+    const canvasHeight = canvas.height || height
+    const designName = autosaveNameRef.current || 'Untitled'
+
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const supabase = createClient()
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+
+          if (!user) return
+
+          const storageKey = `soon-design-id:${key}`
+          let designId = window.localStorage.getItem(storageKey)
+          if (!designId) {
+            designId = crypto.randomUUID()
+            window.localStorage.setItem(storageKey, designId)
+          }
+
+          await supabase.from('designs').upsert({
+            id: designId,
+            user_id: user.id,
+            name: designName,
+            canvas_json: canvasJson,
+            canvas_width: canvasWidth,
+            canvas_height: canvasHeight,
+            is_draft: true,
+            updated_at: new Date().toISOString(),
+          })
+        } catch (error) {
+          console.error('Failed to autosave design:', error)
+        }
+      })()
+    }, 30000)
+  }, [height, width])
+
   const snapshotHistory = useCallback((canvas: Canvas) => {
     if (isRestoringRef.current) return
     const json = JSON.stringify(canvas.toObject(['data']))
@@ -194,7 +253,8 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
     if (stack.length > 50) stack.shift()
     historyRef.current = stack
     historyIndexRef.current = stack.length - 1
-  }, [])
+    scheduleAutosave(canvas)
+  }, [scheduleAutosave])
 
   useEffect(() => {
     const canvas = new Canvas(canvasId, {
@@ -224,6 +284,9 @@ export function useFabricCanvas({ canvasId, height, onSelectElement, width }: Us
     snapshotHistory(canvas)
 
     return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+      }
       canvas.dispose()
       fabricRef.current = null
     }

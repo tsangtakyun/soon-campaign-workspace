@@ -114,7 +114,9 @@ export default function SubmitBriefPage() {
         contentMixLine ? `Content mix: ${contentMixLine}` : '',
         contentMix.totalCredits ? `Weekly credits: ${contentMix.totalCredits}` : '',
         visualStyle.title ? `Visual style: ${visualStyle.titleZh || visualStyle.title} / ${visualStyle.title}` : '',
-        typeface.title ? `Typeface: ${typeface.title} (${typeface.moodZh || typeface.subtitle || ''})` : '',
+        typeface.name || typeface.title
+          ? `Typeface: ${typeface.name || typeface.title} (${typeface.nameEn || typeface.description || typeface.moodZh || typeface.subtitle || ''})`
+          : '',
         photoControl.title ? `Photo control: ${photoControl.titleZh || photoControl.title} / ${photoControl.title}` : '',
         photoControl.generationPrompt ? `Photo generation prompt: ${photoControl.generationPrompt}` : '',
         reviewedTopicLine ? `已確認主題：${reviewedTopicLine}` : '',

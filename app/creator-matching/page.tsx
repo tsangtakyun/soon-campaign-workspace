@@ -97,9 +97,7 @@ function CreatorMatchingContent() {
   const analysisHref = campaignIntakeId
     ? `/paid-analysis?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`
     : '/paid-analysis'
-  const dashboardHref = campaignIntakeId
-    ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}`
-    : '/my-workspace'
+  const dashboardHref = '/onboarding'
   const scriptPlanningHref = campaignIntakeId
     ? `/script-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}`
     : '/script-planning'

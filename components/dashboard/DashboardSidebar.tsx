@@ -1,6 +1,16 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { createClient } from '@/lib/supabase'
+import {
+  clearActiveWorkspaceId,
+  getActiveWorkspaceId,
+  setActiveWorkspaceId,
+  workspaceInitial,
+  type WorkspaceSummary,
+} from '@/lib/workspace-client'
 
 type SidebarItem = {
   icon: string
@@ -12,25 +22,188 @@ type SidebarItem = {
 const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
   { icon: '▣', label: '日曆', href: '/onboarding/scheduled-posts' },
-  { icon: '▱', label: '宣傳活動', href: '#' },
-  { icon: '↯', label: '整合', href: '#', meta: '0/4' },
-  { icon: '✤', label: '品牌素材庫', href: '#' },
-  { icon: '☷', label: '內容偏好', href: '#' },
-  { icon: '✓', label: '審批', href: '#' },
-  { icon: '▥', label: '洞察', href: '#' },
+  { icon: '▱', label: '宣傳活動', href: '/onboarding/campaigns' },
+  { icon: '↯', label: '整合', href: '/onboarding/integrations', meta: '0/4' },
+  { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
+  { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
+  { icon: '◐', label: '視覺風格', href: '/onboarding/settings/visual-style' },
+  { icon: 'Aa', label: '字型風格', href: '/onboarding/settings/typeface' },
+  { icon: '✓', label: '審批', href: '/onboarding/approvals' },
+  { icon: '▥', label: '洞察', href: '/onboarding/insights' },
 ]
 
 type DashboardSidebarProps = {
   activeItem: string
 }
 
+const TRIAL_CREDITS = 200
+
 export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
+  const router = useRouter()
+  const [creditBalance, setCreditBalance] = useState(TRIAL_CREDITS)
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
+  const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
+
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) || workspaces[0] || null
+  const activeWorkspaceLabel = activeWorkspace?.brandName || activeWorkspace?.name || '你的工作台'
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadSidebarData() {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user?.id) {
+          if (!cancelled) setCreditBalance(TRIAL_CREDITS)
+          return
+        }
+
+        const [{ data: creditData }, workspaceResponse] = await Promise.all([
+          supabase.from('user_credits').select('balance').eq('user_id', user.id).maybeSingle(),
+          fetch('/api/workspaces', { cache: 'no-store' }),
+        ])
+        const workspacePayload = await workspaceResponse.json().catch(() => null)
+
+        console.log('[DashboardSidebar] workspace query debug', {
+          userId: user.id,
+          source: 'GET /api/workspaces',
+          responseStatus: workspaceResponse.status,
+          workspacePayload,
+        })
+
+        if (!cancelled && typeof creditData?.balance === 'number') {
+          setCreditBalance(creditData.balance)
+        } else if (!cancelled) {
+          setCreditBalance(TRIAL_CREDITS)
+        }
+
+        if (!cancelled) {
+          const mappedWorkspaces = Array.isArray(workspacePayload?.workspaces)
+            ? (workspacePayload.workspaces as WorkspaceSummary[])
+            : []
+
+          setWorkspaces(mappedWorkspaces)
+          if (!mappedWorkspaces.length) {
+            setActiveWorkspaceIdState(null)
+            return
+          }
+
+          const storedWorkspaceId = getActiveWorkspaceId()
+          const nextActiveWorkspace =
+            mappedWorkspaces.find((workspace) => workspace.id === storedWorkspaceId) || mappedWorkspaces[0]
+
+          setActiveWorkspaceIdState(nextActiveWorkspace.id)
+          if (storedWorkspaceId !== nextActiveWorkspace.id) {
+            setActiveWorkspaceId(nextActiveWorkspace.id)
+          }
+        }
+      } catch {
+        // Keep the dashboard usable when credit tables are not migrated yet.
+      }
+    }
+
+    void loadSidebarData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!workspaceMenuRef.current?.contains(event.target as Node)) {
+        setWorkspaceMenuOpen(false)
+      }
+    }
+
+    if (workspaceMenuOpen) {
+      document.addEventListener('mousedown', handlePointerDown)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+    }
+  }, [workspaceMenuOpen])
+
+  function switchWorkspace(workspaceId: string) {
+    setActiveWorkspaceId(workspaceId)
+    setActiveWorkspaceIdState(workspaceId)
+    setWorkspaceMenuOpen(false)
+    router.refresh()
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    clearActiveWorkspaceId()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   return (
     <aside className="sidebar">
-      <div className="workspace-switcher">
-        <div className="workspace-mark">S</div>
-        <strong>Tommy 的工作台</strong>
-        <span>⌄</span>
+      <div className="workspace-switcher-wrap" ref={workspaceMenuRef}>
+        <button
+          aria-expanded={workspaceMenuOpen}
+          className="workspace-switcher"
+          onClick={() => setWorkspaceMenuOpen((open) => !open)}
+          type="button"
+        >
+          <div className="workspace-mark">{workspaceInitial(activeWorkspaceLabel)}</div>
+          <strong
+            style={{
+              display: 'block',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {activeWorkspaceLabel}
+          </strong>
+          <span>⌄</span>
+        </button>
+
+        {workspaceMenuOpen ? (
+          <div className="workspace-menu">
+            <p>我的工作台</p>
+            <div className="workspace-menu-list">
+              {workspaces.length ? (
+                workspaces.map((workspace) => (
+                  <button
+                    className={workspace.id === activeWorkspaceId ? 'active' : ''}
+                    key={workspace.id}
+                    onClick={() => switchWorkspace(workspace.id)}
+                    type="button"
+                  >
+                    <span className="workspace-menu-check">
+                      {workspace.id === activeWorkspaceId ? '✓' : ''}
+                    </span>
+                    <span>
+                      <strong>{workspace.name}</strong>
+                      <em>{workspace.brandName || workspace.description || '品牌工作台'}</em>
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <span className="workspace-menu-empty">暫時未有工作台</span>
+              )}
+            </div>
+            <div className="workspace-menu-actions">
+              <button type="button" onClick={() => router.push('/onboarding/new-workspace')}>
+                ＋ 建立新工作台
+              </button>
+              <button type="button" className="logout" onClick={handleSignOut}>
+                登出
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
@@ -40,6 +213,10 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
             className={item.label === activeItem ? 'active' : ''}
             href={item.href}
             key={item.label}
+            onClick={(event) => {
+              event.preventDefault()
+              router.push(item.href)
+            }}
           >
             <span>{item.icon}</span>
             <strong>{item.label}</strong>
@@ -48,16 +225,26 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
         ))}
       </nav>
 
+      <Link
+        className={`sidebar-credit-card ${creditBalance < 50 ? 'warning' : ''}`}
+        href="/pricing"
+      >
+        <span className="sidebar-credit-balance">{creditBalance} credits 剩餘</span>
+        <span className="sidebar-credit-action">
+          {creditBalance < 50 ? '積分不足，請升級方案' : '查看方案與用量'}
+        </span>
+      </Link>
+
       <div className="sidebar-group">
         <p>觸及</p>
-        <a href="#">Ⓜ Meta Ads</a>
-        <a href="#">SEO</a>
+        <Link href="/onboarding/meta-ads">Ⓜ Meta Ads</Link>
+        <Link href="/onboarding/seo">SEO</Link>
       </div>
 
       <div className="sidebar-footer">
-        <a href="#">＋ 建立新項目</a>
-        <a href="#">邀請團隊成員</a>
-        <a href="#">幫助與學習</a>
+        <Link href="/onboarding/campaigns">＋ 建立新項目</Link>
+        <Link href="/onboarding/team">邀請團隊成員</Link>
+        <Link href="/onboarding/help">幫助與學習</Link>
       </div>
     </aside>
   )
@@ -72,6 +259,15 @@ export const dashboardSidebarStyles = `
     display: flex;
     flex-direction: column;
     gap: 20px;
+    position: relative;
+    z-index: 30;
+    pointer-events: auto;
+  }
+
+  .workspace-switcher-wrap {
+    position: relative;
+    border-bottom: 1px solid #e2e3e6;
+    padding-bottom: 14px;
   }
 
   .workspace-switcher {
@@ -79,8 +275,13 @@ export const dashboardSidebarStyles = `
     grid-template-columns: 28px 1fr auto;
     align-items: center;
     gap: 10px;
-    padding: 8px 6px 18px;
-    border-bottom: 1px solid #e2e3e6;
+    border: 0;
+    background: transparent;
+    width: 100%;
+    padding: 8px 6px 4px;
+    text-align: left;
+    cursor: pointer;
+    color: #202126;
   }
 
   .workspace-mark {
@@ -98,10 +299,122 @@ export const dashboardSidebarStyles = `
   .workspace-switcher strong {
     font-size: 14px;
     font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace-switcher span {
     color: #9a9da4;
+  }
+
+  .workspace-menu {
+    position: absolute;
+    left: 0;
+    right: -8px;
+    top: calc(100% + 8px);
+    border: 1px solid #dedfe3;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 18px 42px rgba(18, 19, 24, 0.14);
+    padding: 10px;
+    z-index: 80;
+    animation: workspaceMenuIn 140ms ease-out;
+  }
+
+  @keyframes workspaceMenuIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .workspace-menu p {
+    margin: 4px 8px 8px;
+    color: #9a9da4;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .workspace-menu-list {
+    display: grid;
+    gap: 4px;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .workspace-menu-list button,
+  .workspace-menu-actions button {
+    border: 0;
+    background: transparent;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 8px;
+    padding: 9px 8px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .workspace-menu-list button:hover,
+  .workspace-menu-list button.active,
+  .workspace-menu-actions button:hover {
+    background: #f2f3f5;
+  }
+
+  .workspace-menu-check {
+    color: #202126;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .workspace-menu-list strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .workspace-menu-list em {
+    color: #7d8088;
+    display: block;
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.35;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-menu-empty {
+    color: #9a9da4;
+    display: block;
+    font-size: 12px;
+    padding: 10px 8px;
+  }
+
+  .workspace-menu-actions {
+    border-top: 1px solid #eceef1;
+    display: grid;
+    gap: 2px;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .workspace-menu-actions button {
+    display: block;
+    font-size: 13px;
+  }
+
+  .workspace-menu-actions button.logout {
+    color: #991b1b;
   }
 
   .sidebar-nav,
@@ -125,6 +438,7 @@ export const dashboardSidebarStyles = `
     text-decoration: none;
     font-size: 14px;
     white-space: nowrap;
+    cursor: pointer;
   }
 
   .sidebar-group a,
@@ -144,6 +458,55 @@ export const dashboardSidebarStyles = `
   .sidebar-nav em {
     color: #9b9ea6;
     font-style: normal;
+  }
+
+  .sidebar-credit-card {
+    border: 1px solid #dfe1e6;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #202126;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 11px 12px;
+    text-decoration: none !important;
+    white-space: normal;
+  }
+
+  .sidebar-credit-card:hover,
+  .sidebar-credit-card:focus-visible {
+    text-decoration: none !important;
+  }
+
+  .sidebar-credit-balance {
+    color: #202126;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+
+  .sidebar-credit-action {
+    color: #6f7278;
+    font-size: 11px;
+    line-height: 1.25;
+    text-decoration: none;
+  }
+
+  .sidebar-credit-card:hover .sidebar-credit-action,
+  .sidebar-credit-card:focus-visible .sidebar-credit-action {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .sidebar-credit-card.warning {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .sidebar-credit-card.warning .sidebar-credit-balance,
+  .sidebar-credit-card.warning .sidebar-credit-action {
+    color: #b91c1c;
   }
 
   .sidebar-group p {

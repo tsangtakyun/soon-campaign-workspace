@@ -3,11 +3,13 @@ import type { CSSProperties } from 'react'
 export type ScheduledPost = {
   id: string
   type: '靜態圖片' | '文章' | '短影片'
+  postType?: string
+  scheduledAt?: string | null
   time: string
   title: string
   body: string
   image: string
-  status: '新內容' | '草稿'
+  status: '新內容' | '草稿' | '已批准' | '已排程' | '已發布'
 }
 
 export type TopicReference = {
@@ -15,7 +17,7 @@ export type TopicReference = {
   image: string
 }
 
-export type PreviewChannel = 'Instagram' | 'Facebook' | 'LinkedIn' | 'X' | 'Google'
+export type PreviewChannel = 'Instagram' | 'Facebook' | 'Threads'
 
 export type ChannelCaption = {
   id: PreviewChannel

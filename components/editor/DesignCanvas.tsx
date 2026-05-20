@@ -50,6 +50,8 @@ export function DesignCanvas({
   const loadedPostRef = useRef<string | null>(null)
   const displaySize = useMemo(() => getDisplaySize(canvasSize), [canvasSize])
   const controls = useFabricCanvas({
+    autosaveKey: selectedPost.id,
+    autosaveName: selectedPost.title,
     canvasId: 'fabric-design-canvas',
     height: displaySize.height,
     onSelectElement: (id) => {

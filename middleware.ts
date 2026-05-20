@@ -8,10 +8,16 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
 
+  if (pathname === '/my-workspace' || pathname.startsWith('/my-workspace/')) {
+    return NextResponse.redirect(new URL('/onboarding', request.url))
+  }
+
   const isPublicPage =
     pathname === '/' ||
     pathname === '/contact' ||
+    pathname === '/pricing' ||
     pathname === '/signup' ||
+    pathname === '/dashboard' ||
     pathname.startsWith('/onboarding') ||
     pathname === '/submit-brief' ||
     pathname.startsWith('/paid-analysis') ||
@@ -61,11 +67,16 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/login') {
     const next = request.nextUrl.searchParams.get('next')
-    const safeNext = next && next.startsWith('/') ? next : '/my-workspace'
+    const safeNext = normalizeAuthNext(next)
     return NextResponse.redirect(new URL(safeNext, request.url))
   }
 
   return response
+}
+
+function normalizeAuthNext(value: string | null) {
+  if (!value || value === '/my-workspace' || value.startsWith('/my-workspace/')) return '/onboarding'
+  return value.startsWith('/') ? value : '/onboarding'
 }
 
 export const config = {

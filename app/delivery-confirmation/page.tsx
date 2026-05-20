@@ -91,7 +91,7 @@ function DeliveryConfirmationContent() {
     loadSavedCampaign()
   }, [campaignIntakeId, pack.defaultDeliveryExpectation, pack.defaultProductionNotes, pack.defaultShootWindow])
 
-  const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
+  const dashboardHref = '/onboarding'
   const storyboardHref = campaignIntakeId ? `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/storyboard-planning'
   const deliveryTrackingHref = campaignIntakeId ? `/delivery-tracking?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/delivery-tracking'
 

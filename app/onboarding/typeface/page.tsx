@@ -3,49 +3,97 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-import type { ContentStrategyOption } from '@/lib/content-strategy'
-import { getTypefacePreset, type TypefacePreset, typefacePresets } from '@/lib/typefaces'
-import type { VisualStylePreset } from '@/lib/visual-styles'
-import { visualStylePresets } from '@/lib/visual-styles'
+import {
+  recommendTypefaceDirection,
+  recommendTypefacesInDirection,
+  type RankedDirection,
+  type RankedTypeface,
+  type TypefaceRecommendationInput,
+} from '@/lib/recommend-typeface'
+import {
+  getTypefaceCssWeight,
+  getTypefaceFontFaceStyles,
+  typefaces,
+} from '@/lib/typefaces'
 
-type BusinessProfile = {
-  businessName?: string
-  logoUrl?: string
-  brandProfile?: {
-    offer?: string
-  }
-}
+type Step = 'direction' | 'typeface'
 
 function TypefaceContent() {
   const searchParams = useSearchParams()
-  const [selectedId, setSelectedId] = useState('block-w1g')
-  const [showFontModal, setShowFontModal] = useState(false)
-  const [profile, setProfile] = useState<BusinessProfile>({})
-  const [strategy, setStrategy] = useState<ContentStrategyOption | null>(null)
-  const [visualStyle, setVisualStyle] = useState<VisualStylePreset | null>(null)
+  const [input, setInput] = useState<TypefaceRecommendationInput>({})
+  const [rankedDirections, setRankedDirections] = useState<RankedDirection[]>([])
+  const [selectedDirectionId, setSelectedDirectionId] = useState<string | null>(null)
+  const [selectedTypefaceId, setSelectedTypefaceId] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>('direction')
 
-  const selectedTypeface = useMemo(() => getTypefacePreset(selectedId), [selectedId])
-  const businessName = profile.businessName || searchParams.get('brandName') || searchParams.get('name') || 'SOON-LOG'
-  const previewImage = visualStyle?.previewPath || strategy?.imageUrl || '/assets/content-strategies/photos/lifestyle-content.jpg'
-  const previewTitle = previewHeadline(businessName, strategy?.titleZh || strategy?.title || searchParams.get('strategy') || '')
-  const caption = `${businessName} ${profile.brandProfile?.offer || '把品牌故事變成一眼看得明的內容。'}`
+  const rankedTypefaces = useMemo(() => {
+    if (!selectedDirectionId) return []
+    return recommendTypefacesInDirection(selectedDirectionId, input)
+  }, [input, selectedDirectionId])
+
+  const selectedDirection = rankedDirections.find((direction) => direction.id === selectedDirectionId)
+  const selectedTypeface = rankedTypefaces.find((typeface) => typeface.id === selectedTypefaceId) || rankedTypefaces[0]
+  const googleTypefaceLinks = useMemo(
+    () => rankedTypefaces.filter((typeface) => typeface.isGoogleFont).map((typeface) => typeface.cdnUrl),
+    [rankedTypefaces]
+  )
 
   useEffect(() => {
-    setProfile(readSession<BusinessProfile>('soon-business-profile-v1') || {})
-    setStrategy(readSession<ContentStrategyOption>('soon-content-strategy-v1') || null)
+    const nextInput: TypefaceRecommendationInput = {
+      profile: readSession('soon-business-profile-v1') ?? undefined,
+      strategy: readSession('soon-content-strategy-v1') ?? undefined,
+      distribution: readSession('soon-distribution-preferences-v1') ?? undefined,
+    }
+    const ranked = recommendTypefaceDirection(nextInput)
+    const storedTypeface = readSession<{
+      directionId?: string
+      typefaceId?: string
+      id?: string
+    }>('soon-typeface-v1')
+    const typefaceFromStored = storedTypeface?.typefaceId || storedTypeface?.id
+    const storedDirection =
+      storedTypeface?.directionId ||
+      typefaces.find((typeface) => typeface.id === typefaceFromStored)?.directionId ||
+      ranked[0]?.id ||
+      null
 
-    const storedVisualStyle = readSession<VisualStylePreset>('soon-visual-style-v1')
-    const styleFromUrl = visualStylePresets.find((style) => style.id === searchParams.get('visualStyle'))
-    setVisualStyle(storedVisualStyle || styleFromUrl || visualStylePresets[0])
+    setInput(nextInput)
+    setRankedDirections(ranked)
+    setSelectedDirectionId(storedDirection)
+    if (typefaceFromStored) setSelectedTypefaceId(typefaceFromStored)
+  }, [])
 
-    const storedTypeface = readSession<TypefacePreset>('soon-typeface-v1')
-    if (storedTypeface?.id) setSelectedId(storedTypeface.id)
-  }, [searchParams])
+  useEffect(() => {
+    if (!selectedDirectionId || step !== 'typeface') return
+    const ranked = recommendTypefacesInDirection(selectedDirectionId, input)
+    if (!ranked.some((typeface) => typeface.id === selectedTypefaceId)) {
+      setSelectedTypefaceId(ranked[0]?.id ?? null)
+    }
+  }, [input, selectedDirectionId, selectedTypefaceId, step])
 
-  function handleContinue() {
-    sessionStorage.setItem('soon-typeface-v1', JSON.stringify(selectedTypeface))
+  function selectDirection(directionId: string) {
+    const ranked = recommendTypefacesInDirection(directionId, input)
+    setSelectedDirectionId(directionId)
+    setSelectedTypefaceId(ranked[0]?.id ?? null)
+    setStep('typeface')
+  }
 
-    const url = new URL('/onboarding/photo-control', window.location.origin)
+  function handleConfirm() {
+    if (!selectedDirection || !selectedTypeface) return
+
+    sessionStorage.setItem('soon-typeface-v1', JSON.stringify({
+      directionId: selectedDirection.id,
+      directionLabel: selectedDirection.label,
+      directionEmoji: selectedDirection.emoji,
+      typefaceId: selectedTypeface.id,
+      typefaceName: selectedTypeface.name,
+      typefaceNameEn: selectedTypeface.nameEn,
+      fontFamily: selectedTypeface.fontFamily,
+      cdnUrl: selectedTypeface.cdnUrl,
+      isGoogleFont: selectedTypeface.isGoogleFont ?? false,
+    }))
+
+    const url = new URL('/onboarding/content-mood', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign', 'visualStyle'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
@@ -61,116 +109,93 @@ function TypefaceContent() {
       <Steps />
       <button className="more-button" type="button" aria-label="More options">...</button>
 
-      <section className="typeface-layout">
-        <div className="typeface-panel">
-          <div className="typeface-center">
-            <header>
-              <h1>選擇字型</h1>
-              <p>字型會影響之後社交圖像、Reels 封面和廣告素材的第一印象。</p>
-            </header>
+      <header className="page-header">
+        <h1>選擇品牌字型風格</h1>
+        <p>先選擇整體感覺方向，再從推薦字型中選一款</p>
+      </header>
 
-            <button
-              className="selected-font-card"
-              onClick={() => setShowFontModal(true)}
-              style={{
-                fontFamily: selectedTypeface.fontFamily,
-                fontWeight: selectedTypeface.weight,
-                letterSpacing: selectedTypeface.letterSpacing,
-              }}
-              type="button"
-            >
-              <span aria-hidden="true">✓</span>
-              <strong>{selectedTypeface.title}</strong>
-              <small>{selectedTypeface.subtitle}</small>
-            </button>
-
-            <button className="browse-button" onClick={() => setShowFontModal(true)} type="button">
-              瀏覽所有字型
-            </button>
+      <section className="typeface-shell">
+        {rankedDirections.length === 0 ? (
+          <div className="direction-grid" aria-label="載入字型方向">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div className="direction-card skeleton" key={index} />
+            ))}
           </div>
-        </div>
-
-        <aside className="ig-preview-wrap" aria-label="Instagram preview">
-          <div className="ig-card">
-            <div className="ig-head">
-              {profile.logoUrl ? <img src={profile.logoUrl} alt={`${businessName} logo`} /> : <span>{businessName.slice(0, 2).toUpperCase()}</span>}
-              <div>
-                <strong>{businessName}</strong>
-                <small>剛剛</small>
-              </div>
-            </div>
-
-            <div className="ig-image">
-              <img src={previewImage} alt={`${businessName} preview`} />
-              <div className="headline-wrap">
-                <h2
-                  style={{
-                    fontFamily: selectedTypeface.fontFamily,
-                    fontWeight: selectedTypeface.weight,
-                    letterSpacing: selectedTypeface.letterSpacing,
-                  }}
+        ) : step === 'direction' ? (
+          <div className="direction-grid" aria-label="字型風格方向">
+            {rankedDirections.map((direction) => {
+              const selected = direction.id === selectedDirectionId
+              return (
+                <button
+                  aria-pressed={selected}
+                  className={selected ? 'direction-card selected' : 'direction-card'}
+                  key={direction.id}
+                  onClick={() => selectDirection(direction.id)}
+                  type="button"
                 >
-                  {previewTitle}
-                </h2>
-              </div>
-            </div>
-
-            <div className="ig-actions">
-              <span>♡</span>
-              <span>⌕</span>
-              <span>⌁</span>
-              <span>⌑</span>
-            </div>
-            <p><strong>{businessName}</strong> {caption}<em>...更多</em></p>
+                  {direction.recommended ? <span className="gold-badge">為你推薦</span> : null}
+                  <span className="direction-emoji">{direction.emoji}</span>
+                  <span className="direction-title">{direction.label}</span>
+                  <span className="direction-en">{direction.labelEn}</span>
+                  <span className="direction-tagline">{direction.tagline}</span>
+                  <span className="direction-desc">{direction.description}</span>
+                </button>
+              )
+            })}
           </div>
-        </aside>
-      </section>
-
-      {showFontModal ? (
-        <div className="modal-backdrop" role="presentation">
-          <section className="font-modal" aria-modal="true" role="dialog" aria-label="字型風格">
-            <header>
-              <h2>字型風格</h2>
-              <button aria-label="關閉" onClick={() => setShowFontModal(false)} type="button">×</button>
-            </header>
-
-            <div className="font-grid">
-              {typefacePresets.map((font) => {
-                const selected = font.id === selectedTypeface.id
+        ) : (
+          <div className="typeface-step">
+            <button className="back-inline" onClick={() => setStep('direction')} type="button">
+              ← 返回
+            </button>
+            <div className="step-subtitle">
+              <span>{selectedDirection?.emoji}</span>
+              <strong>{selectedDirection?.label}</strong>
+              <em>{selectedDirection?.labelEn}</em>
+            </div>
+            <div className="typeface-list" aria-label="字型選擇">
+              {rankedTypefaces.map((typeface) => {
+                const selected = typeface.id === selectedTypefaceId
                 return (
                   <button
-                    className={`font-option ${selected ? 'selected' : ''}`}
-                    key={font.id}
-                    onClick={() => setSelectedId(font.id)}
-                    style={{
-                      fontFamily: font.fontFamily,
-                      fontWeight: font.weight,
-                      letterSpacing: font.letterSpacing,
-                    }}
+                    aria-pressed={selected}
+                    className={selected ? 'typeface-card selected' : 'typeface-card'}
+                    key={typeface.id}
+                    onClick={() => setSelectedTypefaceId(typeface.id)}
                     type="button"
                   >
-                    <strong>{font.title}</strong>
-                    <small>{font.subtitle}</small>
-                    <em>{font.moodZh}</em>
+                    {typeface.recommended ? <span className="gold-badge">最推薦</span> : null}
+                    {selected ? <span className="checkmark">✓</span> : null}
+                    <strong
+                      style={{
+                        fontFamily: typeface.fontFamily,
+                        fontWeight: getTypefaceCssWeight(typeface.weight),
+                      }}
+                    >
+                      {typeface.nameEn}
+                    </strong>
+                    <em>{typeface.name}</em>
+                    <p>{typeface.description}</p>
                   </button>
                 )
               })}
             </div>
+          </div>
+        )}
+      </section>
 
-            <footer>
-              <button type="button" onClick={() => setShowFontModal(false)}>取消</button>
-              <button type="button" onClick={() => setShowFontModal(false)}>確認選擇</button>
-            </footer>
-          </section>
-        </div>
+      {step === 'typeface' ? (
+        <footer className="typeface-footer">
+          <button type="button" onClick={() => setStep('direction')}>返回</button>
+          <button disabled={!selectedTypeface} type="button" onClick={handleConfirm}>確認選擇</button>
+        </footer>
       ) : null}
 
-      <footer className="typeface-footer">
-        <button type="button" onClick={() => window.history.back()}>返回</button>
-        <button type="button" onClick={handleContinue}>下一步：相片使用</button>
-      </footer>
-
-      <style jsx>{styles}</style>
+      {googleTypefaceLinks.map((href) => (
+        <link href={href} key={href} rel="stylesheet" />
+      ))}
+      <style dangerouslySetInnerHTML={{ __html: getTypefaceFontFaceStyles() }} />
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
     </main>
   )
 }
@@ -198,22 +223,13 @@ function readSession<T>(key: string): T | null {
   }
 }
 
-function previewHeadline(businessName: string, strategyName: string) {
-  if (/產品|product|電商/i.test(strategyName)) return `重新認識 ${businessName}`
-  if (/優惠|offer|promotion/i.test(strategyName)) return `限時體驗 ${businessName}`
-  if (/故事|story/i.test(strategyName)) return `把日常變成故事`
-  if (/權威|authority|教育|education/i.test(strategyName)) return `懂得選擇，才會買得準`
-  return `讓你的品牌被記住`
-}
-
 const styles = `
   .typeface-page {
-    min-height: calc(100vh - 88px);
+    min-height: 100vh;
     background: #ffffff;
     color: #17181c;
     position: relative;
-    padding: 18px 0 76px;
-    overflow: hidden;
+    padding: 22px 24px 96px;
   }
 
   .steps {
@@ -223,8 +239,8 @@ const styles = `
     align-items: center;
     gap: 10px;
     color: #9a9a9a;
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .steps span {
@@ -240,345 +256,238 @@ const styles = `
 
   .steps b {
     color: #b4b4b4;
-    font-size: 0.92rem;
+    font-size: 15px;
     font-weight: 500;
   }
 
   .more-button {
-    position: absolute;
-    top: 18px;
-    right: 30px;
-    border: 0;
+    position: fixed;
+    top: 22px;
+    right: 24px;
+    border: none;
     background: transparent;
-    color: #1b1c1f;
-    font-size: 0.92rem;
+    color: #17181c;
+    font-size: 18px;
     cursor: pointer;
   }
 
-  .typeface-layout {
-    min-height: calc(100vh - 182px);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .typeface-panel {
-    display: grid;
-    place-items: center;
-    padding: 48px clamp(24px, 5vw, 72px);
-  }
-
-  .typeface-center {
-    width: min(100%, 560px);
-    display: grid;
-    justify-items: center;
-    gap: 22px;
-  }
-
-  .typeface-center header {
+  .page-header {
+    max-width: 760px;
+    margin: 58px auto 34px;
     text-align: center;
   }
 
-  h1 {
-    margin: 0 0 8px;
-    font-size: clamp(2rem, 4.2vw, 3rem);
-    line-height: 1;
+  .page-header h1 {
+    margin: 0;
+    font-size: clamp(38px, 5vw, 64px);
+    line-height: 0.98;
     letter-spacing: 0;
-    font-weight: 520;
+    font-weight: 780;
   }
 
-  .typeface-center p {
-    max-width: 480px;
+  .page-header p {
+    margin: 18px 0 0;
+    color: #777b84;
+    font-size: 18px;
+    line-height: 1.5;
+    font-weight: 560;
+  }
+
+  .typeface-shell {
+    width: min(860px, calc(100vw - 48px));
     margin: 0 auto;
-    color: #6b6f78;
-    font-size: 0.95rem;
-    line-height: 1.55;
   }
 
-  .selected-font-card {
-    width: min(100%, 500px);
-    min-height: 150px;
-    border: 1px solid #e6e7eb;
-    border-radius: 9px;
-    background: #fbfbfc;
-    color: #18191d;
-    cursor: pointer;
+  .direction-grid {
     display: grid;
-    place-items: center;
-    align-content: center;
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .direction-card,
+  .typeface-card {
     position: relative;
-    padding: 24px;
-  }
-
-  .selected-font-card span {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    background: #151515;
-    color: #ffffff;
-    display: grid;
-    place-items: center;
-    font: 600 0.8rem/1 Arial, sans-serif;
-  }
-
-  .selected-font-card strong {
-    font-size: clamp(2rem, 4.6vw, 3.2rem);
-    line-height: 0.95;
-    text-align: center;
-  }
-
-  .selected-font-card small {
-    font: 500 0.92rem/1.2 Arial, sans-serif;
-    color: #45484f;
-  }
-
-  .browse-button {
-    border: 1px solid #e3e4e8;
-    border-radius: 7px;
+    border: 1px solid #e1e3e8;
     background: #ffffff;
-    color: #23252b;
-    min-height: 38px;
-    padding: 0 18px;
-    font: inherit;
-    font-size: 0.9rem;
-    font-weight: 500;
+    color: #17181c;
+    border-radius: 18px;
+    text-align: left;
     cursor: pointer;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   }
 
-  .ig-preview-wrap {
-    min-height: calc(100vh - 182px);
-    background: radial-gradient(circle at 50% 10%, #2a2d30 0%, #101214 44%, #090a0b 100%);
-    display: grid;
-    place-items: center;
-    padding: 44px;
-  }
-
-  .ig-card {
-    width: min(100%, 360px);
-    border-radius: 7px;
-    background: #050505;
-    color: #ffffff;
-    overflow: hidden;
-    box-shadow: 0 28px 80px rgba(0,0,0,0.35);
-  }
-
-  .ig-head {
-    height: 42px;
+  .direction-card {
+    min-height: 190px;
+    padding: 26px 24px 22px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
-    padding: 0 12px;
   }
 
-  .ig-head img,
-  .ig-head span {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    object-fit: contain;
-    background: #1c1c1c;
-    display: grid;
-    place-items: center;
+  .direction-card:hover,
+  .typeface-card:hover {
+    transform: translateY(-1px);
+    border-color: #17181c;
+    box-shadow: 0 16px 40px rgba(22, 23, 28, 0.08);
+  }
+
+  .direction-card.selected,
+  .typeface-card.selected {
+    border-color: #17181c;
+    box-shadow: inset 0 0 0 1px #17181c, 0 16px 42px rgba(22, 23, 28, 0.08);
+  }
+
+  .direction-card.skeleton {
+    min-height: 190px;
+    background: linear-gradient(90deg, #f4f4f5 25%, #ececef 50%, #f4f4f5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .gold-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #d4a843;
     color: #ffffff;
-    font-size: 0.58rem;
-    font-weight: 800;
-  }
-
-  .ig-head div {
-    display: grid;
-    gap: 1px;
-  }
-
-  .ig-head strong {
-    font-size: 0.78rem;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
     line-height: 1;
     font-weight: 700;
   }
 
-  .ig-head small {
-    color: rgba(255,255,255,0.7);
-    font-size: 0.62rem;
+  .direction-emoji {
+    font-size: 32px;
+    line-height: 1;
+    margin: 18px 0 4px;
   }
 
-  .ig-image {
-    aspect-ratio: 4 / 5;
-    position: relative;
+  .direction-title {
+    font-size: 22px;
+    line-height: 1.1;
+    font-weight: 760;
+  }
+
+  .direction-en {
+    color: #8b8f98;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .direction-tagline {
+    color: #60646f;
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.35;
+  }
+
+  .direction-desc {
+    color: #5f6470;
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: nowrap;
     overflow: hidden;
-    background: #1b1b1d;
+    text-overflow: ellipsis;
   }
 
-  .ig-image > img {
+  .typeface-step {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .back-inline {
+    width: fit-content;
+    border: none;
+    background: transparent;
+    color: #555a64;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .step-subtitle {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 9px;
+    color: #555a64;
+  }
+
+  .step-subtitle span {
+    font-size: 20px;
+  }
+
+  .step-subtitle strong {
+    color: #17181c;
+    font-size: 18px;
+    font-weight: 750;
+  }
+
+  .step-subtitle em {
+    color: #8b8f98;
+    font-size: 13px;
+    font-style: normal;
+  }
+
+  .typeface-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .typeface-card {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    min-height: 140px;
+    padding: 30px 26px 22px;
+  }
+
+  .typeface-card strong {
     display: block;
+    font-size: 36px;
+    line-height: 1.05;
+    letter-spacing: 0;
+    margin-bottom: 12px;
   }
 
-  .headline-wrap {
-    position: absolute;
-    left: 34px;
-    right: 54px;
-    bottom: 48px;
-    display: flex;
-    justify-content: flex-start;
+  .typeface-card em {
+    display: block;
+    color: #777b84;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 650;
+    margin-bottom: 5px;
   }
 
-  .headline-wrap h2 {
-    max-width: 100%;
+  .typeface-card p {
     margin: 0;
-    border-radius: 8px;
-    background: rgba(39, 31, 28, 0.68);
-    color: #ffffff;
-    padding: 9px 11px;
-    font-size: clamp(1.35rem, 2.4vw, 1.75rem);
-    line-height: 1.08;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
-    box-decoration-break: clone;
-    -webkit-box-decoration-break: clone;
-    text-shadow: 0 2px 16px rgba(0,0,0,0.26);
-  }
-
-  .ig-actions {
-    height: 30px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 12px;
-    color: #f3f3f3;
-    font-size: 1.2rem;
-  }
-
-  .ig-actions span:last-child {
-    margin-left: auto;
-  }
-
-  .ig-card p {
-    margin: 0;
-    padding: 0 12px 14px;
-    color: rgba(255,255,255,0.78);
-    font-size: 0.78rem;
+    color: #777b84;
+    font-size: 12px;
     line-height: 1.45;
   }
 
-  .ig-card p strong {
+  .checkmark {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #17181c;
     color: #ffffff;
-    font-weight: 700;
-  }
-
-  .ig-card p em {
-    color: rgba(255,255,255,0.52);
-    font-style: normal;
-  }
-
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    background: rgba(10, 11, 13, 0.38);
-    backdrop-filter: blur(8px);
-    display: grid;
-    place-items: center;
-    padding: 32px;
-  }
-
-  .font-modal {
-    width: min(100%, 1040px);
-    max-height: min(760px, calc(100vh - 64px));
-    border-radius: 14px;
-    background: #ffffff;
-    color: #18191d;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    box-shadow: 0 24px 90px rgba(0,0,0,0.22);
-    overflow: hidden;
-  }
-
-  .font-modal header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 26px 32px 16px;
-  }
-
-  .font-modal h2 {
-    margin: 0;
-    font-size: 1.55rem;
-    font-weight: 520;
-    letter-spacing: 0;
-  }
-
-  .font-modal header button {
-    width: 34px;
-    height: 34px;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: #1c1d20;
-    cursor: pointer;
-    font-size: 1.35rem;
-    line-height: 1;
-  }
-
-  .font-grid {
-    overflow: auto;
-    padding: 0 32px 28px;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .font-option {
-    min-height: 150px;
-    border: 1px solid transparent;
-    border-radius: 9px;
-    background: #f7f7f8;
-    color: #17181c;
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    align-content: center;
-    gap: 9px;
-    padding: 18px;
-    text-align: center;
-  }
-
-  .font-option.selected {
-    border-color: #17181c;
-    box-shadow: inset 0 0 0 1px #17181c;
-    background: #fbfbfb;
-  }
-
-  .font-option strong {
-    font-size: clamp(1.6rem, 3.1vw, 2.65rem);
-    line-height: 0.96;
-    overflow-wrap: anywhere;
-  }
-
-  .font-option small,
-  .font-option em {
-    font: 500 0.82rem/1.25 Arial, sans-serif;
-    color: #3f4248;
-  }
-
-  .font-option em {
-    color: #777b82;
-    font-style: normal;
-  }
-
-  .font-modal footer,
-  .typeface-footer {
-    min-height: 56px;
-    border-top: 1px solid #e7e7e7;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(18px);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 22px;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 760;
   }
 
   .typeface-footer {
@@ -587,79 +496,83 @@ const styles = `
     right: 0;
     bottom: 0;
     z-index: 20;
+    height: 68px;
+    border-top: 1px solid #e8e8e8;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
   }
 
-  .font-modal footer button,
   .typeface-footer button {
-    min-height: 34px;
-    border-radius: 7px;
-    border: 0;
+    border: none;
+    border-radius: 10px;
     background: transparent;
-    color: #191919;
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 500;
+    color: #17181c;
+    font-size: 14px;
+    font-weight: 650;
     cursor: pointer;
-    padding: 0 14px;
+    padding: 10px 14px;
   }
 
-  .font-modal footer button:last-child,
   .typeface-footer button:last-child {
-    background: #111111;
+    background: #17181c;
     color: #ffffff;
+    padding: 11px 20px;
   }
 
-  @media (max-width: 960px) {
-    .typeface-page {
-      overflow: visible;
-    }
-
-    .typeface-layout {
-      grid-template-columns: 1fr;
-    }
-
-    .ig-preview-wrap {
-      min-height: auto;
-    }
+  .typeface-footer button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
-  @media (max-width: 680px) {
+  @media (max-width: 760px) {
     .typeface-page {
-      padding-top: 14px;
+      padding: 18px 16px 92px;
     }
 
     .steps {
-      width: calc(100% - 28px);
+      max-width: 100%;
       overflow-x: auto;
       justify-content: flex-start;
+      margin: 0;
     }
 
-    .typeface-panel {
-      padding: 36px 16px;
+    .page-header {
+      margin-top: 42px;
     }
 
-    .ig-preview-wrap {
-      padding: 28px 16px 36px;
+    .page-header h1 {
+      font-size: 38px;
     }
 
-    .font-grid {
+    .page-header p {
+      font-size: 15px;
+    }
+
+    .typeface-shell {
+      width: 100%;
+    }
+
+    .direction-grid {
       grid-template-columns: 1fr;
-      padding: 0 18px 24px;
     }
 
-    .modal-backdrop {
-      padding: 14px;
+    .direction-desc {
+      white-space: normal;
     }
 
-    .font-modal header {
-      padding: 20px 18px 14px;
+    .typeface-card strong {
+      font-size: 30px;
     }
   }
 `
 
 export default function TypefacePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<main className="typeface-page"><Steps /></main>}>
       <TypefaceContent />
     </Suspense>
   )

@@ -13,8 +13,6 @@ function LoginContent() {
   const error = searchParams.get('error')
   const next = normalizeAuthNext(searchParams.get('next'))
   const supabase = createClient()
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || 'https://soon-campaign-workspace.vercel.app'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,7 +25,7 @@ function LoginContent() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
   }
@@ -359,6 +357,11 @@ function LoginContent() {
 function normalizeAuthNext(value: string | null) {
   if (!value || value === '/my-workspace' || value.startsWith('/my-workspace/')) return '/onboarding'
   return value.startsWith('/') ? value : '/onboarding'
+}
+
+function getAppUrl() {
+  if (typeof window !== 'undefined') return window.location.origin
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://sooncreator.network'
 }
 
 export default function LoginPage() {

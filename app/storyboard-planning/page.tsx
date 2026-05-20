@@ -90,7 +90,7 @@ function StoryboardPlanningContent() {
     ))
   }, [pack])
 
-  const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
+  const dashboardHref = '/onboarding'
   const scriptPlanningHref = campaignIntakeId ? `/script-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/script-planning'
   const deliveryConfirmationHref = campaignIntakeId ? `/delivery-confirmation?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/delivery-confirmation'
 

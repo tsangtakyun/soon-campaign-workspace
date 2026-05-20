@@ -6,8 +6,8 @@ import { useSearchParams } from 'next/navigation'
 type Channel = {
   id: string
   label: string
-  icon: string
-  color: string
+  icon: 'instagram' | 'facebook' | 'threads' | 'rednote' | 'wechat' | 'tiktok' | 'youtube' | 'newsletter'
+  badge?: string
   disabled?: boolean
 }
 
@@ -22,36 +22,35 @@ const channelGroups: ChannelGroup[] = [
     id: 'social-feed',
     title: '社交 Feed Posts',
     channels: [
-      { id: 'instagram-feed', label: 'Instagram', icon: '◎', color: '#e84393' },
-      { id: 'facebook-feed', label: 'Facebook', icon: 'f', color: '#3178e8' },
-      { id: 'linkedin-feed', label: 'LinkedIn', icon: 'in', color: '#1d72b8' },
-      { id: 'x-feed', label: 'X (Twitter)', icon: 'X', color: '#111111' },
-      { id: 'google-business', label: 'Google Business Profile', icon: 'G', color: '#4285f4', disabled: true },
+      { id: 'instagram-feed', label: 'Instagram', icon: 'instagram' },
+      { id: 'facebook-feed', label: 'Facebook', icon: 'facebook' },
+      { id: 'threads-feed', label: 'Threads', icon: 'threads', badge: '即將推出' },
+      { id: 'rednote-feed', label: '小紅書', icon: 'rednote', badge: '手動發佈' },
+      { id: 'wechat-feed', label: 'WeChat', icon: 'wechat', badge: '手動發佈' },
     ],
   },
   {
     id: 'stories',
     title: 'Stories',
     channels: [
-      { id: 'instagram-stories', label: 'Instagram', icon: '◎', color: '#e84393' },
-      { id: 'facebook-stories', label: 'Facebook', icon: 'f', color: '#3178e8' },
+      { id: 'instagram-stories', label: 'Instagram', icon: 'instagram' },
+      { id: 'facebook-stories', label: 'Facebook', icon: 'facebook' },
     ],
   },
   {
     id: 'short-video',
     title: 'Short-form Video',
     channels: [
-      { id: 'instagram-reels', label: 'Instagram Reels', icon: '◎', color: '#e84393' },
-      { id: 'tiktok', label: 'TikTok', icon: '♪', color: '#111111' },
-      { id: 'youtube-shorts', label: 'YouTube', icon: '▶', color: '#ff2a21' },
+      { id: 'instagram-reels', label: 'Instagram Reels', icon: 'instagram' },
+      { id: 'tiktok', label: 'TikTok', icon: 'tiktok' },
+      { id: 'youtube-shorts', label: 'YouTube', icon: 'youtube' },
     ],
   },
   {
     id: 'long-email',
     title: 'Long-form & Email',
     channels: [
-      { id: 'blog', label: 'Blog', icon: '▤', color: '#111111' },
-      { id: 'newsletter', label: 'Newsletter', icon: '✉', color: '#111111' },
+      { id: 'newsletter', label: 'Newsletter', icon: 'newsletter' },
     ],
   },
 ]
@@ -59,9 +58,6 @@ const channelGroups: ChannelGroup[] = [
 const defaultSelected = new Set([
   'instagram-feed',
   'facebook-feed',
-  'linkedin-feed',
-  'x-feed',
-  'blog',
   'newsletter',
 ])
 
@@ -135,8 +131,9 @@ function DistributionContent() {
                         onClick={() => toggleChannel(channel)}
                         type="button"
                       >
-                        <span className="channel-icon" style={{ color: channel.color }}>{channel.icon}</span>
+                        <span className="channel-icon"><ChannelIcon icon={channel.icon} /></span>
                         <span>{channel.label}</span>
+                        {channel.badge ? <em>{channel.badge}</em> : null}
                         {selected ? <b>✓</b> : null}
                       </button>
                     )
@@ -196,6 +193,89 @@ function Steps() {
         </span>
       ))}
     </nav>
+  )
+}
+
+function ChannelIcon({ icon }: { icon: Channel['icon'] }) {
+  if (icon === 'instagram') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <defs>
+          <radialGradient id="distribution-ig-gradient" cx="30%" cy="107%" r="150%">
+            <stop offset="0%" stopColor="#fdf497" />
+            <stop offset="45%" stopColor="#fd5949" />
+            <stop offset="60%" stopColor="#d6249f" />
+            <stop offset="90%" stopColor="#285AEB" />
+          </radialGradient>
+        </defs>
+        <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#distribution-ig-gradient)" />
+        <circle cx="12" cy="12" r="4.3" fill="none" stroke="#fff" strokeWidth="1.8" />
+        <circle cx="17.4" cy="6.6" r="1.25" fill="#fff" />
+      </svg>
+    )
+  }
+
+  if (icon === 'facebook') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#1877F2" />
+        <path fill="#fff" d="M13.3 18.2v-5.6h1.9l.3-2.2h-2.2V9c0-.6.2-1.1 1.1-1.1h1.2V6a16 16 0 0 0-1.8-.1c-1.8 0-3 1.1-3 3v1.6H8.8v2.2h2.1v5.6h2.4Z" />
+      </svg>
+    )
+  }
+
+  if (icon === 'threads') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#111" />
+        <path fill="none" stroke="#fff" strokeLinecap="round" strokeWidth="1.7" d="M8.2 12.1c0-2.8 1.5-4.5 3.7-4.5 2.3 0 3.8 1.5 4 4.6m-7.2 3.3c.8 1 2 1.5 3.4 1.5 2.2 0 3.7-1.1 3.7-2.7 0-1.5-1.2-2.4-3.3-2.4h-1.1c-1.8 0-2.8.8-2.8 2 0 1.1.9 1.8 2.2 1.8 1.9 0 3.2-1.2 3.2-3.1" />
+      </svg>
+    )
+  }
+
+  if (icon === 'rednote') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="2" y="2" width="20" height="20" rx="5" fill="#ff2442" />
+        <text x="12" y="15.5" textAnchor="middle" fill="#fff" fontSize="10" fontWeight="800">书</text>
+      </svg>
+    )
+  }
+
+  if (icon === 'wechat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#07C160" />
+        <path fill="#fff" d="M10 8.2c-3 0-5.3 1.8-5.3 4 0 1.2.7 2.3 1.8 3l-.4 1.5 1.7-.9c.7.3 1.4.4 2.2.4 3 0 5.3-1.8 5.3-4s-2.4-4-5.3-4Zm-1.8 3.3a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4Zm3.4 0a.7.7 0 1 1 0-1.4.7.7 0 0 1 0 1.4Z" />
+        <path fill="#fff" opacity=".92" d="M14.8 11.6c2.5 0 4.5 1.5 4.5 3.4 0 1-.6 1.9-1.5 2.5l.3 1.2-1.4-.7c-.6.2-1.2.3-1.9.3-2.5 0-4.5-1.5-4.5-3.4s2-3.3 4.5-3.3Zm-1.5 2.8a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2Zm2.9 0a.6.6 0 1 0 0-1.2.6.6 0 0 0 0 1.2Z" />
+      </svg>
+    )
+  }
+
+  if (icon === 'tiktok') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="#111" />
+        <path fill="#25F4EE" d="M13.2 6.3h2c.2 1.4 1 2.4 2.4 2.8v2a5.8 5.8 0 0 1-2.4-.8v4.3a3.7 3.7 0 1 1-3.8-3.7h.4v2.2h-.5a1.5 1.5 0 1 0 1.5 1.5V6.3h.4Z" />
+        <path fill="#FE2C55" d="M12.6 6.1h2c.2 1.4 1 2.4 2.4 2.8v2a5.8 5.8 0 0 1-2.4-.8v4.3a3.7 3.7 0 1 1-3.8-3.7h.4v2.2h-.5a1.5 1.5 0 1 0 1.5 1.5V6.1h.4Z" />
+      </svg>
+    )
+  }
+
+  if (icon === 'youtube') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="6.2" width="18" height="11.6" rx="3.2" fill="#FF0000" />
+        <path fill="#fff" d="m10.4 9.3 5 2.7-5 2.7V9.3Z" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="3" fill="#111" />
+      <path fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" d="m5.8 8 6.2 5 6.2-5" />
+    </svg>
   )
 }
 
@@ -351,6 +431,25 @@ const styles = `
     place-items: center;
     font-weight: 650;
     line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .channel-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  .channel-pill em {
+    border-radius: 999px;
+    background: #f0f1f3;
+    color: #6c7078;
+    font-size: 0.66rem;
+    font-style: normal;
+    font-weight: 650;
+    line-height: 1;
+    padding: 4px 7px;
+    white-space: nowrap;
   }
 
   .channel-pill b {
@@ -360,7 +459,7 @@ const styles = `
     margin-left: 2px;
     display: inline-grid;
     place-items: center;
-    background: #191919;
+    background: #16a34a;
     color: #ffffff;
     font-size: 0.66rem;
   }

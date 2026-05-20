@@ -20,21 +20,33 @@ export async function generateCampaignTheme(input: CampaignThemeInput): Promise<
 
   if (!apiKey) return fallback
 
-  const systemPrompt = [
-    'You are a senior campaign strategist for SOON, an AI marketing platform.',
-    'Create the first campaign details after the user has confirmed a brand profile and selected a content strategy.',
-    'Return only valid JSON. No markdown.',
-    'All human-facing strings must use the requested language.',
-    'For Traditional Chinese, use polished written Traditional Chinese suitable for a client-facing SaaS product.',
-    'The campaign should be practical enough to direct social, video, newsletter, and ad content.',
-    'The campaign name must feel like a real working campaign or content series title, not a vague slogan.',
-    'Keep the campaign name concise, specific, and executable. It should include the concrete customer situation, product use case, content angle, or repeated format when possible.',
-    'Avoid generic AI-sounding words such as: transformation, innovation, empowerment, elevation, exploration, aesthetics, journey, revolution, breakthrough, next generation, unlock, redefine, reimagine.',
-    'For Traditional Chinese, also avoid vague terms like 美學、探索、革新、賦能、重塑、蛻變、突破、昇華、旅程、解鎖 unless the brand itself uses those words.',
-    'Good campaign names look like: 5 秒日常記憶企劃, 朋友日常回憶 Campaign, 把生活變成影片日記, 每日一段回憶計劃.',
-    'Bad campaign names look like: 生活美學探索, 記憶重現生活, 品牌革新之旅, 解鎖未來體驗.',
-    'Theme can be 2-4 sentences.',
-  ].join(' ')
+  const systemPrompt = `You are a senior campaign strategist for SOON, an AI marketing platform. Create the first campaign details after the user has confirmed a brand profile and selected a content strategy. Return only valid JSON. No markdown. All human-facing strings must use the requested language.
+
+LANGUAGE RULES:
+- If the brand name is English and the requested language is Traditional Chinese, you may use a mixed Chinese-English campaign name if it sounds natural (e.g. 'Natter 街坊咖啡時間', 'Natter 每週選擇題'). Do not force a pure Chinese name onto an English brand.
+- If the brand is Chinese, use Chinese only.
+- For Traditional Chinese, use polished written Traditional Chinese suitable for a client-facing SaaS product.
+
+CAMPAIGN NAME RULES:
+- Must feel like a real working campaign or content series title, not a vague slogan
+- Must be concise, specific, and executable
+- Should reflect the selected content strategy type
+- Should reflect the brand's actual offer, audience behavior, or usage scene
+- If budget is high (HK$10,000+), campaign can be more ambitious in scope
+- Maximum 14 Chinese characters or 6 English words unless mixed is clearly better
+- Avoid generic AI-sounding words: transformation, innovation, empowerment, elevation, exploration, aesthetics, journey, revolution, breakthrough, next generation, unlock, redefine, reimagine
+- For Traditional Chinese, also avoid: 美學、探索、革新、賦能、重塑、蛻變、突破、昇華、旅程、解鎖
+
+GOOD campaign names: 'Natter 街坊投票時間', '每週咖啡選擇 by Natter', '5秒日常記憶企劃', '朋友日常回憶 Campaign'
+BAD campaign names: '生活美學探索', 'Godalming 咖啡選擇題', '品牌革新之旅', '解鎖未來體驗'
+
+THEME RULES:
+- 2-4 sentences
+- Should feel like a creative brief, not a description
+- Include the emotional benefit, the content format, and the audience behavior you want to trigger
+- Reference the season, location, or current moment when relevant
+
+The campaign should be practical enough to direct social, video, newsletter, and ad content.`
 
   const userPrompt = [
     `Requested language: ${language}`,
@@ -49,6 +61,10 @@ export async function generateCampaignTheme(input: CampaignThemeInput): Promise<
     `Selected content strategy: ${input.strategy?.title || '未提供'} / ${input.strategy?.titleZh || ''}`,
     `Strategy description: ${input.strategy?.description || '未提供'}`,
     `Strategy reason: ${input.strategy?.reason || '未提供'}`,
+    `Monthly budget: ${input.profile?.budget || '未提供'}`,
+    `Content people: ${input.profile?.contentPeople?.ageRange || ''} ${input.profile?.contentPeople?.gender || ''} ${input.profile?.contentPeople?.ethnicity || ''}`,
+    `Brand tone: ${input.profile?.brandProfile?.tone || '未提供'}`,
+    `Main offer: ${input.profile?.brandProfile?.offer || '未提供'}`,
     '',
     'Campaign name rules:',
     '- Do not write a brand slogan.',

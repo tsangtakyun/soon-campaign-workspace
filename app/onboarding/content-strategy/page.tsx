@@ -59,6 +59,7 @@ function ContentStrategyContent() {
 
       const stored = sessionStorage.getItem('soon-business-profile-v1')
       const profile = stored ? JSON.parse(stored) : {}
+      profile.budget = profile.budget || searchParams.get('budget') || ''
       const language = profile.language || searchParams.get('language') || '繁體中文'
 
       try {

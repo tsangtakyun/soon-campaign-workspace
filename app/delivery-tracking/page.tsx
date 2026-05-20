@@ -83,7 +83,7 @@ function DeliveryTrackingContent() {
     loadSavedCampaign()
   }, [campaignIntakeId])
 
-  const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
+  const dashboardHref = '/onboarding'
   const deliveryConfirmationHref = campaignIntakeId ? `/delivery-confirmation?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/delivery-confirmation'
 
   const progressCards = useMemo(() => ([

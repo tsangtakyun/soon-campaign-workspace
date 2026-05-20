@@ -1,18 +1,43 @@
 'use client'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
+import { recommendVisualStyles, type RankedVisualStyle } from '@/lib/recommend-styles'
 import { type VisualStylePreset, visualStyleBeforePath, visualStylePresets } from '@/lib/visual-styles'
 
 function VisualStyleContent() {
   const searchParams = useSearchParams()
   const [selectedId, setSelectedId] = useState(searchParams.get('style') || visualStylePresets[0].id)
+  const [rankedStyles, setRankedStyles] = useState<RankedVisualStyle[]>([])
   const [split, setSplit] = useState(50)
 
   const selectedStyle = useMemo(() => {
-    return visualStylePresets.find((style) => style.id === selectedId) || visualStylePresets[0]
-  }, [selectedId])
+    return rankedStyles.find((style) => style.id === selectedId) || visualStylePresets.find((style) => style.id === selectedId) || rankedStyles[0] || visualStylePresets[0]
+  }, [rankedStyles, selectedId])
+
+  useEffect(() => {
+    const readSession = (key: string) => {
+      try {
+        const raw = sessionStorage.getItem(key)
+        return raw ? JSON.parse(raw) : null
+      } catch {
+        return null
+      }
+    }
+
+    const profile = readSession('soon-business-profile-v1')
+    const strategy = readSession('soon-content-strategy-v1')
+    const distribution = readSession('soon-distribution-preferences-v1')
+    const contentMix = readSession('soon-content-mix-v1')
+    const ranked = recommendVisualStyles({ profile, strategy, distribution, contentMix })
+
+    setRankedStyles(ranked)
+
+    if (!searchParams.get('style') && ranked[0]?.id) {
+      setSelectedId(ranked[0].id)
+    }
+  }, [searchParams])
 
   function selectStyle(style: VisualStylePreset) {
     setSelectedId(style.id)
@@ -36,16 +61,27 @@ function VisualStyleContent() {
       <Steps />
       <button className="more-button" type="button" aria-label="More options">...</button>
 
+      <header className="page-header">
+        <h1>選擇內容的視覺風格</h1>
+        <p>SOON 會用這個 preset 作為之後生成內容的色調方向。這裡只是在選風格，不是選這張相。</p>
+      </header>
+
       <section className="visual-layout">
         <div className="style-panel">
-          <header>
-            <h1>選擇內容的視覺風格</h1>
-            <p>SOON 會用這個 preset 作為之後生成內容的色調方向。這裡只是在選風格，不是選這張相。</p>
-          </header>
-
           <p className="section-label">所有風格</p>
           <div className="style-list">
-            {visualStylePresets.map((style) => {
+            {rankedStyles.length === 0 ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <div className="style-option skeleton-option" key={index}>
+                  <span className="skeleton-thumb" />
+                  <span className="option-body">
+                    <span className="skeleton-line wide" />
+                    <span className="skeleton-line" />
+                    <span className="skeleton-line short" />
+                  </span>
+                </div>
+              ))
+            ) : rankedStyles.map((style) => {
               const selected = style.id === selectedStyle.id
               return (
                 <button
@@ -54,9 +90,13 @@ function VisualStyleContent() {
                   onClick={() => selectStyle(style)}
                   type="button"
                 >
-                  <img src={style.previewImage} alt={`${style.titleZh} / ${style.title}`} />
+                  {style.recommended ? <span className="recommended-badge">為你推薦</span> : null}
+                  <img src={style.previewImage} alt={`${style.chineseName} / ${style.name}`} />
                   <span className="option-body">
-                    <strong>{style.titleZh} / {style.title}</strong>
+                    <strong>
+                      <span>{style.chineseName}</span>
+                      <span>{style.name}</span>
+                    </strong>
                     <em>{style.description}</em>
                     <small>
                       <span>光線：{style.lighting}</span>
@@ -95,11 +135,6 @@ function VisualStyleContent() {
             />
           </div>
 
-          <section className="style-note">
-            <p>已連接 LUT</p>
-            <h2>{selectedStyle.fileName}</h2>
-            <span>這個 preset 會被儲存在 onboarding 資料入面，之後可用同一個 ID 對應到真正內容生成或後期處理。</span>
-          </section>
         </aside>
       </section>
 
@@ -183,8 +218,10 @@ const styles = `
     align-items: start;
   }
 
-  header {
-    margin-bottom: 24px;
+  .page-header {
+    width: min(100%, 1320px);
+    margin: 0 auto 28px;
+    text-align: center;
   }
 
   h1 {
@@ -195,12 +232,13 @@ const styles = `
     font-weight: 520;
   }
 
-  header p {
+  .page-header p {
     max-width: 650px;
-    margin: 0;
+    margin: 0 auto;
     color: #666970;
     font-size: 0.96rem;
     line-height: 1.5;
+    text-align: center;
   }
 
   .section-label {
@@ -215,10 +253,11 @@ const styles = `
     overflow: auto;
     padding-right: 8px;
     display: grid;
-    gap: 10px;
+    gap: 8px;
   }
 
   .style-option {
+    position: relative;
     width: 100%;
     border: 1px solid #e7e7e7;
     border-radius: 11px;
@@ -226,11 +265,11 @@ const styles = `
     color: #17181c;
     cursor: pointer;
     display: grid;
-    grid-template-columns: 82px 1fr 26px;
-    gap: 14px;
+    grid-template-columns: 120px 1fr 22px;
+    gap: 11px;
     align-items: center;
     text-align: left;
-    padding: 10px;
+    padding: 8px;
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
@@ -245,51 +284,74 @@ const styles = `
   }
 
   .style-option img {
-    width: 82px;
-    aspect-ratio: 1;
+    width: 120px;
+    height: 128px;
     border-radius: 8px;
     object-fit: cover;
     background: #f1f1f2;
   }
 
+  .recommended-badge {
+    position: absolute;
+    top: 13px;
+    left: 13px;
+    z-index: 2;
+    border-radius: 999px;
+    background: #d4a843;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 650;
+    line-height: 1;
+    padding: 4px 6px;
+    pointer-events: none;
+  }
+
   .option-body {
     min-width: 0;
     display: grid;
-    gap: 5px;
+    gap: 4px;
   }
 
   .option-body strong {
-    font-size: 0.98rem;
+    display: grid;
+    gap: 1px;
+    font-size: 0.78rem;
     line-height: 1.2;
     font-weight: 580;
+  }
+
+  .option-body strong span:last-child {
+    color: #6a6d74;
+    font-size: 0.7rem;
+    font-weight: 520;
   }
 
   .option-body em {
     color: #62656b;
     font-style: normal;
-    font-size: 0.84rem;
+    font-size: 0.67rem;
     line-height: 1.4;
   }
 
   .option-body small {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
+    gap: 6px 10px;
     color: #777b82;
-    font-size: 0.76rem;
+    font-size: 0.61rem;
     line-height: 1.2;
   }
 
   .style-option b {
-    width: 24px;
-    height: 24px;
+    width: 19px;
+    height: 19px;
     border-radius: 999px;
     border: 1px solid #dddddd;
     display: grid;
     place-items: center;
     background: #ffffff;
     color: #ffffff;
-    font-size: 0.82rem;
+    font-size: 0.66rem;
     font-weight: 600;
   }
 
@@ -298,18 +360,57 @@ const styles = `
     background: #161719;
   }
 
+  .skeleton-option {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .skeleton-thumb,
+  .skeleton-line {
+    display: block;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #f1f1f2 25%, #e5e5e7 50%, #f1f1f2 75%);
+    background-size: 200% 100%;
+    animation: visual-shimmer 1.4s infinite;
+  }
+
+  .skeleton-thumb {
+    width: 120px;
+    height: 128px;
+  }
+
+  .skeleton-line {
+    width: 60%;
+    height: 10px;
+  }
+
+  .skeleton-line.wide {
+    width: 82%;
+    height: 13px;
+  }
+
+  .skeleton-line.short {
+    width: 42%;
+  }
+
+  @keyframes visual-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   .preview-panel {
     position: sticky;
     top: 18px;
     display: grid;
-    gap: 14px;
+    gap: 11px;
+    margin-top: 29px;
   }
 
   .preview-frame {
-    min-height: 620px;
+    min-height: 496px;
     border-radius: 16px;
     overflow: hidden;
-    background: #f1f1f1;
+    background: #f7f7f7;
     position: relative;
     box-shadow: 0 18px 60px rgba(0, 0, 0, 0.08);
   }
@@ -319,7 +420,8 @@ const styles = `
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center;
   }
 
   .after-layer {
@@ -392,34 +494,6 @@ const styles = `
     cursor: ew-resize;
   }
 
-  .style-note {
-    border: 1px solid #ececef;
-    border-radius: 12px;
-    padding: 16px;
-    background: #ffffff;
-  }
-
-  .style-note p {
-    margin: 0 0 6px;
-    color: #73777f;
-    font-size: 0.76rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .style-note h2 {
-    margin: 0 0 8px;
-    font-size: 1rem;
-    font-weight: 580;
-  }
-
-  .style-note span {
-    display: block;
-    color: #62656b;
-    font-size: 0.84rem;
-    line-height: 1.5;
-  }
-
   .visual-footer {
     position: fixed;
     left: 0;
@@ -466,10 +540,11 @@ const styles = `
 
     .preview-panel {
       position: static;
+      margin-top: 0;
     }
 
     .preview-frame {
-      min-height: 520px;
+      min-height: 416px;
     }
   }
 
@@ -485,15 +560,17 @@ const styles = `
     }
 
     .style-option {
-      grid-template-columns: 68px 1fr 24px;
+      grid-template-columns: 77px 1fr 19px;
     }
 
-    .style-option img {
-      width: 68px;
+    .style-option img,
+    .skeleton-thumb {
+      width: 77px;
+      height: 90px;
     }
 
     .preview-frame {
-      min-height: 420px;
+      min-height: 336px;
     }
   }
 `

@@ -102,7 +102,7 @@ function ScriptPlanningContent() {
     setBackingInfo((prev) => (prev.corePositioning || prev.strongestSellingPoint || prev.suitableAudience || prev.backgroundNotes ? prev : pack.backingInformation))
     setTestContentItems((prev) => (prev.some((item) => item.trim()) ? prev : pack.testContentItems))
   }, [pack])
-  const dashboardHref = campaignIntakeId ? `/my-workspace/${encodeURIComponent(campaignIntakeId)}` : '/my-workspace'
+  const dashboardHref = '/onboarding'
   const creatorHref = campaignIntakeId ? `/creator-matching?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/creator-matching'
   const storyboardHref = campaignIntakeId ? `/storyboard-planning?campaign_intake_id=${encodeURIComponent(campaignIntakeId)}` : '/storyboard-planning'
 

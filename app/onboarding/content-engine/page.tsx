@@ -36,6 +36,11 @@ type ManualProfile = {
   marketPositioning: MarketPositioning
 }
 
+type AnalysisPreviewState = {
+  data: any | null
+  revealStep: number
+}
+
 const emptyManualProfile: ManualProfile = {
   businessName: '',
   businessType: '',
@@ -55,6 +60,7 @@ function ContentEngineContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [progressIndex, setProgressIndex] = useState(0)
+  const [analysisPreview, setAnalysisPreview] = useState<AnalysisPreviewState>({ data: null, revealStep: 0 })
 
   useEffect(() => {
     if (!loading) return
@@ -85,6 +91,45 @@ function ContentEngineContent() {
       contentPersona: '產品',
       primaryLanguage: data?.language === 'English (US)' || data?.language === 'English (UK)' ? 'English' : '繁體中文',
       marketPositioning: '中價優質',
+    }
+  }
+
+  function websiteHost(value: string) {
+    try {
+      const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
+      return new URL(withProtocol).hostname.replace(/^www\./, '')
+    } catch {
+      return value.trim()
+    }
+  }
+
+  function faviconUrl(value: string) {
+    const host = websiteHost(value)
+    return host ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=96` : ''
+  }
+
+  function displayImageUrl(value: string) {
+    if (!value) return ''
+    if (value.startsWith('blob:') || value.startsWith('data:')) return value
+    return `/api/website-image?url=${encodeURIComponent(value)}`
+  }
+
+  function analysisBusinessTypeLabel(value: unknown) {
+    if (value === 'local') return '實體店'
+    if (value === 'products') return '產品品牌'
+    if (value === 'services') return '服務業'
+    return '正在判斷'
+  }
+
+  function analysisPositioning(data: any) {
+    return data?.brandProfile?.position || data?.marketPositioning?.primary || '正在整理品牌定位'
+  }
+
+  async function revealAnalysis(data: any) {
+    setAnalysisPreview({ data, revealStep: 0 })
+    for (let step = 1; step <= 5; step += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+      setAnalysisPreview({ data, revealStep: step })
     }
   }
 
@@ -187,6 +232,7 @@ function ContentEngineContent() {
     setLoading(true)
     setError('')
     setProgressIndex(0)
+    setAnalysisPreview({ data: null, revealStep: 0 })
 
     const passthrough = passthroughParams()
 
@@ -211,6 +257,7 @@ function ContentEngineContent() {
         onboarding: passthrough,
       }))
 
+      await revealAnalysis(data)
       setManualProfile(mapAnalysisToManual(data))
       setMode('manual')
       setLoading(false)
@@ -245,27 +292,43 @@ function ContentEngineContent() {
             <div>
               <strong>你的網站</strong>
               <div className="browser-card">
-                <span>{website.trim()}</span>
-                <div className="skeleton image" />
-                <div className="skeleton line wide" />
-                <div className="skeleton line" />
-                <div className="skeleton button" />
+                <div className="browser-url-row">
+                  {faviconUrl(website) ? <img src={faviconUrl(website)} alt="" /> : <i />}
+                  <span>{website.trim()}</span>
+                </div>
+                <div className={`website-visual ${analysisPreview.revealStep >= 5 ? 'revealed' : ''}`}>
+                  {analysisPreview.data?.logoUrl ? (
+                    <img src={displayImageUrl(analysisPreview.data.logoUrl)} alt="" />
+                  ) : (
+                    <div className="skeleton image" />
+                  )}
+                </div>
+                <div className={analysisPreview.data ? 'website-copy revealed' : 'website-copy'}>
+                  <b>{analysisPreview.data?.sourceSummary?.title || websiteHost(website)}</b>
+                  <p>{analysisPreview.data?.sourceSummary?.description || '正在讀取網站標題、描述和頁面內容...'}</p>
+                </div>
               </div>
             </div>
             <div className="arrow">→</div>
             <div>
               <strong>品牌資料</strong>
               <div className="profile-card">
-                <div className="brand-row">
-                  <i />
-                  <span>正在建立...</span>
+                <div className={`brand-row ${analysisPreview.revealStep >= 1 ? 'revealed' : ''}`}>
+                  {analysisPreview.data?.logoUrl ? <img src={displayImageUrl(analysisPreview.data.logoUrl)} alt="" /> : <i />}
+                  <span>{analysisPreview.revealStep >= 1 ? analysisPreview.data?.businessName || '你的品牌' : '正在建立...'}</span>
                 </div>
-                {['類型', '受眾', '定位'].map((item) => (
-                  <div className="profile-row" key={item}>
-                    <b>{item}</b>
-                    <span />
-                  </div>
-                ))}
+                <div className={`profile-row ${analysisPreview.revealStep >= 2 ? 'revealed' : ''}`}>
+                  <b>類型</b>
+                  {analysisPreview.revealStep >= 2 ? <em>{analysisBusinessTypeLabel(analysisPreview.data?.businessType)}</em> : <span />}
+                </div>
+                <div className={`profile-row ${analysisPreview.revealStep >= 3 ? 'revealed' : ''}`}>
+                  <b>受眾</b>
+                  {analysisPreview.revealStep >= 3 ? <em>{analysisPreview.data?.audience?.summary || '正在整理目標受眾'}</em> : <span />}
+                </div>
+                <div className={`profile-row ${analysisPreview.revealStep >= 4 ? 'revealed' : ''}`}>
+                  <b>定位</b>
+                  {analysisPreview.revealStep >= 4 ? <em>{analysisPositioning(analysisPreview.data)}</em> : <span />}
+                </div>
               </div>
             </div>
           </div>
@@ -324,11 +387,30 @@ function ContentEngineContent() {
             padding: 20px;
           }
 
-          .browser-card span {
-            display: block;
+          .browser-url-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 18px;
-            color: #a1a1a1;
-            font-size: 0.9rem;
+            color: #62666d;
+            font-size: 0.95rem;
+            font-weight: 750;
+          }
+
+          .browser-url-row img,
+          .browser-url-row i {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: #eeeeee;
+            flex-shrink: 0;
+          }
+
+          .browser-url-row span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
 
           .skeleton,
@@ -341,8 +423,53 @@ function ContentEngineContent() {
           }
 
           .skeleton.image {
-            height: 96px;
-            margin-bottom: 18px;
+            width: 100%;
+            height: 100%;
+          }
+
+          .website-visual {
+            height: 108px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #ffffff;
+            border: 1px solid #eeeeee;
+            opacity: 0.78;
+            padding: 18px;
+            transition: opacity 220ms ease, transform 220ms ease;
+          }
+
+          .website-visual.revealed,
+          .website-copy.revealed {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          .website-visual img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+
+          .website-copy {
+            opacity: 0.72;
+            transform: translateY(4px);
+            transition: opacity 220ms ease, transform 220ms ease;
+          }
+
+          .website-copy b {
+            display: block;
+            margin-bottom: 6px;
+            color: #1b1c1f;
+            font-size: 0.95rem;
+            line-height: 1.35;
+          }
+
+          .website-copy p {
+            margin: 0;
+            color: #70737a;
+            font-size: 0.86rem;
+            line-height: 1.45;
           }
 
           .skeleton.line {
@@ -369,13 +496,25 @@ function ContentEngineContent() {
             border-bottom: 1px solid #ededed;
             color: #767676;
             font-weight: 700;
+            opacity: 0.75;
+            transition: opacity 220ms ease, transform 220ms ease;
           }
 
-          .brand-row i {
+          .brand-row.revealed,
+          .profile-row.revealed {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          .brand-row i,
+          .brand-row img {
             width: 42px;
             height: 42px;
-            border-radius: 50%;
-            background: #eeeeee;
+            border-radius: 12px;
+            background: #f6f6f6;
+            object-fit: contain;
+            padding: 6px;
+            flex-shrink: 0;
           }
 
           .profile-row {
@@ -384,6 +523,9 @@ function ContentEngineContent() {
             align-items: center;
             gap: 16px;
             margin-top: 22px;
+            opacity: 0.75;
+            transform: translateY(5px);
+            transition: opacity 220ms ease, transform 220ms ease;
           }
 
           .profile-row b {
@@ -392,6 +534,15 @@ function ContentEngineContent() {
 
           .profile-row span {
             height: 14px;
+          }
+
+          .profile-row em {
+            color: #1b1c1f;
+            font-size: 0.92rem;
+            font-style: normal;
+            font-weight: 700;
+            line-height: 1.4;
+            animation: revealText 220ms ease both;
           }
 
           .arrow {
@@ -405,6 +556,18 @@ function ContentEngineContent() {
           @keyframes shimmer {
             to {
               background-position: -240% 0;
+            }
+          }
+
+          @keyframes revealText {
+            from {
+              opacity: 0;
+              transform: translateY(5px);
+            }
+
+            to {
+              opacity: 1;
+              transform: translateY(0);
             }
           }
 
@@ -504,7 +667,17 @@ function ContentEngineContent() {
               <label className="manual-field upload-field">
                 <span>上傳 Logo 或品牌圖片（選填）</span>
                 <input type="file" accept="image/*" onChange={handleLogoUpload} />
-                {manualProfile.logoUrl ? <em>已選擇品牌圖片</em> : null}
+                {manualProfile.logoUrl ? (
+                  <div className="logo-preview-card">
+                    <div className="logo-preview-image">
+                      <img src={displayImageUrl(manualProfile.logoUrl)} alt="" />
+                    </div>
+                    <div>
+                      <strong>已自動擷取品牌圖片</strong>
+                      <em>你可以保留這張圖，或重新上傳另一張。</em>
+                    </div>
+                  </div>
+                ) : null}
               </label>
 
               <label className="manual-field">
@@ -659,11 +832,11 @@ function ContentEngineContent() {
           min-height: 48px;
           border: 0;
           border-radius: 8px;
-          background: #ef3f2f;
+          background: #202126;
           color: #ffffff;
           font: inherit;
           font-size: 1.05rem;
-          font-weight: 800;
+          font-weight: 500;
           cursor: pointer;
         }
 
@@ -676,17 +849,17 @@ function ContentEngineContent() {
           width: fit-content;
           border: 0;
           background: transparent;
-          color: #ef3f2f;
+          color: #555960;
           font: inherit;
           font-size: 0.98rem;
-          font-weight: 750;
+          font-weight: 500;
           cursor: pointer;
           padding: 8px 4px;
           transition: color 160ms ease, transform 160ms ease;
         }
 
         .switch-link:hover {
-          color: #c92f22;
+          color: #202126;
           transform: translateX(2px);
         }
 
@@ -737,11 +910,47 @@ function ContentEngineContent() {
           cursor: pointer;
         }
 
+        .logo-preview-card {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 12px;
+          border: 1px solid #e6e6e6;
+          border-radius: 8px;
+          background: #fbfbfb;
+        }
+
+        .logo-preview-image {
+          width: 72px;
+          height: 48px;
+          display: grid;
+          place-items: center;
+          border-radius: 6px;
+          overflow: hidden;
+          background: #ffffff;
+          border: 1px solid #eeeeee;
+          flex-shrink: 0;
+        }
+
+        .logo-preview-image img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          padding: 6px;
+        }
+
+        .logo-preview-card strong {
+          display: block;
+          margin-bottom: 3px;
+          color: #1b1c1f;
+          font-size: 0.9rem;
+        }
+
         .upload-field em {
           color: #357a4f;
           font-size: 0.86rem;
           font-style: normal;
-          font-weight: 700;
+          font-weight: 500;
         }
 
         .toggle-grid {
@@ -765,18 +974,19 @@ function ContentEngineContent() {
           color: #1b1c1f;
           font: inherit;
           font-size: 0.95rem;
-          font-weight: 750;
+          font-weight: 500;
           cursor: pointer;
           transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
         }
 
         .toggle-grid button:hover {
-          border-color: #ef3f2f;
+          border-color: #202126;
+          background: #fafafa;
         }
 
         .toggle-grid button.selected {
-          border-color: #ef3f2f;
-          background: #ef3f2f;
+          border-color: #202126;
+          background: #202126;
           color: #ffffff;
         }
 
@@ -785,11 +995,11 @@ function ContentEngineContent() {
           margin-top: 8px;
           border: 0;
           border-radius: 8px;
-          background: #ef3f2f;
+          background: #202126;
           color: #ffffff;
           font: inherit;
           font-size: 1.03rem;
-          font-weight: 850;
+          font-weight: 500;
           cursor: pointer;
           transition: opacity 160ms ease, background 160ms ease;
         }

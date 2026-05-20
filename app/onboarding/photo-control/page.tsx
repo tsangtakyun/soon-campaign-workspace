@@ -3,96 +3,79 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-import type { ContentStrategyOption } from '@/lib/content-strategy'
-import type { TypefacePreset } from '@/lib/typefaces'
-
-type BusinessProfile = {
-  businessName?: string
-  logoUrl?: string
-  productImageUrl?: string
-}
-
 type PhotoControlOption = {
-  id: 'full-freedom' | 'balanced' | 'minimal-changes'
+  id: 'minimal' | 'balanced' | 'full' | 'strict'
   title: string
-  titleZh: string
+  titleEn: string
   icon: string
-  tone: string
   description: string
   generationPrompt: string
   previewImage: string
-  previewAlt: string
 }
 
 const PHOTO_CONTROL_STORAGE_KEY = 'soon-photo-control-v2'
 const PHOTO_CONTROL_GENERATED_STORAGE_KEY = 'soon-photo-control-generated-v1'
-const PHOTO_CONTROL_ASSET_VERSION = '20260504b'
-const ORIGINAL_PRODUCT_IMAGE = `/photo-control/coffee-original.jpg?v=${PHOTO_CONTROL_ASSET_VERSION}`
+const ORIGINAL_PRODUCT_IMAGE = '/photo-control/photo-control-origin.jpg'
 
 const photoControlOptions: PhotoControlOption[] = [
   {
-    id: 'full-freedom',
-    title: 'Full Freedom',
-    titleZh: '完整創作自由',
-    icon: '✦',
-    tone: 'purple',
+    id: 'full',
+    title: '完整創作自由',
+    titleEn: 'Full Freedom',
     description: 'AI 可以大幅重塑畫面，加入人物、場景和情緒，令內容更有廣告感。',
-    generationPrompt: 'Create a polished photorealistic lifestyle advertising image based on the uploaded product photo. The uploaded product must remain the clear hero subject: large, sharp, appetizing, and immediately recognizable in the foreground. If the product is coffee, keep the cup and latte art visible and dominant. Add one or two Asian people in a warm modern Asian cafe environment enjoying or reacting to the product, but keep people secondary and behind or around the hero product. The image should feel aspirational, emotional, creative, and campaign-level, with natural editorial morning light and premium social media composition. Supporting props must stay subtle. Do not add pastries or other food that competes with the product. No text, no logo, no watermark. Vertical Instagram advertising image.',
-    previewImage: `/photo-control/coffee-full-freedom.jpg?v=${PHOTO_CONTROL_ASSET_VERSION}`,
-    previewAlt: 'AI generated lifestyle coffee campaign image',
+    icon: '✨',
+    previewImage: '/photo-control/photo-control-full.jpg',
+    generationPrompt: 'Use the uploaded image as creative inspiration only. Feel free to completely reimagine the scene — add people, change the environment, introduce lifestyle elements, create an editorial or advertising quality image. The result can look significantly different from the original as long as it captures the brand and product essence.',
   },
   {
     id: 'balanced',
-    title: 'Balanced',
-    titleZh: '平衡改動',
-    icon: '▧',
-    tone: 'blue',
+    title: '平衡改動',
+    titleEn: 'Balanced',
     description: 'AI 會保留產品辨識度，只調整背景、光線和構圖，令畫面更完整。',
-    generationPrompt: 'Create a refined photorealistic product lifestyle image based on the uploaded photo. Keep the product clearly recognizable as the main subject and preserve its key shape, material, identity, and appeal. If the product is coffee, the cup, saucer, latte art, and ceramic shape must be the largest, sharpest, most appetizing visual focus. Improve the background, lighting, table styling, color tone, and composition into a premium campaign image. Supporting props may include a small spoon, napkin, plant, or subtle cafe texture only. Do not add people, pastries, or any object that becomes more important than the product. No text, no logo, no watermark. Vertical Instagram product image.',
-    previewImage: `/photo-control/coffee-balanced.jpg?v=${PHOTO_CONTROL_ASSET_VERSION}`,
-    previewAlt: 'AI generated refined coffee product lifestyle image',
+    icon: '⚖️',
+    previewImage: '/photo-control/photo-control-balanced.jpg',
+    generationPrompt: 'Keep the main product recognizable but make moderate creative improvements. Enhance the background environment, improve lighting quality, add complementary props if needed. The product should remain the clear focal point but the overall image should feel more polished and brand-ready.',
   },
   {
-    id: 'minimal-changes',
-    title: 'Minimal Changes',
-    titleZh: '最少改動',
-    icon: '◇',
-    tone: 'green',
+    id: 'minimal',
+    title: '最少改動',
+    titleEn: 'Minimal Changes',
     description: 'AI 只會微調光線、色調和小細節，角度和產品外觀會盡量保持原樣。',
-    generationPrompt: 'Retouch the uploaded photo with minimal changes. Keep the original angle, product appearance, composition, and main details intact. Only improve lighting, color tone, contrast, sharpness, and small imperfections while keeping the image realistic. Resize or crop it to a suitable Instagram format only if needed, without changing the subject or composition significantly.',
-    previewImage: ORIGINAL_PRODUCT_IMAGE,
-    previewAlt: 'Lightly retouched coffee product image',
+    icon: '🔍',
+    previewImage: '/photo-control/photo-control-minimal.jpg',
+    generationPrompt: 'Keep the original product fully recognizable. Only make minimal adjustments: slightly improve lighting, refine color tone, sharpen details. Do not change the composition, background, or add any new elements. The result should look like a professionally edited version of the original photo.',
+  },
+  {
+    id: 'strict',
+    title: '嚴格品牌控制',
+    titleEn: 'Strict Brand Control',
+    description: '只使用你上傳的品牌素材，AI 不會對原圖作任何改動。',
+    icon: '🔒',
+    previewImage: '/photo-control/photo-control-origin.jpg',
+    generationPrompt: 'Use only the exact uploaded brand assets without any AI modification. Do not alter the composition, lighting, or any element of the original image.',
   },
 ]
 
 function PhotoControlContent() {
   const searchParams = useSearchParams()
   const shouldGeneratePreview = searchParams.get('generatePreview') !== '0'
-  const [selectedId, setSelectedId] = useState<PhotoControlOption['id']>('full-freedom')
-  const [profile, setProfile] = useState<BusinessProfile>({})
-  const [strategy, setStrategy] = useState<ContentStrategyOption | null>(null)
-  const [typeface, setTypeface] = useState<TypefacePreset | null>(null)
+  const [selectedId, setSelectedId] = useState<PhotoControlOption['id']>('full')
   const [generatedImages, setGeneratedImages] = useState<Partial<Record<PhotoControlOption['id'], string>>>({})
   const [generatingId, setGeneratingId] = useState<PhotoControlOption['id'] | null>(null)
   const [generationAttempts, setGenerationAttempts] = useState<Partial<Record<PhotoControlOption['id'], true>>>({})
+  const [creditWarning, setCreditWarning] = useState<{ balance: number; required: number } | null>(null)
 
   const selectedOption = useMemo(
-    () => photoControlOptions.find((option) => option.id === selectedId) || photoControlOptions[1],
+    () => photoControlOptions.find((option) => option.id === selectedId) || photoControlOptions[0],
     [selectedId]
   )
-  const businessName = profile.businessName || searchParams.get('brandName') || searchParams.get('name') || 'SOON-LOG'
   const originalImage = ORIGINAL_PRODUCT_IMAGE
   const generatedImage = generatedImages[selectedOption.id]
-  const previewImage = selectedOption.id === 'minimal-changes' ? originalImage : generatedImage || selectedOption.previewImage
-  const previewTitle = previewHeadline(businessName, selectedOption.id, strategy?.titleZh || strategy?.title || searchParams.get('strategy') || '')
+  const previewImage = generatedImage || selectedOption.previewImage
 
   useEffect(() => {
-    setProfile(readSession<BusinessProfile>('soon-business-profile-v1') || {})
-    setStrategy(readSession<ContentStrategyOption>('soon-content-strategy-v1') || null)
-    setTypeface(readSession<TypefacePreset>('soon-typeface-v1') || null)
-
     const stored = readSession<PhotoControlOption>(PHOTO_CONTROL_STORAGE_KEY)
-    if (stored?.id) setSelectedId(stored.id)
+    if (stored?.id && photoControlOptions.some((option) => option.id === stored.id)) setSelectedId(stored.id)
 
     const storedGenerated = readSession<Partial<Record<PhotoControlOption['id'], string>>>(
       PHOTO_CONTROL_GENERATED_STORAGE_KEY,
@@ -101,7 +84,13 @@ function PhotoControlContent() {
   }, [])
 
   useEffect(() => {
-    if (!shouldGeneratePreview || selectedId === 'minimal-changes' || generatedImages[selectedId] || generationAttempts[selectedId] || generatingId) return
+    if (
+      !shouldGeneratePreview ||
+      selectedId === 'strict' ||
+      generatedImages[selectedId] ||
+      generationAttempts[selectedId] ||
+      generatingId
+    ) return
 
     const controller = new AbortController()
     setGenerationAttempts((current) => ({ ...current, [selectedId]: true }))
@@ -118,6 +107,14 @@ function PhotoControlContent() {
       signal: controller.signal,
     })
       .then(async (response) => {
+        if (response.status === 402) {
+          const data = await response.json().catch(() => null)
+          setCreditWarning({
+            balance: Number(data?.balance || 0),
+            required: Number(data?.required || 5),
+          })
+          return null
+        }
         if (!response.ok) return null
         return response.json() as Promise<{ imageDataUrl?: string }>
       })
@@ -144,13 +141,15 @@ function PhotoControlContent() {
 
   function handleContinue() {
     sessionStorage.setItem(PHOTO_CONTROL_STORAGE_KEY, JSON.stringify({
-      ...selectedOption,
+      id: selectedOption.id,
+      title: selectedOption.title,
+      titleEn: selectedOption.titleEn,
       previewImage,
-      generatedPreviewImage: generatedImage || null,
+      generationPrompt: selectedOption.generationPrompt,
     }))
 
     const url = new URL('/onboarding/topic-review', window.location.origin)
-    ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign', 'visualStyle', 'typeface'].forEach((key) => {
+    ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign', 'visualStyle', 'typeface', 'contentMood', 'contentModification'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
     })
@@ -168,7 +167,11 @@ function PhotoControlContent() {
         <div className="choice-panel">
           <div className="choice-inner">
             <header>
-              <h1>當 SOON 使用你的相片，可以改到幾盡？</h1>
+              <h1>
+                我們使用你的相片
+                <br />
+                可以改到幾盡？
+              </h1>
               <p>SOON 會根據貼文主題生成新畫面。你可以決定 AI 可以由原圖改變幾多。</p>
             </header>
 
@@ -184,10 +187,12 @@ function PhotoControlContent() {
                     role="radio"
                     type="button"
                   >
-                    <span className={`option-icon ${option.tone}`} aria-hidden="true">{option.icon}</span>
-                    <span>
-                      <strong>{option.title}</strong>
-                      <em>{option.titleZh}</em>
+                    <span className="option-icon" aria-hidden="true">{option.icon}</span>
+                    <span className="option-copy">
+                      <span className="option-heading">
+                        <strong>{option.title}</strong>
+                        <em>{option.titleEn}</em>
+                      </span>
                       <small>{option.description}</small>
                     </span>
                     <b aria-hidden="true">{selected ? '✓' : ''}</b>
@@ -200,22 +205,9 @@ function PhotoControlContent() {
 
         <aside className={`image-preview ${selectedOption.id}`} aria-label="AI image preview">
           <div className="generated-frame">
-            <img src={previewImage} alt={selectedOption.previewAlt} />
-            {selectedOption.id !== 'balanced' ? <div className="preview-gradient" /> : null}
-            {selectedOption.id === 'full-freedom' ? (
-              <div className="preview-copy">
-                <strong
-                  style={{
-                    fontFamily: typeface?.fontFamily,
-                    fontWeight: typeface?.weight,
-                    letterSpacing: typeface?.letterSpacing,
-                  }}
-                >
-                  {previewTitle}
-                </strong>
-              </div>
-            ) : null}
-            {selectedOption.id === 'minimal-changes' ? <span className="retouch-badge">Light retouch</span> : null}
+            <img key={previewImage} src={previewImage} alt={`${selectedOption.title} preview`} />
+            {selectedOption.id === 'full' ? <div className="preview-gradient" /> : null}
+            <span className="selection-badge">{selectedOption.title}</span>
             {generatingId === selectedOption.id ? <span className="generate-badge">ChatGPT API 生成中</span> : null}
             <div className="original-card">
               <img src={originalImage} alt="Original uploaded product reference" />
@@ -224,6 +216,19 @@ function PhotoControlContent() {
           </div>
         </aside>
       </section>
+
+      {creditWarning ? (
+        <div className="credit-modal-backdrop" role="presentation" onClick={() => setCreditWarning(null)}>
+          <div className="credit-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h2>你的積分不足以生成此內容。</h2>
+            <p>剩餘：{creditWarning.balance} 積分，需要：{creditWarning.required} 積分。</p>
+            <div>
+              <button type="button" onClick={() => setCreditWarning(null)}>稍後再試</button>
+              <button type="button" onClick={() => { window.location.href = '/pricing' }}>升級方案</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="photo-control-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
@@ -258,20 +263,13 @@ function readSession<T>(key: string): T | null {
   }
 }
 
-function previewHeadline(businessName: string, mode: PhotoControlOption['id'], strategyName: string) {
-  if (mode === 'minimal-changes') return `${businessName} 實物細節`
-  if (/優惠|offer|promotion/i.test(strategyName)) return `限時焦點`
-  if (/教育|education|產品|product/i.test(strategyName)) return `看懂產品價值`
-  return `讓 ${businessName} 更有畫面`
-}
-
 const styles = `
   .photo-control-page {
     min-height: calc(100vh - 88px);
     background: #ffffff;
     color: #17181c;
     position: relative;
-    padding: 18px 0 76px;
+    padding: 14px 0 68px;
     overflow: hidden;
   }
 
@@ -315,26 +313,30 @@ const styles = `
   }
 
   .photo-control-layout {
-    min-height: calc(100vh - 164px);
+    width: min(calc(100% - 48px), 1160px);
+    min-height: calc(100vh - 138px);
+    margin: 18px auto 0;
     display: grid;
-    grid-template-columns: 1.02fr 0.98fr;
-    align-items: center;
+    grid-template-columns: minmax(360px, 0.9fr) minmax(420px, 1.1fr);
+    column-gap: clamp(18px, 3vw, 38px);
+    align-items: start;
   }
 
   .choice-panel {
     display: grid;
-    place-items: center;
-    padding: 34px clamp(20px, 4vw, 56px);
+    justify-items: stretch;
+    align-items: start;
+    padding: 0;
   }
 
   .choice-inner {
-    width: min(100%, 500px);
+    width: 100%;
     display: grid;
-    gap: 17px;
+    gap: 16px;
   }
 
   h1 {
-    max-width: 500px;
+    max-width: 520px;
     margin: 0 0 8px;
     font-size: clamp(1.52rem, 2.9vw, 2.2rem);
     line-height: 1.1;
@@ -343,7 +345,7 @@ const styles = `
   }
 
   .choice-inner p {
-    max-width: 460px;
+    max-width: 500px;
     margin: 0;
     color: #666b75;
     font-size: 0.86rem;
@@ -357,7 +359,7 @@ const styles = `
 
   .control-option {
     width: 100%;
-    min-height: 68px;
+    min-height: 92px;
     border: 1px solid #e6e7eb;
     border-radius: 9px;
     background: #fbfbfc;
@@ -365,7 +367,7 @@ const styles = `
     cursor: pointer;
     display: grid;
     grid-template-columns: 36px 1fr 28px;
-    align-items: center;
+    align-items: start;
     gap: 11px;
     padding: 11px 14px;
     text-align: left;
@@ -378,28 +380,26 @@ const styles = `
   }
 
   .option-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
     display: grid;
     place-items: center;
-    font-size: 0.84rem;
+    font-size: 24px;
     font-weight: 800;
+    background: #f2f3f5;
   }
 
-  .option-icon.purple {
-    color: #7f42ff;
-    background: #f0e8ff;
+  .option-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
 
-  .option-icon.blue {
-    color: #2d79da;
-    background: #e8f2ff;
-  }
-
-  .option-icon.green {
-    color: #3b9b58;
-    background: #eaf7ee;
+  .option-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .control-option strong,
@@ -409,23 +409,22 @@ const styles = `
   }
 
   .control-option strong {
-    font-size: 0.86rem;
-    font-weight: 580;
+    font-size: 15px;
+    font-weight: 700;
     line-height: 1.2;
   }
 
   .control-option em {
-    margin-top: 2px;
-    color: #31343a;
+    color: #8b8f98;
     font-style: normal;
-    font-size: 0.74rem;
-    font-weight: 520;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .control-option small {
-    margin-top: 3px;
+    margin-top: 8px;
     color: #6a6f78;
-    font-size: 0.74rem;
+    font-size: 13px;
     line-height: 1.4;
   }
 
@@ -448,15 +447,15 @@ const styles = `
   }
 
   .image-preview {
-    min-height: calc(100vh - 164px);
+    min-height: 0;
     display: grid;
-    place-items: center;
-    padding: 30px clamp(18px, 3vw, 44px) 30px 16px;
+    place-items: start center;
+    padding: 0;
   }
 
   .generated-frame {
-    width: min(100%, 448px);
-    aspect-ratio: 4 / 5;
+    width: min(100%, calc((100vh - 120px) * 0.75), 615px);
+    aspect-ratio: 3 / 4;
     position: relative;
     overflow: hidden;
     border-radius: 12px;
@@ -468,17 +467,14 @@ const styles = `
     width: 100%;
     height: 100%;
     object-fit: cover;
-    display: block;
-  }
-
-  .balanced .generated-frame > img {
     object-position: center;
+    display: block;
+    animation: previewFade 200ms ease;
   }
 
-  .minimal-changes .generated-frame > img {
-    object-fit: cover;
-    filter: saturate(1.04) contrast(1.03) brightness(1.02);
-    transform: scale(1.02);
+  @keyframes previewFade {
+    from { opacity: 0.55; }
+    to { opacity: 1; }
   }
 
   .preview-gradient {
@@ -488,33 +484,17 @@ const styles = `
     pointer-events: none;
   }
 
-  .preview-copy {
-    position: absolute;
-    left: 19px;
-    right: 19px;
-    bottom: 22px;
-    color: #ffffff;
-    text-shadow: 0 3px 18px rgba(0,0,0,0.34);
-  }
-
-  .preview-copy strong {
-    display: block;
-    max-width: 270px;
-    font-size: clamp(1.22rem, 2.4vw, 1.84rem);
-    line-height: 1.02;
-    overflow-wrap: anywhere;
-  }
-
-  .retouch-badge {
+  .selection-badge {
     position: absolute;
     top: 14px;
     right: 14px;
     border-radius: 999px;
     background: rgba(255,255,255,0.84);
     color: #25272d;
-    padding: 6px 8px;
-    font-size: 0.66rem;
-    font-weight: 650;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
   }
 
   .generate-badge {
@@ -559,6 +539,65 @@ const styles = `
     font-weight: 650;
   }
 
+  .credit-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.46);
+    display: grid;
+    place-items: center;
+    padding: 20px;
+  }
+
+  .credit-modal {
+    width: min(100%, 420px);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+    padding: 24px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .credit-modal h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 650;
+    color: #17181c;
+  }
+
+  .credit-modal p {
+    margin: 0;
+    color: #666b75;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .credit-modal div {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .credit-modal button {
+    border: 1px solid #dedfe3;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #17181c;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 9px 14px;
+    cursor: pointer;
+  }
+
+  .credit-modal button:last-child {
+    border-color: #ef4444;
+    background: #ef4444;
+    color: #ffffff;
+  }
+
   .photo-control-footer {
     position: fixed;
     left: 0;
@@ -599,12 +638,19 @@ const styles = `
     }
 
     .photo-control-layout {
+      width: calc(100% - 36px);
       grid-template-columns: 1fr;
+      margin-top: 20px;
     }
 
     .image-preview {
       min-height: auto;
       padding: 22px 18px 42px;
+    }
+
+    .generated-frame {
+      width: min(100%, 520px);
+      aspect-ratio: 3 / 4;
     }
   }
 

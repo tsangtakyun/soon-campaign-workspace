@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import Stripe from 'stripe'
 
 export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get('session_id')
@@ -14,6 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const { default: Stripe } = await import('stripe')
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
     const session = await stripe.checkout.sessions.retrieve(sessionId)
 

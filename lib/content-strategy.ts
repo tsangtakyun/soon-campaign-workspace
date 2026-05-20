@@ -10,6 +10,7 @@ export type ContentStrategyProfile = {
   language?: string
   businessName?: string
   businessType?: 'services' | 'local' | 'products'
+  budget?: string
   elevatorPitch?: string
   audience?: {
     summary?: string
@@ -60,31 +61,25 @@ export async function recommendContentStrategy(
 ): Promise<ContentStrategyRecommendation> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   const model = process.env.ANTHROPIC_STRATEGY_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
-  const catalog = strategyCatalog(contentStrategies)
+  const fullCatalog = strategyCatalog(contentStrategies)
+  const candidateIds = getCandidateStrategies(profile.businessType || '', profile.budget || '')
+  const catalog = fullCatalog.filter((item) => candidateIds.includes(item.id))
 
   if (!apiKey) {
     return fallbackStrategy(catalog)
   }
 
-  const systemPrompt = [
-    'You are a senior content strategist for SOON, an AI marketing platform.',
-    'Recommend one content strategy for a new customer after their website and brand profile have been analyzed.',
-    'Return only valid JSON. No markdown.',
-    'All human-facing strings must use the requested language.',
-    'For Traditional Chinese, use polished written Traditional Chinese suitable for a client-facing SaaS product.',
-    'Choose from the provided public content strategy library only. Do not invent, rename, merge, or translate strategy names.',
-    'Use the internal SOON strategy-library rules only as decision context.',
-    'The recommended option should be the strongest first content pillar for this specific business.',
-  ].join(' ')
+  const systemPrompt = "You are a senior content strategist for SOON, an AI marketing platform. The user's brand profile has been analyzed. A shortlist of the most suitable content strategies has already been pre-selected based on their business type and budget. Your job is to pick the single BEST strategy from this shortlist for this specific brand, and explain why in one sentence. Return only valid JSON. No markdown. All human-facing strings must use the requested language. For Traditional Chinese, use polished written Traditional Chinese suitable for a client-facing SaaS product. Do not invent, rename, or modify strategy names. You must pick from the provided shortlist only."
 
   const libraryContext = library ? summarizeLibrary(library) : 'No internal strategy library provided.'
-  const allowedIds = catalog.map((item) => item.id).join(' | ')
+  const allowedIds = candidateIds.join(', ')
 
   const userPrompt = [
     `Requested language: ${language}`,
     `Brand name: ${profile.businessName || '未提供'}`,
     `Website: ${profile.websiteUrl || '未提供'}`,
     `Business type: ${profile.businessType || '未提供'}`,
+    `Budget: ${profile.budget || '未提供'}`,
     `Elevator pitch: ${profile.elevatorPitch || '未提供'}`,
     `Audience: ${profile.audience?.summary || profile.brandProfile?.audience || '未提供'}`,
     `Content people: ${profile.contentPeople?.ageRange || ''} ${profile.contentPeople?.gender || ''} ${profile.contentPeople?.ethnicity || ''}`,
@@ -107,7 +102,7 @@ export async function recommendContentStrategy(
     'Return JSON with this exact shape:',
     JSON.stringify({
       recommendedId: `one of: ${allowedIds}`,
-      reason: 'one sentence explaining why this fixed strategy is recommended for this brand',
+      reason: 'one sentence explaining why',
     }),
   ].join('\n')
 
@@ -163,6 +158,26 @@ function strategyCatalog(contentStrategies: ContentStrategyLibraryItem[]) {
     imageUrl: item.imageUrl,
     fitFor: item.fitFor,
   }))
+}
+
+function getCandidateStrategies(businessType: string, budget: string): string[] {
+  const isHighBudget = budget?.includes('50,000') || budget?.includes('以上')
+  const type = businessType?.toLowerCase()
+
+  if (type === 'local') {
+    return isHighBudget
+      ? ['offer-promotion', 'community-content', 'lifestyle-content', 'social-proof', 'behind-the-scenes']
+      : ['lifestyle-content', 'social-proof', 'behind-the-scenes', 'storytelling', 'community-content']
+  }
+  if (type === 'products') {
+    return ['product-education', 'lifestyle-content', 'social-proof', 'offer-promotion', 'behind-the-scenes']
+  }
+  if (type === 'services') {
+    return isHighBudget
+      ? ['authority-content', 'social-proof', 'problem-solution', 'call-to-action-content', 'storytelling']
+      : ['authority-content', 'storytelling', 'problem-solution', 'personal-brand-content', 'behind-the-scenes']
+  }
+  return ['lifestyle-content', 'storytelling', 'behind-the-scenes', 'social-proof', 'problem-solution', 'authority-content']
 }
 
 function buildRecommendation(

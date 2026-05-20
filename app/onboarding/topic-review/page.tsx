@@ -1,7 +1,8 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
 
 type ContentMixItem = {
   id: string
@@ -20,10 +21,37 @@ type TopicReference = {
   type: 'image' | 'post'
   topic: string
   image: string
+  productImage?: string | null
+  productImageOptOut?: boolean
+  referenceImage?: string | null
+  referenceImageOptOut?: boolean
+  reference?: ReferenceSelection
+}
+
+type TopicImageType = 'product' | 'reference'
+
+type ReferenceSelection = {
+  url: string
+  imageType: TopicImageType
+}
+
+type TopicAssetSelection = {
+  productImage: string | null
+  productImageOptOut: boolean
+  referenceImage: string | null
+  referenceImageOptOut: boolean
 }
 
 const STORAGE_KEYS = {
+  profile: 'soon-business-profile-v1',
+  strategy: 'soon-content-strategy-v1',
+  campaign: 'soon-campaign-details-v1',
+  distribution: 'soon-distribution-preferences-v1',
   contentMix: 'soon-content-mix-v1',
+  visualStyle: 'soon-visual-style-v1',
+  photoControl: 'soon-photo-control-v2',
+  contentMood: 'soon-content-mood-v1',
+  websiteAnalysis: 'soon-website-analysis-v1',
 }
 
 const PLACEHOLDER_IMAGE =
@@ -34,14 +62,14 @@ const FALLBACK_TOPICS: TopicReference[] = [
     id: 'still-image-1',
     label: '靜態圖片 1',
     type: 'image',
-    topic: '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
+    topic: '',
     image: PLACEHOLDER_IMAGE,
   },
   {
-    id: 'blog-post-1',
-    label: '文章 1',
+    id: 'carousel-1',
+    label: '輪播貼文 1',
     type: 'post',
-    topic: '最好的日常故事，往往是那些夠玩味、夠真實，而且真實到會想傳給朋友再看一次的片段',
+    topic: '',
     image: PLACEHOLDER_IMAGE,
   },
 ]
@@ -87,35 +115,8 @@ const TRENDING_EXAMPLES = [
   },
 ]
 
-const TOPIC_COPY: Record<string, string[]> = {
-  'still-images': [
-    '當朋友可以一起看見日常裡的小片段，平凡的一天也會變得更值得分享',
-    '一個細小但有記憶點的畫面，可以令普通日常變成值得停下來看的內容',
-  ],
-  blogs: [
-    '最好的日常故事，往往是那些夠玩味、夠真實，而且真實到會想傳給朋友再看一次的片段',
-    '有用的故事如果聽起來像朋友會傳來的訊息，就會更容易被記住',
-  ],
-  carousels: [
-    '用一組簡短畫面，把一個細小時刻整理成觀眾一眼明白的故事',
-  ],
-  'feed-videos': [
-    '用一段短場景，令品牌自然出現在觀眾每日會經歷的節奏裡',
-  ],
-  'short-form-video': [
-    '一個有動態的小瞬間，可以成為觀眾停下來看的理由',
-  ],
-  stories: [
-    '內容應該感覺即時、輕鬆，而且容易令人即刻有反應',
-  ],
-  emails: [
-    '直接訊息最有效的時候，是讀起來足夠個人化，令人願意繼續看下去',
-  ],
-}
-
 const CONTENT_TYPE_LABELS: Record<string, { label: string; type: TopicReference['type'] }> = {
   'still-images': { label: '靜態圖片', type: 'image' },
-  blogs: { label: '文章', type: 'post' },
   carousels: { label: '輪播貼文', type: 'image' },
   'feed-videos': { label: '動態影片', type: 'post' },
   'short-form-video': { label: '短影片', type: 'post' },
@@ -133,7 +134,91 @@ function readStorage<T>(key: string): T | null {
   }
 }
 
-function buildTopics(): TopicReference[] {
+function displayImageUrl(value: string) {
+  if (!value) return ''
+  if (value.startsWith('blob:') || value.startsWith('data:') || value.startsWith('/')) return value
+  return `/api/website-image?url=${encodeURIComponent(value)}`
+}
+
+function collectImageStrings(value: unknown): string[] {
+  if (!value) return []
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(collectImageStrings)
+  if (typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+    return [
+      objectValue.url,
+      objectValue.src,
+      objectValue.image,
+      objectValue.imageUrl,
+      objectValue.logoUrl,
+    ].flatMap(collectImageStrings)
+  }
+  return []
+}
+
+function isUsableWebsiteReferenceImage(image: string) {
+  if (!image || image === PLACEHOLDER_IMAGE) return false
+  return !/(logo|icon|favicon|sprite|placeholder|blank|pixel|tracking|facebook\.com\/tr|monogram|gencode|qrcode|qr[-_]?code|award|badge|singleline|title|bar|social|payment|visa|mastercard|blur_|\.(svg|ico|gif)(?:\?|$))/i.test(image)
+}
+
+function normalizeWebsiteReferenceImage(image: string) {
+  try {
+    const url = new URL(image.trim())
+    if (/static\.wixstatic\.com$/i.test(url.hostname) || /static\.parastorage\.com$/i.test(url.hostname)) {
+      const mediaMatch = url.pathname.match(/^(\/media\/[^/]+\.(?:jpe?g|png|webp|avif))(?:\/.*)?$/i)
+      if (mediaMatch?.[1]) {
+        url.pathname = mediaMatch[1]
+        url.search = ''
+        url.hash = ''
+        return url.toString()
+      }
+    }
+
+    if (/cdn\.shopify\.com$/i.test(url.hostname) || /\.myshopify\.com$/i.test(url.hostname)) {
+      url.pathname = url.pathname.replace(
+        /_(?:\d+x\d*|\d+x|x\d+|pico|icon|thumb|small|compact|medium|large|grande|master)(?=\.(?:jpe?g|png|webp|avif)$)/i,
+        ''
+      )
+      url.search = ''
+      url.hash = ''
+      return url.toString()
+    }
+
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return image.trim()
+  }
+}
+
+function readWebsiteReferenceImages(): string[] {
+  const websiteStored = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
+  const analysis = websiteStored?.analysis || websiteStored
+  const images = [
+    ...collectImageStrings(analysis?.websiteImages),
+    ...collectImageStrings(analysis?.images),
+    ...collectImageStrings(analysis?.media),
+  ]
+    .map(normalizeWebsiteReferenceImage)
+    .filter(isUsableWebsiteReferenceImage)
+    .map(displayImageUrl)
+
+  return Array.from(new Set(images))
+}
+
+function pickWebsiteImage(websiteImages: string[], index: number) {
+  if (!websiteImages.length) return PLACEHOLDER_IMAGE
+  if (websiteImages.length <= 3) return websiteImages[index % websiteImages.length]
+
+  const candidate = websiteImages[index % websiteImages.length]
+  const previous = index > 0 ? websiteImages[(index - 1) % websiteImages.length] : ''
+  if (candidate !== previous) return candidate
+
+  return websiteImages[(index + 1) % websiteImages.length]
+}
+
+function buildTopicShells(websiteImages: string[] = readWebsiteReferenceImages()): TopicReference[] {
   const contentMix = readStorage<ContentMixState>(STORAGE_KEYS.contentMix)
   const items = contentMix?.items?.filter((item) => item.quantity > 0) || []
   const topics: TopicReference[] = []
@@ -143,41 +228,98 @@ function buildTopics(): TopicReference[] {
       label: item.title || item.titleZh || 'Content',
       type: 'post' as const,
     }
-    const copyOptions = TOPIC_COPY[item.id] || [
-      `清晰的${typeConfig.label}應該令品牌更容易被理解，也更容易被分享`,
-    ]
-
     for (let index = 0; index < item.quantity; index += 1) {
       const sequence = index + 1
       topics.push({
         id: `${item.id}-${sequence}`,
         label: `${typeConfig.label} ${sequence}`,
         type: typeConfig.type,
-        topic: copyOptions[index % copyOptions.length],
-        image: PLACEHOLDER_IMAGE,
+        topic: '',
+        image: pickWebsiteImage(websiteImages, topics.length),
       })
     }
   })
 
-  if (topics.length) return topics.slice(0, 8)
-  return FALLBACK_TOPICS
+  if (topics.length) return topics
+  return FALLBACK_TOPICS.map((topic, index) => ({
+    ...topic,
+    image: websiteImages.length ? pickWebsiteImage(websiteImages, index) : topic.image,
+  }))
 }
 
 function TopicReviewContent() {
   const searchParams = useSearchParams()
   const [isAnalyzing, setIsAnalyzing] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null)
-  const [topics, setTopics] = useState<TopicReference[]>(() => buildTopics())
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
+  const [editingTopicText, setEditingTopicText] = useState('')
+  const [topics, setTopics] = useState<TopicReference[]>(() => buildTopicShells())
+  const cancelEditRef = useRef(false)
   const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setIsAnalyzing(false)
-      window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(topics))
-    }, 1200)
+  const generateTopics = useCallback(async () => {
+    const websiteImages = readWebsiteReferenceImages()
+    const topicShells = buildTopicShells(websiteImages)
+    setTopics(topicShells)
+    setIsAnalyzing(true)
+    setError(null)
 
-    return () => window.clearTimeout(timer)
-  }, [topics])
+    const profile = readStorage<any>(STORAGE_KEYS.profile)
+    const strategy = readStorage<any>(STORAGE_KEYS.strategy)
+    const campaign = readStorage<any>(STORAGE_KEYS.campaign)
+    const distribution = readStorage<any>(STORAGE_KEYS.distribution)
+    const contentMix = readStorage<any>(STORAGE_KEYS.contentMix)
+    const visualStyle = readStorage<any>(STORAGE_KEYS.visualStyle)
+    const photoControl = readStorage<any>(STORAGE_KEYS.photoControl)
+    const contentMood = readStorage<any>(STORAGE_KEYS.contentMood)
+    const language =
+      profile?.primaryLanguage ||
+      profile?.primary_language ||
+      profile?.language ||
+      searchParams.get('language') ||
+      'zh-TW'
+
+    try {
+      const response = await fetch('/api/topic-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile,
+          strategy,
+          campaign,
+          distribution,
+          contentMix,
+          visualStyle,
+          photoControl,
+          contentMood,
+          language,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok || !Array.isArray(data.topics)) {
+        throw new Error(data?.detail || data?.error || 'Failed to generate topics')
+      }
+
+      const updatedTopics = topicShells.map((topic, index) => ({
+        ...topic,
+        topic: data.topics[index] || topic.topic,
+      }))
+
+      setTopics(updatedTopics)
+      window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(updatedTopics))
+      setIsAnalyzing(false)
+    } catch (err) {
+      console.warn('[topic-review] failed:', err)
+      setError('內容主題生成失敗，請稍後再試。')
+      setIsAnalyzing(false)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    generateTopics()
+  }, [generateTopics])
 
   function preserveParams(url: URL) {
     ;[
@@ -193,6 +335,8 @@ function TopicReviewContent() {
       'visualStyle',
       'typeface',
       'photoControl',
+      'contentMood',
+      'contentModification',
     ].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
@@ -211,15 +355,57 @@ function TopicReviewContent() {
     window.history.back()
   }
 
-  function handleInsertReferenceImage(topicId: string, image: string) {
+  function persistTopics(nextTopics: TopicReference[]) {
+    if (typeof window === 'undefined') return
+    window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(nextTopics))
+  }
+
+  function handleConfirmTopicAssets(topicId: string, selection: TopicAssetSelection) {
     setTopics((currentTopics) => {
       const updatedTopics = currentTopics.map((topic) =>
-        topic.id === topicId ? { ...topic, image } : topic
+        topic.id === topicId
+          ? {
+              ...topic,
+              ...selection,
+              image: selection.productImage || PLACEHOLDER_IMAGE,
+              reference: undefined,
+            }
+          : topic
       )
-      window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(updatedTopics))
+      persistTopics(updatedTopics)
       return updatedTopics
     })
     setActiveReferenceId(null)
+  }
+
+  function startEditingTopic(topic: TopicReference) {
+    cancelEditRef.current = false
+    setEditingTopicId(topic.id)
+    setEditingTopicText(topic.topic)
+  }
+
+  function saveEditedTopic(topicId: string, nextText: string) {
+    const trimmedText = nextText.trim()
+    setTopics((currentTopics) => {
+      const updatedTopics = currentTopics.map((topic) =>
+        topic.id === topicId ? { ...topic, topic: trimmedText || topic.topic } : topic
+      )
+      persistTopics(updatedTopics)
+      return updatedTopics
+    })
+    setEditingTopicId(null)
+    setEditingTopicText('')
+  }
+
+  function cancelEditingTopic() {
+    cancelEditRef.current = true
+    setEditingTopicId(null)
+    setEditingTopicText('')
+  }
+
+  function resizeTopicTextarea(textarea: HTMLTextAreaElement) {
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
   }
 
   return (
@@ -236,31 +422,20 @@ function TopicReviewContent() {
       {isAnalyzing ? (
         <section className="topic-loading" aria-live="polite">
           <p>分析中...</p>
-          <h1>{topics.length > 1 ? '正在生成你的內容主題...' : '正在整理內容主題...'}</h1>
-          <h2>
-            每一條內容都由兩件事開始：一個決定方向的主題，以及一張保持品牌視覺一致的參考圖片。系統會先整理兩者之間的關係。
-          </h2>
-
-          <div className="loading-demo">
-            <div className="loading-topic">
-              <span>宣傳活動裡的主題：</span>
-              <div className="demo-topic-card">
-                <div className="demo-image">
-                  <img src={PLACEHOLDER_IMAGE} alt="參考圖片佔位圖" />
-                  <em>參考圖片</em>
-                </div>
-                <p>{topics[0]?.topic || FALLBACK_TOPICS[0].topic}</p>
-              </div>
-            </div>
-            <div className="demo-arrow">→</div>
-            <div className="generated-post">
-              <span>生成內容示意：</span>
-              <div className="mock-post">
-                <img src={PLACEHOLDER_IMAGE} alt="生成內容示意" />
-                <strong>日常<br />也可以<br />更有<br />畫面</strong>
-              </div>
-            </div>
+          <h1>正在為你的品牌生成內容主題...</h1>
+          <h2>每一條內容都從品牌洞察出發，為你量身訂製。</h2>
+          <div className="topic-loading-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
           </div>
+        </section>
+      ) : error ? (
+        <section className="topic-error" aria-live="polite">
+          <p>生成未完成</p>
+          <h1>{error}</h1>
+          <h2>我們未能成功取得 AI 內容主題。你可以重新嘗試，系統會保留目前的內容組合和設定。</h2>
+          <button type="button" onClick={generateTopics}>重新生成</button>
         </section>
       ) : (
         <section className="topic-review-content">
@@ -272,14 +447,30 @@ function TopicReviewContent() {
           <div className="topic-list">
             {topics.map((topic) => (
               <article className="topic-row" key={topic.id}>
-                <button
-                  type="button"
-                  className="topic-image topic-image-button"
-                  onClick={() => setActiveReferenceId(topic.id)}
-                  aria-label={`更換${topic.label}參考圖片`}
-                >
-                  <img src={topic.image} alt={`${topic.label} reference`} />
-                </button>
+                <div className="topic-image-stack">
+                  <button
+                    type="button"
+                    className="topic-image topic-image-button"
+                    onClick={() => setActiveReferenceId(topic.id)}
+                    aria-label={`更換${topic.label}參考圖片`}
+                  >
+                    <img src={topic.productImage || topic.image || PLACEHOLDER_IMAGE} alt={`${topic.label} reference`} />
+                    {topic.productImage ? (
+                      <span className="topic-image-badge product">產品圖</span>
+                    ) : null}
+                    {topic.referenceImage ? (
+                      <span className="topic-reference-thumb">
+                        <img src={topic.referenceImage} alt="" />
+                        <span className="topic-image-badge reference">
+                          靈感圖
+                        </span>
+                      </span>
+                    ) : null}
+                  </button>
+                  {!topic.productImage && !topic.referenceImage && topic.image !== PLACEHOLDER_IMAGE ? (
+                    <span className="topic-website-image-label">參考圖片</span>
+                  ) : null}
+                </div>
                 <div className="topic-copy">
                   <h2>
                     <span className={topic.type === 'image' ? 'topic-icon image' : 'topic-icon post'} aria-hidden="true">
@@ -288,7 +479,53 @@ function TopicReviewContent() {
                     {topic.label}
                   </h2>
                   <p className="topic-label">主題：</p>
-                  <p className="topic-text">{topic.topic}</p>
+                  {editingTopicId === topic.id ? (
+                    <textarea
+                      className="topic-text-editor"
+                      value={editingTopicText}
+                      autoFocus
+                      rows={1}
+                      onBlur={() => {
+                        if (cancelEditRef.current) {
+                          cancelEditRef.current = false
+                          return
+                        }
+                        saveEditedTopic(topic.id, editingTopicText)
+                      }}
+                      onChange={(event) => {
+                        setEditingTopicText(event.target.value)
+                        resizeTopicTextarea(event.currentTarget)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          event.preventDefault()
+                          cancelEditingTopic()
+                          return
+                        }
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault()
+                          saveEditedTopic(topic.id, editingTopicText)
+                        }
+                      }}
+                      ref={(node) => {
+                        if (!node) return
+                        resizeTopicTextarea(node)
+                        node.focus()
+                        node.selectionStart = node.value.length
+                        node.selectionEnd = node.value.length
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="topic-text editable-topic-text"
+                      onClick={() => startEditingTopic(topic)}
+                      aria-label={`編輯${topic.label}主題`}
+                    >
+                      <span>{topic.topic}</span>
+                      <span className="topic-edit-icon" aria-hidden="true">✎</span>
+                    </button>
+                  )}
                 </div>
               </article>
             ))}
@@ -298,14 +535,14 @@ function TopicReviewContent() {
 
       <footer className="topic-review-footer">
         <button type="button" onClick={handleBack}>返回</button>
-        {!isAnalyzing ? <button type="button" onClick={handleContinue}>繼續</button> : null}
+        {!isAnalyzing && !error ? <button type="button" onClick={handleContinue}>繼續</button> : null}
       </footer>
 
       {activeTopic ? (
         <ReferenceImageModal
           topic={activeTopic}
           onClose={() => setActiveReferenceId(null)}
-          onInsertImage={(image) => handleInsertReferenceImage(activeTopic.id, image)}
+          onConfirm={(selection) => handleConfirmTopicAssets(activeTopic.id, selection)}
         />
       ) : null}
 
@@ -317,28 +554,105 @@ function TopicReviewContent() {
 function ReferenceImageModal({
   topic,
   onClose,
-  onInsertImage,
+  onConfirm,
 }: {
   topic: TopicReference
   onClose: () => void
-  onInsertImage: (image: string) => void
+  onConfirm: (selection: TopicAssetSelection) => void
 }) {
-  const [view, setView] = useState<'library' | 'generate'>('library')
-  const [size, setSize] = useState<'正方形' | '橫向' | '直向'>('正方形')
-  const [style, setStyle] = useState<'相片' | '插畫'>('相片')
-  const [selectedImage, setSelectedImage] = useState<string | null>(
-    topic.image !== PLACEHOLDER_IMAGE ? topic.image : null
+  const legacyReference =
+    topic.reference?.imageType === 'reference'
+      ? topic.reference.url
+      : topic.reference?.imageType === 'product'
+        ? null
+        : null
+  const [productImage, setProductImage] = useState<string | null>(
+    topic.productImage || (topic.reference?.imageType === 'product' ? topic.reference.url : null)
   )
+  const [referenceImage, setReferenceImage] = useState<string | null>(topic.referenceImage || legacyReference)
+  const [productImageOptOut, setProductImageOptOut] = useState(Boolean(topic.productImageOptOut))
+  const [referenceImageOptOut, setReferenceImageOptOut] = useState(Boolean(topic.referenceImageOptOut))
+  const [uploadingField, setUploadingField] = useState<TopicImageType | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
-  function handleInsertImage() {
-    if (!selectedImage) return
-    onInsertImage(selectedImage)
+  function handleConfirm() {
+    onConfirm({
+      productImage: productImageOptOut ? null : productImage,
+      productImageOptOut,
+      referenceImage: referenceImageOptOut ? null : referenceImage,
+      referenceImageOptOut,
+    })
+  }
+
+  async function uploadTopicImage(file: File, imageType: TopicImageType) {
+    const supabase = createClient()
+    const sessionId = window.localStorage.getItem('soon-onboarding-session-id')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const ownerId = user?.id || sessionId
+
+    if (!ownerId) {
+      throw new Error('Missing onboarding session')
+    }
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+    const storagePath = `${ownerId}/topic-review/${topic.id}/${imageType}/${Date.now()}-${safeName}`
+    const { error: uploadError } = await supabase.storage
+      .from('brand-assets')
+      .upload(storagePath, file, { cacheControl: '3600', upsert: false })
+    if (uploadError) throw uploadError
+
+    const { data: publicUrlData } = supabase.storage.from('brand-assets').getPublicUrl(storagePath)
+    const url = publicUrlData.publicUrl
+
+    const { error: insertError } = await supabase.from('brand_assets').insert({
+      user_id: user?.id || null,
+      onboarding_session_id: sessionId || null,
+      asset_type: imageType === 'product' ? 'product' : 'reference',
+      url,
+      filename: file.name,
+      is_used: true,
+    })
+    if (insertError) throw insertError
+
+    return url
+  }
+
+  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>, imageType: TopicImageType) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setUploadError('請上傳 JPG 或 PNG 圖片。')
+      event.target.value = ''
+      return
+    }
+
+    setUploadingField(imageType)
+    setUploadError(null)
+    try {
+      const url = await uploadTopicImage(file, imageType)
+      if (imageType === 'product') {
+        setProductImage(url)
+        setProductImageOptOut(false)
+      } else {
+        setReferenceImage(url)
+        setReferenceImageOptOut(false)
+      }
+    } catch (err) {
+      console.warn('[topic-review/assets] upload failed:', err)
+      setUploadError('上傳未完成，請稍後再試。')
+    } finally {
+      setUploadingField(null)
+      event.target.value = ''
+    }
   }
 
   return (
     <div className="reference-modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section
-        className={view === 'generate' ? 'reference-modal generate-modal' : 'reference-modal'}
+        className="reference-modal topic-data-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="reference-modal-title"
@@ -347,108 +661,114 @@ function ReferenceImageModal({
         <button type="button" className="reference-modal-close" onClick={onClose} aria-label="關閉">
           ×
         </button>
-        {view === 'generate' ? (
-          <GenerateImagePanel
-            setSize={setSize}
-            setStyle={setStyle}
-            size={size}
-            style={style}
-          />
-        ) : (
-          <>
-            <div className="reference-modal-body">
-              <header>
-                <p>{topic.label}</p>
-                <h2 id="reference-modal-title">更換參考圖片</h2>
-              </header>
+        <div className="reference-modal-body">
+          <header>
+            <h2 id="reference-modal-title">為「{topic.label}」填寫資料</h2>
+          </header>
 
-              <div className="reference-search" aria-hidden="true">
-                <span>⌕</span>
-                <p>搜尋圖片和影片</p>
-              </div>
-
-              <div className="modal-actions">
-                <label className="upload-pill">
-                  <input type="file" />
-                  <span>上載</span>
-                </label>
-                <span className="file-empty">未選擇檔案</span>
-                <button type="button" onClick={() => setView('generate')}>用 AI 生成</button>
-              </div>
-
-              <ReferenceSection title="用 AI 生成">
-                <button type="button" className="create-card" onClick={() => setView('generate')}>
-                  <strong>AI</strong>
-                  <span>自行<br />建立</span>
-                </button>
-                {AI_REFERENCE_IMAGES.map((image) => (
-                  <SelectableAssetButton
-                    image={image}
-                    isSelected={selectedImage === image}
-                    key={image}
-                    onSelect={() => setSelectedImage(image)}
-                  />
-                ))}
-              </ReferenceSection>
-
-              <ReferenceSection title="你的品牌素材庫" action="SOON-LOG">
-                <SelectableAssetButton
-                  className="brand-kit-card"
-                  image={PLACEHOLDER_IMAGE}
-                  isSelected={selectedImage === PLACEHOLDER_IMAGE}
-                  label="SOON-LOG"
-                  onSelect={() => setSelectedImage(PLACEHOLDER_IMAGE)}
-                />
-              </ReferenceSection>
-
-              <ReferenceSection title="庫存相片" action="查看全部">
-                {STOCK_PHOTOS.map((image) => (
-                  <SelectableAssetButton
-                    image={image}
-                    isSelected={selectedImage === image}
-                    key={image}
-                    onSelect={() => setSelectedImage(image)}
-                  />
-                ))}
-              </ReferenceSection>
-
-              <ReferenceSection title="庫存影片" action="查看全部">
-                {STOCK_VIDEOS.map((video) => (
-                  <SelectableAssetButton
-                    className="video-card"
-                    image={video.image}
-                    isSelected={selectedImage === video.image}
-                    key={video.image}
-                    onSelect={() => setSelectedImage(video.image)}
-                  >
-                    <span>{video.duration}</span>
-                  </SelectableAssetButton>
-                ))}
-              </ReferenceSection>
+          <section className="topic-data-section">
+            <div className="topic-data-section-heading">
+              <h3>這個 post 想展示什麼？</h3>
+              <p>上傳你想推廣的產品、服務或場景的圖片</p>
             </div>
+            <UploadDropzone
+              disabled={productImageOptOut}
+              image={productImage}
+              inputId={`product-image-${topic.id}`}
+              isUploading={uploadingField === 'product'}
+              label="上傳產品、服務或場景圖片"
+              onUpload={(event) => handleUpload(event, 'product')}
+            />
+            <label className="topic-data-radio">
+              <input
+                type="radio"
+                checked={productImageOptOut}
+                onChange={() => {
+                  setProductImageOptOut(true)
+                  setProductImage(null)
+                }}
+              />
+              <span>這個 post 不需要展示任何產品或服務</span>
+            </label>
+          </section>
 
-            <div className="insert-image-bar">
-              <button
-                type="button"
-                className="deselect-button"
-                disabled={!selectedImage}
-                onClick={() => setSelectedImage(null)}
-              >
-                取消選擇
-              </button>
-              <button
-                type="button"
-                className="insert-image-button"
-                disabled={!selectedImage}
-                onClick={handleInsertImage}
-              >
-                插入圖片
-              </button>
+          <hr className="topic-data-divider" />
+
+          <section className="topic-data-section">
+            <div className="topic-data-section-heading">
+              <h3>有沒有你喜歡的感覺參考？</h3>
+              <p>在 Instagram 或 Pinterest 見過覺得好看的圖？截圖上傳，SOON 會參考它的氛圍。</p>
             </div>
-          </>
-        )}
+            <UploadDropzone
+              disabled={referenceImageOptOut}
+              image={referenceImage}
+              inputId={`reference-image-${topic.id}`}
+              isUploading={uploadingField === 'reference'}
+              label="上傳感覺參考圖"
+              onUpload={(event) => handleUpload(event, 'reference')}
+            />
+            <label className="topic-data-radio">
+              <input
+                type="radio"
+                checked={referenceImageOptOut}
+                onChange={() => {
+                  setReferenceImageOptOut(true)
+                  setReferenceImage(null)
+                }}
+              />
+              <span>沒有，讓 SOON 自行決定</span>
+            </label>
+          </section>
+
+          {uploadError ? <p className="asset-error">{uploadError}</p> : null}
+        </div>
+
+        <div className="insert-image-bar">
+          <button type="button" className="deselect-button" onClick={onClose}>
+            取消
+          </button>
+          <button type="button" className="insert-image-button" onClick={handleConfirm}>
+            確認
+          </button>
+        </div>
       </section>
     </div>
+  )
+}
+
+function UploadDropzone({
+  disabled,
+  image,
+  inputId,
+  isUploading,
+  label,
+  onUpload,
+}: {
+  disabled: boolean
+  image: string | null
+  inputId: string
+  isUploading: boolean
+  label: string
+  onUpload: (event: React.ChangeEvent<HTMLInputElement>) => void
+}) {
+  return (
+    <label className={`topic-upload-zone ${disabled ? 'disabled' : ''}`} htmlFor={inputId}>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/jpeg,image/png"
+        disabled={disabled || isUploading}
+        onChange={onUpload}
+      />
+      {image ? (
+        <img src={image} alt="" />
+      ) : (
+        <span>
+          <strong>{isUploading ? '上傳中...' : label}</strong>
+          <em>支援 JPG、PNG</em>
+        </span>
+      )}
+    </label>
   )
 }
 
@@ -456,6 +776,7 @@ function SelectableAssetButton({
   children,
   className = '',
   image,
+  imageType,
   isSelected,
   label = '參考圖片',
   onSelect,
@@ -463,6 +784,7 @@ function SelectableAssetButton({
   children?: React.ReactNode
   className?: string
   image: string
+  imageType: TopicImageType
   isSelected: boolean
   label?: string
   onSelect: () => void
@@ -478,6 +800,9 @@ function SelectableAssetButton({
       <img src={image} alt="" />
       {isSelected ? <span className="selected-check" aria-hidden="true">✓</span> : null}
       {children}
+      <span className={`asset-type-label ${imageType}`}>
+        {imageType === 'product' ? 'AI 會以此作為主角' : 'AI 會參考此風格'}
+      </span>
     </button>
   )
 }
@@ -627,22 +952,36 @@ const styles = `
   }
 
   .topic-loading,
+  .topic-error,
   .topic-review-content {
     width: min(100%, 760px);
     margin: 52px auto 0;
   }
 
   .topic-loading {
+    min-height: calc(100vh - 190px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+    padding-bottom: 48px;
     text-align: center;
   }
 
-  .topic-loading > p {
+  .topic-error {
+    text-align: center;
+  }
+
+  .topic-loading > p,
+  .topic-error > p {
     margin: 0 0 13px;
     color: #a6a6a6;
     font-size: 11px;
   }
 
   .topic-loading h1,
+  .topic-error h1,
   .topic-review-content h1 {
     margin: 0;
     color: #1b1c20;
@@ -653,6 +992,7 @@ const styles = `
   }
 
   .topic-loading h2,
+  .topic-error h2,
   .topic-review-content header p {
     margin: 11px 0 0;
     color: #5d6067;
@@ -661,108 +1001,66 @@ const styles = `
     font-weight: 400;
   }
 
-  .topic-loading h2 {
+  .topic-loading h2,
+  .topic-error h2 {
     max-width: 462px;
     margin-left: auto;
     margin-right: auto;
   }
 
-  .loading-demo {
-    margin-top: 34px;
-    padding-top: 24px;
-    border-top: 1px solid #ececec;
-    display: grid;
-    grid-template-columns: 1fr auto 175px;
-    align-items: center;
-    gap: 24px;
-    text-align: left;
-  }
-
-  .loading-topic > span,
-  .generated-post > span {
-    display: block;
-    margin-bottom: 10px;
-    color: #25262a;
-    font-size: 11px;
-  }
-
-  .demo-topic-card {
-    display: grid;
-    grid-template-columns: 112px 1fr;
-    gap: 10px;
-    align-items: stretch;
-  }
-
-  .demo-image {
-    position: relative;
-    overflow: hidden;
+  .topic-error button {
+    margin-top: 22px;
+    border: 0;
     border-radius: 8px;
-    min-height: 112px;
-    background: #f1f1f1;
+    background: #111111;
+    color: #ffffff;
+    padding: 10px 16px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
   }
 
-  .demo-image img,
-  .mock-post img,
+  .topic-loading-dots {
+    margin-top: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+
+  .topic-loading-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #191a1d;
+    opacity: 0.28;
+    animation: topicDotPulse 900ms ease-in-out infinite;
+  }
+
+  .topic-loading-dots span:nth-child(2) {
+    animation-delay: 120ms;
+  }
+
+  .topic-loading-dots span:nth-child(3) {
+    animation-delay: 240ms;
+  }
+
+  @keyframes topicDotPulse {
+    0%, 80%, 100% {
+      transform: translateY(0);
+      opacity: 0.28;
+    }
+    40% {
+      transform: translateY(-5px);
+      opacity: 0.78;
+    }
+  }
+
   .topic-image img {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
-  }
-
-  .demo-image em {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 7px;
-    color: #ffffff;
-    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.55));
-    font-style: normal;
-    text-align: center;
-  }
-
-  .demo-topic-card p {
-    min-height: 112px;
-    margin: 0;
-    border: 1px solid #e8e8e8;
-    border-radius: 6px;
-    padding: 14px;
-    color: #24252a;
-    font-size: 13px;
-    line-height: 1.35;
-  }
-
-  .demo-arrow {
-    color: #111111;
-    font-size: 34px;
-    font-weight: 300;
-  }
-
-  .mock-post {
-    position: relative;
-    overflow: hidden;
-    width: 175px;
-    aspect-ratio: 4 / 5;
-    border: 1px solid #e8e8e8;
-    border-radius: 8px;
-    background: #f5f5f5;
-    box-shadow: 0 17px 49px rgba(0,0,0,0.08);
-  }
-
-  .mock-post img {
-    object-fit: cover;
-    opacity: 0.72;
-  }
-
-  .mock-post strong {
-    position: absolute;
-    top: 29px;
-    right: 17px;
-    color: #ffffff;
-    font-size: 22px;
-    line-height: 0.92;
-    text-align: right;
   }
 
   .topic-review-content header {
@@ -782,7 +1080,16 @@ const styles = `
     gap: 28px;
   }
 
+  .topic-image-stack {
+    width: 112px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
   .topic-image {
+    position: relative;
     width: 112px;
     height: 77px;
     display: grid;
@@ -798,9 +1105,70 @@ const styles = `
     transition: transform 160ms ease, opacity 160ms ease;
   }
 
+  .topic-image-button > img {
+    border-radius: 8px;
+    background: #f8f8f8;
+  }
+
   .topic-image-button:hover {
     transform: translateY(-1px);
     opacity: 0.88;
+  }
+
+  .topic-website-image-label {
+    color: #8b9099;
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .topic-image-badge {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    border-radius: 999px;
+    padding: 3px 7px;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 650;
+    line-height: 1;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.16);
+  }
+
+  .topic-image-badge.product {
+    background: #2563eb;
+  }
+
+  .topic-image-badge.reference {
+    background: #d4a843;
+  }
+
+  .topic-reference-thumb {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    width: 42px;
+    height: 32px;
+    border: 2px solid #ffffff;
+    border-radius: 7px;
+    overflow: hidden;
+    background: #f3f4f6;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  }
+
+  .topic-reference-thumb > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .topic-reference-thumb .topic-image-badge {
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    padding: 2px 4px;
+    font-size: 8px;
+    text-align: center;
   }
 
   .topic-copy h2 {
@@ -847,6 +1215,56 @@ const styles = `
     line-height: 1.45;
   }
 
+  .editable-topic-text {
+    position: relative;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    padding: 0 24px 2px 0;
+    text-align: left;
+    font: inherit;
+    cursor: text;
+  }
+
+  .editable-topic-text:hover {
+    color: #111111;
+  }
+
+  .topic-edit-icon {
+    position: absolute;
+    right: 0;
+    top: 1px;
+    color: #9ca3af;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+
+  .editable-topic-text:hover .topic-edit-icon {
+    opacity: 1;
+  }
+
+  .topic-text-editor {
+    width: 100%;
+    margin: 10px 0 0;
+    padding: 7px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    background: #fbfbfb;
+    color: #202126;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.45;
+    resize: none;
+    overflow: hidden;
+    outline: none;
+  }
+
+  .topic-text-editor:focus {
+    border-color: #d4a843;
+    box-shadow: 0 0 0 3px rgba(212,168,67,0.14);
+  }
+
   .topic-review-footer {
     position: fixed;
     left: 0;
@@ -891,7 +1309,7 @@ const styles = `
 
   .reference-modal {
     position: relative;
-    width: min(100%, 1020px);
+    width: min(100%, 720px);
     max-height: calc(100vh - 72px);
     overflow: hidden;
     border-radius: 14px;
@@ -920,7 +1338,7 @@ const styles = `
   .reference-modal-body {
     min-height: 0;
     overflow: auto;
-    padding: 32px 36px 26px;
+    padding: 32px 36px 28px;
   }
 
   .reference-modal header p {
@@ -937,8 +1355,214 @@ const styles = `
     font-weight: 500;
   }
 
+  .topic-data-modal .reference-modal-body {
+    padding-bottom: 20px;
+  }
+
+  .topic-data-section {
+    margin-top: 26px;
+  }
+
+  .topic-data-section-heading h3 {
+    margin: 0;
+    color: #1d1f24;
+    font-size: 16px;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+
+  .topic-data-section-heading p {
+    margin: 6px 0 0;
+    color: #7a7f8b;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .topic-upload-zone {
+    margin-top: 14px;
+    min-height: 160px;
+    border: 1.5px dashed #cfd4dc;
+    border-radius: 14px;
+    background: #fafafa;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 160ms ease, background 160ms ease, opacity 160ms ease;
+  }
+
+  .topic-upload-zone:hover {
+    border-color: #aeb5c2;
+    background: #f7f7f8;
+  }
+
+  .topic-upload-zone.disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    background: #f3f4f6;
+  }
+
+  .topic-upload-zone input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .topic-upload-zone img {
+    width: 100%;
+    height: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    display: block;
+    background: #ffffff;
+  }
+
+  .topic-upload-zone span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: #202126;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .topic-upload-zone strong {
+    font-weight: 650;
+  }
+
+  .topic-upload-zone em {
+    color: #9ca3af;
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .topic-data-radio {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #3d414a;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .topic-data-radio input {
+    width: 15px;
+    height: 15px;
+    accent-color: #17181c;
+  }
+
+  .topic-data-divider {
+    margin: 28px 0 0;
+    border: 0;
+    border-top: 1px solid #eceef2;
+  }
+
+  .reference-modal header > span {
+    display: block;
+    margin-top: 8px;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .reference-tabs {
+    margin-top: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 10px;
+    background: #f3f4f6;
+    padding: 4px;
+  }
+
+  .reference-tabs button {
+    min-height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #6b7280;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0 14px;
+    cursor: pointer;
+  }
+
+  .reference-tabs button.active {
+    background: #ffffff;
+    color: #17181c;
+    box-shadow: 0 1px 7px rgba(0,0,0,0.08);
+  }
+
+  .reference-tab-panel {
+    margin-top: 22px;
+  }
+
+  .reference-info {
+    margin: 0 0 16px;
+    border: 1px solid #f1e6bd;
+    border-radius: 9px;
+    background: #fff8e1;
+    color: #78622a;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 10px 12px;
+  }
+
+  .product-upload-button {
+    width: 100%;
+    min-height: 54px;
+    border: 1px dashed #c8ccd3;
+    border-radius: 12px;
+    background: #f9fafb;
+    color: #202126;
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .product-upload-button input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .asset-error {
+    margin: 10px 0 0;
+    color: #b42318;
+    font-size: 12px;
+  }
+
+  .product-asset-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+  }
+
+  .product-asset-empty {
+    margin-top: 18px;
+    border: 1px solid #eceef2;
+    border-radius: 12px;
+    background: #fbfbfb;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 18px;
+    text-align: center;
+  }
+
   .reference-search {
-    margin-top: 24px;
+    margin-top: 0;
     min-height: 46px;
     border: 1px solid #e6e8ec;
     border-radius: 9px;
@@ -1028,7 +1652,7 @@ const styles = `
   .create-card,
   .brand-kit-card {
     position: relative;
-    height: 78px;
+    height: 110px;
     border: 0;
     border-radius: 8px;
     overflow: hidden;
@@ -1070,9 +1694,34 @@ const styles = `
   .asset-card img,
   .brand-kit-card img {
     width: 100%;
-    height: 100%;
+    height: calc(100% - 26px);
     object-fit: cover;
     display: block;
+  }
+
+  .asset-type-label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.94);
+    color: #5d6067;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 6px;
+    text-align: center;
+  }
+
+  .asset-type-label.product {
+    color: #1d4ed8;
+  }
+
+  .asset-type-label.reference {
+    color: #9a6b05;
   }
 
   .create-card {
@@ -1090,7 +1739,7 @@ const styles = `
 
   .brand-kit-card {
     width: 120px;
-    height: 82px;
+    height: 110px;
     background: #ffffff;
   }
 

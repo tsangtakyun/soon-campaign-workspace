@@ -36,34 +36,18 @@ export const CHANNELS: ChannelCaption[] = [
     limit: 33000,
   },
   {
-    id: 'LinkedIn',
-    label: 'LinkedIn',
-    icon: 'in',
-    note: '專業但有人味，聚焦品牌觀點、價值和啟發。',
-    limit: 3000,
-  },
-  {
-    id: 'X',
-    label: 'X / Twitter',
-    icon: 'X',
-    note: '短促、有 hook，可以更直接或帶一點玩味。',
-    limit: 280,
-  },
-  {
-    id: 'Google',
-    label: 'Google Business',
-    icon: 'G',
-    note: '清晰、在地、偏向更新消息和行動提示。',
-    limit: 1500,
+    id: 'Threads',
+    label: 'Threads',
+    icon: 'Th',
+    note: '文字更直接、有對話感，適合單張圖片配簡潔文字。',
+    limit: 500,
   },
 ]
 
 export const POST_PLATFORMS: PostPlatform[] = [
   { id: 'Instagram', icon: 'IG', label: 'Instagram', status: '未連接' },
   { id: 'Facebook', icon: 'f', label: 'Facebook', status: '未連接' },
-  { id: 'LinkedIn', icon: 'in', label: 'LinkedIn', status: '未連接' },
-  { id: 'X', icon: 'X', label: 'X / Twitter', status: '未連接' },
-  { id: 'Google', icon: 'G', label: 'Google Business', status: '未連接' },
+  { id: 'Threads', icon: 'Th', label: 'Threads', status: '未連接' },
 ]
 
 export const TEMPLATE_PRESETS: TemplatePreset[] = [

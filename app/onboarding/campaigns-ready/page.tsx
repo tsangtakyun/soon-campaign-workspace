@@ -1,7 +1,13 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+
+import {
+  getOrCreateOnboardingSessionId,
+  markOnboardingPersisted,
+} from '@/lib/onboarding-session'
+import { getActiveWorkspaceId, setActiveWorkspaceId } from '@/lib/workspace-client'
 
 type CampaignTheme = {
   id: number
@@ -10,43 +16,142 @@ type CampaignTheme = {
   body: string
 }
 
-const CAMPAIGN_THEMES: CampaignTheme[] = [
-  {
-    id: 1,
-    dateRange: '5月3日 - 5月9日',
-    title: '分享你的日常，點燃真實連結',
-    body: 'SOON-LOG 邀請用戶用創意方式記錄並分享日常故事。主題聚焦於以玩味、細膩而有情緒的短片，建立親密感和社群連結，令數碼分享變得更個人、更真實。',
-  },
-  {
-    id: 2,
-    dateRange: '5月10日 - 5月16日',
-    title: '媽媽、回憶，和那些值得留下的時刻',
-    body: 'SOON-LOG 以母親節為切入點，鼓勵用戶捕捉與媽媽，或生命中重要照顧者相處的細小片段。溫暖視覺與 AI 創意會令平凡經驗變成值得保存的故事。',
-  },
-  {
-    id: 3,
-    dateRange: '5月17日 - 5月23日',
-    title: '日常魔法：讓回憶動起來',
-    body: '這個主題展示每一個日常瞬間，只要被捕捉和分享，就可以變得更有意思。內容方向會突出創作自由、情感親近，以及用戶參與式故事。',
-  },
-  {
-    id: 4,
-    dateRange: '5月24日 - 5月30日',
-    title: 'AI 製作的日常回憶',
-    body: '以日常敘事為核心，展示 SOON-LOG 如何將生活片段變成有記憶點、以社群為中心的內容。主題會強調簡單、親近，以及不需要剪片技巧也能分享世界。',
-  },
-]
+const SESSION_KEYS = {
+  websiteAnalysis: 'soon-website-analysis-v1',
+  profile: 'soon-business-profile-v1',
+  strategy: 'soon-content-strategy-v1',
+  campaign: 'soon-campaign-details-v1',
+  distribution: 'soon-distribution-preferences-v1',
+  contentMix: 'soon-content-mix-v1',
+  contentMood: 'soon-content-mood-v1',
+  contentModification: 'soon-content-modification-v1',
+  visualStyle: 'soon-visual-style-v1',
+  typeface: 'soon-typeface-v1',
+  photoControl: 'soon-photo-control-v2',
+  topicReview: 'soon-topic-review-v1',
+}
+
+function readSession<T>(key: string): T | null {
+  try {
+    const value = window.sessionStorage.getItem(key)
+    return value ? (JSON.parse(value) as T) : null
+  } catch {
+    return null
+  }
+}
+
+function readSessionString(key: string) {
+  try {
+    return window.sessionStorage.getItem(key) || null
+  } catch {
+    return null
+  }
+}
+
+function formatDateRange(start: Date) {
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return `${start.getMonth() + 1}月${start.getDate()}日 - ${end.getMonth() + 1}月${end.getDate()}日`
+}
+
+function buildDateRanges() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  return Array.from({ length: 4 }, (_, index) => {
+    const start = new Date(today)
+    start.setDate(today.getDate() + index * 7)
+    return formatDateRange(start)
+  })
+}
+
+function withIdsAndDates(themes: Array<{ title: string; body: string }>): CampaignTheme[] {
+  const dateRanges = buildDateRanges()
+  return themes.map((theme, index) => ({
+    id: index + 1,
+    dateRange: dateRanges[index],
+    title: theme.title,
+    body: theme.body,
+  }))
+}
 
 function CampaignsReadyContent() {
   const searchParams = useSearchParams()
   const [isGenerating, setIsGenerating] = useState(true)
-  const [themes, setThemes] = useState(CAMPAIGN_THEMES)
+  const [isCompleting, setIsCompleting] = useState(false)
+  const [themes, setThemes] = useState<CampaignTheme[]>([])
+  const themesRef = useRef<CampaignTheme[]>([])
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const [regeneratingId, setRegeneratingId] = useState<number | null>(null)
+  const [imageProgress, setImageProgress] = useState({ current: 0, total: 0 })
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsGenerating(false), 1200)
-    return () => window.clearTimeout(timer)
-  }, [])
+    themesRef.current = themes
+  }, [themes])
+
+  const generateThemes = useCallback(async (regenerateIndex?: number) => {
+    const profile = readSession<any>(SESSION_KEYS.profile) || {}
+    const strategy = readSession<any>(SESSION_KEYS.strategy) || {}
+    const campaign = readSession<any>(SESSION_KEYS.campaign) || {}
+    const contentMood = readSession<any>(SESSION_KEYS.contentMood) || {}
+    const language =
+      profile.primaryLanguage ||
+      profile.primary_language ||
+      profile.language ||
+      searchParams.get('language') ||
+      'zh-TW'
+
+    if (regenerateIndex) {
+      setRegeneratingId(regenerateIndex)
+    } else {
+      setIsGenerating(true)
+    }
+    setError('')
+
+    try {
+      const response = await fetch('/api/campaign-themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile,
+          strategy,
+          campaign,
+          contentMood,
+          language,
+          regenerateIndex,
+          existingThemes: regenerateIndex ? themesRef.current : undefined,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok || !Array.isArray(data.themes)) {
+        throw new Error(data?.detail || data?.error || 'Failed to generate campaign themes')
+      }
+
+      const nextThemes = withIdsAndDates(data.themes)
+      setThemes((currentThemes) => {
+        if (!regenerateIndex) return nextThemes
+        const replacement = nextThemes[regenerateIndex - 1]
+        if (!replacement) return currentThemes
+        return currentThemes.map((theme) =>
+          theme.id === regenerateIndex
+            ? { ...replacement, id: theme.id, dateRange: theme.dateRange }
+            : theme
+        )
+      })
+    } catch (err) {
+      console.warn('[campaign-themes] failed:', err)
+      setError('宣傳活動主題生成失敗，請稍後再試。')
+    } finally {
+      setIsGenerating(false)
+      setRegeneratingId(null)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    void generateThemes()
+  }, [generateThemes])
 
   function preserveParams(url: URL) {
     ;[
@@ -61,6 +166,7 @@ function CampaignsReadyContent() {
       'campaign',
       'visualStyle',
       'typeface',
+      'contentModification',
       'photoControl',
     ].forEach((key) => {
       const value = searchParams.get(key)
@@ -72,25 +178,101 @@ function CampaignsReadyContent() {
     window.history.back()
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('soon-campaign-themes-v1', JSON.stringify(themes))
     }
-    const url = new URL('/onboarding/scheduled-posts', window.location.origin)
+
+    setIsCompleting(true)
+    setError('')
+
+    const payload = {
+      sessionId: getOrCreateOnboardingSessionId(),
+      websiteAnalysis: readSession(SESSION_KEYS.websiteAnalysis),
+      businessProfile: readSession(SESSION_KEYS.profile),
+      contentStrategy: readSession(SESSION_KEYS.strategy),
+      campaignDetails: readSession(SESSION_KEYS.campaign),
+      distributionPrefs: readSession(SESSION_KEYS.distribution),
+      contentMix: readSession(SESSION_KEYS.contentMix),
+      contentMood: readSession(SESSION_KEYS.contentMood),
+      contentModification: readSessionString(SESSION_KEYS.contentModification),
+      visualStyle: readSession(SESSION_KEYS.visualStyle),
+      typeface: readSession(SESSION_KEYS.typeface),
+      photoControl: readSession(SESSION_KEYS.photoControl),
+      topicReview: readSession(SESSION_KEYS.topicReview),
+      campaignThemes: themes,
+      workspaceId: getActiveWorkspaceId(),
+    }
+
+    try {
+      const response = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const message = await response.text().catch(() => '')
+        throw new Error(message || `HTTP ${response.status}`)
+      }
+
+      const result = await response.json().catch(() => ({}))
+      if (typeof result?.workspaceId === 'string') {
+        setActiveWorkspaceId(result.workspaceId)
+      }
+      markOnboardingPersisted()
+      console.log('[campaigns-ready] week-one post image queue:', {
+        count: Array.isArray(result?.createdPostIds) ? result.createdPostIds.length : 0,
+        totalCreated: Array.isArray(result?.allCreatedPostIds) ? result.allCreatedPostIds.length : undefined,
+      })
+      await generatePostImagesFromClient(result?.createdPostIds)
+    } catch (err) {
+      console.warn('[onboarding/complete] failed from campaigns-ready:', err)
+      setIsCompleting(false)
+      setError('儲存設定時出現問題，請再試一次。')
+      return
+    }
+
+    const url = new URL('/dashboard', window.location.origin)
     preserveParams(url)
     window.location.href = `${url.pathname}${url.search}`
   }
 
+  async function generatePostImagesFromClient(postIds: unknown) {
+    if (!Array.isArray(postIds) || postIds.length === 0) return
+    setImageProgress({ current: 0, total: postIds.length })
+
+    for (let index = 0; index < postIds.length; index += 1) {
+      const postId = postIds[index]
+      if (typeof postId !== 'string') continue
+      setImageProgress({ current: index + 1, total: postIds.length })
+      try {
+        console.log('[campaigns-ready] generating post image:', { postId })
+        const response = await fetch('/api/generate-post-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postId }),
+        })
+
+        const result = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          console.warn('[campaigns-ready] post image generation failed:', result)
+        } else {
+          console.log('[campaigns-ready] post image generated:', result)
+        }
+      } catch (error) {
+        console.warn('[campaigns-ready] post image generation error:', error)
+      }
+    }
+  }
+
   function handleRegenerate(themeId: number) {
+    void generateThemes(themeId)
+  }
+
+  function handleTitleChange(themeId: number, title: string) {
     setThemes((currentThemes) =>
-      currentThemes.map((theme) =>
-        theme.id === themeId
-          ? {
-              ...theme,
-              title: `${theme.title.replace('（已重新生成）', '')}（已重新生成）`,
-            }
-          : theme
-      )
+      currentThemes.map((theme) => (theme.id === themeId ? { ...theme, title } : theme))
     )
   }
 
@@ -113,23 +295,28 @@ function CampaignsReadyContent() {
 
       {isGenerating ? (
         <section className="campaign-loading" aria-live="polite">
-          <p>AI 正在生成...</p>
-          <h1>正在整理你的首四個宣傳活動主題...</h1>
-          <div className="loading-stack">
-            {[1, 2, 3, 4].map((item) => (
-              <div className="loading-card" key={item}>
-                <span />
-                <strong />
-                <p />
-              </div>
-            ))}
-          </div>
+          <div className="campaign-spinner" aria-hidden="true" />
+          <h1>正在為你的品牌創作宣傳活動主題...</h1>
+        </section>
+      ) : isCompleting ? (
+        <section className="campaign-loading" aria-live="polite">
+          <div className="campaign-spinner" aria-hidden="true" />
+          <h1>
+            正在為你創作內容圖片...
+            {imageProgress.total > 0 ? ` (${imageProgress.current}/${imageProgress.total})` : ''}
+          </h1>
+        </section>
+      ) : error ? (
+        <section className="campaign-error" aria-live="polite">
+          <p>生成未完成</p>
+          <h1>{error}</h1>
+          <button type="button" onClick={() => generateThemes()}>重新生成全部</button>
         </section>
       ) : (
         <section className="campaign-content">
           <header>
             <h1>你的首四個宣傳活動已準備好！</h1>
-            <p>在系統生成內容之前，你可以調整任何主題，或者重新生成它們。</p>
+            <p>在系統創作內容之前，你可以調整任何主題，或者重新創作它們。</p>
           </header>
 
           <div className="campaign-list">
@@ -147,16 +334,29 @@ function CampaignsReadyContent() {
                       <button type="button" onClick={() => setEditingId(editingId === theme.id ? null : theme.id)}>
                         {editingId === theme.id ? '完成調整' : '調整'}
                       </button>
-                      <button type="button" onClick={() => handleRegenerate(theme.id)}>重新生成</button>
+                      <button
+                        type="button"
+                        disabled={regeneratingId === theme.id}
+                        onClick={() => handleRegenerate(theme.id)}
+                      >
+                        {regeneratingId === theme.id ? '生成中...' : '重新生成'}
+                      </button>
                     </div>
                   </div>
 
                   {editingId === theme.id ? (
-                    <textarea
-                      aria-label={`調整宣傳活動 ${theme.id}`}
-                      value={theme.body}
-                      onChange={(event) => handleBodyChange(theme.id, event.target.value)}
-                    />
+                    <div className="campaign-edit-fields">
+                      <input
+                        aria-label={`調整宣傳活動 ${theme.id} 標題`}
+                        value={theme.title}
+                        onChange={(event) => handleTitleChange(theme.id, event.target.value)}
+                      />
+                      <textarea
+                        aria-label={`調整宣傳活動 ${theme.id}`}
+                        value={theme.body}
+                        onChange={(event) => handleBodyChange(theme.id, event.target.value)}
+                      />
+                    </div>
                   ) : (
                     <p>{theme.body}</p>
                   )}
@@ -169,7 +369,11 @@ function CampaignsReadyContent() {
 
       <footer className="campaign-footer">
         <button type="button" onClick={handleBack}>返回</button>
-        {!isGenerating ? <button type="button" onClick={handleContinue}>繼續</button> : null}
+        {!isGenerating && !error ? (
+          <button type="button" onClick={handleContinue} disabled={isCompleting}>
+            {isCompleting ? '儲存中...' : '繼續'}
+          </button>
+        ) : null}
       </footer>
 
       <style dangerouslySetInnerHTML={{ __html: styles }} />
@@ -213,6 +417,7 @@ const styles = `
   }
 
   .campaign-loading,
+  .campaign-error,
   .campaign-content {
     width: min(100%, 760px);
     margin: 52px auto 0;
@@ -220,15 +425,28 @@ const styles = `
 
   .campaign-loading {
     text-align: center;
+    min-height: 54vh;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 16px;
   }
 
-  .campaign-loading > p {
-    margin: 0 0 13px;
-    color: #6c95d8;
-    font-size: 12px;
+  .campaign-spinner {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 3px solid #eceef2;
+    border-top-color: #111111;
+    animation: campaign-spin 800ms linear infinite;
+  }
+
+  @keyframes campaign-spin {
+    to { transform: rotate(360deg); }
   }
 
   .campaign-loading h1,
+  .campaign-error h1,
   .campaign-content h1 {
     margin: 0;
     color: #1b1c20;
@@ -236,6 +454,33 @@ const styles = `
     line-height: 1.12;
     font-weight: 500;
     letter-spacing: 0;
+  }
+
+  .campaign-error {
+    min-height: 54vh;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .campaign-error p {
+    margin: 0;
+    color: #9a9da4;
+    font-size: 13px;
+  }
+
+  .campaign-error button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 9px;
+    background: #111111;
+    color: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    padding: 0 16px;
+    cursor: pointer;
   }
 
   .campaign-content header p {
@@ -355,22 +600,51 @@ const styles = `
     white-space: nowrap;
   }
 
+  .campaign-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
   .campaign-copy p,
+  .campaign-edit-fields input,
   .campaign-copy textarea {
     margin: 13px 0 0;
-    color: #22242a;
+    color: #1a1a1a;
     font: inherit;
     font-size: 14px;
     line-height: 1.45;
+    background: #ffffff;
+  }
+
+  .campaign-edit-fields {
+    display: grid;
+    gap: 10px;
+    margin-top: 13px;
+  }
+
+  .campaign-edit-fields input {
+    width: 100%;
+    margin: 0;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 650;
   }
 
   .campaign-copy textarea {
     width: 100%;
+    margin: 0;
     min-height: 110px;
-    border: 1px solid #dfdfdf;
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
     padding: 12px;
     resize: vertical;
+  }
+
+  .campaign-edit-fields input:focus,
+  .campaign-copy textarea:focus {
+    border-color: #111111;
+    outline: none;
   }
 
   .campaign-footer {

@@ -1176,7 +1176,7 @@ export function EditorSidePanel({
         <div className="post-section">
           <label className="settings-label">Crosspost</label>
           <div className="post-platforms">
-            {POST_PLATFORMS.filter((platform) => platform.id !== 'Google').map((platform) => (
+            {POST_PLATFORMS.map((platform) => (
               <div className="post-platform-row" key={platform.id}>
                 <span className="post-platform-icon">{platform.icon}</span>
                 <span className="post-platform-name">{platform.label}</span>

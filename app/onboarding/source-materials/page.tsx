@@ -3,23 +3,12 @@
 import { Suspense, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-type TopicReference = {
-  id: string
-  label: string
-  image: string
-}
-
 const STORAGE_KEYS = {
-  topicReview: 'soon-topic-review-v1',
+  websiteAnalysis: 'soon-website-analysis-v1',
 }
 
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
-
-const FALLBACK_WEBSITE_IMAGES = [
-  '/photo-control/coffee-full-freedom.jpg',
-  '/assets/content-strategies/photos/lifestyle-content.jpg',
-]
 
 function readStorage<T>(key: string): T | null {
   if (typeof window === 'undefined') return null
@@ -31,6 +20,63 @@ function readStorage<T>(key: string): T | null {
   }
 }
 
+function displayImageUrl(value: string) {
+  if (!value) return ''
+  if (value.startsWith('blob:') || value.startsWith('data:') || value.startsWith('/')) return value
+  return `/api/website-image?url=${encodeURIComponent(value)}`
+}
+
+function collectImageStrings(value: unknown): string[] {
+  if (!value) return []
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(collectImageStrings)
+  if (typeof value === 'object') {
+    const objectValue = value as Record<string, unknown>
+    return [
+      objectValue.url,
+      objectValue.src,
+      objectValue.image,
+      objectValue.imageUrl,
+    ].flatMap(collectImageStrings)
+  }
+  return []
+}
+
+function isUsableWebsiteReferenceImage(image: string) {
+  if (!image || image === PLACEHOLDER_IMAGE) return false
+  return !/(logo|icon|favicon|sprite|placeholder|blank|pixel|tracking|facebook\.com\/tr|monogram|gencode|qrcode|qr[-_]?code|award|badge|singleline|title|bar|social|payment|visa|mastercard|blur_|\.(svg|ico|gif)(?:\?|$))/i.test(image)
+}
+
+function normalizeWebsiteReferenceImage(image: string) {
+  try {
+    const url = new URL(image.trim())
+    if (/static\.wixstatic\.com$/i.test(url.hostname) || /static\.parastorage\.com$/i.test(url.hostname)) {
+      const mediaMatch = url.pathname.match(/^(\/media\/[^/]+\.(?:jpe?g|png|webp|avif))(?:\/.*)?$/i)
+      if (mediaMatch?.[1]) {
+        url.pathname = mediaMatch[1]
+        url.search = ''
+        url.hash = ''
+        return url.toString()
+      }
+    }
+
+    if (/cdn\.shopify\.com$/i.test(url.hostname) || /\.myshopify\.com$/i.test(url.hostname)) {
+      url.pathname = url.pathname.replace(
+        /_(?:\d+x\d*|\d+x|x\d+|pico|icon|thumb|small|compact|medium|large|grande|master)(?=\.(?:jpe?g|png|webp|avif)$)/i,
+        ''
+      )
+      url.search = ''
+      url.hash = ''
+      return url.toString()
+    }
+
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return image.trim()
+  }
+}
+
 function SourceMaterialsContent() {
   const searchParams = useSearchParams()
   const uploadInputRef = useRef<HTMLInputElement>(null)
@@ -38,12 +84,17 @@ function SourceMaterialsContent() {
   const [uploadedNames, setUploadedNames] = useState<string[]>([])
 
   const websiteImages = useMemo(() => {
-    const topics = readStorage<TopicReference[]>(STORAGE_KEYS.topicReview) || []
-    const topicImages = topics
-      .map((topic) => topic.image)
-      .filter((image) => image && image !== PLACEHOLDER_IMAGE)
-    const uniqueImages = Array.from(new Set(topicImages))
-    return uniqueImages.length ? uniqueImages : FALLBACK_WEBSITE_IMAGES
+    const websiteStored = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
+    const analysis = websiteStored?.analysis || websiteStored
+    const images = [
+      ...collectImageStrings(analysis?.websiteImages),
+      ...collectImageStrings(analysis?.images),
+      ...collectImageStrings(analysis?.media),
+    ]
+      .map(normalizeWebsiteReferenceImage)
+      .filter(isUsableWebsiteReferenceImage)
+      .map(displayImageUrl)
+    return Array.from(new Set(images))
   }, [])
 
   function preserveParams(url: URL) {
@@ -59,6 +110,7 @@ function SourceMaterialsContent() {
       'campaign',
       'visualStyle',
       'typeface',
+      'contentModification',
       'photoControl',
     ].forEach((key) => {
       const value = searchParams.get(key)
@@ -109,9 +161,13 @@ function SourceMaterialsContent() {
               <button type="button" onClick={() => setIsAdjusting(true)}>調整</button>
             </div>
             <div className="website-thumbs">
-              {websiteImages.slice(0, 4).map((image) => (
-                <img src={image} alt="" key={image} />
-              ))}
+              {websiteImages.length ? (
+                websiteImages.slice(0, 4).map((image) => (
+                  <img src={image} alt="" key={image} />
+                ))
+              ) : (
+                <span className="empty-website-assets">未找到可用網站圖片</span>
+              )}
             </div>
           </article>
 
@@ -145,9 +201,9 @@ function SourceMaterialsContent() {
             <h2 id="adjust-title">網站素材</h2>
             <p>這些圖片會用作之後生成內容的視覺參考。</p>
             <div className="adjust-grid">
-              {websiteImages.map((image) => (
+              {websiteImages.length ? websiteImages.map((image) => (
                 <img src={image} alt="" key={image} />
-              ))}
+              )) : <p>暫時未找到可用網站圖片。你可以返回上一頁重新分析，或在右邊上載素材。</p>}
             </div>
           </section>
         </div>
@@ -310,8 +366,17 @@ const styles = `
   .website-thumbs img {
     width: 44px;
     height: 44px;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 6px;
+    border: 1px solid #eeeeee;
+    background: #ffffff;
+    padding: 4px;
+  }
+
+  .empty-website-assets {
+    color: #8a8e97;
+    font-size: 12px;
+    line-height: 44px;
   }
 
   .upload-dropzone {
@@ -425,8 +490,11 @@ const styles = `
   .adjust-grid img {
     width: 100%;
     aspect-ratio: 1 / 1;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 8px;
+    border: 1px solid #eeeeee;
+    background: #ffffff;
+    padding: 8px;
   }
 
   @media (max-width: 760px) {

@@ -70,13 +70,6 @@ export const contentMixCatalog: Omit<ContentMixItem, 'quantity' | 'enabled'>[] =
     creditsEach: 6,
   },
   {
-    id: 'blogs',
-    title: 'Blogs',
-    titleZh: 'Blog 文章',
-    description: 'Long-form SEO articles',
-    creditsEach: 20,
-  },
-  {
     id: 'emails',
     title: 'Emails',
     titleZh: 'Email',
@@ -98,7 +91,8 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
     'You are a senior content operations planner for SOON.',
     'Recommend a practical first-week content mix based on the selected content strategy, campaign theme, and distribution channels.',
     'Return only valid JSON. No markdown.',
-    'Use only the seven fixed content types provided. Do not add, remove, or rename items.',
+    'Use only the fixed content types provided. Do not add, remove, or rename items.',
+    "Only recommend content types that match the user's selected distribution channels. If a channel was not selected, set its quantity to 0 and do not include it in the primary recommendation.",
     `The mix should be realistic for one first week. Keep total credits at or below ${weeklyCreditLimit}.`,
     'For most first-week campaigns, recommend 3-6 total deliverables, unless the channel mix clearly requires more.',
     'All human-facing strings must use the requested language.',
@@ -130,7 +124,6 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
         'feed-videos': 1,
         'short-form-video': 0,
         stories: 0,
-        blogs: 1,
         emails: 1,
       },
       reason: 'one sentence explaining why this first-week mix fits the campaign',
@@ -195,7 +188,6 @@ export function fallbackContentMix(input: ContentMixInput): ContentMixRecommenda
     'feed-videos': hasShortVideo ? 0 : 1,
     'short-form-video': hasShortVideo ? 1 : 0,
     stories: hasStories ? 2 : 0,
-    blogs: 1,
     emails: 1,
   }
   const items = fitItemsWithinLimit(buildItems(quantities), weeklyCreditLimit)
@@ -225,7 +217,7 @@ function calculateTotal(items: ContentMixItem[]) {
 }
 
 function fitItemsWithinLimit(items: ContentMixItem[], limit: number) {
-  const reduceOrder = ['stories', 'emails', 'blogs', 'still-images', 'carousels', 'feed-videos', 'short-form-video']
+  const reduceOrder = ['stories', 'emails', 'still-images', 'carousels', 'feed-videos', 'short-form-video']
   const nextItems = items.map((item) => ({ ...item }))
 
   while (calculateTotal(nextItems) > limit) {

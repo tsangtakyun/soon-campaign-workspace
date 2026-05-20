@@ -181,7 +181,7 @@ function PaidAnalysisContent() {
   ]
   const savedAnalysisHref = campaignIntakeIdFromUrl || campaignIntakeId
     ? `/paid-analysis?campaign_intake_id=${encodeURIComponent(campaignIntakeIdFromUrl || campaignIntakeId)}`
-    : '/my-workspace'
+    : '/onboarding'
 
   return (
     <main style={{

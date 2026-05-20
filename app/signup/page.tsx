@@ -15,7 +15,7 @@ function SignupContent() {
   const contentEngineBase = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
   const onboardingNext = selectedPlan ? `/signup?onboarding=1&plan=${selectedPlan}` : '/signup?onboarding=1'
   const nextWithOnboarding = (name: string, budget: string, category: string) => {
-    const url = new URL(contentEngineBase, appUrl)
+    const url = new URL(contentEngineBase, getAppUrl())
     url.searchParams.set('name', name)
     url.searchParams.set('budget', budget)
     url.searchParams.set('category', category)
@@ -32,7 +32,6 @@ function SignupContent() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState('')
   const supabase = createClient()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://soon-campaign-workspace.vercel.app'
 
   async function handleGoogleSignup() {
     setLoading('google')
@@ -40,7 +39,7 @@ function SignupContent() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${appUrl}/auth/callback`,
+        redirectTo: `${getAppUrl()}/auth/callback`,
       },
     })
   }
@@ -55,7 +54,7 @@ function SignupContent() {
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(onboardingNext)}`,
+          emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(onboardingNext)}`,
         },
       })
 
@@ -470,4 +469,9 @@ export default function SignupPage() {
       <SignupContent />
     </Suspense>
   )
+}
+
+function getAppUrl() {
+  if (typeof window !== 'undefined') return window.location.origin
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://sooncreator.network'
 }
