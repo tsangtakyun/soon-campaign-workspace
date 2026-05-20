@@ -60,41 +60,6 @@ type EditorSidePanelProps = {
   onCloseDesignMode: () => void
 }
 
-function escapeSvgText(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-function buildAiMediaPlaceholder(prompt: string, size: string, style: string) {
-  const width = size === 'landscape' ? 1200 : size === 'portrait' ? 900 : 1080
-  const height = size === 'landscape' ? 800 : size === 'portrait' ? 1200 : 1080
-  const safePrompt = escapeSvgText(prompt.trim().slice(0, 82) || 'AI 生成圖片')
-  const styleLabel = style === 'illustration' ? '插畫風格' : '照片風格'
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#f5f0eb"/>
-          <stop offset="48%" stop-color="#c8b6a8"/>
-          <stop offset="100%" stop-color="#1a1a1a"/>
-        </linearGradient>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#bg)"/>
-      <rect x="${width * 0.08}" y="${height * 0.1}" width="${width * 0.84}" height="${height * 0.8}" rx="36" fill="rgba(255,255,255,0.22)"/>
-      <text x="${width * 0.5}" y="${height * 0.42}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${Math.round(width * 0.052)}" font-weight="800" fill="#ffffff">AI IMAGE</text>
-      <text x="${width * 0.5}" y="${height * 0.5}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${Math.round(width * 0.03)}" fill="#ffffff">${styleLabel}</text>
-      <foreignObject x="${width * 0.18}" y="${height * 0.56}" width="${width * 0.64}" height="${height * 0.22}">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; color: white; font-size: ${Math.round(width * 0.03)}px; line-height: 1.25; text-align: center; font-weight: 700;">${safePrompt}</div>
-      </foreignObject>
-    </svg>
-  `
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
-}
-
 function ElementShelf({
   expanded,
   items,
@@ -170,12 +135,38 @@ export function EditorSidePanel({
   const [aiImagePrompt, setAiImagePrompt] = useState('')
   const [aiImageSize, setAiImageSize] = useState<'square' | 'landscape' | 'portrait'>('square')
   const [aiImageStyle, setAiImageStyle] = useState<'photo' | 'illustration'>('photo')
+  const [aiImageLoading, setAiImageLoading] = useState(false)
+  const [aiImageError, setAiImageError] = useState('')
 
-  const generateAiImage = () => {
-    const label = aiImagePrompt.trim() ? `AI：${aiImagePrompt.trim().slice(0, 18)}` : 'AI 生成圖片'
-    const url = buildAiMediaPlaceholder(aiImagePrompt, aiImageSize, aiImageStyle)
-    onTrackUploadedImage({ url, label })
-    onAddImage(url, label)
+  const generateAiImage = async () => {
+    if (!aiImagePrompt.trim()) return
+    setAiImageLoading(true)
+    setAiImageError('')
+
+    try {
+      const res = await fetch('/api/editor/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: aiImagePrompt,
+          size: aiImageSize,
+          style: aiImageStyle,
+        }),
+      })
+      const data = (await res.json()) as { detail?: string; error?: string; imageUrl?: string }
+      if (!res.ok || !data.imageUrl) {
+        throw new Error(data.detail || data.error || 'Failed')
+      }
+
+      const label = `AI：${aiImagePrompt.trim().slice(0, 18)}`
+      onTrackUploadedImage({ url: data.imageUrl, label })
+      onAddImage(data.imageUrl, label)
+      setAiImagePrompt('')
+    } catch (err) {
+      setAiImageError(err instanceof Error ? err.message : '生成失敗，請重試')
+    } finally {
+      setAiImageLoading(false)
+    }
   }
 
   if (selectedElement) {
@@ -789,12 +780,17 @@ export function EditorSidePanel({
 
             <button
               className="media-generate-button"
-              disabled={!aiImagePrompt.trim()}
-              onClick={generateAiImage}
+              disabled={!aiImagePrompt.trim() || aiImageLoading}
+              onClick={() => void generateAiImage()}
               type="button"
             >
-              生成並插入 · 5 credits
+              {aiImageLoading ? '⏳ 生成中，約需 15 秒...' : '生成並插入 · 5 credits'}
             </button>
+            {aiImageError ? (
+              <p style={{ color: '#dc2626', fontSize: 12, marginTop: 6 }}>
+                ❌ {aiImageError}
+              </p>
+            ) : null}
           </div>
         </section>
 
