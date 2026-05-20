@@ -846,6 +846,11 @@ function ScheduledPostsPageContent() {
 
       const scheduledAt = new Date(createScheduledAt)
       if (Number.isNaN(scheduledAt.getTime())) throw new Error('請選擇有效的發布時間。')
+      if (scheduledAt < new Date()) {
+        const nextAvailableTime = localDateTimeValue()
+        setCreateScheduledAt(nextAvailableTime)
+        throw new Error('發布時間不能早於現在，已改為一小時後。')
+      }
 
       const title = createTitle.trim()
       if (!title) throw new Error('請輸入標題。')
@@ -2981,7 +2986,21 @@ function ScheduledPostsPageContent() {
               </label>
               <label>
                 <span>發布日期與時間</span>
-                <input type="datetime-local" value={createScheduledAt} onChange={(event) => setCreateScheduledAt(event.target.value)} />
+                <input
+                  type="datetime-local"
+                  min={localDateTimeValue(0)}
+                  value={createScheduledAt}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    const selectedTime = new Date(value)
+                    if (value && !Number.isNaN(selectedTime.getTime()) && selectedTime < new Date()) {
+                      setCreateScheduledAt(localDateTimeValue())
+                      setToolbarMessage('發布時間不能早於現在，已改為一小時後。')
+                      return
+                    }
+                    setCreateScheduledAt(value)
+                  }}
+                />
               </label>
               <footer>
                 <button type="button" onClick={() => setCreateModalOpen(false)}>取消</button>
@@ -3541,12 +3560,17 @@ const styles = `
   }
 
   .post-editor-action-btn.approve {
-    background: #202126;
+    background: #16a34a;
     color: #ffffff;
   }
 
   .post-editor-action-btn:hover {
     opacity: 0.85;
+  }
+
+  .post-editor-action-btn.approve:hover {
+    background: #15803d;
+    opacity: 1;
   }
 
   .post-editor-action-btn:disabled {
