@@ -198,7 +198,7 @@ export function PostReviewClient({ campaign, nextId, post, prevId, workspaceId }
   }
 
   function handleEditDesign() {
-    router.push('/scheduled-posts')
+    router.push(`/scheduled-posts?postId=${post.id}`)
   }
 
   function renderHoverImage(aspectRatio: string) {
