@@ -743,6 +743,7 @@ function ScheduledPostsPageContent() {
   const canvasRef = useRef<HTMLElement | null>(null)
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const fabricControlsRef = useRef<FabricControls | null>(null)
+  const designElementsImageRef = useRef<string>('')
   const designHistoryIndexRef = useRef(-1)
   const designHistoryRef = useRef<string[]>([])
   const isRestoringDesignHistoryRef = useRef(false)
@@ -790,13 +791,14 @@ function ScheduledPostsPageContent() {
   }, [activeWorkspaceId, showAttachModal])
 
   const openDesignEditor = (post: ScheduledPost) => {
-    if (designElementsPostId !== post.id) {
+    if (designElementsPostId !== post.id || designElementsImageRef.current !== post.image) {
       const nextElements = createPostDesignElements(post)
       designHistoryRef.current = [JSON.stringify(nextElements)]
       designHistoryIndexRef.current = 0
       setDesignElements(nextElements)
       void fabricControlsRef.current?.loadDesignElements(nextElements)
       setDesignElementsPostId(post.id)
+      designElementsImageRef.current = post.image
       setSelectedElementId(null)
     }
     setDesignMode(true)
