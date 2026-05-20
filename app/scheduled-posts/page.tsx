@@ -383,18 +383,25 @@ function isInCurrentWeek(post: ScheduledPost) {
   return scheduled >= start && scheduled < end
 }
 
-function createPostDesignElements(post: ScheduledPost): DesignElement[] {
+function createPostDesignElements(post: ScheduledPost, canvasSize?: { w: number; h: number }): DesignElement[] {
+  const isSquare = !canvasSize || canvasSize.w === canvasSize.h
+  const displayW = 430
+  const displayH = isSquare ? 430 : 538
+  const bodyPreview = post.body
+    ? post.body.slice(0, 60) + (post.body.length > 60 ? '...' : '')
+    : ''
+
   return [
     {
       id: `image-background-${post.id}`,
       kind: 'image',
       item: 'background',
       label: '背景圖片',
-      x: 50,
-      y: 50,
-      size: 430,
-      width: 430,
-      height: 538,
+      x: 0,
+      y: 0,
+      size: displayW,
+      width: displayW,
+      height: displayH,
       rotation: 0,
       opacity: 100,
       color: '#ffffff',
@@ -435,7 +442,7 @@ function createPostDesignElements(post: ScheduledPost): DesignElement[] {
       opacity: 100,
       color: '#ffffff',
       zIndex: 11,
-      textContent: 'is the one friends replay most.',
+      textContent: bodyPreview,
       fontFamily: 'inherit',
       fontSize: 21,
       fontWeight: 'normal',
@@ -444,28 +451,6 @@ function createPostDesignElements(post: ScheduledPost): DesignElement[] {
       textAlign: 'left',
       width: 310,
       lineHeight: 1.08,
-    },
-    {
-      id: `text-logo-${post.id}`,
-      kind: 'text',
-      item: 'logo',
-      label: '品牌 Logo',
-      x: 18,
-      y: 91,
-      size: 21,
-      rotation: -4,
-      opacity: 100,
-      color: '#ffffff',
-      zIndex: 12,
-      textContent: 'SOON\nLOG',
-      fontFamily: 'inherit',
-      fontSize: 21,
-      fontWeight: 'bold',
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'center',
-      width: 86,
-      lineHeight: 0.8,
     },
   ]
 }
@@ -791,8 +776,15 @@ function ScheduledPostsPageContent() {
   }, [activeWorkspaceId, showAttachModal])
 
   const openDesignEditor = (post: ScheduledPost) => {
+    const isSquare = post.type === '靜態圖片' || Boolean(post.postType && !post.postType.toLowerCase().includes('story'))
+    const newCanvasSize = isSquare
+      ? { label: 'Instagram 方形貼文', w: 1080, h: 1080 }
+      : { label: 'Instagram 直向貼文', w: 1080, h: 1350 }
+
+    setCanvasSize(newCanvasSize)
+
     if (designElementsPostId !== post.id || designElementsImageRef.current !== post.image) {
-      const nextElements = createPostDesignElements(post)
+      const nextElements = createPostDesignElements(post, newCanvasSize)
       designHistoryRef.current = [JSON.stringify(nextElements)]
       designHistoryIndexRef.current = 0
       setDesignElements(nextElements)
