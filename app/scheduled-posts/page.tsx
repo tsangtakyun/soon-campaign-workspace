@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, type FormEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
-import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
 import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
@@ -577,7 +577,8 @@ function ScheduledPostsPageContent() {
   const [compact, setCompact] = useState(false)
   const fallbackScheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
   const [persistedScheduledPosts, setPersistedScheduledPosts] = useState<ScheduledPost[]>([])
-  const scheduledPosts = persistedScheduledPosts.length > 0 ? persistedScheduledPosts : fallbackScheduledPosts
+  const [postsLoaded, setPostsLoaded] = useState(false)
+  const scheduledPosts = persistedScheduledPosts
   const currentWeekPosts = useMemo(() => scheduledPosts.filter(isInCurrentWeek), [scheduledPosts])
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
   const [postStatuses, setPostStatuses] = useState<Record<string, 'draft' | 'approved' | 'scheduled' | 'published' | 'rejected'>>({})
@@ -626,13 +627,13 @@ function ScheduledPostsPageContent() {
   const isRestoringDesignHistoryRef = useRef(false)
 
   useEffect(() => {
-    if (!autoPostId || scheduledPosts.length === 0) return
+    if (!autoPostId || !postsLoaded || scheduledPosts.length === 0) return
     const target = scheduledPosts.find((post) => post.id === autoPostId)
     if (target) {
       setSelectedPost(target)
       router.replace('/scheduled-posts', { scroll: false })
     }
-  }, [autoPostId, router, scheduledPosts])
+  }, [autoPostId, postsLoaded, router, scheduledPosts])
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
@@ -1047,6 +1048,9 @@ function ScheduledPostsPageContent() {
     let cancelled = false
 
     async function loadPersistedPostsAndCredits() {
+      setPostsLoaded(false)
+      setPersistedScheduledPosts([])
+
       try {
         const supabase = createClient()
         const {
@@ -1066,6 +1070,7 @@ function ScheduledPostsPageContent() {
             if (!cancelled) {
               setActiveWorkspaceIdState(null)
               setPersistedScheduledPosts([])
+              setPostsLoaded(true)
             }
             return
           }
@@ -1083,20 +1088,26 @@ function ScheduledPostsPageContent() {
         } else if (sessionId) {
           query = query.eq('onboarding_session_id', sessionId)
         } else {
+          if (!cancelled) setPostsLoaded(true)
           return
         }
 
         const { data, error } = await query
+        if (error) throw error
 
-        if (!cancelled && !error) {
+        if (!cancelled) {
           setPersistedScheduledPosts(
             ((data || []) as Record<string, unknown>[]).map((post, index) =>
               mapPersistedScheduledPost(post, index, fallbackScheduledPosts)
             )
           )
+          setPostsLoaded(true)
         }
       } catch {
-        // Keep the static calendar fallback when Supabase has no rows or the user is not signed in.
+        if (!cancelled) {
+          setPersistedScheduledPosts([])
+          setPostsLoaded(true)
+        }
       }
     }
 
@@ -2035,23 +2046,38 @@ function ScheduledPostsPageContent() {
         <div className="calendar-date-pill">5月8日 星期五</div>
 
         <section className={compact ? 'schedule-column compact' : 'schedule-column'} aria-label="今日排程">
-          {scheduledPosts.map((post) => (
-            <article className="post-card" key={post.id} onClick={() => setSelectedPost(post)}>
-              <div className="post-card-head">
-                <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
-                <strong>{post.time}</strong>
-              </div>
-              <p className="post-preview">{post.body}</p>
-              <div className="post-image-wrap">
-                <img src={post.image} alt="" />
-                <span>{post.status}</span>
-              </div>
-              <div className="post-copy">
-                <h2>{post.title}</h2>
-                <p>{post.body}</p>
-              </div>
-            </article>
-          ))}
+          {!postsLoaded
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <article className="post-card post-card-skeleton" key={`loading-post-${index}`} aria-hidden="true">
+                  <div className="post-card-head">
+                    <span />
+                    <strong />
+                  </div>
+                  <p className="post-preview" />
+                  <div className="post-image-wrap" />
+                  <div className="post-copy">
+                    <h2 />
+                    <p />
+                  </div>
+                </article>
+              ))
+            : scheduledPosts.map((post) => (
+                <article className="post-card" key={post.id} onClick={() => setSelectedPost(post)}>
+                  <div className="post-card-head">
+                    <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
+                    <strong>{post.time}</strong>
+                  </div>
+                  <p className="post-preview">{post.body}</p>
+                  <div className="post-image-wrap">
+                    <img src={post.image} alt="" />
+                    <span>{post.status}</span>
+                  </div>
+                  <div className="post-copy">
+                    <h2>{post.title}</h2>
+                    <p>{post.body}</p>
+                  </div>
+                </article>
+              ))}
         </section>
         {toolbarMessage ? <div className="toolbar-message">{toolbarMessage}</div> : null}
       </section>
@@ -2148,7 +2174,7 @@ function ScheduledPostsPageContent() {
         </div>
       ) : null}
 
-      <style dangerouslySetInnerHTML={{ __html: styles }} />
+      <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
     </main>
   )
 }
@@ -2172,104 +2198,6 @@ const styles = `
     color: #202126;
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
-  }
-
-  .sidebar {
-    min-height: 100vh;
-    border-right: 1px solid #e6e7ea;
-    background: #f2f3f5;
-    padding: 16px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    position: relative;
-    z-index: 30;
-    pointer-events: auto;
-  }
-
-  .workspace-switcher {
-    display: grid;
-    grid-template-columns: 28px 1fr auto;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 6px 18px;
-    border-bottom: 1px solid #e2e3e6;
-  }
-
-  .workspace-mark {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    background: #ffd946;
-    color: #111111;
-    display: grid;
-    place-items: center;
-    font-weight: 800;
-    font-size: 13px;
-  }
-
-  .workspace-switcher strong {
-    font-size: 14px;
-    font-weight: 550;
-  }
-
-  .workspace-switcher span {
-    color: #9a9da4;
-  }
-
-  .sidebar-nav,
-  .sidebar-group,
-  .sidebar-footer {
-    display: grid;
-    gap: 5px;
-  }
-
-  .sidebar-nav a,
-  .sidebar-group a,
-  .sidebar-footer a {
-    min-height: 34px;
-    border-radius: 9px;
-    color: #6f7278;
-    display: grid;
-    grid-template-columns: 24px 1fr auto;
-    align-items: center;
-    gap: 8px;
-    padding: 0 10px;
-    text-decoration: none;
-    font-size: 14px;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .sidebar-group a,
-  .sidebar-footer a {
-    display: flex;
-  }
-
-  .sidebar-nav a.active {
-    background: #e5e7eb;
-    color: #202126;
-  }
-
-  .sidebar-nav strong {
-    font-weight: 500;
-  }
-
-  .sidebar-nav em {
-    color: #9b9ea6;
-    font-style: normal;
-  }
-
-  .sidebar-group p {
-    margin: 8px 10px 4px;
-    color: #9a9da4;
-    font-size: 12px;
-  }
-
-  .sidebar-footer {
-    margin-top: auto;
-    border-top: 1px solid #e2e3e6;
-    padding-top: 12px;
   }
 
   .calendar-shell {
@@ -2400,6 +2328,51 @@ const styles = `
     transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(32, 33, 38, 0.09);
     border-color: #c8c9ce;
+  }
+
+  .post-card-skeleton {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .post-card-skeleton .post-card-head span,
+  .post-card-skeleton .post-card-head strong,
+  .post-card-skeleton .post-preview,
+  .post-card-skeleton .post-copy h2,
+  .post-card-skeleton .post-copy p {
+    display: block;
+    border-radius: 999px;
+    background: #eceef2;
+  }
+
+  .post-card-skeleton .post-card-head span {
+    width: 72px;
+    height: 14px;
+  }
+
+  .post-card-skeleton .post-card-head strong {
+    width: 48px;
+    height: 14px;
+  }
+
+  .post-card-skeleton .post-preview {
+    height: 52px;
+    margin: 10px;
+    padding: 0;
+  }
+
+  .post-card-skeleton .post-image-wrap {
+    background: #f1f2f4;
+  }
+
+  .post-card-skeleton .post-copy h2 {
+    height: 22px;
+    width: 78%;
+  }
+
+  .post-card-skeleton .post-copy p {
+    height: 32px;
+    width: 100%;
   }
 
   .post-card-head {
