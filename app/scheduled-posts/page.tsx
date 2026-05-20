@@ -52,6 +52,84 @@ type PlatformConnection = {
   platform: string
 }
 
+function PlatformIcon({ channel }: { channel: PreviewChannel }) {
+  if (channel === 'Instagram') {
+    return (
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#f09433" />
+            <stop offset="25%" stopColor="#e6683c" />
+            <stop offset="50%" stopColor="#dc2743" />
+            <stop offset="75%" stopColor="#cc2366" />
+            <stop offset="100%" stopColor="#bc1888" />
+          </linearGradient>
+        </defs>
+        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="url(#ig-grad)" />
+        <circle cx="12" cy="12" r="4.5" stroke="white" strokeWidth="1.8" fill="none" />
+        <circle cx="17.5" cy="6.5" r="1.2" fill="white" />
+      </svg>
+    )
+  }
+
+  if (channel === 'Facebook') {
+    return (
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <rect width="24" height="24" rx="4" fill="#1877F2" />
+        <path d="M16 8h-2a1 1 0 00-1 1v2h3l-.5 3H13v7h-3v-7H8v-3h2V9a4 4 0 014-4h2v3z" fill="white" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+      <rect width="24" height="24" rx="4" fill="#000" />
+      <path
+        d="M16.5 11.5c-.3-1.5-1.5-2.5-3.5-2.5-2.2 0-3.8 1.6-3.8 3.8 0 2.3 1.5 3.7 3.8 3.7.9 0 1.8-.3 2.4-.8"
+        stroke="white"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.5 9.1c1.2.3 2 1.1 2.2 2.2.3 1.5-.3 3-1.7 3.5"
+        stroke="white"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function InstagramActions() {
+  return (
+    <>
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
+        <path
+          d="M20.8 5.7c-1.7-2-4.6-1.9-6.2.1L12 8.8 9.4 5.8c-1.6-2-4.5-2.1-6.2-.1-1.8 2.1-1.4 5.2.8 7.1l8 7 8-7c2.2-1.9 2.6-5 .8-7.1z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
+        <path
+          d="M20 11.5a7.5 7.5 0 01-8 7.48 8.8 8.8 0 01-3.1-.82L4 19.5l1.38-4.3A7.5 7.5 0 1120 11.5z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
+        <path d="M21 3L3.5 11.2l6.6 2.5L13 20.5 21 3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M10.1 13.7L21 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+      <svg className="bookmark-icon" viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
+        <path d="M7 4h10v16l-5-3.2L7 20V4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      </svg>
+    </>
+  )
+}
+
 function readTopicImages() {
   if (typeof window === 'undefined') return FALLBACK_IMAGES
   try {
@@ -916,6 +994,13 @@ function ScheduledPostsPageContent() {
     if (!name) return ''
     return platformId === 'instagram' || platformId === 'threads' ? `@${name}` : name
   }
+
+  const previewPlatformId =
+    previewChannel === 'Instagram' ? 'instagram' : previewChannel === 'Threads' ? 'threads' : 'facebook'
+  const previewUsername = platformAccountName(previewPlatformId) || 'SOON'
+  const previewConnectionLabel = platformConnections[previewPlatformId] ? '已連接' : '尚未連接帳戶'
+  const workspaceName = brandKit.businessName
+  const workspaceInitial = workspaceName?.[0]?.toUpperCase() || 'S'
 
   const rejectPost = (post: ScheduledPost) => {
     setPostStatuses((current) => ({ ...current, [post.id]: 'rejected' }))
@@ -1817,33 +1902,24 @@ function ScheduledPostsPageContent() {
                   className={previewChannel === platform.channel ? 'active' : ''}
                   key={platform.id}
                   onClick={() => setPreviewChannel(platform.channel)}
+                  aria-label={platform.label}
                   type="button"
                 >
-                  {platform.channel === 'Instagram' ? 'IG' : platform.channel === 'Facebook' ? 'FB' : 'Th'}
+                  <PlatformIcon channel={platform.channel} />
                 </button>
               ))}
             </div>
 
             <article className={`phone-preview ${previewChannel.toLowerCase()}`}>
               <header>
-                <div className="avatar">S</div>
-                <strong>
-                  {previewChannel === 'Instagram'
-                    ? platformAccountName('instagram') || 'soon_log'
-                    : previewChannel === 'Threads'
-                      ? platformAccountName('threads') || 'soon_threads'
-                      : platformAccountName('facebook') || 'SOON-LOG'}
-                </strong>
+                <div className="avatar">{workspaceInitial}</div>
+                <strong>{previewUsername}</strong>
                 <span>
-                  {platformConnections[
-                    previewChannel === 'Instagram'
-                      ? 'instagram'
-                      : previewChannel === 'Threads'
-                        ? 'threads'
-                        : 'facebook'
-                  ]
-                    ? '已連接'
-                    : '尚未連接帳戶'}
+                  {previewChannel === 'Instagram'
+                    ? `${previewConnectionLabel} • 贊助`
+                    : previewChannel === 'Facebook'
+                      ? `${previewConnectionLabel} · 剛剛 · 🌐`
+                      : `${previewConnectionLabel} ·  剛剛`}
                 </span>
               </header>
               <div className="phone-image">
@@ -1857,24 +1933,29 @@ function ScheduledPostsPageContent() {
                 </button>
               </div>
               {previewChannel === 'Threads' ? (
-                <div className="threads-preview-note">單張圖片 + 文字貼文</div>
+                <p>
+                  <strong>{previewUsername}</strong> {selectedCaption}
+                </p>
+              ) : null}
+              {previewChannel === 'Threads' ? (
+                <div className="threads-preview-note">回覆</div>
+              ) : previewChannel === 'Facebook' ? (
+                <div className="phone-actions facebook-actions">
+                  <span>👍 讚好</span>
+                  <span>💬 留言</span>
+                  <span>↗ 分享</span>
+                </div>
               ) : (
                 <div className="phone-actions">
-                  <span>♡</span>
-                  <span>○</span>
-                  <span>⌲</span>
+                  <InstagramActions />
                   <button type="button" onClick={() => openCaptionModal(selectedPost)}>編輯 caption</button>
                 </div>
               )}
-              <p>
-                <strong>
-                  {previewChannel === 'Instagram'
-                    ? platformAccountName('instagram') || 'soon_log'
-                    : previewChannel === 'Threads'
-                      ? platformAccountName('threads') || 'soon_threads'
-                      : platformAccountName('facebook') || 'SOON-LOG'}
-                </strong> {selectedCaption}
-              </p>
+              {previewChannel !== 'Threads' ? (
+                <p>
+                  <strong>{previewUsername}</strong> {selectedCaption}
+                </p>
+              ) : null}
             </article>
 
             <div className="result-actions">
@@ -2838,8 +2919,14 @@ const styles = `
     border: 1px solid #e1e3e8;
     background: #ffffff;
     color: #3f424a;
+    display: grid;
+    place-items: center;
     font-weight: 750;
     cursor: pointer;
+  }
+
+  .view-switcher button svg {
+    display: block;
   }
 
   .view-switcher button.active {
@@ -2973,11 +3060,27 @@ const styles = `
     align-items: center;
     gap: 13px;
     padding: 8px 14px;
+    color: #202126;
   }
 
   .phone-actions span {
-    font-size: 23px;
+    font-size: 13px;
+    font-weight: 650;
     line-height: 1;
+  }
+
+  .phone-actions svg {
+    flex: 0 0 auto;
+  }
+
+  .phone-actions .bookmark-icon {
+    margin-left: auto;
+  }
+
+  .phone-actions.facebook-actions {
+    justify-content: space-around;
+    border-top: 1px solid #f0f1f3;
+    color: #555963;
   }
 
   .phone-actions button {
@@ -3012,6 +3115,25 @@ const styles = `
   .phone-preview.linkedin {
     width: 360px;
     border-radius: 14px;
+  }
+
+  .phone-preview.facebook .avatar {
+    background: #1877F2;
+    color: #ffffff;
+  }
+
+  .phone-preview.facebook .phone-image {
+    aspect-ratio: 16 / 9;
+  }
+
+  .phone-preview.threads .avatar {
+    background: #000000;
+    color: #ffffff;
+  }
+
+  .phone-preview.instagram .avatar {
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    color: #ffffff;
   }
 
   .phone-preview.x,
@@ -3127,6 +3249,7 @@ const styles = `
     border-top: 1px solid #f0f1f3;
     color: #6f737d;
     font-size: 12px;
+    font-weight: 650;
     padding: 10px 14px 0;
   }
 
