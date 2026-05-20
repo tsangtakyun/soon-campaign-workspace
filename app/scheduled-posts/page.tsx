@@ -966,23 +966,38 @@ function ScheduledPostsPageContent() {
   }
 
   const handleAiCommand = async () => {
-    if (!aiCommand.trim() || !selectedPost || aiLoading) return
+    if ((!aiCommand.trim() && !attachedImage) || !selectedPost || aiLoading) return
 
     setAiLoading(true)
     setAiStatus('processing')
     try {
-      const response = await fetch('/api/scheduled-posts/improve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'copy',
-          postIds: [selectedPost.id],
-          workspaceId: activeWorkspaceId,
-          userCommand: aiCommand,
-          attachedImageUrl: attachedImage?.url ?? null,
-        }),
-      })
-      if (!response.ok) throw new Error('Failed')
+      if (attachedImage) {
+        const response = await fetch('/api/posts/update-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: attachedImage.url,
+            postId: selectedPost.id,
+            workspaceId: activeWorkspaceId,
+          }),
+        })
+        if (!response.ok) throw new Error('Failed to update image')
+      }
+
+      if (aiCommand.trim()) {
+        const response = await fetch('/api/scheduled-posts/improve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'copy',
+            postIds: [selectedPost.id],
+            workspaceId: activeWorkspaceId,
+            userCommand: aiCommand,
+          }),
+        })
+        if (!response.ok) throw new Error('Failed to improve copy')
+      }
+
       setAiCommand('')
       setAttachedImage(null)
       setAiStatus('done')
@@ -2370,14 +2385,14 @@ function ScheduledPostsPageContent() {
                 <button
                   type="submit"
                   aria-label="送出要求"
-                  disabled={!aiCommand.trim() || aiLoading}
+                  disabled={(!aiCommand.trim() && !attachedImage) || aiLoading}
                   style={{
                     alignItems: 'center',
-                    background: aiLoading ? '#e5e7eb' : (!aiCommand.trim() ? '#e5e7eb' : '#111827'),
+                    background: aiLoading ? '#e5e7eb' : (!aiCommand.trim() && !attachedImage ? '#e5e7eb' : '#111827'),
                     border: 'none',
                     borderRadius: '50%',
                     color: aiLoading ? '#9ca3af' : 'white',
-                    cursor: !aiCommand.trim() || aiLoading ? 'not-allowed' : 'pointer',
+                    cursor: (!aiCommand.trim() && !attachedImage) || aiLoading ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     fontSize: 16,
                     height: 32,
