@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, type FormEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, type ChangeEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
@@ -50,6 +50,14 @@ type PlatformConnection = {
   account_id?: string | null
   account_name?: string | null
   platform: string
+}
+
+type AttachAsset = {
+  asset_type: string
+  filename: string | null
+  id: string
+  source_url?: string | null
+  url: string
 }
 
 function PlatformIcon({ channel }: { channel: PreviewChannel }) {
@@ -715,6 +723,11 @@ function ScheduledPostsPageContent() {
   const [improveProgress, setImproveProgress] = useState({ current: 0, total: 0 })
   const [aiCommand, setAiCommand] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
+  const [showAttachModal, setShowAttachModal] = useState(false)
+  const [attachAssets, setAttachAssets] = useState<AttachAsset[]>([])
+  const [attachLoading, setAttachLoading] = useState(false)
+  const [attachTab, setAttachTab] = useState<'all' | 'website' | 'uploaded'>('all')
+  const [selectedAttach, setSelectedAttach] = useState<string | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
@@ -722,6 +735,11 @@ function ScheduledPostsPageContent() {
   const designHistoryIndexRef = useRef(-1)
   const designHistoryRef = useRef<string[]>([])
   const isRestoringDesignHistoryRef = useRef(false)
+  const filteredAttachAssets = useMemo(() => {
+    if (attachTab === 'website') return attachAssets.filter((asset) => asset.asset_type === 'website_image')
+    if (attachTab === 'uploaded') return attachAssets.filter((asset) => asset.asset_type !== 'website_image')
+    return attachAssets
+  }, [attachAssets, attachTab])
 
   useEffect(() => {
     if (!autoPostId || !postsLoaded || scheduledPosts.length === 0) return
@@ -731,6 +749,32 @@ function ScheduledPostsPageContent() {
       router.replace('/scheduled-posts', { scroll: false })
     }
   }, [autoPostId, postsLoaded, router, scheduledPosts])
+
+  useEffect(() => {
+    if (!showAttachModal || !activeWorkspaceId) return
+
+    let cancelled = false
+    setAttachLoading(true)
+    fetch(`/api/brand-kit-data?workspace_id=${encodeURIComponent(activeWorkspaceId)}`, {
+      cache: 'no-store',
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) return
+        const assets = Array.isArray(data?.assets) ? data.assets : []
+        setAttachAssets(assets as AttachAsset[])
+      })
+      .catch(() => {
+        if (!cancelled) setAttachAssets([])
+      })
+      .finally(() => {
+        if (!cancelled) setAttachLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeWorkspaceId, showAttachModal])
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
@@ -935,6 +979,55 @@ function ScheduledPostsPageContent() {
       router.refresh()
     } finally {
       setAiLoading(false)
+    }
+  }
+
+  const handleAttachUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !activeWorkspaceId) return
+
+    setAttachLoading(true)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user?.id) throw new Error('請先登入')
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+      const storagePath = `${user.id}/brand-kit/${activeWorkspaceId}/${Date.now()}-${safeName}`
+      const { error: uploadError } = await supabase.storage
+        .from('brand-assets')
+        .upload(storagePath, file, { cacheControl: '3600', upsert: false })
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage.from('brand-assets').getPublicUrl(storagePath)
+      const nextAsset: Omit<AttachAsset, 'id'> = {
+        asset_type: 'upload',
+        filename: file.name,
+        source_url: null,
+        url: publicUrlData.publicUrl,
+      }
+      const { data: inserted, error: insertError } = await supabase
+        .from('brand_assets')
+        .insert({
+          ...nextAsset,
+          is_used: false,
+          user_id: user.id,
+          workspace_id: activeWorkspaceId,
+        })
+        .select('id,url,filename,asset_type,source_url')
+        .single()
+      if (insertError) throw insertError
+
+      const asset = inserted as AttachAsset
+      setAttachAssets((current) => [asset, ...current])
+      setSelectedAttach(asset.id)
+      setAiCommand((current) => `${current} [圖片: ${asset.url}]`.trim())
+      setShowAttachModal(false)
+    } finally {
+      setAttachLoading(false)
+      event.target.value = ''
     }
   }
 
@@ -1901,6 +1994,200 @@ function ScheduledPostsPageContent() {
           </div>
         </header>
 
+        {showAttachModal && (
+          <div
+            style={{
+              alignItems: 'center',
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              inset: 0,
+              justifyContent: 'center',
+              position: 'fixed',
+              zIndex: 1000,
+            }}
+            onClick={() => setShowAttachModal(false)}
+          >
+            <div
+              style={{
+                background: 'white',
+                borderRadius: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '80vh',
+                overflow: 'hidden',
+                width: 560,
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ borderBottom: '1px solid #e5e7eb', padding: '20px 24px 0' }}>
+                <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>選擇圖片</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachModal(false)}
+                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 20 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 0 }}>
+                  {([
+                    ['all', '全部'],
+                    ['website', '網站圖片'],
+                    ['uploaded', '上傳'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAttachTab(key)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: attachTab === key ? '2px solid #111827' : '2px solid transparent',
+                        color: attachTab === key ? '#111827' : '#6b7280',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        fontWeight: attachTab === key ? 600 : 400,
+                        padding: '8px 16px',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 24px' }}>
+                <label
+                  style={{
+                    alignItems: 'center',
+                    border: '1px dashed #d1d5db',
+                    borderRadius: 8,
+                    color: '#374151',
+                    cursor: activeWorkspaceId && !attachLoading ? 'pointer' : 'not-allowed',
+                    display: 'inline-flex',
+                    fontSize: 14,
+                    gap: 8,
+                    opacity: activeWorkspaceId && !attachLoading ? 1 : 0.5,
+                    padding: '8px 16px',
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={!activeWorkspaceId || attachLoading}
+                    style={{ display: 'none' }}
+                    onChange={handleAttachUpload}
+                  />
+                  📤 從本機上傳
+                </label>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                {attachLoading ? (
+                  <div style={{ color: '#9ca3af', padding: 40, textAlign: 'center' }}>載入中...</div>
+                ) : filteredAttachAssets.length === 0 ? (
+                  <div style={{ color: '#9ca3af', padding: 40, textAlign: 'center' }}>暫時沒有圖片</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    {filteredAttachAssets.map((asset) => (
+                      <div
+                        key={asset.id}
+                        onClick={() => setSelectedAttach(asset.id === selectedAttach ? null : asset.id)}
+                        style={{
+                          aspectRatio: '1',
+                          border: selectedAttach === asset.id ? '3px solid #111827' : '3px solid transparent',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}
+                        title={asset.filename || asset.source_url || asset.url}
+                      >
+                        <img
+                          src={asset.url}
+                          alt={asset.filename || asset.asset_type}
+                          style={{ height: '100%', objectFit: 'cover', width: '100%' }}
+                        />
+                        {selectedAttach === asset.id && (
+                          <div
+                            style={{
+                              alignItems: 'center',
+                              background: '#111827',
+                              borderRadius: '50%',
+                              color: 'white',
+                              display: 'flex',
+                              fontSize: 12,
+                              height: 20,
+                              justifyContent: 'center',
+                              position: 'absolute',
+                              right: 6,
+                              top: 6,
+                              width: 20,
+                            }}
+                          >
+                            ✓
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  gap: 12,
+                  justifyContent: 'flex-end',
+                  padding: '16px 24px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowAttachModal(false)}
+                  style={{
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    padding: '8px 20px',
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedAttach}
+                  onClick={() => {
+                    const asset = attachAssets.find((item) => item.id === selectedAttach)
+                    if (asset) {
+                      setAiCommand((current) => `${current} [圖片: ${asset.url}]`.trim())
+                    }
+                    setShowAttachModal(false)
+                    setSelectedAttach(null)
+                  }}
+                  style={{
+                    background: selectedAttach ? '#111827' : '#e5e7eb',
+                    border: 'none',
+                    borderRadius: 8,
+                    color: selectedAttach ? 'white' : '#9ca3af',
+                    cursor: selectedAttach ? 'pointer' : 'not-allowed',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: '8px 20px',
+                  }}
+                >
+                  確認選擇
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <section className="editor-shell">
           <aside className="ai-improve-panel">
             <div className="improve-copy">
@@ -1949,17 +2236,26 @@ function ScheduledPostsPageContent() {
                 }}
               />
               <div>
-                <label aria-label="附加檔案">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      if (file) setAiCommand((current) => `${current} [附件: ${file.name}]`)
-                    }}
-                  />
-                  <span>附件</span>
-                </label>
+                <button
+                  type="button"
+                  aria-label="附加檔案"
+                  onClick={() => setShowAttachModal(true)}
+                  style={{
+                    alignItems: 'center',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    fontSize: 13,
+                    gap: 4,
+                    padding: '4px 8px',
+                    width: 'auto',
+                  }}
+                >
+                  📎 附件
+                </button>
                 <button
                   type="submit"
                   aria-label="送出要求"
