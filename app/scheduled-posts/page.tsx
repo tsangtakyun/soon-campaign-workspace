@@ -100,33 +100,43 @@ function PlatformIcon({ channel }: { channel: PreviewChannel }) {
   )
 }
 
-function InstagramActions() {
+function SocialActionIcon({
+  type,
+  size = 22,
+  stroke = '#262626',
+  strokeWidth = 1.8,
+}: {
+  type: 'heart' | 'comment' | 'share' | 'bookmark' | 'repost'
+  size?: number
+  stroke?: string
+  strokeWidth?: number
+}) {
   return (
-    <>
-      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
-        <path
-          d="M20.8 5.7c-1.7-2-4.6-1.9-6.2.1L12 8.8 9.4 5.8c-1.6-2-4.5-2.1-6.2-.1-1.8 2.1-1.4 5.2.8 7.1l8 7 8-7c2.2-1.9 2.6-5 .8-7.1z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
-        <path
-          d="M20 11.5a7.5 7.5 0 01-8 7.48 8.8 8.8 0 01-3.1-.82L4 19.5l1.38-4.3A7.5 7.5 0 1120 11.5z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
-        <path d="M21 3L3.5 11.2l6.6 2.5L13 20.5 21 3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-        <path d="M10.1 13.7L21 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      </svg>
-      <svg className="bookmark-icon" viewBox="0 0 24 24" width="23" height="23" fill="none" aria-hidden="true">
-        <path d="M7 4h10v16l-5-3.2L7 20V4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-      </svg>
-    </>
+    <svg viewBox="0 0 24 24" width={size} height={size} stroke={stroke} strokeWidth={strokeWidth} fill="none" aria-hidden="true">
+      {type === 'heart' ? (
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+      ) : null}
+      {type === 'comment' ? (
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      ) : null}
+      {type === 'share' ? (
+        <>
+          <line x1="22" y1="2" x2="11" y2="13" />
+          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+        </>
+      ) : null}
+      {type === 'bookmark' ? (
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+      ) : null}
+      {type === 'repost' ? (
+        <>
+          <path d="M17 1l4 4-4 4" />
+          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+          <path d="M7 23l-4-4 4-4" />
+          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+        </>
+      ) : null}
+    </svg>
   )
 }
 
@@ -998,7 +1008,6 @@ function ScheduledPostsPageContent() {
   const previewPlatformId =
     previewChannel === 'Instagram' ? 'instagram' : previewChannel === 'Threads' ? 'threads' : 'facebook'
   const previewUsername = platformAccountName(previewPlatformId) || 'SOON'
-  const previewConnectionLabel = platformConnections[previewPlatformId] ? '已連接' : '尚未連接帳戶'
   const workspaceName = brandKit.businessName
   const workspaceInitial = workspaceName?.[0]?.toUpperCase() || 'S'
 
@@ -1910,52 +1919,218 @@ function ScheduledPostsPageContent() {
               ))}
             </div>
 
-            <article className={`phone-preview ${previewChannel.toLowerCase()}`}>
-              <header>
-                <div className="avatar">{workspaceInitial}</div>
-                <strong>{previewUsername}</strong>
-                <span>
-                  {previewChannel === 'Instagram'
-                    ? `${previewConnectionLabel} • 贊助`
-                    : previewChannel === 'Facebook'
-                      ? `${previewConnectionLabel} · 剛剛 · 🌐`
-                      : `${previewConnectionLabel} ·  剛剛`}
-                </span>
-              </header>
-              <div className="phone-image">
-                <img src={selectedPost.image} alt="" />
-                <div className="phone-overlay">
-                  <strong>{selectedPost.title}</strong>
-                  <span>{selectedPost.type}</span>
+            <article
+              className={`phone-preview ${previewChannel.toLowerCase()}`}
+              style={{
+                background: 'transparent',
+                border: 0,
+                borderRadius: 0,
+                boxShadow: 'none',
+                maxWidth: previewChannel === 'Facebook' ? 470 : previewChannel === 'Threads' ? 380 : 400,
+                overflow: 'visible',
+                width: '100%',
+              }}
+            >
+              {previewChannel === 'Threads' ? (
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e5e5e5',
+                    borderRadius: 12,
+                    color: '#000000',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                    fontSize: 15,
+                    margin: '0 auto',
+                    maxWidth: 380,
+                    overflow: 'hidden',
+                    width: '100%',
+                  }}
+                >
+                  <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 10, padding: '14px 16px 10px' }}>
+                    <div style={{ display: 'grid', justifyItems: 'center' }}>
+                      <div
+                        style={{
+                          alignItems: 'center',
+                          background: '#000000',
+                          borderRadius: '50%',
+                          color: '#ffffff',
+                          display: 'flex',
+                          fontWeight: 700,
+                          height: 36,
+                          justifyContent: 'center',
+                          width: 36,
+                        }}
+                      >
+                        {workspaceInitial}
+                      </div>
+                      <div style={{ background: '#cccccc', height: 20, marginTop: 8, width: 2 }} />
+                    </div>
+                    <div>
+                      <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
+                        <strong style={{ fontSize: 15, fontWeight: 650 }}>{previewUsername}</strong>
+                        <span style={{ color: '#777777', marginLeft: 'auto' }}>1小時</span>
+                        <span style={{ fontWeight: 700 }}>•••</span>
+                      </div>
+                      <p style={{ lineHeight: 1.35, margin: '5px 0 12px' }}>{selectedCaption}</p>
+                    </div>
+                  </div>
+                  <div className="phone-image" style={{ aspectRatio: '4 / 5', margin: '0 16px 12px', borderRadius: 12 }}>
+                    <img src={selectedPost.image} alt="" style={{ height: '100%', objectFit: 'cover', width: '100%' }} />
+                    <div className="phone-overlay">
+                      <strong>{selectedPost.title}</strong>
+                      <span>{selectedPost.type}</span>
+                    </div>
+                    <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
+                      ✎ 編輯設計
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: 18, padding: '0 64px 10px' }}>
+                    <SocialActionIcon type="heart" size={20} stroke="#000000" strokeWidth={1.5} />
+                    <SocialActionIcon type="comment" size={20} stroke="#000000" strokeWidth={1.5} />
+                    <SocialActionIcon type="repost" size={20} stroke="#000000" strokeWidth={1.5} />
+                    <SocialActionIcon type="share" size={20} stroke="#000000" strokeWidth={1.5} />
+                  </div>
+                  <div style={{ color: '#777777', fontSize: 14, padding: '0 64px 16px' }}>回覆 · 123 讚</div>
                 </div>
-                <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
-                  ✎ 編輯設計
-                </button>
-              </div>
-              {previewChannel === 'Threads' ? (
-                <p>
-                  <strong>{previewUsername}</strong> {selectedCaption}
-                </p>
-              ) : null}
-              {previewChannel === 'Threads' ? (
-                <div className="threads-preview-note">回覆</div>
               ) : previewChannel === 'Facebook' ? (
-                <div className="phone-actions facebook-actions">
-                  <span>👍 讚好</span>
-                  <span>💬 留言</span>
-                  <span>↗ 分享</span>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: 8,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                    color: '#050505',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    fontSize: 15,
+                    margin: '0 auto',
+                    maxWidth: 470,
+                    overflow: 'hidden',
+                    width: '100%',
+                  }}
+                >
+                  <header style={{ alignItems: 'center', display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 10, padding: '12px 14px 8px' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: '#1877F2',
+                        borderRadius: '50%',
+                        color: '#ffffff',
+                        display: 'flex',
+                        fontWeight: 700,
+                        height: 40,
+                        justifyContent: 'center',
+                        width: 40,
+                      }}
+                    >
+                      {workspaceInitial}
+                    </div>
+                    <div style={{ display: 'grid', gap: 2 }}>
+                      <strong style={{ fontSize: 15, fontWeight: 700 }}>{previewUsername}</strong>
+                      <span style={{ color: '#65676b', fontSize: 13 }}>剛剛 · 🌐</span>
+                    </div>
+                    <span style={{ color: '#65676b', fontWeight: 700 }}>•••</span>
+                  </header>
+                  <p style={{ lineHeight: 1.35, margin: 0, padding: '4px 14px 12px' }}>{selectedCaption}</p>
+                  <div className="phone-image" style={{ aspectRatio: '16 / 9' }}>
+                    <img src={selectedPost.image} alt="" style={{ height: '100%', objectFit: 'cover', width: '100%' }} />
+                    <div className="phone-overlay">
+                      <strong>{selectedPost.title}</strong>
+                      <span>{selectedPost.type}</span>
+                    </div>
+                    <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
+                      ✎ 編輯設計
+                    </button>
+                  </div>
+                  <div style={{ borderTop: '1px solid #e4e6eb', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '4px 8px' }}>
+                    {['👍 讚好', '💬 留言', '↗ 分享'].map((label) => (
+                      <button
+                        key={label}
+                        onMouseEnter={(event) => {
+                          event.currentTarget.style.background = '#e4e6eb'
+                        }}
+                        onMouseLeave={(event) => {
+                          event.currentTarget.style.background = 'transparent'
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 0,
+                          borderRadius: 6,
+                          color: '#65676b',
+                          cursor: 'pointer',
+                          font: 'inherit',
+                          fontSize: 15,
+                          fontWeight: 600,
+                          padding: '8px 0',
+                        }}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="phone-actions">
-                  <InstagramActions />
-                  <button type="button" onClick={() => openCaptionModal(selectedPost)}>編輯 caption</button>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #dbdbdb',
+                    borderRadius: 0,
+                    color: '#262626',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                    fontSize: 14,
+                    margin: '0 auto',
+                    maxWidth: 400,
+                    overflow: 'hidden',
+                    width: '100%',
+                  }}
+                >
+                  <header style={{ alignItems: 'center', display: 'flex', gap: 10, minHeight: 56, padding: '10px 14px' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: 'linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #7c3aed, #ec4899) border-box',
+                        border: '2px solid transparent',
+                        borderRadius: '50%',
+                        color: '#262626',
+                        display: 'flex',
+                        fontWeight: 700,
+                        height: 32,
+                        justifyContent: 'center',
+                        width: 32,
+                      }}
+                    >
+                      {workspaceInitial}
+                    </div>
+                    <strong style={{ color: '#262626', fontSize: 14, fontWeight: 600 }}>{previewUsername}</strong>
+                    <span style={{ color: '#262626', fontWeight: 700, marginLeft: 'auto' }}>•••</span>
+                  </header>
+                  <div className="phone-image" style={{ aspectRatio: '1 / 1' }}>
+                    <img src={selectedPost.image} alt="" style={{ height: '100%', objectFit: 'cover', width: '100%' }} />
+                    <div className="phone-overlay">
+                      <strong>{selectedPost.title}</strong>
+                      <span>{selectedPost.type}</span>
+                    </div>
+                    <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
+                      ✎ 編輯設計
+                    </button>
+                  </div>
+                  <div style={{ alignItems: 'center', display: 'flex', gap: 14, padding: '12px 12px 8px' }}>
+                    <SocialActionIcon type="heart" />
+                    <SocialActionIcon type="comment" />
+                    <SocialActionIcon type="share" />
+                    <div style={{ marginLeft: 'auto' }}>
+                      <SocialActionIcon type="bookmark" />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gap: 5, padding: '0 12px 14px' }}>
+                    <strong style={{ fontWeight: 600 }}>讚好 123 人</strong>
+                    <p style={{ lineHeight: 1.35, margin: 0 }}>
+                      <strong style={{ fontWeight: 600 }}>{previewUsername}</strong> {selectedCaption}
+                    </p>
+                    <span style={{ color: '#8e8e8e' }}>查看全部 12 則留言</span>
+                    <span style={{ color: '#8e8e8e', fontSize: 11 }}>1 小時前</span>
+                  </div>
                 </div>
               )}
-              {previewChannel !== 'Threads' ? (
-                <p>
-                  <strong>{previewUsername}</strong> {selectedCaption}
-                </p>
-              ) : null}
             </article>
 
             <div className="result-actions">
