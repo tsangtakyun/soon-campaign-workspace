@@ -2005,7 +2005,7 @@ function ScheduledPostsPageContent() {
                     width: '100%',
                   }}
                 >
-                  <header style={{ alignItems: 'center', display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 8, padding: '12px 12px 8px' }}>
+                  <header style={{ alignItems: 'center', display: 'flex', gap: 8, padding: '12px 12px 8px 12px' }}>
                     <div
                       style={{
                         alignItems: 'center',
@@ -2013,6 +2013,8 @@ function ScheduledPostsPageContent() {
                         borderRadius: '50%',
                         color: '#ffffff',
                         display: 'flex',
+                        flexShrink: 0,
+                        fontSize: 16,
                         fontWeight: 700,
                         height: 40,
                         justifyContent: 'center',
@@ -2021,11 +2023,12 @@ function ScheduledPostsPageContent() {
                     >
                       {workspaceInitial}
                     </div>
-                    <div style={{ display: 'grid', gap: 2 }}>
-                      <strong style={{ fontSize: 15, fontWeight: 700 }}>{previewUsername}</strong>
-                      <span style={{ color: '#65676b', fontSize: 13 }}>剛剛 · 🌐</span>
+                    <div>
+                      <div style={{ color: '#050505', fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{previewUsername}</div>
+                      <div style={{ color: '#65676b', fontSize: 12, lineHeight: 1.2 }}>剛剛 · 🌐</div>
                     </div>
-                    <span style={{ color: '#65676b', fontWeight: 700 }}>•••</span>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ color: '#65676b', cursor: 'pointer', fontSize: 18 }}>•••</span>
                   </header>
                   <p style={{ lineHeight: 1.35, margin: 0, padding: '4px 14px 12px' }}>{selectedCaption}</p>
                   <div className="phone-image" style={{ aspectRatio: '16 / 9' }}>
