@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   BRAND_COLORS,
@@ -58,6 +58,14 @@ type EditorSidePanelProps = {
   onApplyBrandColor: (color: string) => void
   onOpenCaptionEditor: () => void
   onCloseDesignMode: () => void
+  workspaceId: string | null
+}
+
+type BrandAsset = {
+  asset_type: string
+  filename: string
+  id: string
+  url: string
 }
 
 function ElementShelf({
@@ -131,12 +139,39 @@ export function EditorSidePanel({
   onApplyBrandColor,
   onOpenCaptionEditor,
   onCloseDesignMode,
+  workspaceId,
 }: EditorSidePanelProps) {
   const [aiImagePrompt, setAiImagePrompt] = useState('')
   const [aiImageSize, setAiImageSize] = useState<'square' | 'landscape' | 'portrait'>('square')
   const [aiImageStyle, setAiImageStyle] = useState<'photo' | 'illustration'>('photo')
   const [aiImageLoading, setAiImageLoading] = useState(false)
   const [aiImageError, setAiImageError] = useState('')
+  const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setBrandAssets([])
+      return
+    }
+
+    let cancelled = false
+    fetch(`/api/brand-kit-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
+      cache: 'no-store',
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) return
+        const assets = Array.isArray(data?.assets) ? data.assets : []
+        setBrandAssets(assets as BrandAsset[])
+      })
+      .catch(() => {
+        if (!cancelled) setBrandAssets([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
 
   const generateAiImage = async () => {
     if (!aiImagePrompt.trim()) return
@@ -822,22 +857,25 @@ export function EditorSidePanel({
               ))}
             </div>
 
-            {uploadedImages.length > 0 ? (
+            {brandAssets.length > 0 ? (
               <div className="media-grid compact">
-                {uploadedImages.slice(0, 6).map((image, index) => (
+                {brandAssets.map((asset) => (
                   <button
                     className="media-thumb-btn"
-                    key={`brand-kit-${image.url}-${index}`}
-                    onClick={() => onAddImage(image.url, image.label)}
-                    title={image.label}
+                    key={asset.id}
+                    onClick={() => {
+                      onTrackUploadedImage({ url: asset.url, label: asset.filename })
+                      onAddImage(asset.url, asset.filename)
+                    }}
+                    title={asset.filename}
                     type="button"
                   >
-                    <img alt={image.label} className="media-thumb" src={image.url} />
+                    <img alt={asset.filename} className="media-thumb" src={asset.url} />
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="media-brand-kit-copy">已上載嘅 logo、品牌圖片同參考素材會同步顯示喺呢度。</p>
+              <p style={{ color: '#9ca3af', fontSize: 12 }}>暫無素材</p>
             )}
           </div>
         </section>

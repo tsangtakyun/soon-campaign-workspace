@@ -2019,6 +2019,7 @@ function ScheduledPostsPageContent() {
             selectedElement={selectedElement}
             selectedPost={selectedPost}
             uploadedImages={uploadedImages}
+            workspaceId={activeWorkspaceId}
           />
         </section>
 
