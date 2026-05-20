@@ -69,5 +69,19 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|paid-analysis|api|.*\\..*).*)'],
+  matcher: [
+    '/',
+    '/contact',
+    '/creator-matching',
+    '/delivery-confirmation',
+    '/delivery-tracking',
+    '/login',
+    '/my-workspace/:path*',
+    '/onboarding/:path*',
+    '/ops/:path*',
+    '/script-planning',
+    '/signup',
+    '/storyboard-planning',
+    '/submit-brief',
+  ],
 }
