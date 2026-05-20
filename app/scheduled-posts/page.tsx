@@ -46,6 +46,14 @@ const PUBLISH_PLATFORMS = [
   { channel: 'Threads' as PreviewChannel, id: 'threads', label: 'Threads' },
 ]
 
+const AI_IMAGE_SUGGESTIONS = [
+  { icon: '🖼️', label: '更改相片內容：', text: '在背景加入人物，令場景更豐富' },
+  { icon: '🏙️', label: '調整背景：', text: '將背景換成現代辦公室' },
+  { icon: '✏️', label: '更改文字疊加：', text: '將標題放大並移到頂部' },
+  { icon: '🎨', label: '修改顏色：', text: '令整體配色更鮮明' },
+  { icon: '🏷️', label: '修改品牌：', text: '將我的 logo 加到右下角' },
+]
+
 type PlatformConnection = {
   account_id?: string | null
   account_name?: string | null
@@ -965,37 +973,87 @@ function ScheduledPostsPageContent() {
     }
   }
 
+  const refreshSelectedPost = async (postId: string) => {
+    setRefreshKey((value) => value + 1)
+
+    const supabase = createClient()
+    const { data: updatedPost } = await supabase
+      .from('campaign_posts')
+      .select('id,title,body,post_type,scheduled_at,image_url,status,marketing_campaigns(name,strategy_emoji)')
+      .eq('id', postId)
+      .single()
+
+    if (updatedPost) {
+      const mapped = mapPersistedScheduledPost(
+        updatedPost as Record<string, unknown>,
+        0,
+        fallbackScheduledPosts
+      )
+      const rawImageUrl = (updatedPost as Record<string, unknown>).image_url
+      if (typeof rawImageUrl === 'string' && rawImageUrl) {
+        mapped.image = rawImageUrl
+      }
+      setSelectedPost(mapped)
+    }
+  }
+
+  const generatePostImageFromCommand = async (command: string, referenceImageUrl: string | null) => {
+    if (!selectedPost) throw new Error('No selected post')
+
+    console.log('[generate-with-reference] sending:', {
+      currentPostImageUrl: selectedPost.image,
+      postId: selectedPost.id,
+      referenceImageUrl,
+      workspaceId: activeWorkspaceId,
+    })
+    const response = await fetch('/api/posts/generate-with-reference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentPostImageUrl: selectedPost.image,
+        postId: selectedPost.id,
+        postBody: selectedPost.body,
+        postTitle: selectedPost.title,
+        referenceImageUrl,
+        userCommand: command || 'Improve this image for professional social media marketing',
+        workspaceId: activeWorkspaceId,
+      }),
+    })
+    const result = await response.json()
+    console.log('[generate-with-reference] response:', result)
+    if (!response.ok) throw new Error(result.detail || 'Failed to generate image')
+  }
+
+  const handleAiCommandWithText = async (text: string) => {
+    if (!selectedPost || aiLoading) return
+
+    setAiCommand(text)
+    setAiLoading(true)
+    setAiStatus('processing')
+    try {
+      await generatePostImageFromCommand(text, null)
+      setAiStatus('done')
+      await refreshSelectedPost(selectedPost.id)
+      window.setTimeout(() => setAiStatus('idle'), 4000)
+    } catch {
+      setAiStatus('error')
+      window.setTimeout(() => setAiStatus('idle'), 4000)
+    } finally {
+      setAiLoading(false)
+      setAiCommand('')
+    }
+  }
+
   const handleAiCommand = async () => {
     if ((!aiCommand.trim() && !attachedImage) || !selectedPost || aiLoading) return
+
+    const command = aiCommand.trim()
+    const isCaptionOnly = /caption|文案|標題文字|copy/i.test(command) && !attachedImage
 
     setAiLoading(true)
     setAiStatus('processing')
     try {
-      if (attachedImage) {
-        console.log('[generate-with-reference] sending:', {
-          postId: selectedPost.id,
-          referenceImageUrl: attachedImage.url,
-          workspaceId: activeWorkspaceId,
-        })
-        const response = await fetch('/api/posts/generate-with-reference', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentPostImageUrl: selectedPost.image,
-            postId: selectedPost.id,
-            postBody: selectedPost.body,
-            postTitle: selectedPost.title,
-            referenceImageUrl: attachedImage.url,
-            userCommand: aiCommand.trim() || 'Combine the person with the product and create a professional marketing image',
-            workspaceId: activeWorkspaceId,
-          }),
-        })
-        const result = await response.json()
-        console.log('[generate-with-reference] response:', result)
-        if (!response.ok) throw new Error(result.detail || 'Failed to generate image')
-      }
-
-      if (!attachedImage && aiCommand.trim()) {
+      if (isCaptionOnly) {
         const response = await fetch('/api/scheduled-posts/improve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1003,37 +1061,21 @@ function ScheduledPostsPageContent() {
             mode: 'copy',
             postIds: [selectedPost.id],
             workspaceId: activeWorkspaceId,
-            userCommand: aiCommand,
+            userCommand: command,
           }),
         })
-        if (!response.ok) throw new Error('Failed to improve copy')
+        if (!response.ok) throw new Error('Failed to improve caption')
+      } else {
+        await generatePostImageFromCommand(
+          command || 'Improve this image for professional social media marketing',
+          attachedImage?.url ?? null
+        )
       }
 
       setAiCommand('')
       setAttachedImage(null)
       setAiStatus('done')
-      setRefreshKey((value) => value + 1)
-
-      const supabase = createClient()
-      const { data: updatedPost } = await supabase
-        .from('campaign_posts')
-        .select('id,title,body,post_type,scheduled_at,image_url,status,marketing_campaigns(name,strategy_emoji)')
-        .eq('id', selectedPost.id)
-        .single()
-
-      if (updatedPost) {
-        const mapped = mapPersistedScheduledPost(
-          updatedPost as Record<string, unknown>,
-          0,
-          fallbackScheduledPosts
-        )
-        const rawImageUrl = (updatedPost as Record<string, unknown>).image_url
-        if (typeof rawImageUrl === 'string' && rawImageUrl) {
-          mapped.image = rawImageUrl
-        }
-        setSelectedPost(mapped)
-      }
-
+      await refreshSelectedPost(selectedPost.id)
       window.setTimeout(() => setAiStatus('idle'), 4000)
     } catch {
       setAiStatus('error')
@@ -2284,26 +2326,32 @@ function ScheduledPostsPageContent() {
             <div className="improve-copy">
               <p>SOON 可以這樣改善這則貼文：</p>
               <ol style={{ listStyle: 'none', padding: 0, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🖼️</span>
-                  <span><strong>更改相片內容：</strong>「在背景加入人物，令場景更豐富」</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🏙️</span>
-                  <span><strong>調整背景：</strong>「將背景換成現代辦公室」</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>✏️</span>
-                  <span><strong>更改文字疊加：</strong>「將標題放大並移到頂部」</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🎨</span>
-                  <span><strong>修改顏色：</strong>「令整體配色更鮮明」</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🏷️</span>
-                  <span><strong>修改品牌：</strong>「將我的 logo 加到右下角」</span>
-                </li>
+                {AI_IMAGE_SUGGESTIONS.map((suggestion) => (
+                  <li
+                    key={suggestion.label}
+                    onClick={() => {
+                      void handleAiCommandWithText(suggestion.text)
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.background = '#f3f4f6'
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.background = 'transparent'
+                    }}
+                    style={{
+                      alignItems: 'flex-start',
+                      borderRadius: '6px',
+                      cursor: aiLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      gap: '8px',
+                      padding: '4px 6px',
+                      transition: 'background 150ms',
+                    }}
+                  >
+                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{suggestion.icon}</span>
+                    <span><strong>{suggestion.label}</strong>「{suggestion.text}」</span>
+                  </li>
+                ))}
               </ol>
               <p>你想怎樣調整？</p>
             </div>
@@ -2435,7 +2483,7 @@ function ScheduledPostsPageContent() {
             </form>
             {aiStatus === 'processing' && (
               <p style={{ color: '#6b7280', fontSize: 12, margin: '6px 0 0' }}>
-                ⏳ AI 正在生成圖片，需時約 20-30 秒...
+                ⏳ AI 正在根據你的指令修改圖片，需時約 20-30 秒...
               </p>
             )}
             {aiStatus === 'done' && (

@@ -41,7 +41,7 @@ async function writeImagePrompt(input: {
   currentPostImageUrl: string
   postBody: string
   postTitle: string
-  referenceImageUrl: string
+  referenceImageUrl: string | null
   userCommand: string
 }) {
   const fallbackPrompt = `
@@ -49,9 +49,9 @@ Professional social media marketing image for Hong Kong/Asian beauty and lifesty
 Post title: ${input.postTitle}
 Post body: ${input.postBody}
 Instruction: ${input.userCommand}
-The first image is the current post product image. The second image is the person reference.
-Show the same person from the reference image holding, using, or interacting with the product from the current post image.
-Maintain the person's appearance and facial features. No text overlays.
+The current post image is the base image to edit.
+${input.referenceImageUrl ? 'Use the reference image as an additional visual reference as instructed.' : 'No extra reference image is provided.'}
+Apply the user's instruction while maintaining professional marketing quality. No text overlays.
 `.trim()
 
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -59,32 +59,30 @@ Maintain the person's appearance and facial features. No text overlays.
 
   const anthropic = new Anthropic({ apiKey })
   const promptResponse = await anthropic.messages.create({
-    max_tokens: 500,
     messages: [
       {
         role: 'user',
-        content: `You are an expert at writing image generation prompts for social media marketing.
+        content: `You are an expert at writing image editing prompts for social media marketing.
 
+Current post image: this is the BASE image to edit
 Post title: ${input.postTitle}
 Post body: ${input.postBody}
-User instruction: ${input.userCommand || 'Combine the person with the product'}
+User instruction: ${input.userCommand}
+${input.referenceImageUrl ? 'Reference image provided: yes (use it as visual reference for style/person/product to incorporate)' : 'No reference image provided'}
 
-The user has provided:
-1. The current post product image
-2. A reference photo of a person (face/person image)
-
-Write a detailed image generation prompt in English that:
-- Shows the SAME person from the reference photo
-- Shows them holding, using, or interacting with the product from the current post image
-- Maintains the person's appearance and facial features
-- Creates a natural, professional marketing scene
+Write a detailed image editing prompt in English that:
+- Starts from the current post image as the base
+- Applies the user's instruction to modify/enhance it
+${input.referenceImageUrl ? '- Incorporates elements from the reference image as instructed' : ''}
 - Incorporates the user's instruction
+- Maintains professional marketing quality
 - Is suitable for the Hong Kong/Asian beauty/lifestyle market
-- No text overlays
+- No text overlays in the image
 
 Return ONLY the prompt text, no explanation.`,
       },
     ],
+    max_tokens: 600,
     model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
   })
 
@@ -98,9 +96,10 @@ export async function POST(req: Request) {
     const postId = asString(body.postId)
     const workspaceId = asString(body.workspaceId)
     const referenceImageUrl = asString(body.referenceImageUrl)
-    const userCommand = asString(body.userCommand, 'Combine the person with the product')
+    const userCommand = asString(body.userCommand)
+    const currentPostImageUrl = asString(body.currentPostImageUrl)
 
-    if (!isUuid(postId) || !isUuid(workspaceId) || !referenceImageUrl) {
+    if (!isUuid(postId) || !isUuid(workspaceId) || !currentPostImageUrl || !userCommand) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -127,16 +126,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    const currentPostImageUrl = asString(body.currentPostImageUrl, asString(post.image_url))
-    if (!currentPostImageUrl) {
-      return NextResponse.json({ error: 'Missing current post image' }, { status: 400 })
-    }
-
     const imagePrompt = await writeImagePrompt({
       currentPostImageUrl,
       postBody: asString(post.body, asString(body.postBody)),
       postTitle: asString(post.title, asString(body.postTitle)),
-      referenceImageUrl,
+      referenceImageUrl: referenceImageUrl || null,
       userCommand,
     })
 
@@ -146,17 +140,23 @@ export async function POST(req: Request) {
     }
 
     const openai = new OpenAI({ apiKey })
-    const currentPostImage = await loadImageFile(currentPostImageUrl, 'current-post.jpg')
-    const referenceImage = await loadImageFile(referenceImageUrl, 'reference-person.jpg')
+    const currentPostImage = await loadImageFile(currentPostImageUrl, 'base-image.jpg')
+    const imageInputs: File[] = [currentPostImage]
+    if (referenceImageUrl) {
+      const referenceImage = await loadImageFile(referenceImageUrl, 'reference.jpg')
+      imageInputs.push(referenceImage)
+    }
     const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
-    const imagePromptWithReferences = `${imagePrompt}
+    const imagePromptWithReferences = referenceImageUrl
+      ? `${imagePrompt}
 
-Combine the images: use the first image as the product/source image, and show the person from the second image holding or using that product naturally. Professional marketing photography, Asian beauty market style. No text overlays.`
+Use the first image as the base image. Use the second image only as an additional reference as instructed. Professional marketing photography, Asian beauty market style. No text overlays.`
+      : imagePrompt
 
     let imageResponse: Awaited<ReturnType<typeof openai.images.edit>>
     try {
       imageResponse = await openai.images.edit({
-        image: [currentPostImage, referenceImage],
+        image: imageInputs.length === 1 ? imageInputs[0] : imageInputs,
         model: imageModel,
         output_format: 'jpeg',
         prompt: imagePromptWithReferences,
@@ -164,14 +164,15 @@ Combine the images: use the first image as the product/source image, and show th
         size: '1024x1024',
       } as Parameters<typeof openai.images.edit>[0])
     } catch (error) {
-      console.error('[generate-with-reference] multi-image edit failed, retrying with current post image only:', error)
+      if (imageInputs.length === 1) throw error
+      console.error('[generate-with-reference] multi-image edit failed, retrying with base image only:', error)
       imageResponse = await openai.images.edit({
         image: currentPostImage,
         model: imageModel,
         output_format: 'jpeg',
         prompt: `${imagePromptWithReferences}
 
-Person reference image URL: ${referenceImageUrl}`,
+Reference image URL: ${referenceImageUrl}`,
         quality: 'medium',
         size: '1024x1024',
       } as Parameters<typeof openai.images.edit>[0])
