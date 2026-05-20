@@ -986,7 +986,24 @@ function ScheduledPostsPageContent() {
       setAiCommand('')
       setAttachedImage(null)
       setAiStatus('done')
-      router.refresh()
+      setRefreshKey((value) => value + 1)
+
+      const supabase = createClient()
+      const { data: updatedPost } = await supabase
+        .from('campaign_posts')
+        .select('id,title,body,post_type,scheduled_at,image_url,status,marketing_campaigns(name,strategy_emoji)')
+        .eq('id', selectedPost.id)
+        .single()
+
+      if (updatedPost) {
+        const mapped = mapPersistedScheduledPost(
+          updatedPost as Record<string, unknown>,
+          0,
+          fallbackScheduledPosts
+        )
+        setSelectedPost(mapped)
+      }
+
       window.setTimeout(() => setAiStatus('idle'), 4000)
     } catch {
       setAiStatus('error')
