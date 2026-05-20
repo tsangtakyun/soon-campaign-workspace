@@ -731,6 +731,7 @@ function ScheduledPostsPageContent() {
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const fabricControlsRef = useRef<FabricControls | null>(null)
   const designHistoryIndexRef = useRef(-1)
   const designHistoryRef = useRef<string[]>([])
@@ -2019,9 +2020,28 @@ function ScheduledPostsPageContent() {
               }}
               onClick={(event) => event.stopPropagation()}
             >
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/*"
+                disabled={!activeWorkspaceId || attachLoading}
+                style={{ display: 'none' }}
+                onChange={handleAttachUpload}
+              />
               <div style={{ borderBottom: '1px solid #e5e7eb', padding: '20px 24px 0' }}>
-                <div style={{ alignItems: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>選擇圖片</h3>
+                <div style={{ alignItems: 'flex-start', display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>選擇圖片</h3>
+                    <p
+                      style={{
+                        color: '#6b7280',
+                        fontSize: 13,
+                        margin: '4px 0 0 0',
+                      }}
+                    >
+                      以下圖片來自你的品牌素材庫
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowAttachModal(false)}
@@ -2059,9 +2079,13 @@ function ScheduledPostsPageContent() {
               </div>
 
               <div style={{ borderBottom: '1px solid #f3f4f6', padding: '12px 24px' }}>
-                <label
+                <button
+                  type="button"
+                  onClick={() => uploadInputRef.current?.click()}
+                  disabled={!activeWorkspaceId || attachLoading}
                   style={{
                     alignItems: 'center',
+                    background: 'white',
                     border: '1px dashed #d1d5db',
                     borderRadius: 8,
                     color: '#374151',
@@ -2073,15 +2097,8 @@ function ScheduledPostsPageContent() {
                     padding: '8px 16px',
                   }}
                 >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={!activeWorkspaceId || attachLoading}
-                    style={{ display: 'none' }}
-                    onChange={handleAttachUpload}
-                  />
                   📤 從本機上傳
-                </label>
+                </button>
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
