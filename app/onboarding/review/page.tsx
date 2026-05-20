@@ -1,1 +1,5 @@
-export { default } from '../../submit-brief/page'
+import { redirect } from 'next/navigation'
+
+export default function OnboardingReviewPage() {
+  redirect('/onboarding')
+}

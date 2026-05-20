@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  const next = nextFromQuery || nextFromCookie || '/my-workspace'
-  const safeNext = next.startsWith('/') ? next : '/my-workspace'
+  const next = nextFromQuery || nextFromCookie || '/onboarding'
+  const safeNext = next.startsWith('/') ? next : '/onboarding'
   const response = NextResponse.redirect(new URL(safeNext, request.url))
   response.cookies.set('soon_auth_next', '', { path: '/', maxAge: 0 })
   return response

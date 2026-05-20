@@ -14,17 +14,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/claim') ||
     pathname === '/signup' ||
     pathname.startsWith('/onboarding') ||
-    pathname === '/submit-brief' ||
-    pathname.startsWith('/paid-analysis') ||
-    pathname.startsWith('/creator-matching') ||
-    pathname.startsWith('/script-planning') ||
-    pathname.startsWith('/storyboard-planning') ||
-    pathname.startsWith('/delivery-confirmation') ||
-    pathname.startsWith('/delivery-tracking') ||
     pathname === '/login' ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/stripe') ||
-    pathname.startsWith('/api/paid-analysis') ||
     pathname.startsWith('/api/campaign-workflow')
 
   const supabase = createServerClient(
@@ -62,7 +54,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/login') {
     const next = request.nextUrl.searchParams.get('next')
-    const safeNext = next && next.startsWith('/') ? next : '/my-workspace'
+    const safeNext = next && next.startsWith('/') ? next : '/onboarding'
     return NextResponse.redirect(new URL(safeNext, request.url))
   }
 
@@ -74,16 +66,9 @@ export const config = {
     '/',
     '/contact',
     '/claim/:path*',
-    '/creator-matching',
-    '/delivery-confirmation',
-    '/delivery-tracking',
     '/login',
-    '/my-workspace/:path*',
     '/onboarding/:path*',
     '/ops/:path*',
-    '/script-planning',
     '/signup',
-    '/storyboard-planning',
-    '/submit-brief',
   ],
 }
