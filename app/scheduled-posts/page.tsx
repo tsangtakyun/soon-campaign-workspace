@@ -1946,34 +1946,32 @@ function ScheduledPostsPageContent() {
                     width: '100%',
                   }}
                 >
-                  <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 10, padding: '14px 16px 10px' }}>
-                    <div style={{ display: 'grid', justifyItems: 'center' }}>
-                      <div
-                        style={{
-                          alignItems: 'center',
-                          background: '#000000',
-                          borderRadius: '50%',
-                          color: '#ffffff',
-                          display: 'flex',
-                          fontWeight: 700,
-                          height: 36,
-                          justifyContent: 'center',
-                          width: 36,
-                        }}
-                      >
-                        {workspaceInitial}
-                      </div>
-                      <div style={{ background: '#cccccc', height: 20, marginTop: 8, width: 2 }} />
+                  <div style={{ alignItems: 'center', display: 'flex', gap: 8, padding: '12px 12px 4px' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: '#000000',
+                        borderRadius: '50%',
+                        color: '#ffffff',
+                        display: 'flex',
+                        flexShrink: 0,
+                        fontSize: 14,
+                        fontWeight: 700,
+                        height: 36,
+                        justifyContent: 'center',
+                        width: 36,
+                      }}
+                    >
+                      {workspaceInitial}
                     </div>
-                    <div>
-                      <div style={{ alignItems: 'center', display: 'flex', gap: 8 }}>
-                        <strong style={{ fontSize: 15, fontWeight: 650 }}>{previewUsername}</strong>
-                        <span style={{ color: '#777777', marginLeft: 'auto' }}>1小時</span>
-                        <span style={{ fontWeight: 700 }}>•••</span>
-                      </div>
-                      <p style={{ lineHeight: 1.35, margin: '5px 0 12px' }}>{selectedCaption}</p>
-                    </div>
+                    <div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>{previewUsername}</div>
+                    <span style={{ color: '#999999', fontSize: 12 }}>1小時</span>
+                    <span style={{ color: '#999999' }}>•••</span>
                   </div>
+                  <div style={{ color: '#000000', fontSize: 15, lineHeight: 1.4, padding: '0 12px 8px 56px' }}>
+                    {selectedCaption}
+                  </div>
+                  <div style={{ background: '#cccccc', height: 20, margin: '0 0 8px 29px', width: 2 }} />
                   <div className="phone-image" style={{ aspectRatio: '4 / 5', margin: '0 16px 12px', borderRadius: 12 }}>
                     <img src={selectedPost.image} alt="" style={{ height: '100%', objectFit: 'cover', width: '100%' }} />
                     <div className="phone-overlay">
@@ -2007,7 +2005,7 @@ function ScheduledPostsPageContent() {
                     width: '100%',
                   }}
                 >
-                  <header style={{ alignItems: 'center', display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 10, padding: '12px 14px 8px' }}>
+                  <header style={{ alignItems: 'center', display: 'grid', gridTemplateColumns: '40px 1fr auto', gap: 8, padding: '12px 12px 8px' }}>
                     <div
                       style={{
                         alignItems: 'center',
