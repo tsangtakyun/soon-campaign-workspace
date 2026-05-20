@@ -728,6 +728,7 @@ function ScheduledPostsPageContent() {
   const [attachLoading, setAttachLoading] = useState(false)
   const [attachTab, setAttachTab] = useState<'all' | 'website' | 'uploaded'>('all')
   const [selectedAttach, setSelectedAttach] = useState<string | null>(null)
+  const [attachedImage, setAttachedImage] = useState<{ url: string; filename: string } | null>(null)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
@@ -746,6 +747,7 @@ function ScheduledPostsPageContent() {
     if (!autoPostId || !postsLoaded || scheduledPosts.length === 0) return
     const target = scheduledPosts.find((post) => post.id === autoPostId)
     if (target) {
+      setAttachedImage(null)
       setSelectedPost(target)
       router.replace('/scheduled-posts', { scroll: false })
     }
@@ -974,9 +976,11 @@ function ScheduledPostsPageContent() {
           postIds: [selectedPost.id],
           workspaceId: activeWorkspaceId,
           userCommand: aiCommand,
+          attachedImageUrl: attachedImage?.url ?? null,
         }),
       })
       setAiCommand('')
+      setAttachedImage(null)
       router.refresh()
     } finally {
       setAiLoading(false)
@@ -1136,14 +1140,20 @@ function ScheduledPostsPageContent() {
     if (!selectedPost) return
     const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
     const nextPost = scheduledPosts[index + 1]
-    if (nextPost) setSelectedPost(nextPost)
+    if (nextPost) {
+      setAttachedImage(null)
+      setSelectedPost(nextPost)
+    }
   }
 
   const goToPrevPost = () => {
     if (!selectedPost) return
     const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
     const prevPost = scheduledPosts[index - 1]
-    if (prevPost) setSelectedPost(prevPost)
+    if (prevPost) {
+      setAttachedImage(null)
+      setSelectedPost(prevPost)
+    }
   }
 
   const selectedCaption =
@@ -1925,7 +1935,10 @@ function ScheduledPostsPageContent() {
             <button
               aria-label="返回日曆"
               className="post-editor-back-btn"
-              onClick={() => setSelectedPost(null)}
+              onClick={() => {
+                setAttachedImage(null)
+                setSelectedPost(null)
+              }}
               type="button"
             >
               ←
@@ -2166,10 +2179,12 @@ function ScheduledPostsPageContent() {
                   onClick={() => setShowAttachModal(false)}
                   style={{
                     background: 'white',
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid #d1d5db',
                     borderRadius: 8,
+                    color: '#111827',
                     cursor: 'pointer',
                     fontSize: 14,
+                    fontWeight: 500,
                     padding: '8px 20px',
                   }}
                 >
@@ -2181,7 +2196,7 @@ function ScheduledPostsPageContent() {
                   onClick={() => {
                     const asset = attachAssets.find((item) => item.id === selectedAttach)
                     if (asset) {
-                      setAiCommand((current) => `${current} [圖片: ${asset.url}]`.trim())
+                      setAttachedImage({ url: asset.url, filename: asset.filename || '已選圖片' })
                     }
                     setShowAttachModal(false)
                     setSelectedAttach(null)
@@ -2240,6 +2255,56 @@ function ScheduledPostsPageContent() {
                 void handleAiCommand()
               }}
             >
+              {attachedImage && (
+                <div
+                  style={{
+                    alignItems: 'center',
+                    background: '#f3f4f6',
+                    borderRadius: '8px',
+                    color: '#374151',
+                    display: 'flex',
+                    fontSize: '12px',
+                    gap: '6px',
+                    justifyContent: 'flex-start',
+                    margin: '10px 10px 0',
+                    minHeight: 'auto',
+                    padding: '6px 10px',
+                  }}
+                >
+                  <img
+                    src={attachedImage.url}
+                    alt=""
+                    style={{ borderRadius: 4, height: 28, objectFit: 'cover', width: 28 }}
+                  />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {attachedImage.filename}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedImage(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      height: 'auto',
+                      lineHeight: 1,
+                      padding: '0 2px',
+                      width: 'auto',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <textarea
                 placeholder="要求 SOON 修改這則貼文..."
                 value={aiCommand}
@@ -2519,7 +2584,15 @@ function ScheduledPostsPageContent() {
               <span>你喜歡這個結果嗎？</span>
               <button type="button">不喜歡</button>
               <button type="button">喜歡</button>
-              <button type="button" onClick={() => setSelectedPost(null)}>關閉</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAttachedImage(null)
+                  setSelectedPost(null)
+                }}
+              >
+                關閉
+              </button>
             </div>
           </section>
 
@@ -2707,7 +2780,14 @@ function ScheduledPostsPageContent() {
                 </article>
               ))
             : scheduledPosts.map((post) => (
-                <article className="post-card" key={post.id} onClick={() => setSelectedPost(post)}>
+                <article
+                  className="post-card"
+                  key={post.id}
+                  onClick={() => {
+                    setAttachedImage(null)
+                    setSelectedPost(post)
+                  }}
+                >
                   <div className="post-card-head">
                     <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
                     <strong>{post.time}</strong>
