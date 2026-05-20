@@ -580,6 +580,13 @@ function ScheduledPostsPageContent() {
   const [postsLoaded, setPostsLoaded] = useState(false)
   const scheduledPosts = persistedScheduledPosts
   const currentWeekPosts = useMemo(() => scheduledPosts.filter(isInCurrentWeek), [scheduledPosts])
+  const today = new Date()
+  const dateLabel = today.toLocaleDateString('zh-HK', { month: 'long', day: 'numeric' })
+  const dateWithDay = today.toLocaleDateString('zh-HK', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  })
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
   const [postStatuses, setPostStatuses] = useState<Record<string, 'draft' | 'approved' | 'scheduled' | 'published' | 'rejected'>>({})
   const [publishing, setPublishing] = useState(false)
@@ -2021,7 +2028,7 @@ function ScheduledPostsPageContent() {
             <button type="button" aria-label="上一日">‹</button>
             <button type="button">今天</button>
             <button type="button" aria-label="下一日">›</button>
-            <strong>5月8日</strong>
+            <strong>{dateLabel}</strong>
           </div>
 
           <div className="calendar-actions">
@@ -2043,7 +2050,7 @@ function ScheduledPostsPageContent() {
           </button>
         </div>
 
-        <div className="calendar-date-pill">5月8日 星期五</div>
+        <div className="calendar-date-pill">{dateWithDay}</div>
 
         <section className={compact ? 'schedule-column compact' : 'schedule-column'} aria-label="今日排程">
           {!postsLoaded
