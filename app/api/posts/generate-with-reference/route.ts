@@ -9,6 +9,7 @@ import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase
 export const maxDuration = 60
 
 type GenerateWithReferenceBody = {
+  currentPostImageUrl?: string
   postBody?: string
   postId?: string
   postTitle?: string
@@ -25,20 +26,22 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function loadImageFile(imageUrl: string) {
+async function loadImageFile(imageUrl: string, filename: string) {
   const response = await fetch(imageUrl)
   if (!response.ok) {
-    throw new Error(`Unable to load reference image (${response.status})`)
+    throw new Error(`Unable to load image (${response.status})`)
   }
 
   const contentType = response.headers.get('content-type') || 'image/jpeg'
   const bytes = await response.arrayBuffer()
-  return new File([bytes], 'reference-image.jpg', { type: contentType })
+  return new File([bytes], filename, { type: contentType })
 }
 
 async function writeImagePrompt(input: {
+  currentPostImageUrl: string
   postBody: string
   postTitle: string
+  referenceImageUrl: string
   userCommand: string
 }) {
   const fallbackPrompt = `
@@ -46,7 +49,9 @@ Professional social media marketing image for Hong Kong/Asian beauty and lifesty
 Post title: ${input.postTitle}
 Post body: ${input.postBody}
 Instruction: ${input.userCommand}
-Use the attached reference image for visual style, mood, lighting, and composition. No text overlays.
+The first image is the current post product image. The second image is the person reference.
+Show the same person from the reference image holding, using, or interacting with the product from the current post image.
+Maintain the person's appearance and facial features. No text overlays.
 `.trim()
 
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -62,15 +67,20 @@ Use the attached reference image for visual style, mood, lighting, and compositi
 
 Post title: ${input.postTitle}
 Post body: ${input.postBody}
-User instruction: ${input.userCommand}
+User instruction: ${input.userCommand || 'Combine the person with the product'}
+
+The user has provided:
+1. The current post product image
+2. A reference photo of a person (face/person image)
 
 Write a detailed image generation prompt in English that:
-- Uses the provided reference image as the visual reference for style, mood, lighting, and composition
-- Captures the mood and style suitable for this post
-- Is optimized for social media: vibrant, professional, eye-catching
+- Shows the SAME person from the reference photo
+- Shows them holding, using, or interacting with the product from the current post image
+- Maintains the person's appearance and facial features
+- Creates a natural, professional marketing scene
 - Incorporates the user's instruction
 - Is suitable for the Hong Kong/Asian beauty/lifestyle market
-- Avoids text overlays, logos, watermarks, and unreadable text
+- No text overlays
 
 Return ONLY the prompt text, no explanation.`,
       },
@@ -88,7 +98,7 @@ export async function POST(req: Request) {
     const postId = asString(body.postId)
     const workspaceId = asString(body.workspaceId)
     const referenceImageUrl = asString(body.referenceImageUrl)
-    const userCommand = asString(body.userCommand, 'Generate a high quality marketing image')
+    const userCommand = asString(body.userCommand, 'Combine the person with the product')
 
     if (!isUuid(postId) || !isUuid(workspaceId) || !referenceImageUrl) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -109,7 +119,7 @@ export async function POST(req: Request) {
     const adminSupabase = createAdminSupabase()
     const { data: post, error: postError } = await adminSupabase
       .from('campaign_posts')
-      .select('id,title,body,post_type,workspace_id,user_id,onboarding_session_id')
+      .select('id,title,body,post_type,image_url,workspace_id,user_id,onboarding_session_id')
       .eq('id', postId)
       .single()
 
@@ -117,9 +127,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
+    const currentPostImageUrl = asString(body.currentPostImageUrl, asString(post.image_url))
+    if (!currentPostImageUrl) {
+      return NextResponse.json({ error: 'Missing current post image' }, { status: 400 })
+    }
+
     const imagePrompt = await writeImagePrompt({
+      currentPostImageUrl,
       postBody: asString(post.body, asString(body.postBody)),
       postTitle: asString(post.title, asString(body.postTitle)),
+      referenceImageUrl,
       userCommand,
     })
 
@@ -129,15 +146,36 @@ export async function POST(req: Request) {
     }
 
     const openai = new OpenAI({ apiKey })
-    const referenceImage = await loadImageFile(referenceImageUrl)
-    const imageResponse = await openai.images.edit({
-      image: referenceImage,
-      model: process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1',
-      output_format: 'jpeg',
-      prompt: `${imagePrompt}\n\nUse the provided image as the visual reference. Create a new professional marketing image inspired by it, not a direct copy. No text overlays.`,
-      quality: 'medium',
-      size: '1024x1024',
-    } as Parameters<typeof openai.images.edit>[0])
+    const currentPostImage = await loadImageFile(currentPostImageUrl, 'current-post.jpg')
+    const referenceImage = await loadImageFile(referenceImageUrl, 'reference-person.jpg')
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+    const imagePromptWithReferences = `${imagePrompt}
+
+Combine the images: use the first image as the product/source image, and show the person from the second image holding or using that product naturally. Professional marketing photography, Asian beauty market style. No text overlays.`
+
+    let imageResponse: Awaited<ReturnType<typeof openai.images.edit>>
+    try {
+      imageResponse = await openai.images.edit({
+        image: [currentPostImage, referenceImage],
+        model: imageModel,
+        output_format: 'jpeg',
+        prompt: imagePromptWithReferences,
+        quality: 'medium',
+        size: '1024x1024',
+      } as Parameters<typeof openai.images.edit>[0])
+    } catch (error) {
+      console.error('[generate-with-reference] multi-image edit failed, retrying with current post image only:', error)
+      imageResponse = await openai.images.edit({
+        image: currentPostImage,
+        model: imageModel,
+        output_format: 'jpeg',
+        prompt: `${imagePromptWithReferences}
+
+Person reference image URL: ${referenceImageUrl}`,
+        quality: 'medium',
+        size: '1024x1024',
+      } as Parameters<typeof openai.images.edit>[0])
+    }
 
     const imageData = imageResponse as { data?: Array<{ b64_json?: string }> }
     const generatedBase64 = imageData.data?.[0]?.b64_json

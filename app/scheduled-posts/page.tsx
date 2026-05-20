@@ -981,11 +981,12 @@ function ScheduledPostsPageContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            currentPostImageUrl: selectedPost.image,
             postId: selectedPost.id,
             postBody: selectedPost.body,
             postTitle: selectedPost.title,
             referenceImageUrl: attachedImage.url,
-            userCommand: aiCommand.trim() || '生成一張適合這篇貼文的專業圖片',
+            userCommand: aiCommand.trim() || 'Combine the person with the product and create a professional marketing image',
             workspaceId: activeWorkspaceId,
           }),
         })
