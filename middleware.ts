@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
   const isPublicPage =
     pathname === '/' ||
     pathname === '/contact' ||
+    pathname.startsWith('/claim') ||
     pathname === '/signup' ||
     pathname.startsWith('/onboarding') ||
     pathname === '/submit-brief' ||
@@ -72,6 +73,7 @@ export const config = {
   matcher: [
     '/',
     '/contact',
+    '/claim/:path*',
     '/creator-matching',
     '/delivery-confirmation',
     '/delivery-tracking',
