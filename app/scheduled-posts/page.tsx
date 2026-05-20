@@ -713,6 +713,8 @@ function ScheduledPostsPageContent() {
   const [improvePanelOpen, setImprovePanelOpen] = useState(false)
   const [improveMode, setImproveMode] = useState<'copy' | 'image-prompt'>('copy')
   const [improveProgress, setImproveProgress] = useState({ current: 0, total: 0 })
+  const [aiCommand, setAiCommand] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLElement | null>(null)
@@ -911,6 +913,28 @@ function ScheduledPostsPageContent() {
     } finally {
       setToolbarBusy(false)
       setImproveProgress({ current: 0, total: 0 })
+    }
+  }
+
+  const handleAiCommand = async () => {
+    if (!aiCommand.trim() || !selectedPost || aiLoading) return
+
+    setAiLoading(true)
+    try {
+      await fetch('/api/scheduled-posts/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'copy',
+          postIds: [selectedPost.id],
+          workspaceId: activeWorkspaceId,
+          userCommand: aiCommand,
+        }),
+      })
+      setAiCommand('')
+      router.refresh()
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -1881,24 +1905,69 @@ function ScheduledPostsPageContent() {
           <aside className="ai-improve-panel">
             <div className="improve-copy">
               <p>SOON 可以這樣改善這則貼文：</p>
-              <ol>
-                <li><strong>更改相片內容：</strong>「在背景加入人物，令場景更豐富」</li>
-                <li><strong>調整背景：</strong>「將背景換成現代辦公室」</li>
-                <li><strong>更改文字疊加：</strong>「將標題放大並移到頂部」</li>
-                <li><strong>修改顏色：</strong>「令整體配色更鮮明」</li>
-                <li><strong>修改品牌：</strong>「將我的 logo 加到右下角」</li>
+              <ol style={{ listStyle: 'none', padding: 0, margin: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🖼️</span>
+                  <span><strong>更改相片內容：</strong>「在背景加入人物，令場景更豐富」</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🏙️</span>
+                  <span><strong>調整背景：</strong>「將背景換成現代辦公室」</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>✏️</span>
+                  <span><strong>更改文字疊加：</strong>「將標題放大並移到頂部」</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🎨</span>
+                  <span><strong>修改顏色：</strong>「令整體配色更鮮明」</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '16px', flexShrink: 0 }}>🏷️</span>
+                  <span><strong>修改品牌：</strong>「將我的 logo 加到右下角」</span>
+                </li>
               </ol>
               <p>你想怎樣調整？</p>
             </div>
 
-            <form className="ai-command-box">
-              <textarea placeholder="要求 SOON 修改這則貼文..." />
+            <form
+              className="ai-command-box"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void handleAiCommand()
+              }}
+            >
+              <textarea
+                placeholder="要求 SOON 修改這則貼文..."
+                value={aiCommand}
+                onChange={(event) => setAiCommand(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void handleAiCommand()
+                  }
+                }}
+              />
               <div>
                 <label aria-label="附加檔案">
-                  <input type="file" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (file) setAiCommand((current) => `${current} [附件: ${file.name}]`)
+                    }}
+                  />
                   <span>附件</span>
                 </label>
-                <button type="button" aria-label="送出要求">↑</button>
+                <button
+                  type="submit"
+                  aria-label="送出要求"
+                  disabled={!aiCommand.trim() || aiLoading}
+                  style={{ opacity: aiCommand.trim() && !aiLoading ? 1 : 0.4 }}
+                >
+                  {aiLoading ? '...' : '↑'}
+                </button>
               </div>
             </form>
           </aside>
