@@ -297,6 +297,10 @@ export const dashboardSidebarStyles = `
   }
 
   .workspace-switcher strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 14px;
     font-weight: 550;
     overflow: hidden;

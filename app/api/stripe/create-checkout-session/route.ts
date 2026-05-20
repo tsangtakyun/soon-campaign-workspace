@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         },
       },
       customer_email: body.email || undefined,
-      success_url: `${origin}/paid-analysis?session_id={CHECKOUT_SESSION_ID}&campaign_intake_id=${encodeURIComponent(body.campaignIntakeId)}`,
+      success_url: `${origin}/onboarding?session_id={CHECKOUT_SESSION_ID}&campaign_intake_id=${encodeURIComponent(body.campaignIntakeId)}`,
       cancel_url: `${origin}${safeCancelPath}`,
       metadata: {
         campaign_intake_id: body.campaignIntakeId,

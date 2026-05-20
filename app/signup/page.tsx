@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase'
 function SignupContent() {
   const searchParams = useSearchParams()
   const selectedPlan = searchParams.get('plan')
-  const next = selectedPlan ? `/submit-brief?plan=${selectedPlan}` : '/submit-brief'
+  const next = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
   const contentEngineBase = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
   const onboardingNext = selectedPlan ? `/signup?onboarding=1&plan=${selectedPlan}` : '/signup?onboarding=1'
   const nextWithOnboarding = (name: string, budget: string, category: string) => {
