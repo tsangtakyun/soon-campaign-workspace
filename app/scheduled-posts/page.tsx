@@ -387,8 +387,8 @@ function createPostDesignElements(post: ScheduledPost, canvasSize?: { w: number;
   const isSquare = !canvasSize || canvasSize.w === canvasSize.h
   const displayW = 430
   const displayH = isSquare ? 430 : 538
-  const titleY = isSquare ? 300 : 420
-  const bodyY = isSquare ? 360 : 480
+  const titleY = isSquare ? 68 : 75
+  const bodyY = isSquare ? 80 : 88
   const bodyPreview = post.body
     ? post.body.slice(0, 60) + (post.body.length > 60 ? '...' : '')
     : ''
@@ -415,7 +415,7 @@ function createPostDesignElements(post: ScheduledPost, canvasSize?: { w: number;
       kind: 'text',
       item: 'headline',
       label: '標題文字',
-      x: 16,
+      x: 5,
       y: titleY,
       size: 22,
       rotation: 0,
@@ -437,7 +437,7 @@ function createPostDesignElements(post: ScheduledPost, canvasSize?: { w: number;
       kind: 'text',
       item: 'subtitle',
       label: '副標題文字',
-      x: 16,
+      x: 5,
       y: bodyY,
       size: 13,
       rotation: 0,
