@@ -972,26 +972,29 @@ function ScheduledPostsPageContent() {
     setAiStatus('processing')
     try {
       if (attachedImage) {
-        console.log('[update-image] sending:', {
-          imageUrl: attachedImage.url,
+        console.log('[generate-with-reference] sending:', {
           postId: selectedPost.id,
+          referenceImageUrl: attachedImage.url,
           workspaceId: activeWorkspaceId,
         })
-        const response = await fetch('/api/posts/update-image', {
+        const response = await fetch('/api/posts/generate-with-reference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageUrl: attachedImage.url,
             postId: selectedPost.id,
+            postBody: selectedPost.body,
+            postTitle: selectedPost.title,
+            referenceImageUrl: attachedImage.url,
+            userCommand: aiCommand.trim() || '生成一張適合這篇貼文的專業圖片',
             workspaceId: activeWorkspaceId,
           }),
         })
         const result = await response.json()
-        console.log('[update-image] response:', result)
-        if (!response.ok) throw new Error('Failed to update image')
+        console.log('[generate-with-reference] response:', result)
+        if (!response.ok) throw new Error(result.detail || 'Failed to generate image')
       }
 
-      if (aiCommand.trim()) {
+      if (!attachedImage && aiCommand.trim()) {
         const response = await fetch('/api/scheduled-posts/improve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2431,7 +2434,7 @@ function ScheduledPostsPageContent() {
             </form>
             {aiStatus === 'processing' && (
               <p style={{ color: '#6b7280', fontSize: 12, margin: '6px 0 0' }}>
-                ⏳ SOON 正在處理你的指令...
+                ⏳ AI 正在生成圖片，需時約 20-30 秒...
               </p>
             )}
             {aiStatus === 'done' && (

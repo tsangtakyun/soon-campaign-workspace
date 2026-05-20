@@ -8,10 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
     "fabric": "^6.9.1",
     "next": "15.3.6",
+    "openai": "^6.38.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "stripe": "^18.3.0"
