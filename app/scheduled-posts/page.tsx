@@ -972,6 +972,11 @@ function ScheduledPostsPageContent() {
     setAiStatus('processing')
     try {
       if (attachedImage) {
+        console.log('[update-image] sending:', {
+          imageUrl: attachedImage.url,
+          postId: selectedPost.id,
+          workspaceId: activeWorkspaceId,
+        })
         const response = await fetch('/api/posts/update-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -981,6 +986,8 @@ function ScheduledPostsPageContent() {
             workspaceId: activeWorkspaceId,
           }),
         })
+        const result = await response.json()
+        console.log('[update-image] response:', result)
         if (!response.ok) throw new Error('Failed to update image')
       }
 
@@ -1016,6 +1023,10 @@ function ScheduledPostsPageContent() {
           0,
           fallbackScheduledPosts
         )
+        const rawImageUrl = (updatedPost as Record<string, unknown>).image_url
+        if (typeof rawImageUrl === 'string' && rawImageUrl) {
+          mapped.image = rawImageUrl
+        }
         setSelectedPost(mapped)
       }
 

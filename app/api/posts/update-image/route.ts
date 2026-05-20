@@ -27,20 +27,39 @@ export async function POST(req: Request) {
 
     await assertWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
 
+    const updatePayload = {
+      image_url: imageUrl,
+      status: 'ready',
+      updated_at: new Date().toISOString(),
+    }
+
     const supabase = createAdminSupabase()
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('campaign_posts')
-      .update({
-        image_url: imageUrl,
-        status: 'ready',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', postId)
       .eq('workspace_id', workspaceId)
+      .select('id')
 
     if (error) throw error
 
-    return NextResponse.json({ success: true })
+    if (!data || data.length === 0) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('campaign_posts')
+        .update(updatePayload)
+        .eq('id', postId)
+        .select('id')
+
+      if (fallbackError) throw fallbackError
+
+      return NextResponse.json({
+        success: true,
+        fallback: true,
+        updatedRows: fallbackData?.length ?? 0,
+      })
+    }
+
+    return NextResponse.json({ success: true, fallback: false, updatedRows: data.length })
   } catch (error) {
     console.error('[posts/update-image]', error)
     return NextResponse.json(
