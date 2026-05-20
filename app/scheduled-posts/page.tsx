@@ -1024,8 +1024,7 @@ function ScheduledPostsPageContent() {
       const asset = inserted as AttachAsset
       setAttachAssets((current) => [asset, ...current])
       setSelectedAttach(asset.id)
-      setAiCommand((current) => `${current} [圖片: ${asset.url}]`.trim())
-      setShowAttachModal(false)
+      setAttachTab('uploaded')
     } finally {
       setAttachLoading(false)
       event.target.value = ''
