@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 
 import { buildFullAnalysis, type CampaignFormInput } from '@/lib/analysis'
+import { getStrategyLibrary } from '@/lib/strategy-library-store'
 
 type CompletePayload = {
   sessionId?: string
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
     const session = await stripe.checkout.sessions.retrieve(body.sessionId)
 
-    if (session.payment_status !== 'paid') {
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
       return NextResponse.json({ error: 'Payment not completed yet' }, { status: 400 })
     }
 
@@ -116,7 +117,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const analysis = buildFullAnalysis(resolvedForm)
+    const strategyLibrary = await getStrategyLibrary()
+    const analysis = buildFullAnalysis(resolvedForm, strategyLibrary)
 
     if (resolvedCampaignIntakeId) {
       const { error } = await supabase

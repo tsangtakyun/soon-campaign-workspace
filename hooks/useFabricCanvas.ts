@@ -1,0 +1,438 @@
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Canvas, Circle, FabricImage, FabricObject, IText, Polygon, Rect, Triangle } from 'fabric'
+
+import type { CanvasSize, DesignElement } from '@/components/editor/editorTypes'
+
+type FabricElementObject = FabricObject & {
+  data?: {
+    id?: string
+    kind?: DesignElement['kind']
+    item?: string
+  }
+}
+
+type UseFabricCanvasOptions = {
+  canvasId: string
+  height: number
+  width: number
+  onSelectElement?: (id: string | null) => void
+}
+
+const BASE_CANVAS = { width: 430, height: 538 }
+
+function toCanvasPosition(element: DesignElement, size: Pick<CanvasSize, 'h' | 'w'>) {
+  return {
+    left: (element.x / 100) * size.w,
+    top: (element.y / 100) * size.h,
+  }
+}
+
+function elementScale(size: Pick<CanvasSize, 'h' | 'w'>) {
+  return Math.min(size.w / BASE_CANVAS.width, size.h / BASE_CANVAS.height)
+}
+
+function buildStarPoints(outerRadius: number, innerRadius: number, points = 5) {
+  return Array.from({ length: points * 2 }, (_, index) => {
+    const radius = index % 2 === 0 ? outerRadius : innerRadius
+    const angle = (Math.PI / points) * index - Math.PI / 2
+    return {
+      x: outerRadius + Math.cos(angle) * radius,
+      y: outerRadius + Math.sin(angle) * radius,
+    }
+  })
+}
+
+function buildDiamondPoints(size: number) {
+  const half = size / 2
+  return [
+    { x: half, y: 0 },
+    { x: size, y: half },
+    { x: half, y: size },
+    { x: 0, y: half },
+  ]
+}
+
+function buildPentagonPoints(size: number) {
+  const radius = size / 2
+  return Array.from({ length: 5 }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / 5 - Math.PI / 2
+    return { x: radius + Math.cos(angle) * radius, y: radius + Math.sin(angle) * radius }
+  })
+}
+
+function attachElementData<T extends FabricElementObject>(object: T, element: DesignElement) {
+  object.set({
+    angle: element.rotation,
+    opacity: element.opacity / 100,
+    originX: 'center',
+    originY: 'center',
+  })
+  object.data = { id: element.id, item: element.item, kind: element.kind }
+  return object
+}
+
+function applyControls(object: FabricElementObject) {
+  object.set({
+    borderColor: '#111111',
+    cornerColor: '#ffffff',
+    cornerSize: 12,
+    cornerStrokeColor: '#111111',
+    padding: 0,
+    transparentCorners: false,
+  })
+}
+
+async function createFabricObject(element: DesignElement, size: Pick<CanvasSize, 'h' | 'w'>) {
+  const scale = elementScale(size)
+  const position = toCanvasPosition(element, size)
+  const common = {
+    ...position,
+    angle: element.rotation,
+    opacity: element.opacity / 100,
+    originX: 'center' as const,
+    originY: 'center' as const,
+  }
+
+  if (element.kind === 'image') {
+    const image = await FabricImage.fromURL(element.imageUrl || '', { crossOrigin: 'anonymous' })
+    if (element.item === 'background') {
+      const coverScale = Math.max(size.w / (image.width || 1), size.h / (image.height || 1))
+      image.set({
+        ...common,
+        left: size.w / 2,
+        top: size.h / 2,
+        scaleX: coverScale,
+        scaleY: coverScale,
+      })
+    } else {
+      const targetWidth = (element.width || element.size || 300) * scale
+      image.scaleToWidth(targetWidth)
+      image.set(common)
+    }
+    return attachElementData(image as FabricElementObject, element)
+  }
+
+  if (element.kind === 'text') {
+    const text = new IText(element.textContent || element.label, {
+      ...common,
+      fill: element.color,
+      fontFamily: element.fontFamily === 'inherit' ? 'Arial, sans-serif' : element.fontFamily,
+      fontSize: (element.fontSize || element.size || 24) * scale,
+      fontStyle: element.fontStyle || 'normal',
+      fontWeight: element.fontWeight || 'normal',
+      lineHeight: element.lineHeight || 1.3,
+      textAlign: element.textAlign || 'center',
+      width: (element.width || 300) * scale,
+    })
+    return attachElementData(text as FabricElementObject, element)
+  }
+
+  if (element.kind === 'icon') {
+    const icon = new IText(element.item, {
+      ...common,
+      fill: element.color,
+      fontFamily: 'Arial, sans-serif',
+      fontSize: element.size * scale,
+      fontWeight: 'bold',
+      textAlign: 'center',
+    })
+    return attachElementData(icon as FabricElementObject, element)
+  }
+
+  const objectSize = element.size * scale
+  const defaults = {
+    ...common,
+    fill: element.kind === 'frame' ? 'rgba(255,255,255,0.22)' : element.color,
+    stroke: element.kind === 'frame' ? 'rgba(255,255,255,0.75)' : undefined,
+    strokeWidth: element.kind === 'frame' ? Math.max(2, 3 * scale) : 0,
+  }
+
+  let shape: FabricElementObject
+  if (element.item === 'circle') {
+    shape = new Circle({ ...defaults, radius: objectSize / 2 }) as FabricElementObject
+  } else if (element.item === 'triangle') {
+    shape = new Triangle({ ...defaults, height: objectSize, width: objectSize }) as FabricElementObject
+  } else if (element.item === 'diamond') {
+    shape = new Polygon(buildDiamondPoints(objectSize), defaults) as FabricElementObject
+  } else if (element.item === 'pentagon') {
+    shape = new Polygon(buildPentagonPoints(objectSize), defaults) as FabricElementObject
+  } else if (element.item === 'star') {
+    shape = new Polygon(buildStarPoints(objectSize / 2, objectSize / 4), defaults) as FabricElementObject
+  } else {
+    shape = new Rect({
+      ...defaults,
+      height: objectSize,
+      rx: element.item === 'rounded' ? objectSize * 0.18 : 0,
+      ry: element.item === 'rounded' ? objectSize * 0.18 : 0,
+      width: objectSize,
+    }) as FabricElementObject
+  }
+
+  return attachElementData(shape, element)
+}
+
+export function useFabricCanvas({ canvasId, height, onSelectElement, width }: UseFabricCanvasOptions) {
+  const fabricRef = useRef<Canvas | null>(null)
+  const historyIndexRef = useRef(-1)
+  const historyRef = useRef<string[]>([])
+  const isRestoringRef = useRef(false)
+  const onSelectElementRef = useRef(onSelectElement)
+  const sizeRef = useRef({ h: height, w: width })
+
+  useEffect(() => {
+    onSelectElementRef.current = onSelectElement
+  }, [onSelectElement])
+
+  const snapshotHistory = useCallback((canvas: Canvas) => {
+    if (isRestoringRef.current) return
+    const json = JSON.stringify(canvas.toObject(['data']))
+    const stack = historyRef.current.slice(0, historyIndexRef.current + 1)
+    if (stack[stack.length - 1] === json) return
+    stack.push(json)
+    if (stack.length > 50) stack.shift()
+    historyRef.current = stack
+    historyIndexRef.current = stack.length - 1
+  }, [])
+
+  useEffect(() => {
+    const canvas = new Canvas(canvasId, {
+      backgroundColor: '#ffffff',
+      height,
+      preserveObjectStacking: true,
+      selection: true,
+      width,
+    })
+
+    fabricRef.current = canvas
+    sizeRef.current = { h: height, w: width }
+
+    const onMutation = () => snapshotHistory(canvas)
+    const onSelection = () => {
+      const object = canvas.getActiveObject() as FabricElementObject | undefined
+      onSelectElementRef.current?.(object?.data?.id || null)
+    }
+
+    canvas.on('object:added', onMutation)
+    canvas.on('object:modified', onMutation)
+    canvas.on('object:removed', onMutation)
+    canvas.on('selection:created', onSelection)
+    canvas.on('selection:updated', onSelection)
+    canvas.on('selection:cleared', () => onSelectElementRef.current?.(null))
+
+    snapshotHistory(canvas)
+
+    return () => {
+      canvas.dispose()
+      fabricRef.current = null
+    }
+  }, [canvasId, snapshotHistory])
+
+  useEffect(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const previous = sizeRef.current
+    if (previous.w === width && previous.h === height) return
+    const scaleX = width / previous.w
+    const scaleY = height / previous.h
+    canvas.setDimensions({ height, width })
+    canvas.getObjects().forEach((object) => {
+      object.set({
+        left: (object.left || 0) * scaleX,
+        scaleX: (object.scaleX || 1) * scaleX,
+        scaleY: (object.scaleY || 1) * scaleY,
+        top: (object.top || 0) * scaleY,
+      })
+      object.setCoords()
+    })
+    sizeRef.current = { h: height, w: width }
+    canvas.renderAll()
+    snapshotHistory(canvas)
+  }, [height, snapshotHistory, width])
+
+  const loadDesignElements = useCallback(
+    async (elements: DesignElement[]) => {
+      const canvas = fabricRef.current
+      if (!canvas) return
+      isRestoringRef.current = true
+      canvas.clear()
+      canvas.backgroundColor = '#ffffff'
+      const sorted = [...elements].sort((a, b) => a.zIndex - b.zIndex)
+      const objects = await Promise.all(sorted.map((element) => createFabricObject(element, sizeRef.current)))
+      objects.forEach((object) => {
+        applyControls(object)
+        canvas.add(object)
+      })
+      canvas.discardActiveObject()
+      canvas.renderAll()
+      isRestoringRef.current = false
+      snapshotHistory(canvas)
+    },
+    [snapshotHistory]
+  )
+
+  const addDesignElement = useCallback(async (element: DesignElement) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const object = await createFabricObject(element, sizeRef.current)
+    applyControls(object)
+    canvas.add(object)
+    canvas.setActiveObject(object)
+    canvas.renderAll()
+  }, [])
+
+  const updateDesignElement = useCallback(async (id: string, changes: Partial<DesignElement>) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const activeObject = canvas.getActiveObject() as FabricElementObject | undefined
+    const object =
+      (canvas.getObjects().find((candidate) => (candidate as FabricElementObject).data?.id === id) as
+        | FabricElementObject
+        | undefined) ||
+      (activeObject?.data?.id === id ? activeObject : undefined) ||
+      (changes.textContent !== undefined && activeObject && 'text' in activeObject ? activeObject : undefined)
+    if (!object) return
+
+    if (changes.imageUrl && object.type === 'image') {
+      const replacement = await FabricImage.fromURL(changes.imageUrl, { crossOrigin: 'anonymous' })
+      replacement.set({
+        angle: object.angle,
+        data: object.data,
+        left: object.left,
+        opacity: object.opacity,
+        originX: 'center',
+        originY: 'center',
+        scaleX: object.scaleX,
+        scaleY: object.scaleY,
+        top: object.top,
+      })
+      applyControls(replacement as FabricElementObject)
+      canvas.remove(object)
+      canvas.add(replacement)
+      canvas.setActiveObject(replacement)
+      canvas.renderAll()
+      return
+    }
+
+    const nextProps: Record<string, unknown> = {}
+    if (changes.rotation !== undefined) nextProps.angle = changes.rotation
+    if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
+    if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
+    if (changes.fontStyle !== undefined) nextProps.fontStyle = changes.fontStyle
+    if (changes.fontWeight !== undefined) nextProps.fontWeight = changes.fontWeight
+    if (changes.lineHeight !== undefined) nextProps.lineHeight = changes.lineHeight
+    if (changes.opacity !== undefined) nextProps.opacity = changes.opacity / 100
+    if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
+    if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current)
+
+    if (changes.textContent !== undefined && 'text' in object) {
+      object.set({ text: changes.textContent })
+      if (object instanceof IText) {
+        object.initDimensions()
+      }
+    }
+
+    object.set(nextProps)
+    object.setCoords()
+    canvas.requestRenderAll()
+  }, [])
+
+  const deleteSelected = useCallback(() => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const active = canvas.getActiveObjects()
+    if (!active.length) return
+    canvas.discardActiveObject()
+    active.forEach((object) => canvas.remove(object))
+    canvas.renderAll()
+  }, [])
+
+  const duplicateSelected = useCallback(async () => {
+    const canvas = fabricRef.current
+    const active = canvas?.getActiveObject()
+    if (!canvas || !active) return
+    const cloned = await active.clone()
+    cloned.set({ left: (cloned.left || 0) + 22, top: (cloned.top || 0) + 22 })
+    if ((cloned as FabricElementObject).data?.id) {
+      ;(cloned as FabricElementObject).data = {
+        ...(cloned as FabricElementObject).data,
+        id: `${(cloned as FabricElementObject).data?.id}-copy-${Date.now()}`,
+      }
+    }
+    applyControls(cloned as FabricElementObject)
+    canvas.add(cloned)
+    canvas.setActiveObject(cloned)
+    canvas.renderAll()
+  }, [])
+
+  const undo = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas || historyIndexRef.current <= 0) return
+    historyIndexRef.current -= 1
+    isRestoringRef.current = true
+    await canvas.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]))
+    canvas.renderAll()
+    isRestoringRef.current = false
+  }, [])
+
+  const redo = useCallback(async () => {
+    const canvas = fabricRef.current
+    if (!canvas || historyIndexRef.current >= historyRef.current.length - 1) return
+    historyIndexRef.current += 1
+    isRestoringRef.current = true
+    await canvas.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]))
+    canvas.renderAll()
+    isRestoringRef.current = false
+  }, [])
+
+  const bringForward = useCallback(() => {
+    const canvas = fabricRef.current
+    const object = canvas?.getActiveObject()
+    if (!canvas || !object) return
+    canvas.bringObjectForward(object)
+    canvas.renderAll()
+    snapshotHistory(canvas)
+  }, [snapshotHistory])
+
+  const sendBackward = useCallback(() => {
+    const canvas = fabricRef.current
+    const object = canvas?.getActiveObject()
+    if (!canvas || !object) return
+    canvas.sendObjectBackwards(object)
+    canvas.renderAll()
+    snapshotHistory(canvas)
+  }, [snapshotHistory])
+
+  const exportPNG = useCallback((multiplier = 2) => {
+    return fabricRef.current?.toDataURL({ format: 'png', multiplier }) || ''
+  }, [])
+
+  return useMemo(
+    () => ({
+      addDesignElement,
+      bringForward,
+      deleteSelected,
+      duplicateSelected,
+      exportPNG,
+      fabricRef,
+      loadDesignElements,
+      redo,
+      sendBackward,
+      undo,
+      updateDesignElement,
+    }),
+    [
+      addDesignElement,
+      bringForward,
+      deleteSelected,
+      duplicateSelected,
+      exportPNG,
+      loadDesignElements,
+      redo,
+      sendBackward,
+      undo,
+      updateDesignElement,
+    ]
+  )
+}

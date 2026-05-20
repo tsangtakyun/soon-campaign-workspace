@@ -2,8 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'SOON 廣告工作台',
-  description: 'SOON 廣告工作台，集中處理策略分析、創作者配對與 AI 內容工作流程。',
+  title: 'SOON | AI 宣傳策略與內容製作平台',
+  description: 'SOON 將品牌需求、創作者配對、腳本、分鏡與製作流程串成同一套內容宣傳系統。',
 }
 
 function NavBar() {
@@ -12,22 +12,23 @@ function NavBar() {
       <nav className="site-nav">
         <Link href="/" className="brand-mark">
           <span className="brand-dot" />
-          <span>SOON 廣告工作台</span>
+          <span>SOON</span>
         </Link>
 
         <div className="nav-links">
-          <a href="/#overview">總覽</a>
-          <a href="/#metrics">成效</a>
-          <a href="/#workflow">流程</a>
-          <Link href="/my-workspace">工作台</Link>
+          <a href="/#pricing">方案</a>
+          <Link href="/login">登入</Link>
         </div>
 
         <div className="nav-actions">
-          <Link href="/my-workspace" className="nav-secondary">
-            登入
+          <a href="/#pricing" className="nav-pricing">
+            查看方案
+          </a>
+          <Link href="/contact" className="nav-secondary">
+            聯絡我們
           </Link>
-          <Link href="/submit-brief" className="nav-primary">
-            開始填寫需求
+          <Link href="/signup" className="nav-primary">
+            開始試用
           </Link>
         </div>
       </nav>
@@ -37,16 +38,14 @@ function NavBar() {
           __html: `
             .site-nav {
               position: sticky;
-              top: 18px;
+              top: 0;
               z-index: 1000;
-              width: min(1240px, calc(100% - 32px));
-              margin: 18px auto 0;
-              padding: 14px 18px;
-              border-radius: 999px;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-              background: linear-gradient(180deg, rgba(15, 18, 24, 0.92), rgba(7, 8, 11, 0.92));
-              box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-              backdrop-filter: blur(18px);
+              width: 100%;
+              margin: 0;
+              padding: 22px 7vw;
+              border: 0;
+              background: rgba(8, 9, 11, 0.72);
+              backdrop-filter: blur(14px);
               display: flex;
               align-items: center;
               justify-content: space-between;
@@ -59,9 +58,9 @@ function NavBar() {
               gap: 10px;
               color: #f6f7fb;
               text-decoration: none;
-              font-size: 0.98rem;
-              font-weight: 500;
-              letter-spacing: -0.04em;
+              font-size: 1.08rem;
+              font-weight: 800;
+              letter-spacing: 0.04em;
               white-space: nowrap;
             }
 
@@ -77,7 +76,7 @@ function NavBar() {
               display: flex;
               align-items: center;
               justify-content: center;
-              gap: 14px;
+              gap: 26px;
               flex: 1;
               flex-wrap: wrap;
             }
@@ -85,9 +84,9 @@ function NavBar() {
             .nav-links a {
               color: rgba(233, 236, 245, 0.8);
               text-decoration: none;
-              font-size: 0.92rem;
-              font-weight: 400;
-              letter-spacing: -0.03em;
+              font-size: 1rem;
+              font-weight: 650;
+              letter-spacing: -0.02em;
               transition: color 160ms ease;
             }
 
@@ -104,35 +103,42 @@ function NavBar() {
             }
 
             .nav-secondary,
+            .nav-pricing,
             .nav-primary {
               text-decoration: none;
-              border-radius: 999px;
-              padding: 11px 18px;
-              font-size: 0.92rem;
-              font-weight: 400;
-              letter-spacing: -0.03em;
+              border-radius: 6px;
+              padding: 14px 20px;
+              font-size: 1rem;
+              font-weight: 750;
+              letter-spacing: -0.02em;
               white-space: nowrap;
             }
 
+            .nav-pricing {
+              color: #111111;
+              background: #ffd84d;
+              border: 1px solid rgba(255, 216, 77, 0.85);
+              box-shadow: 0 14px 30px rgba(255, 216, 77, 0.22);
+            }
+
             .nav-secondary {
-              color: rgba(239, 243, 255, 0.88);
-              border: 1px solid rgba(255, 255, 255, 0.12);
-              background: rgba(255, 255, 255, 0.03);
+              color: #101114;
+              border: 1px solid rgba(255, 255, 255, 0.16);
+              background: #ffffff;
             }
 
             .nav-primary {
               color: #ffffff;
-              background: linear-gradient(135deg, #ff5d36, #ff3d2e);
-              box-shadow: 0 0 0 1px rgba(255, 121, 93, 0.22), 0 0 30px rgba(255, 84, 48, 0.36);
+              background: #ef3f2f;
+              box-shadow: 0 14px 30px rgba(239, 63, 47, 0.28);
             }
 
             @media (max-width: 980px) {
               .site-nav {
-                border-radius: 28px;
-                padding: 16px;
-                top: 12px;
+                padding: 16px 20px;
                 flex-direction: column;
                 align-items: stretch;
+                background: rgba(8, 9, 11, 0.92);
               }
 
               .nav-links {
@@ -144,6 +150,7 @@ function NavBar() {
               }
 
               .nav-secondary,
+              .nav-pricing,
               .nav-primary {
                 flex: 1;
                 text-align: center;
@@ -151,10 +158,6 @@ function NavBar() {
             }
 
             @media (max-width: 640px) {
-              .site-nav {
-                width: min(100% - 20px, 1240px);
-              }
-
               .nav-links {
                 gap: 10px 14px;
               }

@@ -1,3 +1,5 @@
+import { defaultStrategyLibrary, type StrategyItem, type StrategyLibraryState } from '@/lib/strategy-library'
+
 export type CampaignFormInput = {
   campaignIntakeId?: string
   contactName?: string
@@ -217,22 +219,124 @@ function objectiveText(objective: string) {
   return objectiveMap[objective] || '清楚 angle'
 }
 
-export function buildAnalysisPreview(form: CampaignFormInput): AnalysisPreview | null {
+function pickFirst(items: StrategyItem[], fallback: StrategyItem) {
+  return items.find((item) => item.name.trim() || item.summary.trim()) || fallback
+}
+
+function selectObjectiveRule(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.objectives.length ? library.objectives : defaultStrategyLibrary.objectives
+  const targetId =
+    form.objective === 'sales'
+      ? 'objective_conversion'
+      : form.objective === 'reach'
+        ? 'objective_awareness'
+        : 'objective_consideration'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.objectives[0])
+}
+
+function selectBrandSituation(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.brandSituations.length ? library.brandSituations : defaultStrategyLibrary.brandSituations
+  const signal = `${form.campaignTitle} ${form.brief} ${form.mustInclude}`.toLowerCase()
+  const targetId =
+    /新店|開幕|new|launch|上市|推出|新產品/.test(signal)
+      ? 'situation_new_launch'
+      : /轉化|落單|查詢|dm|whatsapp|booking|預約|sales/.test(signal)
+        ? 'situation_known_but_low_conversion'
+        : /翻新|rebrand|升級|形象|定位|高端|年輕化/.test(signal)
+          ? 'situation_repositioning'
+          : /冇反應|下跌|重複|疲勞|新角度|爆款/.test(signal)
+            ? 'situation_content_fatigue'
+            : 'situation_new_launch'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.brandSituations[0])
+}
+
+function selectBudgetShape(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.budgetShapes.length ? library.budgetShapes : defaultStrategyLibrary.budgetShapes
+  const targetId =
+    form.budgetRange === '3000-8000'
+      ? 'budget_lean_test'
+      : form.budgetRange === '8000-15000'
+        ? 'budget_standard_launch'
+        : form.budgetRange === '30000-50000'
+          ? 'budget_campaign_burst'
+          : form.objective === 'reach'
+            ? 'budget_multi_angle_push'
+            : 'budget_creator_duo'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.budgetShapes[0])
+}
+
+function selectAngleType(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.angleTypes.length ? library.angleTypes : defaultStrategyLibrary.angleTypes
+  const targetId =
+    form.objective === 'sales'
+      ? 'angle_sales_problem_solution'
+      : form.objective === 'reach'
+        ? 'angle_reach_surprise'
+        : form.vertical === 'food'
+          ? 'angle_social_proof'
+          : 'angle_branding_mood'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.angleTypes[0])
+}
+
+function selectFunnelStage(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.funnelStages.length ? library.funnelStages : defaultStrategyLibrary.funnelStages
+  const targetId =
+    form.objective === 'sales'
+      ? 'funnel_bottom_action'
+      : form.objective === 'reach'
+        ? 'funnel_top_attention'
+        : 'funnel_middle_trust'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.funnelStages[0])
+}
+
+function selectDeliverableShape(form: CampaignFormInput, library: StrategyLibraryState) {
+  const items = library.deliverableShapes.length ? library.deliverableShapes : defaultStrategyLibrary.deliverableShapes
+  const targetId =
+    form.budgetRange === '3000-8000'
+      ? 'deliverable_single_reel'
+      : form.budgetRange === '8000-15000'
+        ? 'deliverable_reel_plus_cutdown'
+        : form.budgetRange === '30000-50000'
+          ? 'deliverable_hero_plus_assets'
+          : form.objective === 'reach'
+            ? 'deliverable_multi_angle'
+            : 'deliverable_creator_duo_pack'
+
+  return items.find((item) => item.id === targetId) || pickFirst(items, defaultStrategyLibrary.deliverableShapes[0])
+}
+
+export function buildAnalysisPreview(form: CampaignFormInput, library: StrategyLibraryState = defaultStrategyLibrary): AnalysisPreview | null {
   if (!form.brief.trim()) return null
+  const objectiveRule = selectObjectiveRule(form, library)
+  const brandSituation = selectBrandSituation(form, library)
+  const angle = selectAngleType(form, library)
+  const budgetShape = selectBudgetShape(form, library)
+  const deliverableShape = selectDeliverableShape(form, library)
 
   return {
-    summary: `${form.businessName || '你嘅品牌'}而家最想要嘅方向係${objectiveText(form.objective)}。系統會根據你填寫嘅內容，極速生成最適合你嘅題材方向，再分析適合點樣做 social media 宣傳。`,
-    angleA: form.vertical === 'food'
+    summary: `${form.businessName || '你嘅品牌'}而家最接近「${objectiveRule.name}」目標，同時情況似係「${brandSituation.name}」。系統會根據呢個 marketing context，生成更貼近 objective、funnel 同 KPI 嘅宣傳方向。`,
+    angleA: angle.name
+      ? `${angle.name}：${angle.summary}`
+      : form.vertical === 'food'
       ? '值唔值得專程去食'
       : form.vertical === 'travel'
         ? '離開城市半日就去到另一個世界'
         : form.vertical === 'product'
           ? '生活中一用就有感分別'
           : '原來香港仲有呢種體驗',
-    angleB: form.vertical === 'product'
+    angleB: deliverableShape.name
+      ? `${deliverableShape.name}：${deliverableShape.summary}`
+      : form.vertical === 'product'
       ? '一條偏實測，一條偏情境種草'
       : '一條主 Reel + 一條補充 cutdown',
-    budgetGuide: form.budgetRange === '3000-8000'
+    budgetGuide: budgetShape.name
+      ? `${budgetShape.name}：${budgetShape.summary}`
+      : form.budgetRange === '3000-8000'
       ? '適合做單條快狠準測試內容'
       : form.budgetRange === '8000-15000'
         ? '適合做一條主片 + 一條補充內容'
@@ -242,9 +346,14 @@ export function buildAnalysisPreview(form: CampaignFormInput): AnalysisPreview |
   }
 }
 
-export function buildFullAnalysis(form: CampaignFormInput): FullAnalysis {
-  const preview = buildAnalysisPreview(form)
+export function buildFullAnalysis(form: CampaignFormInput, library: StrategyLibraryState = defaultStrategyLibrary): FullAnalysis {
   const brand = form.businessName || '你嘅品牌'
+  const objectiveRule = selectObjectiveRule(form, library)
+  const brandSituation = selectBrandSituation(form, library)
+  const budgetShape = selectBudgetShape(form, library)
+  const angleType = selectAngleType(form, library)
+  const funnelStage = selectFunnelStage(form, library)
+  const deliverableShape = selectDeliverableShape(form, library)
   const audienceHint =
     form.vertical === 'food'
       ? '18-35 歲、會睇飲食內容、願意為新店同打卡感買單嘅 audience'
@@ -259,17 +368,20 @@ export function buildFullAnalysis(form: CampaignFormInput): FullAnalysis {
     overview: `${brand} 呢次唔應該只係「出一條片」咁簡單，而係要將 attention、內容節奏、分發同轉化串成一個完整 campaign。先用最 fit 嘅 angle 打入市場，再根據數據搵 winning formula，會比盲目搵中介同亂出內容更有效率。`,
     campaignNorthStar: '用內容去測試 attention -> 用數據搵 winning -> 再用錢放大 -> 最後變現。',
     strategy: [
-      `${brand} 呢次建議只集中一個主目標：${objectiveText(form.objective)}，避免 campaign 一開始平均分散火力。`,
+      `${brand} 呢次建議只集中一個主目標：${objectiveRule.name}。${objectiveRule.summary} 成功指標應該優先睇 ${objectiveRule.successMetric || '最貼近 business objective 嘅核心 KPI'}。`,
+      `現時 campaign context 比較似「${brandSituation.name}」：${brandSituation.summary} 所以策略唔應該只問「拍咩片」，而係先決定要改變市場邊一個認知或行動。`,
       `核心 audience 應先鎖定為 ${audienceHint}，然後所有內容都圍住「點樣令觀眾停低」去設計，而唔係只係介紹你賣緊乜。`,
-      `主角度建議以「${preview?.angleA || '主角度'}」切入，第二條角度先再延伸做對比、驚喜或轉化版本。`,
+      `主角度建議以「${angleType.name}」切入：${angleType.summary} 適合原因係 ${angleType.fitFor}。`,
     ],
     contentPlanning: [
-      `${preview?.angleB || '一條主 Reel + 一條補充 cutdown'} 會係最合理嘅第一輪 content shape，再按 budget 拉開 hero content 同補充短片比例。`,
+      `Funnel 上建議先以「${funnelStage.name}」做主軸：${funnelStage.summary} 對應 KPI 係 ${funnelStage.successMetric || 'retention、engagement 同 conversion signal'}。`,
+      `${deliverableShape.name} 會係最合理嘅第一輪 content shape：${deliverableShape.summary}`,
       '內容規劃唔止分平台，仲要分節奏：先用爆點內容搶 attention，再用解釋型或信任型內容承接。',
       '每條片都應該有清晰 hook template，Must include 內嘅元素要自然散落喺片中，而唔係最後一次過硬塞。',
     ],
     production: [
-      `${preview?.budgetGuide || '先用一條主內容做測試'}，production 重點唔係拍得幾靚，而係每一秒有冇為 retention 設計。`,
+      `${budgetShape.name} 係今次建議 budget strategy：${budgetShape.summary} 適合原因係 ${budgetShape.fitFor}。`,
+      angleType.notFitFor ? `要避免嘅情況：${angleType.name} 唔適合用喺 ${angleType.notFitFor}，所以拍攝同剪接時要確保賣點、場景或 creator 表達足夠支撐呢個 angle。` : '拍攝前要先確保 chosen angle 有足夠畫面同賣點支撐。',
       '拍攝前應先有 script、shot list、opening hook、關鍵 close-up，同埋明確知道邊幾秒要帶出產品或場景價值。',
       '剪接階段要優先處理節奏、字幕、畫面資訊密度同開頭 3 秒停留力，而唔係只係執顏色同靚畫面。',
     ],
@@ -285,10 +397,11 @@ export function buildFullAnalysis(form: CampaignFormInput): FullAnalysis {
       form.objective === 'sales'
         ? '你而家最需要設計明確嘅轉化路線，例如 Reel -> WhatsApp -> closing，而唔係只係期望觀眾自己會搵你。'
         : '即使主目標唔係即刻 sales，都應該有輕量 CTA，例如 follow、收藏、DM、預約，等流量有承接位。',
+      objectiveRule.notFitFor ? `如果現場承接未準備好，要小心：${objectiveRule.name} 唔適合 ${objectiveRule.notFitFor}。` : 'CTA、landing page 同客戶服務承接要同內容承諾一致。',
       'Landing page、link in bio 同 CTA 文案應跟內容 angle 一致，咁先唔會由吸引人去到臨門一腳斷層。',
     ],
     optimization: [
-      'Campaign 唔係做一次就完，第一輪上線後應集中睇 retention、儲存、分享、CTR 同查詢質量。',
+      `Campaign 唔係做一次就完，第一輪上線後應集中睇：${objectiveRule.successMetric || 'retention、儲存、分享、CTR 同查詢質量'}。`,
       '下一輪最值得做嘅係 A/B testing：開頭 hook、thumbnail、第一句字幕、CTA 位置，都可以逐樣測。',
       '將表現最好嘅 opening、角度同 creator formula 留低，再用第二輪 budget 放大，先係專業 campaign 最值錢嘅地方。',
     ],

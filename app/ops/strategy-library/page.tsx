@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 
 import { defaultStrategyLibrary, type StrategyItem, type StrategyLibraryState } from '@/lib/strategy-library'
 
-const STORAGE_KEY = 'soon-strategy-library-v1'
-
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}`
 }
@@ -20,25 +18,65 @@ function sectionTitle(title: string, subtitle: string) {
 }
 
 function emptyItem(prefix: string): StrategyItem {
-  return { id: makeId(prefix), name: '', summary: '', fitFor: '' }
+  return { id: makeId(prefix), name: '', summary: '', fitFor: '', notFitFor: '', successMetric: '' }
 }
 
 export default function StrategyLibraryPage() {
   const [library, setLibrary] = useState<StrategyLibraryState>(defaultStrategyLibrary)
   const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState('正在載入 Supabase strategy library...')
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (raw) setLibrary(JSON.parse(raw) as StrategyLibraryState)
-    } catch {}
-    setLoaded(true)
+    let cancelled = false
+
+    async function loadLibrary() {
+      try {
+        const response = await fetch('/api/strategy-library', { cache: 'no-store' })
+        const data = await response.json()
+
+        if (!response.ok) throw new Error(data.error || 'Unable to load strategy library')
+        if (!cancelled) {
+          setLibrary(data.library || defaultStrategyLibrary)
+          setStatus('已同步 Supabase strategy library。')
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setLibrary(defaultStrategyLibrary)
+          setStatus(error.message || '未能同步 Supabase，暫時顯示預設 library。')
+        }
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
+    }
+
+    loadLibrary()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  useEffect(() => {
-    if (!loaded) return
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(library))
-  }, [library, loaded])
+  async function saveLibrary(nextLibrary = library) {
+    setSaving(true)
+    setStatus('正在儲存到 Supabase...')
+
+    try {
+      const response = await fetch('/api/strategy-library', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ library: nextLibrary }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) throw new Error(data.hint || data.error || 'Unable to save strategy library')
+      setLibrary(data.library || nextLibrary)
+      setStatus(`已儲存。${data.updatedAt ? `最後更新：${new Date(data.updatedAt).toLocaleString('zh-HK')}` : ''}`)
+    } catch (error: any) {
+      setStatus(error.message || '儲存失敗，請檢查 Supabase table 是否已建立。')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function updateItem(section: keyof StrategyLibraryState, id: string, patch: Partial<StrategyItem>) {
     setLibrary((prev) => ({
@@ -63,7 +101,7 @@ export default function StrategyLibraryPage() {
 
   function resetLibrary() {
     setLibrary(defaultStrategyLibrary)
-    window.localStorage.removeItem(STORAGE_KEY)
+    saveLibrary(defaultStrategyLibrary)
   }
 
   function renderSection(
@@ -103,14 +141,26 @@ export default function StrategyLibraryPage() {
               <textarea
                 value={item.summary}
                 onChange={(e) => updateItem(section, item.id, { summary: e.target.value })}
-                placeholder="一句講清楚呢個 shape / angle / deliverable 係咩。"
+                placeholder="一句講清楚呢個 strategy rule 係咩。"
                 style={{ width: '100%', minHeight: '82px', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(26,26,24,0.14)', background: '#fff', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
               />
               <textarea
                 value={item.fitFor}
                 onChange={(e) => updateItem(section, item.id, { fitFor: e.target.value })}
-                placeholder="適合邊啲 campaign / budget / objective。"
-                style={{ width: '100%', minHeight: '72px', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(26,26,24,0.14)', background: '#fff', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical' }}
+                placeholder="適合邊啲 campaign / objective / brand situation。"
+                style={{ width: '100%', minHeight: '72px', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(26,26,24,0.14)', background: '#fff', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
+              />
+              <textarea
+                value={item.notFitFor || ''}
+                onChange={(e) => updateItem(section, item.id, { notFitFor: e.target.value })}
+                placeholder="不適合情況：幾時唔應該用呢條規則。"
+                style={{ width: '100%', minHeight: '68px', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(26,26,24,0.14)', background: '#fff', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
+              />
+              <textarea
+                value={item.successMetric || ''}
+                onChange={(e) => updateItem(section, item.id, { successMetric: e.target.value })}
+                placeholder="Success Metric：應該睇咩 KPI 判斷成功。"
+                style={{ width: '100%', minHeight: '68px', padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(26,26,24,0.14)', background: '#fff', fontSize: '14px', boxSizing: 'border-box', resize: 'vertical' }}
               />
             </div>
           ))}
@@ -143,22 +193,32 @@ export default function StrategyLibraryPage() {
               Campaign Strategy Library
             </h1>
             <p style={{ margin: 0, maxWidth: '760px', fontSize: '18px', lineHeight: 1.7, color: '#5b5348' }}>
-              呢頁係俾 SOON internal team 定義同調整 `Budget Shape`、`Angle` 同 `Deliverable Shape`。之後 submit 頁右邊個 AI 分析就可以由呢套 library 生出嚟，而唔係每次求其寫。
+              呢頁係俾 SOON internal team 定義同調整 Objective、Brand Situation、Budget Shape、Angle、Funnel Stage 同 Deliverable Shape。付款後嘅完整 AI 分析會優先讀取呢套 Supabase library。
             </p>
+            <div style={{ marginTop: '16px', fontSize: '14px', color: '#6d6257' }}>{status}</div>
           </div>
 
           <div style={{ padding: '24px', borderRadius: '28px', background: 'rgba(29,29,27,0.94)', color: '#f5f0e6' }}>
             <div style={{ fontSize: '12px', letterSpacing: '0.14em', color: '#b8b0a2', marginBottom: '10px' }}>HOW TO USE</div>
             <div style={{ display: 'grid', gap: '10px', fontSize: '15px', lineHeight: 1.7 }}>
               <div>1. 先整理你想保留嘅 budget 策略類型</div>
-              <div>2. 再定義常用 angle 類別</div>
-              <div>3. 最後定 deliverable package 組合</div>
-              <div>4. 未來再接返 AI prompt / Supabase 持久化</div>
+              <div>2. 定義 objective、brand situation 同 funnel stage</div>
+              <div>3. 再定義常用 angle 同 deliverable package</div>
+              <div>4. 每條 rule 都寫埋不適合情況同 success metric</div>
             </div>
             <button
               type="button"
+              onClick={() => saveLibrary()}
+              disabled={!loaded || saving}
+              style={{ marginTop: '18px', marginRight: '10px', border: 'none', borderRadius: '999px', padding: '12px 16px', background: '#f5f0e6', color: '#1a1a18', cursor: saving ? 'wait' : 'pointer' }}
+            >
+              {saving ? '儲存中...' : '儲存 library'}
+            </button>
+            <button
+              type="button"
               onClick={resetLibrary}
-              style={{ marginTop: '18px', border: '1px solid rgba(255,255,255,0.20)', borderRadius: '999px', padding: '12px 16px', background: 'transparent', color: '#f5f0e6', cursor: 'pointer' }}
+              disabled={saving}
+              style={{ marginTop: '18px', border: '1px solid rgba(255,255,255,0.20)', borderRadius: '999px', padding: '12px 16px', background: 'transparent', color: '#f5f0e6', cursor: saving ? 'wait' : 'pointer' }}
             >
               重設做預設 library
             </button>
@@ -166,8 +226,11 @@ export default function StrategyLibraryPage() {
         </section>
 
         <div style={{ display: 'grid', gap: '18px' }}>
+          {renderSection('objectives', 'Objectives', 'CAMPAIGN GOAL', '新增 Objective', 'objective')}
+          {renderSection('brandSituations', 'Brand Situations', 'BRAND CONTEXT', '新增 Brand Situation', 'situation')}
           {renderSection('budgetShapes', 'Budget Shapes', 'BUDGET STRATEGY', '新增 Budget Shape', 'budget')}
           {renderSection('angleTypes', 'Angle Types', 'CONTENT ANGLE', '新增 Angle Type', 'angle')}
+          {renderSection('funnelStages', 'Funnel Stages', 'MARKETING FUNNEL', '新增 Funnel Stage', 'funnel')}
           {renderSection('deliverableShapes', 'Deliverable Shapes', 'DELIVERABLE PACKAGE', '新增 Deliverable Shape', 'deliverable')}
         </div>
       </div>
