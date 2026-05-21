@@ -322,6 +322,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     fabricRef.current = canvas
     sizeRef.current = { h: height, w: width }
+    console.log('canvas element id:', canvas.lowerCanvasEl?.id)
 
     const onMutation = () => snapshotHistory(canvas)
     const onSelection = () => {
@@ -422,11 +423,22 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       top: size.h / 2,
     })
     image.setCoords()
+    const backgroundObject = image as FabricElementObject
+    backgroundObject.data = { id: `image-background-${Date.now()}`, item: 'background', kind: 'image' }
+
+    const existingBackgrounds = canvas
+      .getObjects()
+      .filter((object) => (object as FabricElementObject).data?.item === 'background')
+
+    existingBackgrounds.forEach((object) => canvas.remove(object))
+    canvas.add(backgroundObject)
+    canvas.sendObjectToBack(backgroundObject)
     canvas.backgroundImage = image
     canvas.backgroundColor = '#ffffff'
     canvas.discardActiveObject()
     canvas.renderAll()
     canvas.requestRenderAll()
+    console.log('canvas element id:', canvas.lowerCanvasEl?.id)
     console.log('background applied, rendering canvas')
     snapshotHistory(canvas)
   }, [snapshotHistory])
