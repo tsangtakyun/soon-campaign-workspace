@@ -277,7 +277,9 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
   const historyIndexRef = useRef(-1)
   const historyRef = useRef<string[]>([])
   const isRestoringRef = useRef(false)
+  const currentSizeRef = useRef({ height, width })
   const onSelectElementRef = useRef(onSelectElement)
+  const snapshotHistoryRef = useRef<(canvas: Canvas) => void>(() => {})
   const sizeRef = useRef({ h: height, w: width })
 
   useEffect(() => {
@@ -289,6 +291,10 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     autosaveNameRef.current = autosaveName
   }, [autosaveKey, autosaveName])
 
+  useEffect(() => {
+    currentSizeRef.current = { height, width }
+  }, [height, width])
+
   const scheduleAutosave = useCallback((canvas: Canvas) => {
     if (typeof window === 'undefined') return
     const key = autosaveKeyRef.current
@@ -299,8 +305,8 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
 
     const canvasJson = canvas.toObject(['data'])
-    const canvasWidth = canvas.width || width
-    const canvasHeight = canvas.height || height
+    const canvasWidth = canvas.width || currentSizeRef.current.width
+    const canvasHeight = canvas.height || currentSizeRef.current.height
     const designName = autosaveNameRef.current || 'Untitled'
 
     autosaveTimerRef.current = window.setTimeout(() => {
@@ -335,7 +341,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
         }
       })()
     }, 30000)
-  }, [height, width])
+  }, [])
 
   const snapshotHistory = useCallback((canvas: Canvas) => {
     if (isRestoringRef.current) return
@@ -348,6 +354,10 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     historyIndexRef.current = stack.length - 1
     scheduleAutosave(canvas)
   }, [scheduleAutosave])
+
+  useEffect(() => {
+    snapshotHistoryRef.current = snapshotHistory
+  }, [snapshotHistory])
 
   useEffect(() => {
     const canvas = new Canvas(canvasId, {
@@ -394,21 +404,12 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     if (oldWidth === width && oldHeight === height) return
 
     const objects = canvas.getObjects()
-    logCanvasResizeState('before resize', canvas, objects, sizeRef.current, { h: height, w: width })
     const activeObject = canvas.getActiveObject()
     const backgroundImage = canvas.backgroundImage as FabricObject | undefined
     const scaleX = width / oldWidth
     const scaleY = height / oldHeight
-    console.log('[canvas-resize] scale calculation', {
-      newHeight: height,
-      newWidth: width,
-      oldHeight,
-      oldWidth,
-      scaleX,
-      scaleY,
-      storedHeight: sizeRef.current.h,
-      storedWidth: sizeRef.current.w,
-    })
+    console.log('[resize-effect] resizing from', oldWidth, oldHeight, 'to', width, height)
+    logCanvasResizeState('before resize', canvas, objects, sizeRef.current, { h: height, w: width })
 
     canvas.setDimensions({ height, width })
 
@@ -435,12 +436,14 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
 
     sizeRef.current = { h: height, w: width }
+    currentSizeRef.current = { height, width }
     canvas.calcOffset()
     canvas.renderAll()
     canvas.requestRenderAll()
+    console.log('[resize-effect] objects scaled:', canvas.getObjects().length)
     logCanvasResizeState('after resize', canvas, canvas.getObjects(), sizeRef.current, { h: height, w: width })
-    snapshotHistory(canvas)
-  }, [height, snapshotHistory, width])
+    snapshotHistoryRef.current(canvas)
+  }, [height, width])
 
   const loadDesignElements = useCallback(
     async (elements: DesignElement[]) => {
