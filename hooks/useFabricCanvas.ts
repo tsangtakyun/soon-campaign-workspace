@@ -449,12 +449,13 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     existingBackgrounds.forEach((object) => canvas.remove(object))
     canvas.add(backgroundObject)
-    canvas.sendObjectToBack(backgroundObject)
+    canvas.moveObjectTo(backgroundObject, 0)
     canvas.backgroundImage = image
     canvas.backgroundColor = '#ffffff'
     canvas.discardActiveObject()
     canvas.renderAll()
     canvas.requestRenderAll()
+    console.log('ai bg z-index:', canvas.getObjects().indexOf(backgroundObject))
     console.log('canvas element id:', canvas.lowerCanvasEl?.id)
     console.log('canvas objects after:', describeObjects())
     console.log('background applied, rendering canvas')
