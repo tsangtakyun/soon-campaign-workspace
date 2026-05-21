@@ -189,6 +189,11 @@ export function EditorSidePanel({
         }),
       })
       const data = (await res.json()) as { detail?: string; error?: string; imageUrl?: string }
+      if (res.status === 402) {
+        const creditData = data as { balance?: number; required?: number }
+        setAiImageError(`Credits 不足（需要 ${creditData.required ?? 5} credits，現有 ${creditData.balance ?? 0}）`)
+        return
+      }
       if (!res.ok || !data.imageUrl) {
         throw new Error(data.detail || data.error || 'Failed')
       }

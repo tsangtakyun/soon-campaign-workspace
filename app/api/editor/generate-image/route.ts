@@ -2,9 +2,11 @@ import OpenAI from 'openai'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { getUserCredits, spendCredits } from '@/lib/credits'
 import { createServerSupabase } from '@/lib/server-supabase'
 
 export const maxDuration = 60
+const EDITOR_IMAGE_CREDIT_COST = 5
 
 type GenerateEditorImageBody = {
   prompt?: string
@@ -35,6 +37,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const credits = await getUserCredits(user.id)
+    if (!credits || credits.balance < EDITOR_IMAGE_CREDIT_COST) {
+      return NextResponse.json(
+        {
+          balance: credits?.balance ?? 0,
+          error: 'INSUFFICIENT_CREDITS',
+          required: EDITOR_IMAGE_CREDIT_COST,
+        },
+        { status: 402 }
+      )
+    }
+
     const sizeMap: Record<string, '1024x1024' | '1792x1024' | '1024x1792'> = {
       landscape: '1792x1024',
       portrait: '1024x1792',
@@ -60,7 +74,18 @@ export async function POST(req: Request) {
     const imageUrl = response.data?.[0]?.url
     if (!imageUrl) throw new Error('No image generated')
 
-    return NextResponse.json({ imageUrl })
+    const remaining = await spendCredits(
+      user.id,
+      EDITOR_IMAGE_CREDIT_COST,
+      '設計編輯器 AI 圖片生成',
+      'photo-generation'
+    )
+
+    return NextResponse.json({
+      creditsRemaining: remaining,
+      creditsUsed: EDITOR_IMAGE_CREDIT_COST,
+      imageUrl,
+    })
   } catch (error) {
     console.error('[editor/generate-image]', error)
     return NextResponse.json(
