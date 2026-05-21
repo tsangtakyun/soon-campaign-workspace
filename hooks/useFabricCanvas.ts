@@ -413,18 +413,23 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const size = sizeRef.current
     const coverScale = Math.max(size.w / (image.width || 1), size.h / (image.height || 1))
     image.set({
-      evented: false,
+      evented: true,
+      hasBorders: true,
+      hasControls: true,
       left: size.w / 2,
+      lockMovementX: false,
+      lockMovementY: false,
       originX: 'center',
       originY: 'center',
       scaleX: coverScale,
       scaleY: coverScale,
-      selectable: false,
+      selectable: true,
       top: size.h / 2,
     })
     image.setCoords()
     const backgroundObject = image as FabricElementObject
-    backgroundObject.data = { id: `ai-background-${Date.now()}`, item: 'background', kind: 'image' }
+    backgroundObject.data = { id: `ai-background-${Date.now()}`, item: 'image', kind: 'image' }
+    applyControls(backgroundObject)
 
     const describeObjects = () =>
       canvas.getObjects().map((object) => {
@@ -454,15 +459,13 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       .getObjects()
       .filter((object) => {
         const fabricObject = object as FabricElementObject & { id?: string; item?: string }
-        const item = fabricObject.data?.item ?? fabricObject.item
         const id = fabricObject.data?.id ?? fabricObject.id ?? ''
-        return object.type === 'image' && item === 'background' && id.startsWith('ai-background-')
+        return object.type === 'image' && id.startsWith('ai-background-')
       })
 
     existingBackgrounds.forEach((object) => canvas.remove(object))
     canvas.add(backgroundObject)
     canvas.moveObjectTo(backgroundObject, 0)
-    canvas.backgroundImage = image
     canvas.backgroundColor = '#ffffff'
     canvas.discardActiveObject()
     canvas.renderAll()
