@@ -84,10 +84,26 @@ async function loadTextFont(fontFamily?: string) {
   if (!fontFamily || fontFamily === 'inherit' || typeof document === 'undefined' || !document.fonts) return
 
   try {
-    await document.fonts.load(`16px "${fontFamily.replace(/"/g, '\\"')}"`)
+    const safeFontFamily = fontFamily.replace(/'/g, "\\'")
+    await Promise.all([
+      document.fonts.load(`500 16px '${safeFontFamily}'`),
+      document.fonts.load(`16px '${safeFontFamily}'`),
+    ])
   } catch (error) {
     console.warn('Font load warning:', error)
   }
+}
+
+function isTextStyleChange(changes: Partial<DesignElement>) {
+  return (
+    changes.fontFamily !== undefined ||
+    changes.fontSize !== undefined ||
+    changes.fontStyle !== undefined ||
+    changes.fontWeight !== undefined ||
+    changes.textAlign !== undefined ||
+    changes.textContent !== undefined ||
+    changes.textDecoration !== undefined
+  )
 }
 
 function applyControls(object: FabricElementObject) {
@@ -365,11 +381,14 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const canvas = fabricRef.current
     if (!canvas) return
     const activeObject = canvas.getActiveObject() as FabricElementObject | undefined
+    const activeTextObject = activeObject instanceof IText ? (activeObject as FabricElementObject) : undefined
+    const idObject = canvas.getObjects().find((candidate) => (candidate as FabricElementObject).data?.id === id) as
+      | FabricElementObject
+      | undefined
     const object =
-      (canvas.getObjects().find((candidate) => (candidate as FabricElementObject).data?.id === id) as
-        | FabricElementObject
-        | undefined) ||
+      (isTextStyleChange(changes) ? activeTextObject : undefined) ||
       (activeObject?.data?.id === id ? activeObject : undefined) ||
+      idObject ||
       (changes.textContent !== undefined && activeObject && 'text' in activeObject ? activeObject : undefined)
     if (!object) return
 
@@ -419,10 +438,14 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     object.set(nextProps)
     if (object instanceof IText) {
+      object.dirty = true
       object.initDimensions()
     }
     object.setCoords()
     canvas.renderAll()
+    if (changes.fontFamily !== undefined && object instanceof IText) {
+      console.log('Font applied:', resolvedTextFontFamily(changes.fontFamily), 'to object:', object.text)
+    }
   }, [])
 
   const deleteSelected = useCallback(() => {
