@@ -1850,33 +1850,8 @@ function ScheduledPostsPageContent() {
     setActiveDesignTool('媒體')
   }
 
-  const applyBackgroundImage = (imageUrl: string, label = 'AI 背景') => {
-    const isSquare = canvasSize.w === canvasSize.h
-    const currentBackground = designElements.find(
-      (element) => element.kind === 'image' && element.item === 'background'
-    )
-    const backgroundElement: DesignElement = {
-      id: `image-background-${selectedPost.id}-${Date.now()}`,
-      kind: 'image',
-      item: 'background',
-      label,
-      x: currentBackground?.x ?? 0,
-      y: currentBackground?.y ?? 0,
-      size: currentBackground?.size ?? 430,
-      width: currentBackground?.width ?? 430,
-      height: currentBackground?.height ?? (isSquare ? 430 : 538),
-      rotation: currentBackground?.rotation ?? 0,
-      opacity: 100,
-      color: '#ffffff',
-      zIndex: currentBackground?.zIndex ?? 1,
-      imageUrl,
-    }
-    const nextElements = [
-      backgroundElement,
-      ...designElements.filter((element) => !(element.kind === 'image' && element.item === 'background')),
-    ]
-    void fabricControlsRef.current?.loadDesignElements(nextElements)
-    setDesignElements(nextElements)
+  const applyBackgroundImage = (imageUrl: string) => {
+    void fabricControlsRef.current?.applyBackgroundImage(imageUrl)
     setSelectedElementId(null)
     setActiveDesignTool('背景')
   }
@@ -2217,6 +2192,7 @@ function ScheduledPostsPageContent() {
             onApplyBrandColor={applyBrandColor}
             onApplyTemplate={applyTemplatePreset}
             onCloseDesignMode={() => setDesignMode(false)}
+            onCreditsChange={setCreditBalance}
             onDelete={deleteSelectedElement}
             onDeselectElement={deselectDesignElement}
             onImageUpload={handleImageUpload}

@@ -43,6 +43,7 @@ type EditorSidePanelProps = {
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
   onApplyBackgroundImage: (url: string, label: string) => void
+  onCreditsChange: (balance: number) => void
   onApplyTemplate: (template: Template) => void
   onResizeCanvas: (size: CanvasSize) => void
   onSetDraggingOver: (value: boolean) => void
@@ -144,6 +145,7 @@ export function EditorSidePanel({
   onImageUpload,
   onTrackUploadedImage,
   onApplyBackgroundImage,
+  onCreditsChange,
   onApplyTemplate,
   onResizeCanvas,
   onSetDraggingOver,
@@ -248,7 +250,7 @@ export function EditorSidePanel({
           style: aiImageStyle,
         }),
       })
-      const data = (await res.json()) as { detail?: string; error?: string; imageUrl?: string }
+      const data = (await res.json()) as { creditsRemaining?: number; detail?: string; error?: string; imageUrl?: string }
       if (res.status === 402) {
         const creditData = data as { balance?: number; required?: number }
         setAiImageError(`Credits 不足（需要 ${creditData.required ?? 5} credits，現有 ${creditData.balance ?? 0}）`)
@@ -259,6 +261,7 @@ export function EditorSidePanel({
       }
 
       const label = `AI：${aiImagePrompt.trim().slice(0, 18)}`
+      if (typeof data.creditsRemaining === 'number') onCreditsChange(data.creditsRemaining)
       onTrackUploadedImage({ url: data.imageUrl, label })
       onAddImage(data.imageUrl, label)
       setAiImagePrompt('')
@@ -293,7 +296,7 @@ export function EditorSidePanel({
           style: 'photo',
         }),
       })
-      const data = (await res.json()) as { detail?: string; error?: string; imageUrl?: string }
+      const data = (await res.json()) as { creditsRemaining?: number; detail?: string; error?: string; imageUrl?: string }
       if (res.status === 402) {
         const creditData = data as { balance?: number; required?: number }
         setAiBackgroundError(`Credits 不足，需要 ${creditData.required ?? 5} credits，目前 ${creditData.balance ?? 0}`)
@@ -305,6 +308,7 @@ export function EditorSidePanel({
 
       const label = `AI 背景：${basePrompt.slice(0, 18)}`
       const image = { url: data.imageUrl, label }
+      if (typeof data.creditsRemaining === 'number') onCreditsChange(data.creditsRemaining)
       setAiBackgroundImage(image)
       onTrackUploadedImage(image)
       onApplyBackgroundImage(image.url, image.label)

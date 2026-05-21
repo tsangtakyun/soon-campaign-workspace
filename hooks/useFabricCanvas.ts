@@ -405,6 +405,30 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
   }, [])
 
+  const applyBackgroundImage = useCallback(async (imageUrl: string) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    const image = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+    const size = sizeRef.current
+    const coverScale = Math.max(size.w / (image.width || 1), size.h / (image.height || 1))
+    image.set({
+      evented: false,
+      left: size.w / 2,
+      originX: 'center',
+      originY: 'center',
+      scaleX: coverScale,
+      scaleY: coverScale,
+      selectable: false,
+      top: size.h / 2,
+    })
+    canvas.backgroundImage = image
+    canvas.backgroundColor = '#ffffff'
+    canvas.discardActiveObject()
+    canvas.renderAll()
+    canvas.requestRenderAll()
+    snapshotHistory(canvas)
+  }, [snapshotHistory])
+
   const updateDesignElement = useCallback(async (id: string, changes: Partial<DesignElement>) => {
     const canvas = fabricRef.current
     if (!canvas) return
@@ -553,6 +577,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
   return useMemo(
     () => ({
       addDesignElement,
+      applyBackgroundImage,
       bringForward,
       deleteSelected,
       duplicateSelected,
@@ -566,6 +591,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }),
     [
       addDesignElement,
+      applyBackgroundImage,
       bringForward,
       deleteSelected,
       duplicateSelected,
