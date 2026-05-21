@@ -427,8 +427,9 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       top: size.h / 2,
     })
     image.setCoords()
+    const backgroundId = `ai-background-${Date.now()}`
     const backgroundObject = image as FabricElementObject
-    backgroundObject.data = { id: `ai-background-${Date.now()}`, item: 'image', kind: 'image' }
+    backgroundObject.data = { id: backgroundId, item: 'image', kind: 'image' }
     applyControls(backgroundObject)
 
     const describeObjects = () =>
@@ -465,9 +466,8 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     existingBackgrounds.forEach((object) => canvas.remove(object))
     canvas.add(backgroundObject)
-    canvas.moveObjectTo(backgroundObject, 0)
+    canvas.setActiveObject(backgroundObject)
     canvas.backgroundColor = '#ffffff'
-    canvas.discardActiveObject()
     canvas.renderAll()
     canvas.requestRenderAll()
     console.log('ai bg z-index:', canvas.getObjects().indexOf(backgroundObject))
@@ -475,6 +475,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     console.log('canvas objects after:', describeObjects())
     console.log('background applied, rendering canvas')
     snapshotHistory(canvas)
+    return backgroundId
   }, [snapshotHistory])
 
   const updateDesignElement = useCallback(async (id: string, changes: Partial<DesignElement>) => {

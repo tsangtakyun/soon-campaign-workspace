@@ -1858,8 +1858,31 @@ function ScheduledPostsPageContent() {
       console.warn('[AI Background] Fabric controls not ready')
       return
     }
-    await controls.applyBackgroundImage(imageUrl)
-    setSelectedElementId(null)
+    const backgroundId = await controls.applyBackgroundImage(imageUrl)
+    if (!backgroundId) return
+
+    const nextElement: DesignElement = {
+      id: backgroundId,
+      kind: 'image',
+      item: 'photo',
+      label: 'AI background image',
+      x: 50,
+      y: 50,
+      size: canvasSize.w,
+      width: canvasSize.w,
+      height: canvasSize.h,
+      rotation: 0,
+      opacity: 100,
+      color: 'transparent',
+      zIndex: 30 + designElements.length,
+      imageUrl,
+    }
+
+    setDesignElements((current) => [
+      ...current.filter((element) => !element.id.startsWith('ai-background-')),
+      nextElement,
+    ])
+    setSelectedElementId(backgroundId)
     setActiveDesignTool('背景')
   }
 
