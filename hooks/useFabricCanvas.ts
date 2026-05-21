@@ -403,45 +403,13 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const oldHeight = canvas.getHeight() || sizeRef.current.h
     if (oldWidth === width && oldHeight === height) return
 
-    const objects = canvas.getObjects()
-    const activeObject = canvas.getActiveObject()
-    const backgroundImage = canvas.backgroundImage as FabricObject | undefined
-    const scaleX = width / oldWidth
-    const scaleY = height / oldHeight
     console.log('[resize-effect] resizing from', oldWidth, oldHeight, 'to', width, height)
-    logCanvasResizeState('before resize', canvas, objects, sizeRef.current, { h: height, w: width })
-
     canvas.setDimensions({ height, width })
-
-    objects.forEach((object) => {
-      object.set({
-        left: (object.left || 0) * scaleX,
-        scaleX: (object.scaleX || 1) * scaleX,
-        scaleY: (object.scaleY || 1) * scaleY,
-        top: (object.top || 0) * scaleY,
-      })
-      object.setCoords()
-    })
-
-    if (backgroundImage) {
-      backgroundImage.set({
-        scaleX: width / (backgroundImage.width || width),
-        scaleY: height / (backgroundImage.height || height),
-      })
-      backgroundImage.setCoords()
-    }
-
-    if (activeObject && objects.includes(activeObject)) {
-      canvas.setActiveObject(activeObject)
-    }
-
     sizeRef.current = { h: height, w: width }
     currentSizeRef.current = { height, width }
     canvas.calcOffset()
-    canvas.renderAll()
     canvas.requestRenderAll()
-    console.log('[resize-effect] objects scaled:', canvas.getObjects().length)
-    logCanvasResizeState('after resize', canvas, canvas.getObjects(), sizeRef.current, { h: height, w: width })
+    console.log('[resize-effect] frame resized; objects preserved:', canvas.getObjects().length)
     snapshotHistoryRef.current(canvas)
   }, [height, width])
 
