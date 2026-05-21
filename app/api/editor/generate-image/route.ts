@@ -62,16 +62,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 })
     }
 
-    const openai = new OpenAI({ apiKey })
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      n: 1,
-      prompt: `${prompt}. ${styleInstruction} High quality marketing image, suitable for social media. No text overlays.`,
-      quality: 'standard',
-      size: imageSize,
-    })
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+    const finalPrompt = `${prompt}. ${styleInstruction} High quality marketing image, suitable for social media. No text overlays.`
 
-    const imageUrl = response.data?.[0]?.url
+    let imageUrl = ''
+    if (imageModel === 'dall-e-3') {
+      const openai = new OpenAI({ apiKey })
+      const response = await openai.images.generate({
+        model: imageModel,
+        n: 1,
+        prompt: finalPrompt,
+        quality: 'standard',
+        size: imageSize,
+      })
+      imageUrl = response.data?.[0]?.url || ''
+    } else {
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: finalPrompt,
+          size: imageSize,
+          quality: 'medium',
+          output_format: 'jpeg',
+        }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error?.message || 'OpenAI image generation failed')
+      }
+
+      const base64 = data?.data?.[0]?.b64_json
+      imageUrl = base64 ? `data:image/jpeg;base64,${base64}` : ''
+    }
+
     if (!imageUrl) throw new Error('No image generated')
 
     const remaining = await spendCredits(
