@@ -127,6 +127,7 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
       fontWeight: element.fontWeight || 'normal',
       lineHeight: element.lineHeight || 1.3,
       textAlign: element.textAlign || 'center',
+      underline: element.textDecoration === 'underline',
       width: (element.width || 300) * scale,
     })
     return attachElementData(text as FabricElementObject, element)
@@ -381,12 +382,16 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const nextProps: Record<string, unknown> = {}
     if (changes.rotation !== undefined) nextProps.angle = changes.rotation
     if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
+    if (changes.fontFamily !== undefined) {
+      nextProps.fontFamily = changes.fontFamily === 'inherit' ? 'Arial, sans-serif' : changes.fontFamily
+    }
     if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
     if (changes.fontStyle !== undefined) nextProps.fontStyle = changes.fontStyle
     if (changes.fontWeight !== undefined) nextProps.fontWeight = changes.fontWeight
     if (changes.lineHeight !== undefined) nextProps.lineHeight = changes.lineHeight
     if (changes.opacity !== undefined) nextProps.opacity = changes.opacity / 100
     if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
+    if (changes.textDecoration !== undefined) nextProps.underline = changes.textDecoration === 'underline'
     if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current)
 
     if (changes.textContent !== undefined && 'text' in object) {
@@ -397,6 +402,9 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
 
     object.set(nextProps)
+    if (object instanceof IText) {
+      object.initDimensions()
+    }
     object.setCoords()
     canvas.requestRenderAll()
   }, [])

@@ -11,6 +11,7 @@ import {
   STOCK_MEDIA,
   TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
+import { typefaces } from '@/lib/typefaces'
 import type {
   CanvasSize,
   DesignElement,
@@ -67,6 +68,19 @@ type BrandAsset = {
   id: string
   url: string
 }
+
+const TYPEFACE_DIRECTION_LABELS: Record<string, string> = {
+  editorial: '質感字型',
+  gothic: '黑體',
+  handwriting: '手寫體',
+  impact: '衝擊字型',
+  poster: '海報字型',
+  rounded: '圓體',
+}
+
+const uniqueTypefaces = typefaces.filter((typeface, index, list) => {
+  return list.findIndex((candidate) => candidate.fontFamily === typeface.fontFamily) === index
+})
 
 function ElementShelf({
   expanded,
@@ -377,6 +391,41 @@ export function EditorSidePanel({
                 rows={4}
                 value={selectedElement.textContent || ''}
               />
+            </section>
+
+            <section className="settings-section settings-row">
+              <label className="settings-label" htmlFor="selected-text-font-family">字型</label>
+              <select
+                id="selected-text-font-family"
+                onChange={(event) => onUpdateElement(selectedElement.id, { fontFamily: event.target.value })}
+                style={{
+                  background: '#111827',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  borderRadius: 8,
+                  color: '#f9fafb',
+                  fontSize: 13,
+                  minWidth: 0,
+                  padding: '8px 10px',
+                  width: '100%',
+                }}
+                value={selectedElement.fontFamily || 'inherit'}
+              >
+                <option value="inherit">預設字型</option>
+                {Object.entries(TYPEFACE_DIRECTION_LABELS).map(([directionId, label]) => {
+                  const directionTypefaces = uniqueTypefaces.filter((typeface) => typeface.directionId === directionId)
+                  if (!directionTypefaces.length) return null
+
+                  return (
+                    <optgroup key={directionId} label={label}>
+                      {directionTypefaces.map((typeface) => (
+                        <option key={typeface.fontFamily} value={typeface.fontFamily}>
+                          {typeface.nameEn} ({typeface.name})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                })}
+              </select>
             </section>
 
             <section className="settings-section settings-row">

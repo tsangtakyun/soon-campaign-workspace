@@ -5,6 +5,7 @@ import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 
 import { useFabricCanvas } from '@/hooks/useFabricCanvas'
 import type { CanvasSize, DesignElement, DesignTool, ScheduledPost } from '@/components/editor/editorTypes'
+import { getGoogleTypefaceLinks, getTypefaceFontFaceStyles } from '@/lib/typefaces'
 
 export type FabricControls = ReturnType<typeof useFabricCanvas>
 
@@ -60,6 +61,25 @@ export function DesignCanvas({
     },
     width: displaySize.width,
   })
+
+  useEffect(() => {
+    const styleEl = document.createElement('style')
+    styleEl.textContent = getTypefaceFontFaceStyles()
+    document.head.appendChild(styleEl)
+
+    getGoogleTypefaceLinks().forEach((url) => {
+      if (!document.querySelector(`link[href="${url}"]`)) {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        document.head.appendChild(link)
+      }
+    })
+
+    return () => {
+      document.head.removeChild(styleEl)
+    }
+  }, [])
 
   useEffect(() => {
     onFabricReady?.(controls)
