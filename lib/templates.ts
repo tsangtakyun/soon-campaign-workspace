@@ -33,7 +33,7 @@ export const templates: Template[] = [
     category: 'Lifestyle',
     type: 'Single',
     style: 'Bold',
-    thumbnail: '#ffffff',
+    thumbnail: '/templates/wordplay-product.jpg',
     elements: [
       { type: 'background', bgColor: '#ffffff' },
       {
@@ -84,7 +84,7 @@ export const templates: Template[] = [
     category: 'Lifestyle',
     type: 'Single',
     style: 'Minimal',
-    thumbnail: '#8b8b8b',
+    thumbnail: '/templates/fullbleed-bottom-text.jpg',
     elements: [
       {
         type: 'image_placeholder',
@@ -107,7 +107,7 @@ export const templates: Template[] = [
     category: 'Promotion',
     type: 'Single',
     style: 'Bold',
-    thumbnail: '#e63329',
+    thumbnail: '/templates/promo-blocks.jpg',
     elements: [
       {
         type: 'image_placeholder',
@@ -157,7 +157,7 @@ export const templates: Template[] = [
     category: 'Food',
     type: 'Single',
     style: 'Minimal',
-    thumbnail: '#f5a623',
+    thumbnail: '/templates/pure-product-photo.jpg',
     elements: [
       {
         type: 'image_placeholder',
@@ -171,7 +171,7 @@ export const templates: Template[] = [
     category: 'Storytelling',
     type: 'Single',
     style: 'Editorial',
-    thumbnail: '#ffffff',
+    thumbnail: '/templates/cold-joke-quote.jpg',
     elements: [
       { type: 'background', bgColor: '#ffffff' },
       {

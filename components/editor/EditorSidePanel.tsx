@@ -1075,7 +1075,11 @@ export function EditorSidePanel({
                 className="template-thumb-preview"
                 style={{ background: template.thumbnail, color: template.thumbnail === '#ffffff' ? '#111111' : '#ffffff' }}
               >
-                <span className="template-thumb-label">{template.category}</span>
+                {template.thumbnail.startsWith('/') ? (
+                  <img alt={template.name} src={template.thumbnail} />
+                ) : (
+                  <span className="template-thumb-label">{template.category}</span>
+                )}
               </div>
               <span className="template-thumb-name">{template.name}</span>
             </button>

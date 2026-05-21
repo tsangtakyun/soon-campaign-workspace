@@ -5441,6 +5441,13 @@ const styles = `
     width: 100%;
   }
 
+  .template-thumb-preview img {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
   .template-thumb-btn:hover .template-thumb-preview {
     opacity: 0.82;
     transform: translateY(-1px);
