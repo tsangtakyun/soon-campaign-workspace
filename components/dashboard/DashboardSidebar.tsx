@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Package, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import {
   clearActiveWorkspaceId,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/workspace-client'
 
 type SidebarItem = {
-  icon: string
+  icon: ReactNode
   label: string
   href: string
   meta?: string
@@ -23,6 +24,8 @@ const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
   { icon: '▣', label: '日曆', href: '/onboarding/scheduled-posts' },
   { icon: '▱', label: '宣傳活動', href: '/onboarding/campaigns' },
+  { icon: <Users aria-hidden="true" size={16} strokeWidth={2} />, label: '創作者配對', href: '/onboarding/creator-match' },
+  { icon: <Package aria-hidden="true" size={16} strokeWidth={2} />, label: '我的產品', href: '/onboarding/my-products' },
   { icon: '↯', label: '整合', href: '/onboarding/integrations', meta: '0/4' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
   { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
@@ -39,6 +42,7 @@ type DashboardSidebarProps = {
 const TRIAL_CREDITS = 200
 
 export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
+  const pathname = usePathname()
   const router = useRouter()
   const [creditBalance, setCreditBalance] = useState(TRIAL_CREDITS)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
@@ -207,22 +211,25 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
-        {sidebarItems.map((item) => (
-          <Link
-            aria-current={item.label === activeItem ? 'page' : undefined}
-            className={item.label === activeItem ? 'active' : ''}
-            href={item.href}
-            key={item.label}
-            onClick={(event) => {
-              event.preventDefault()
-              router.push(item.href)
-            }}
-          >
-            <span>{item.icon}</span>
-            <strong>{item.label}</strong>
-            {item.meta ? <em>{item.meta}</em> : null}
-          </Link>
-        ))}
+        {sidebarItems.map((item) => {
+          const isActive = item.label === activeItem || pathname === item.href || pathname.startsWith(`${item.href}/`)
+          return (
+            <Link
+              aria-current={isActive ? 'page' : undefined}
+              className={isActive ? 'active' : ''}
+              href={item.href}
+              key={item.label}
+              onClick={(event) => {
+                event.preventDefault()
+                router.push(item.href)
+              }}
+            >
+              <span>{item.icon}</span>
+              <strong>{item.label}</strong>
+              {item.meta ? <em>{item.meta}</em> : null}
+            </Link>
+          )
+        })}
       </nav>
 
       <Link
