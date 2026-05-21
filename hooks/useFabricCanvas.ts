@@ -351,12 +351,19 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
   useEffect(() => {
     const canvas = fabricRef.current
     if (!canvas) return
-    const previous = sizeRef.current
-    if (previous.w === width && previous.h === height) return
-    const scaleX = width / previous.w
-    const scaleY = height / previous.h
+    const oldWidth = canvas.getWidth() || sizeRef.current.w
+    const oldHeight = canvas.getHeight() || sizeRef.current.h
+    if (oldWidth === width && oldHeight === height) return
+
+    const objects = canvas.getObjects()
+    const activeObject = canvas.getActiveObject()
+    const backgroundImage = canvas.backgroundImage as FabricObject | undefined
+    const scaleX = width / oldWidth
+    const scaleY = height / oldHeight
+
     canvas.setDimensions({ height, width })
-    canvas.getObjects().forEach((object) => {
+
+    objects.forEach((object) => {
       object.set({
         left: (object.left || 0) * scaleX,
         scaleX: (object.scaleX || 1) * scaleX,
@@ -365,8 +372,23 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       })
       object.setCoords()
     })
+
+    if (backgroundImage) {
+      backgroundImage.set({
+        scaleX: width / (backgroundImage.width || width),
+        scaleY: height / (backgroundImage.height || height),
+      })
+      backgroundImage.setCoords()
+    }
+
+    if (activeObject && objects.includes(activeObject)) {
+      canvas.setActiveObject(activeObject)
+    }
+
     sizeRef.current = { h: height, w: width }
+    canvas.calcOffset()
     canvas.renderAll()
+    canvas.requestRenderAll()
     snapshotHistory(canvas)
   }, [height, snapshotHistory, width])
 
