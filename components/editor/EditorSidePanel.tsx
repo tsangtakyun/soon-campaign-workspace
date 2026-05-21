@@ -42,6 +42,7 @@ type EditorSidePanelProps = {
   onAddImage: (url: string, label: string) => void
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
+  onApplyBackgroundImage: (url: string, label: string) => void
   onApplyTemplate: (template: Template) => void
   onResizeCanvas: (size: CanvasSize) => void
   onSetDraggingOver: (value: boolean) => void
@@ -142,6 +143,7 @@ export function EditorSidePanel({
   onAddImage,
   onImageUpload,
   onTrackUploadedImage,
+  onApplyBackgroundImage,
   onApplyTemplate,
   onResizeCanvas,
   onSetDraggingOver,
@@ -161,6 +163,10 @@ export function EditorSidePanel({
   const [aiImageStyle, setAiImageStyle] = useState<'photo' | 'illustration'>('photo')
   const [aiImageLoading, setAiImageLoading] = useState(false)
   const [aiImageError, setAiImageError] = useState('')
+  const [aiBackgroundPrompt, setAiBackgroundPrompt] = useState('')
+  const [aiBackgroundLoading, setAiBackgroundLoading] = useState(false)
+  const [aiBackgroundError, setAiBackgroundError] = useState('')
+  const [aiBackgroundImage, setAiBackgroundImage] = useState<{ url: string; label: string } | null>(null)
   const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
   const [selectedTextFontFamily, setSelectedTextFontFamily] = useState(
     selectedElement?.kind === 'text' ? selectedElement.fontFamily || 'inherit' : 'inherit'
@@ -260,6 +266,52 @@ export function EditorSidePanel({
       setAiImageError(err instanceof Error ? err.message : '生成失敗，請重試')
     } finally {
       setAiImageLoading(false)
+    }
+  }
+
+  const appendBackgroundPrompt = (phrase: string) => {
+    setAiBackgroundPrompt((current) => {
+      const trimmed = current.trim()
+      return trimmed ? `${trimmed} ${phrase}` : phrase
+    })
+  }
+
+  const generateAiBackground = async () => {
+    const basePrompt = aiBackgroundPrompt.trim()
+    if (!basePrompt) return
+    setAiBackgroundLoading(true)
+    setAiBackgroundError('')
+
+    try {
+      const finalPrompt = `${basePrompt}, 1080x1080 square format, social media background, no text, no people, photographic quality`
+      const res = await fetch('/api/editor/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          size: 'square',
+          style: 'photo',
+        }),
+      })
+      const data = (await res.json()) as { detail?: string; error?: string; imageUrl?: string }
+      if (res.status === 402) {
+        const creditData = data as { balance?: number; required?: number }
+        setAiBackgroundError(`Credits 不足，需要 ${creditData.required ?? 5} credits，目前 ${creditData.balance ?? 0}`)
+        return
+      }
+      if (!res.ok || !data.imageUrl) {
+        throw new Error(data.detail || data.error || 'Failed')
+      }
+
+      const label = `AI 背景：${basePrompt.slice(0, 18)}`
+      const image = { url: data.imageUrl, label }
+      setAiBackgroundImage(image)
+      onTrackUploadedImage(image)
+      onApplyBackgroundImage(image.url, image.label)
+    } catch (err) {
+      setAiBackgroundError(err instanceof Error ? err.message : '生成失敗，請重試')
+    } finally {
+      setAiBackgroundLoading(false)
     }
   }
 
@@ -1127,6 +1179,74 @@ export function EditorSidePanel({
         </div>
 
         <input className="panel-search-input" placeholder="搜尋背景..." type="search" />
+
+        <section className="background-ai-section">
+          <h3 className="panel-section-title">AI 生成背景</h3>
+          <div className="media-ai-card background-ai-card">
+            <textarea
+              className="media-ai-input"
+              onChange={(event) => setAiBackgroundPrompt(event.target.value)}
+              placeholder="描述你想要的背景效果，例如：柔和粉紅大理石材質、日落漸層、簡約奶油白場景..."
+              rows={3}
+              value={aiBackgroundPrompt}
+            />
+
+            <div className="background-ai-chip-row">
+              {[
+                { label: '材質', phrase: '帶有細緻紋理的' },
+                { label: '場景', phrase: '乾淨的攝影棚場景' },
+                { label: '漸層', phrase: '柔和漸層色調' },
+              ].map((chip) => (
+                <button
+                  className="background-ai-chip"
+                  key={chip.label}
+                  onClick={() => appendBackgroundPrompt(chip.phrase)}
+                  type="button"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              className="media-generate-button"
+              disabled={!aiBackgroundPrompt.trim() || aiBackgroundLoading}
+              onClick={() => void generateAiBackground()}
+              type="button"
+            >
+              {aiBackgroundLoading ? '生成中...' : '✦ AI 生成背景'}
+            </button>
+
+            {aiBackgroundLoading ? (
+              <div className="background-ai-status">
+                <span className="background-ai-spinner" />
+                <span>生成中...</span>
+              </div>
+            ) : null}
+
+            {aiBackgroundError ? (
+              <p style={{ color: '#dc2626', fontSize: 12, margin: 0 }}>⚠ {aiBackgroundError}</p>
+            ) : null}
+
+            {aiBackgroundImage ? (
+              <div className="background-ai-preview">
+                <div className="background-ai-preview-card">
+                  <img alt={aiBackgroundImage.label} src={aiBackgroundImage.url} />
+                  <span>{aiBackgroundImage.label}</span>
+                </div>
+                <button
+                  className="background-ai-apply-button"
+                  onClick={() => onApplyBackgroundImage(aiBackgroundImage.url, aiBackgroundImage.label)}
+                  type="button"
+                >
+                  套用
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="background-ai-divider" />
 
         <h3 className="panel-section-title">顏色</h3>
         <div className="bg-color-grid">

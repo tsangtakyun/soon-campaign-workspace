@@ -1850,6 +1850,37 @@ function ScheduledPostsPageContent() {
     setActiveDesignTool('媒體')
   }
 
+  const applyBackgroundImage = (imageUrl: string, label = 'AI 背景') => {
+    const isSquare = canvasSize.w === canvasSize.h
+    const currentBackground = designElements.find(
+      (element) => element.kind === 'image' && element.item === 'background'
+    )
+    const backgroundElement: DesignElement = {
+      id: `image-background-${selectedPost.id}-${Date.now()}`,
+      kind: 'image',
+      item: 'background',
+      label,
+      x: currentBackground?.x ?? 0,
+      y: currentBackground?.y ?? 0,
+      size: currentBackground?.size ?? 430,
+      width: currentBackground?.width ?? 430,
+      height: currentBackground?.height ?? (isSquare ? 430 : 538),
+      rotation: currentBackground?.rotation ?? 0,
+      opacity: 100,
+      color: '#ffffff',
+      zIndex: currentBackground?.zIndex ?? 1,
+      imageUrl,
+    }
+    const nextElements = [
+      backgroundElement,
+      ...designElements.filter((element) => !(element.kind === 'image' && element.item === 'background')),
+    ]
+    void fabricControlsRef.current?.loadDesignElements(nextElements)
+    setDesignElements(nextElements)
+    setSelectedElementId(null)
+    setActiveDesignTool('背景')
+  }
+
   const updateImageElement = (id: string, changes: Partial<DesignElement>) => {
     void fabricControlsRef.current?.updateDesignElement(id, changes)
     setDesignElements((current) =>
@@ -2182,6 +2213,7 @@ function ScheduledPostsPageContent() {
             onAddImage={addImageElement}
             onAddText={addTextElement}
             onAddTextStyle={addTextStyleElement}
+            onApplyBackgroundImage={applyBackgroundImage}
             onApplyBrandColor={applyBrandColor}
             onApplyTemplate={applyTemplatePreset}
             onCloseDesignMode={() => setDesignMode(false)}
@@ -5321,6 +5353,100 @@ const styles = `
   .media-generate-button:disabled {
     cursor: not-allowed;
     opacity: 0.36;
+  }
+
+  .background-ai-section {
+    display: grid;
+    gap: 8px;
+  }
+
+  .background-ai-card {
+    gap: 10px;
+  }
+
+  .background-ai-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .background-ai-chip {
+    background: #ffffff;
+    border: 1px solid #dfe2e8;
+    border-radius: 999px;
+    color: #3a3f47;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 11px;
+  }
+
+  .background-ai-status {
+    align-items: center;
+    color: #606672;
+    display: flex;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .background-ai-spinner {
+    animation: background-ai-spin 0.8s linear infinite;
+    border: 2px solid #dfe2e8;
+    border-radius: 999px;
+    border-top-color: #111111;
+    display: inline-block;
+    height: 14px;
+    width: 14px;
+  }
+
+  @keyframes background-ai-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .background-ai-preview {
+    display: grid;
+    gap: 8px;
+  }
+
+  .background-ai-preview-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    color: #555b66;
+    overflow: hidden;
+  }
+
+  .background-ai-preview-card img {
+    display: block;
+    height: 96px;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .background-ai-preview-card span {
+    display: block;
+    font-size: 11px;
+    padding: 7px 8px;
+  }
+
+  .background-ai-apply-button {
+    background: #111111;
+    border: 0;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+    min-height: 34px;
+  }
+
+  .background-ai-divider {
+    background: #e8eaef;
+    height: 1px;
+    margin: 14px 0 4px;
   }
 
   .media-brand-logo-button {
