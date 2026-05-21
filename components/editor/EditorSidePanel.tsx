@@ -9,7 +9,7 @@ import {
   POST_PLATFORMS,
   SHAPE_ITEMS,
   STOCK_MEDIA,
-  TEXT_STYLE_PRESETS,
+  DISTINCT_TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
 import { typefaces } from '@/lib/typefaces'
 import type {
@@ -800,7 +800,7 @@ export function EditorSidePanel({
         <section className="text-panel-section">
           <h3>文字樣式</h3>
           <div className="text-style-grid">
-            {TEXT_STYLE_PRESETS.map((preset) => (
+            {DISTINCT_TEXT_STYLE_PRESETS.map((preset) => (
               <button
                 className="text-style-card"
                 key={preset.label}

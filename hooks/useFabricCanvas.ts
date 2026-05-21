@@ -96,6 +96,7 @@ async function loadTextFont(fontFamily?: string) {
 
 function isTextStyleChange(changes: Partial<DesignElement>) {
   return (
+    changes.backgroundColor !== undefined ||
     changes.fontFamily !== undefined ||
     changes.fontSize !== undefined ||
     changes.fontStyle !== undefined ||
@@ -167,6 +168,7 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
     await loadTextFont(element.fontFamily)
     const text = new IText(element.textContent || element.label, {
       ...common,
+      backgroundColor: element.backgroundColor,
       fill: element.color,
       fontFamily: resolvedTextFontFamily(element.fontFamily),
       fontSize: (element.fontSize || element.size || 24) * scale,
@@ -392,7 +394,12 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     applyControls(object)
     canvas.add(object)
     canvas.setActiveObject(object)
-    canvas.renderAll()
+    if (object instanceof IText) {
+      forceTextObjectRender(canvas, object)
+    } else {
+      canvas.renderAll()
+      canvas.requestRenderAll()
+    }
   }, [])
 
   const updateDesignElement = useCallback(async (id: string, changes: Partial<DesignElement>) => {
@@ -434,6 +441,9 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const nextProps: Record<string, unknown> = {}
     if (changes.rotation !== undefined) nextProps.angle = changes.rotation
     if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
+    if (changes.backgroundColor !== undefined && object.type !== 'image') {
+      nextProps.backgroundColor = changes.backgroundColor
+    }
     if (changes.fontFamily !== undefined) {
       await loadTextFont(changes.fontFamily)
       nextProps.fontFamily = resolvedTextFontFamily(changes.fontFamily)

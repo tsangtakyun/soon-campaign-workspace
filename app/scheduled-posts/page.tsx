@@ -1612,6 +1612,12 @@ function ScheduledPostsPageContent() {
   const addTextStyleElement = (preset: TextStylePreset) => {
     const id = `text-style-${preset.label}-${Date.now()}`
     const fontWeight = preset.style.fontWeight === 'bold' || preset.style.fontWeight === 900 ? 'bold' : 'normal'
+    const fontStyle = preset.style.fontStyle === 'italic' ? 'italic' : 'normal'
+    const textAlign =
+      preset.style.textAlign === 'left' || preset.style.textAlign === 'right' || preset.style.textAlign === 'center'
+        ? preset.style.textAlign
+        : 'center'
+    const opacity = typeof preset.style.opacity === 'number' ? Math.round(preset.style.opacity * 100) : 100
     const nextElement: DesignElement = {
       id,
       kind: 'text',
@@ -1621,16 +1627,17 @@ function ScheduledPostsPageContent() {
       y: 46,
       size: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
       rotation: 0,
-      opacity: 100,
+      opacity,
       color: typeof preset.style.color === 'string' ? preset.style.color : '#111111',
+      backgroundColor: typeof preset.style.backgroundColor === 'string' ? preset.style.backgroundColor : undefined,
       zIndex: 20 + designElements.length,
       textContent: preset.textContent,
       fontFamily: typeof preset.style.fontFamily === 'string' ? preset.style.fontFamily : 'inherit',
       fontSize: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
       fontWeight,
-      fontStyle: 'normal',
+      fontStyle,
       textDecoration: 'none',
-      textAlign: 'center',
+      textAlign,
       width: 300,
       lineHeight: 1.25,
     }

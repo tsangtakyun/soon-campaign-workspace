@@ -50,6 +50,7 @@ export type DesignElement = {
   rotation: number
   opacity: number
   color: string
+  backgroundColor?: string
   zIndex: number
   textContent?: string
   fontFamily?: string

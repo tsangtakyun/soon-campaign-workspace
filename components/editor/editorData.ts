@@ -110,6 +110,75 @@ export const TEXT_STYLE_PRESETS: TextStylePreset[] = [
   },
 ]
 
+export const DISTINCT_TEXT_STYLE_PRESETS: TextStylePreset[] = [
+  {
+    label: 'Pop-Up',
+    textContent: '重點提示',
+    style: {
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontStyle: 'normal',
+      fontWeight: 'bold',
+      textAlign: 'center',
+    },
+  },
+  {
+    label: 'Story',
+    textContent: '今日故事',
+    style: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontStyle: 'italic',
+      fontWeight: 'normal',
+      opacity: 0.9,
+      textAlign: 'left',
+    },
+  },
+  {
+    label: 'Offering',
+    textContent: '限時優惠',
+    style: {
+      color: '#FFD700',
+      fontSize: 22,
+      fontWeight: 'bold',
+      textAlign: 'center',
+    },
+  },
+  {
+    label: 'Bold',
+    textContent: '大膽標題',
+    style: {
+      color: '#000000',
+      fontSize: 28,
+      fontWeight: 'bold',
+      textAlign: 'center',
+    },
+  },
+  {
+    label: 'Minimal',
+    textContent: '簡約文字',
+    style: {
+      color: '#CCCCCC',
+      fontSize: 16,
+      fontWeight: 'normal',
+      textAlign: 'left',
+    },
+  },
+  {
+    label: 'Release',
+    textContent: '新品上市',
+    style: {
+      color: '#000000',
+      fontSize: 20,
+      fontStyle: 'italic',
+      fontWeight: 'bold',
+      opacity: 0.85,
+      textAlign: 'center',
+    },
+  },
+]
+
 export const DESIGN_TOOL_ITEMS: Array<[string, DesignTool]> = [
   ['⌘', '元素'],
   ['▧', '媒體'],
