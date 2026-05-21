@@ -281,6 +281,7 @@ export function EditorSidePanel({
 
   const applyAiBackgroundImage = async (image: { url: string; label: string } | null) => {
     if (!image?.url) return
+    console.log('套用 clicked, image:', image)
     try {
       await onApplyBackgroundImage(image.url, image.label)
     } catch (err) {

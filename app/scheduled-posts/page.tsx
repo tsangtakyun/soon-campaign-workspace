@@ -1852,6 +1852,8 @@ function ScheduledPostsPageContent() {
 
   const applyBackgroundImage = async (imageUrl: string) => {
     const controls = fabricControlsRef.current
+    const canvas = controls?.fabricRef.current ?? null
+    console.log('套用 clicked, canvas:', canvas)
     if (!controls) {
       console.warn('[AI Background] Fabric controls not ready')
       return
