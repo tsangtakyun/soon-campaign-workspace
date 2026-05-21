@@ -201,30 +201,13 @@ export const templates: Template[] = [
     ],
   },
   {
-    id: 'visual-only',
-    name: '純視覺衝擊',
-    category: '產品',
-    mood: '生活',
-    type: 'Single',
-    style: 'Minimal',
-    thumbnail: '#1a1a1a',
-    elements: [
-      {
-        type: 'image',
-        x: 0, y: 0, w: 1.0, h: 1.0,
-        placeholder: true,
-        label: '產品主圖（建議俯拍/特寫）',
-      },
-    ],
-  },
-  {
     id: 'collab-launch',
     name: '聯乘發佈型',
     category: '產品',
     mood: '廣告',
     type: 'Single',
     style: 'Bold',
-    thumbnail: '#2a2a2a',
+    thumbnail: '/templates/collab-launch.jpg',
     elements: [
       {
         type: 'rect',
