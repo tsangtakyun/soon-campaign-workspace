@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   BRAND_COLORS,
@@ -164,12 +164,42 @@ export function EditorSidePanel({
   const [selectedTextFontFamily, setSelectedTextFontFamily] = useState(
     selectedElement?.kind === 'text' ? selectedElement.fontFamily || 'inherit' : 'inherit'
   )
+  const fontSelectRef = useRef<HTMLSelectElement>(null)
+
+  const handleFontSelect = useCallback(
+    (value: string) => {
+      console.log('Font select triggered:', value)
+      if (value === selectedTextFontFamily) return
+      setSelectedTextFontFamily(value)
+      if (selectedElement?.kind === 'text') {
+        onUpdateElement(selectedElement.id, { fontFamily: value })
+      }
+    },
+    [onUpdateElement, selectedElement, selectedTextFontFamily]
+  )
 
   useEffect(() => {
     setSelectedTextFontFamily(
       selectedElement?.kind === 'text' ? selectedElement.fontFamily || 'inherit' : 'inherit'
     )
   }, [selectedElement?.id])
+
+  useEffect(() => {
+    const select = fontSelectRef.current
+    if (!select) return
+
+    const handleNativeSelect = () => {
+      handleFontSelect(select.value)
+    }
+
+    select.addEventListener('change', handleNativeSelect)
+    select.addEventListener('input', handleNativeSelect)
+
+    return () => {
+      select.removeEventListener('change', handleNativeSelect)
+      select.removeEventListener('input', handleNativeSelect)
+    }
+  }, [handleFontSelect])
 
   useEffect(() => {
     if (!workspaceId) {
@@ -406,11 +436,9 @@ export function EditorSidePanel({
               <label className="settings-label" htmlFor="selected-text-font-family">字型</label>
               <select
                 id="selected-text-font-family"
-                onChange={(event) => {
-                  const nextFontFamily = event.target.value
-                  setSelectedTextFontFamily(nextFontFamily)
-                  onUpdateElement(selectedElement.id, { fontFamily: nextFontFamily })
-                }}
+                onChange={(event) => handleFontSelect(event.target.value)}
+                onInput={(event) => handleFontSelect((event.target as HTMLSelectElement).value)}
+                ref={fontSelectRef}
                 style={{
                   background: '#111827',
                   border: '1px solid rgba(255,255,255,0.14)',
