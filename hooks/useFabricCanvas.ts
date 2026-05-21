@@ -118,6 +118,44 @@ function applyControls(object: FabricElementObject) {
   })
 }
 
+function logCanvasResizeState(
+  label: string,
+  canvas: Canvas,
+  objects: FabricObject[],
+  storedSize: { h: number; w: number },
+  nextSize?: { h: number; w: number }
+) {
+  console.log(`[canvas-resize] ${label}`, {
+    canvasHeight: canvas.height,
+    canvasWidth: canvas.width,
+    getHeight: canvas.getHeight(),
+    getWidth: canvas.getWidth(),
+    lowerCanvasHeight: canvas.lowerCanvasEl?.height,
+    lowerCanvasWidth: canvas.lowerCanvasEl?.width,
+    nextHeight: nextSize?.h,
+    nextWidth: nextSize?.w,
+    objectCount: objects.length,
+    objects: objects.map((object, index) => {
+      const fabricObject = object as FabricElementObject
+      return {
+        angle: object.angle,
+        height: object.height,
+        id: fabricObject.data?.id,
+        index,
+        kind: fabricObject.data?.kind,
+        left: object.left,
+        scaleX: object.scaleX,
+        scaleY: object.scaleY,
+        top: object.top,
+        type: object.type,
+        width: object.width,
+      }
+    }),
+    storedHeight: storedSize.h,
+    storedWidth: storedSize.w,
+  })
+}
+
 function forceTextObjectRender(canvas: Canvas, object: IText) {
   object.set({ objectCaching: false })
   object.dirty = true
@@ -356,10 +394,21 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     if (oldWidth === width && oldHeight === height) return
 
     const objects = canvas.getObjects()
+    logCanvasResizeState('before resize', canvas, objects, sizeRef.current, { h: height, w: width })
     const activeObject = canvas.getActiveObject()
     const backgroundImage = canvas.backgroundImage as FabricObject | undefined
     const scaleX = width / oldWidth
     const scaleY = height / oldHeight
+    console.log('[canvas-resize] scale calculation', {
+      newHeight: height,
+      newWidth: width,
+      oldHeight,
+      oldWidth,
+      scaleX,
+      scaleY,
+      storedHeight: sizeRef.current.h,
+      storedWidth: sizeRef.current.w,
+    })
 
     canvas.setDimensions({ height, width })
 
@@ -389,6 +438,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     canvas.calcOffset()
     canvas.renderAll()
     canvas.requestRenderAll()
+    logCanvasResizeState('after resize', canvas, canvas.getObjects(), sizeRef.current, { h: height, w: width })
     snapshotHistory(canvas)
   }, [height, snapshotHistory, width])
 
