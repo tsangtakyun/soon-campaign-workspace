@@ -456,7 +456,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
         const fabricObject = object as FabricElementObject & { id?: string; item?: string }
         const item = fabricObject.data?.item ?? fabricObject.item
         const id = fabricObject.data?.id ?? fabricObject.id ?? ''
-        return object.type === 'image' && item === 'background' && (id.startsWith('ai-background-') || /^image-background-\d+$/.test(id))
+        return object.type === 'image' && item === 'background' && (id.startsWith('ai-background-') || id.startsWith('image-background-'))
       })
 
     existingBackgrounds.forEach((object) => canvas.remove(object))
