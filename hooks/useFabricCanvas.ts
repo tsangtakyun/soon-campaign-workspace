@@ -76,6 +76,20 @@ function attachElementData<T extends FabricElementObject>(object: T, element: De
   return object
 }
 
+function resolvedTextFontFamily(fontFamily?: string) {
+  return !fontFamily || fontFamily === 'inherit' ? 'Arial, sans-serif' : fontFamily
+}
+
+async function loadTextFont(fontFamily?: string) {
+  if (!fontFamily || fontFamily === 'inherit' || typeof document === 'undefined' || !document.fonts) return
+
+  try {
+    await document.fonts.load(`16px "${fontFamily.replace(/"/g, '\\"')}"`)
+  } catch (error) {
+    console.warn('Font load warning:', error)
+  }
+}
+
 function applyControls(object: FabricElementObject) {
   object.set({
     borderColor: '#111111',
@@ -118,10 +132,11 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   }
 
   if (element.kind === 'text') {
+    await loadTextFont(element.fontFamily)
     const text = new IText(element.textContent || element.label, {
       ...common,
       fill: element.color,
-      fontFamily: element.fontFamily === 'inherit' ? 'Arial, sans-serif' : element.fontFamily,
+      fontFamily: resolvedTextFontFamily(element.fontFamily),
       fontSize: (element.fontSize || element.size || 24) * scale,
       fontStyle: element.fontStyle || 'normal',
       fontWeight: element.fontWeight || 'normal',
@@ -383,7 +398,8 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     if (changes.rotation !== undefined) nextProps.angle = changes.rotation
     if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
     if (changes.fontFamily !== undefined) {
-      nextProps.fontFamily = changes.fontFamily === 'inherit' ? 'Arial, sans-serif' : changes.fontFamily
+      await loadTextFont(changes.fontFamily)
+      nextProps.fontFamily = resolvedTextFontFamily(changes.fontFamily)
     }
     if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
     if (changes.fontStyle !== undefined) nextProps.fontStyle = changes.fontStyle
@@ -406,7 +422,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       object.initDimensions()
     }
     object.setCoords()
-    canvas.requestRenderAll()
+    canvas.renderAll()
   }, [])
 
   const deleteSelected = useCallback(() => {
