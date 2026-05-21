@@ -678,6 +678,58 @@ function templateBox(element: TemplateElement) {
   }
 }
 
+function createImagePlaceholderElements(
+  element: TemplateElement,
+  index: number,
+  id: string,
+  box: ReturnType<typeof templateBox>
+): DesignElement[] {
+  const label = element.label || '圖片位置'
+
+  return [
+    {
+      id,
+      kind: 'shape',
+      item: 'rounded',
+      label,
+      x: box.x,
+      y: box.y,
+      size: Math.min(box.width, box.height),
+      width: box.width,
+      height: box.height,
+      rotation: 0,
+      opacity: 100,
+      color: '#e0e0e0',
+      strokeColor: '#bbbbbb',
+      strokeDashArray: [8, 4],
+      strokeWidth: 2,
+      zIndex: index,
+    },
+    {
+      id: `${id}-label`,
+      kind: 'text',
+      item: 'placeholder-label',
+      label: '圖片提示',
+      x: box.x,
+      y: box.y,
+      size: 14,
+      rotation: 0,
+      opacity: 82,
+      color: '#555555',
+      zIndex: index + 0.1,
+      textContent: label,
+      fontFamily: 'inherit',
+      fontSize: box.height < 70 ? 11 : 15,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      textDecoration: 'none',
+      textAlign: 'center',
+      width: Math.max(80, box.width * 0.82),
+      lineHeight: 1.15,
+    },
+  ]
+}
+
 function createContentTemplateElements(template: Template): DesignElement[] {
   return template.elements.flatMap((element, index): DesignElement[] => {
     const box = templateBox(element)
@@ -704,49 +756,11 @@ function createContentTemplateElements(template: Template): DesignElement[] {
     }
 
     if (element.type === 'image') {
-      return [
-        {
-          id,
-          kind: 'shape',
-          item: 'rounded',
-          label: element.label || '圖片位置',
-          x: box.x,
-          y: box.y,
-          size: Math.min(box.width, box.height),
-          width: box.width,
-          height: box.height,
-          rotation: 0,
-          opacity: 100,
-          color: '#e0e0e0',
-          strokeColor: '#bbbbbb',
-          strokeDashArray: [8, 4],
-          strokeWidth: 2,
-          zIndex: index,
-        },
-      ]
+      return createImagePlaceholderElements(element, index, id, box)
     }
 
     if (element.type === 'image_placeholder') {
-      return [
-        {
-          id,
-          kind: 'shape',
-          item: 'rounded',
-          label: '圖片位置',
-          x: box.x,
-          y: box.y,
-          size: Math.min(box.width, box.height),
-          width: box.width,
-          height: box.height,
-          rotation: 0,
-          opacity: 100,
-          color: '#e0e0e0',
-          strokeColor: '#bbbbbb',
-          strokeDashArray: [8, 4],
-          strokeWidth: 2,
-          zIndex: index,
-        },
-      ]
+      return createImagePlaceholderElements(element, index, id, box)
     }
 
     if (element.type === 'text' || element.type === 'badge') {
