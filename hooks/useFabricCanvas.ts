@@ -424,11 +424,28 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     })
     image.setCoords()
     const backgroundObject = image as FabricElementObject
-    backgroundObject.data = { id: `image-background-${Date.now()}`, item: 'background', kind: 'image' }
+    backgroundObject.data = { id: `ai-background-${Date.now()}`, item: 'background', kind: 'image' }
+
+    const describeObjects = () =>
+      canvas.getObjects().map((object) => {
+        const fabricObject = object as FabricElementObject & { id?: string; item?: string }
+        return {
+          type: object.type,
+          item: fabricObject.data?.item ?? fabricObject.item,
+          id: fabricObject.data?.id ?? fabricObject.id,
+        }
+      })
+
+    console.log('canvas objects before:', describeObjects())
 
     const existingBackgrounds = canvas
       .getObjects()
-      .filter((object) => (object as FabricElementObject).data?.item === 'background')
+      .filter((object) => {
+        const fabricObject = object as FabricElementObject & { id?: string; item?: string }
+        const item = fabricObject.data?.item ?? fabricObject.item
+        const id = fabricObject.data?.id ?? fabricObject.id ?? ''
+        return object.type === 'image' && item === 'background' && (id.startsWith('ai-background-') || /^image-background-\d+$/.test(id))
+      })
 
     existingBackgrounds.forEach((object) => canvas.remove(object))
     canvas.add(backgroundObject)
@@ -439,6 +456,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     canvas.renderAll()
     canvas.requestRenderAll()
     console.log('canvas element id:', canvas.lowerCanvasEl?.id)
+    console.log('canvas objects after:', describeObjects())
     console.log('background applied, rendering canvas')
     snapshotHistory(canvas)
   }, [snapshotHistory])
