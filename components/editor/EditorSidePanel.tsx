@@ -161,6 +161,15 @@ export function EditorSidePanel({
   const [aiImageLoading, setAiImageLoading] = useState(false)
   const [aiImageError, setAiImageError] = useState('')
   const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
+  const [selectedTextFontFamily, setSelectedTextFontFamily] = useState(
+    selectedElement?.kind === 'text' ? selectedElement.fontFamily || 'inherit' : 'inherit'
+  )
+
+  useEffect(() => {
+    setSelectedTextFontFamily(
+      selectedElement?.kind === 'text' ? selectedElement.fontFamily || 'inherit' : 'inherit'
+    )
+  }, [selectedElement?.id])
 
   useEffect(() => {
     if (!workspaceId) {
@@ -397,7 +406,11 @@ export function EditorSidePanel({
               <label className="settings-label" htmlFor="selected-text-font-family">字型</label>
               <select
                 id="selected-text-font-family"
-                onChange={(event) => onUpdateElement(selectedElement.id, { fontFamily: event.target.value })}
+                onChange={(event) => {
+                  const nextFontFamily = event.target.value
+                  setSelectedTextFontFamily(nextFontFamily)
+                  onUpdateElement(selectedElement.id, { fontFamily: nextFontFamily })
+                }}
                 style={{
                   background: '#111827',
                   border: '1px solid rgba(255,255,255,0.14)',
@@ -408,7 +421,7 @@ export function EditorSidePanel({
                   padding: '8px 10px',
                   width: '100%',
                 }}
-                value={selectedElement.fontFamily || 'inherit'}
+                value={selectedTextFontFamily}
               >
                 <option value="inherit">預設字型</option>
                 {Object.entries(TYPEFACE_DIRECTION_LABELS).map(([directionId, label]) => {
