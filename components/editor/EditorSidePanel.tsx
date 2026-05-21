@@ -1214,7 +1214,7 @@ export function EditorSidePanel({
               onClick={() => void generateAiBackground()}
               type="button"
             >
-              {aiBackgroundLoading ? '生成中...' : '✦ AI 生成背景'}
+              {aiBackgroundLoading ? '生成中...' : '✦ AI 生成背景 · 5 credits'}
             </button>
 
             {aiBackgroundLoading ? (
