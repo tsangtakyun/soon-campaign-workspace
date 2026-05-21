@@ -51,6 +51,9 @@ export type DesignElement = {
   opacity: number
   color: string
   backgroundColor?: string
+  strokeColor?: string
+  strokeWidth?: number
+  strokeDashArray?: number[]
   zIndex: number
   textContent?: string
   fontFamily?: string

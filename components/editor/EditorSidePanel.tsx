@@ -12,6 +12,7 @@ import {
   DISTINCT_TEXT_STYLE_PRESETS,
 } from '@/components/editor/editorData'
 import { typefaces } from '@/lib/typefaces'
+import { templates, type Template } from '@/lib/templates'
 import type {
   CanvasSize,
   DesignElement,
@@ -41,7 +42,7 @@ type EditorSidePanelProps = {
   onAddImage: (url: string, label: string) => void
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
-  onApplyTemplate: (templateId: TemplatePresetId) => void
+  onApplyTemplate: (template: Template) => void
   onResizeCanvas: (size: CanvasSize) => void
   onSetDraggingOver: (value: boolean) => void
   onUpdateElement: (id: string, changes: Partial<DesignElement>) => void
@@ -1062,21 +1063,21 @@ export function EditorSidePanel({
         </div>
 
         <div className="templates-grid">
-          {placeholderTemplates.map((template) => (
+            {templates.map((template) => (
             <button
               className="template-thumb-btn"
-              key={template.label}
-              onClick={() => onApplyTemplate(template.templateId)}
-              title={template.label}
+              key={template.id}
+              onClick={() => onApplyTemplate(template)}
+              title={template.name}
               type="button"
             >
               <div
                 className="template-thumb-preview"
-                style={{ background: template.bg, color: template.color }}
+                style={{ background: template.thumbnail, color: template.thumbnail === '#ffffff' ? '#111111' : '#ffffff' }}
               >
-                <span className="template-thumb-label">{template.label}</span>
+                <span className="template-thumb-label">{template.category}</span>
               </div>
-              <span className="template-thumb-name">{template.label}</span>
+              <span className="template-thumb-name">{template.name}</span>
             </button>
           ))}
         </div>

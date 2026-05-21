@@ -15,6 +15,7 @@ import {
   hasPersistedOnboardingSession,
   markOnboardingPersisted,
 } from '@/lib/onboarding-session'
+import type { Template, TemplateElement } from '@/lib/templates'
 import type { FabricControls } from '@/components/editor/DesignCanvas'
 import { createClient } from '@/lib/supabase'
 import {
@@ -659,6 +660,122 @@ function createTemplateDesignElements(post: ScheduledPost, templateId: TemplateP
   }
 
   return createPostDesignElements({ ...post, image: imageUrl })
+}
+
+const TEMPLATE_CANVAS = { w: 430, h: 538 }
+
+function templateBox(element: TemplateElement) {
+  const x = element.x ?? 0
+  const y = element.y ?? 0
+  const w = element.w ?? 0.5
+  const h = element.h ?? 0.12
+
+  return {
+    height: h * TEMPLATE_CANVAS.h,
+    width: w * TEMPLATE_CANVAS.w,
+    x: (x + w / 2) * 100,
+    y: (y + h / 2) * 100,
+  }
+}
+
+function createContentTemplateElements(template: Template): DesignElement[] {
+  return template.elements.flatMap((element, index): DesignElement[] => {
+    const box = templateBox(element)
+    const id = `${template.id}-${element.type}-${index}-${Date.now()}`
+
+    if (element.type === 'background') {
+      return [
+        {
+          id,
+          kind: 'shape',
+          item: 'square',
+          label: '背景',
+          x: 50,
+          y: 50,
+          size: TEMPLATE_CANVAS.w,
+          width: TEMPLATE_CANVAS.w,
+          height: TEMPLATE_CANVAS.h,
+          rotation: 0,
+          opacity: Math.round((element.bgOpacity ?? 1) * 100),
+          color: element.bgColor || '#ffffff',
+          zIndex: index,
+        },
+      ]
+    }
+
+    if (element.type === 'image_placeholder') {
+      return [
+        {
+          id,
+          kind: 'shape',
+          item: 'rounded',
+          label: '圖片位置',
+          x: box.x,
+          y: box.y,
+          size: Math.min(box.width, box.height),
+          width: box.width,
+          height: box.height,
+          rotation: 0,
+          opacity: 100,
+          color: '#e0e0e0',
+          strokeColor: '#bbbbbb',
+          strokeDashArray: [8, 4],
+          strokeWidth: 2,
+          zIndex: index,
+        },
+      ]
+    }
+
+    if (element.type === 'text' || element.type === 'badge') {
+      return [
+        {
+          id,
+          kind: 'text',
+          item: element.type,
+          label: element.type === 'badge' ? '標籤文字' : '文字',
+          x: box.x,
+          y: box.y,
+          size: element.fontSize || 20,
+          rotation: 0,
+          opacity: 100,
+          color: element.color || '#000000',
+          backgroundColor: element.backgroundColor,
+          zIndex: index,
+          textContent: element.content || '文字',
+          fontFamily: 'inherit',
+          fontSize: element.fontSize || 20,
+          fontWeight: element.fontWeight || 'normal',
+          fontStyle: element.fontStyle || 'normal',
+          textDecoration: 'none',
+          textAlign: element.textAlign || 'left',
+          width: box.width,
+          lineHeight: 1.12,
+        },
+      ]
+    }
+
+    if (element.type === 'shape') {
+      return [
+        {
+          id,
+          kind: 'shape',
+          item: 'rounded',
+          label: '圖形',
+          x: box.x,
+          y: box.y,
+          size: Math.min(box.width, box.height),
+          width: box.width,
+          height: box.height,
+          rotation: 0,
+          opacity: Math.round((element.bgOpacity ?? 1) * 100),
+          color: element.bgColor || '#111111',
+          zIndex: index,
+        },
+      ]
+    }
+
+    return []
+  })
 }
 
 function ScheduledPostsPageContent() {
@@ -1738,11 +1855,9 @@ function ScheduledPostsPageContent() {
     )
   }
 
-  const applyTemplatePreset = (templateId: TemplatePresetId) => {
+  const applyTemplatePreset = (template: Template) => {
     if (!selectedPost) return
-    const currentImage =
-      designElements.find((element) => element.kind === 'image' && element.imageUrl)?.imageUrl || selectedPost.image
-    const nextElements = createTemplateDesignElements(selectedPost, templateId, currentImage)
+    const nextElements = createContentTemplateElements(template)
     setDesignElements(nextElements)
     void fabricControlsRef.current?.loadDesignElements(nextElements)
     setSelectedElementId(null)

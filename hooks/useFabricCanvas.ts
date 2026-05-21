@@ -197,11 +197,14 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   }
 
   const objectSize = element.size * scale
+  const objectWidth = (element.width || element.size) * scale
+  const objectHeight = (element.height || element.size) * scale
   const defaults = {
     ...common,
     fill: element.kind === 'frame' ? 'rgba(255,255,255,0.22)' : element.color,
-    stroke: element.kind === 'frame' ? 'rgba(255,255,255,0.75)' : undefined,
-    strokeWidth: element.kind === 'frame' ? Math.max(2, 3 * scale) : 0,
+    stroke: element.strokeColor || (element.kind === 'frame' ? 'rgba(255,255,255,0.75)' : undefined),
+    strokeDashArray: element.strokeDashArray,
+    strokeWidth: element.strokeWidth !== undefined ? element.strokeWidth * scale : element.kind === 'frame' ? Math.max(2, 3 * scale) : 0,
   }
 
   let shape: FabricElementObject
@@ -218,10 +221,10 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   } else {
     shape = new Rect({
       ...defaults,
-      height: objectSize,
-      rx: element.item === 'rounded' ? objectSize * 0.18 : 0,
-      ry: element.item === 'rounded' ? objectSize * 0.18 : 0,
-      width: objectSize,
+      height: objectHeight,
+      rx: element.item === 'rounded' ? Math.min(objectWidth, objectHeight) * 0.08 : 0,
+      ry: element.item === 'rounded' ? Math.min(objectWidth, objectHeight) * 0.08 : 0,
+      width: objectWidth,
     }) as FabricElementObject
   }
 
