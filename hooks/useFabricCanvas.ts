@@ -117,6 +117,22 @@ function applyControls(object: FabricElementObject) {
   })
 }
 
+function forceTextObjectRender(canvas: Canvas, object: IText) {
+  object.set({ objectCaching: false })
+  object.dirty = true
+  object.initDimensions()
+  object.setCoords()
+  canvas.renderAll()
+  canvas.requestRenderAll()
+  window.setTimeout(() => {
+    object.dirty = true
+    object.initDimensions()
+    object.setCoords()
+    canvas.renderAll()
+    canvas.requestRenderAll()
+  }, 100)
+}
+
 async function createFabricObject(element: DesignElement, size: Pick<CanvasSize, 'h' | 'w'>) {
   const scale = elementScale(size)
   const position = toCanvasPosition(element, size)
@@ -159,6 +175,7 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
       lineHeight: element.lineHeight || 1.3,
       textAlign: element.textAlign || 'center',
       underline: element.textDecoration === 'underline',
+      objectCaching: false,
       width: (element.width || 300) * scale,
     })
     return attachElementData(text as FabricElementObject, element)
@@ -171,6 +188,7 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
       fontFamily: 'Arial, sans-serif',
       fontSize: element.size * scale,
       fontWeight: 'bold',
+      objectCaching: false,
       textAlign: 'center',
     })
     return attachElementData(icon as FabricElementObject, element)
@@ -438,11 +456,12 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     object.set(nextProps)
     if (object instanceof IText) {
-      object.dirty = true
-      object.initDimensions()
+      forceTextObjectRender(canvas, object)
+    } else {
+      object.setCoords()
+      canvas.renderAll()
+      canvas.requestRenderAll()
     }
-    object.setCoords()
-    canvas.renderAll()
     if (changes.fontFamily !== undefined && object instanceof IText) {
       console.log('Font applied:', resolvedTextFontFamily(changes.fontFamily), 'to object:', object.text)
     }
