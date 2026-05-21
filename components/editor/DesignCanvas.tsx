@@ -359,7 +359,7 @@ export function DesignCanvas({
         }}
         style={{ border: 'none', cursor: 'pointer' }}
       >
-        AI Ask SOON
+        讓 AI 幫你改圖
       </button>
       <div className="zoom-control">1 / 1 重新排序頁面　⌕ 100%</div>
     </section>
