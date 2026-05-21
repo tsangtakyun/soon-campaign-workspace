@@ -703,6 +703,29 @@ function createContentTemplateElements(template: Template): DesignElement[] {
       ]
     }
 
+    if (element.type === 'image') {
+      return [
+        {
+          id,
+          kind: 'shape',
+          item: 'rounded',
+          label: element.label || '圖片位置',
+          x: box.x,
+          y: box.y,
+          size: Math.min(box.width, box.height),
+          width: box.width,
+          height: box.height,
+          rotation: 0,
+          opacity: 100,
+          color: '#e0e0e0',
+          strokeColor: '#bbbbbb',
+          strokeDashArray: [8, 4],
+          strokeWidth: 2,
+          zIndex: index,
+        },
+      ]
+    }
+
     if (element.type === 'image_placeholder') {
       return [
         {
@@ -727,6 +750,10 @@ function createContentTemplateElements(template: Template): DesignElement[] {
     }
 
     if (element.type === 'text' || element.type === 'badge') {
+      const textContent = element.content || element.text || '文字'
+      const textColor = element.color || element.fill || '#000000'
+      const textAlign = element.textAlign || element.align || 'left'
+
       return [
         {
           id,
@@ -738,18 +765,40 @@ function createContentTemplateElements(template: Template): DesignElement[] {
           size: element.fontSize || 20,
           rotation: 0,
           opacity: 100,
-          color: element.color || '#000000',
+          color: textColor,
           backgroundColor: element.backgroundColor,
           zIndex: index,
-          textContent: element.content || '文字',
+          textContent,
           fontFamily: 'inherit',
           fontSize: element.fontSize || 20,
           fontWeight: element.fontWeight || 'normal',
           fontStyle: element.fontStyle || 'normal',
           textDecoration: 'none',
-          textAlign: element.textAlign || 'left',
+          textAlign,
           width: box.width,
           lineHeight: 1.12,
+        },
+      ]
+    }
+
+    if (element.type === 'rect') {
+      return [
+        {
+          id,
+          kind: 'shape',
+          item: element.rx ? 'rounded' : 'square',
+          label: element.label || '圖形',
+          x: box.x,
+          y: box.y,
+          size: Math.min(box.width, box.height),
+          width: box.width,
+          height: box.height,
+          rotation: 0,
+          opacity: Math.round((element.bgOpacity ?? 1) * 100),
+          color: element.fill || element.bgColor || '#111111',
+          strokeColor: element.stroke,
+          strokeWidth: element.strokeWidth,
+          zIndex: index,
         },
       ]
     }
