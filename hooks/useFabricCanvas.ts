@@ -439,15 +439,15 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     console.log('canvas objects before:', describeObjects())
     canvas.getObjects().forEach((object, index) => {
       const fabricObject = object as FabricElementObject & { id?: string; item?: string }
-      console.log(`object[${index}]:`, {
+      console.log(`object[${index}]: ` + JSON.stringify({
         type: object.type,
         item: fabricObject.data?.item ?? fabricObject.item,
         id: fabricObject.data?.id ?? fabricObject.id,
-        width: object.width,
-        height: object.height,
+        w: Math.round((object.width || 0) * (object.scaleX || 1)),
+        h: Math.round((object.height || 0) * (object.scaleY || 1)),
         scaleX: object.scaleX,
         scaleY: object.scaleY,
-      })
+      }))
     })
 
     const existingBackgrounds = canvas
