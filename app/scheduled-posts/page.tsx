@@ -2189,6 +2189,7 @@ function ScheduledPostsPageContent() {
             canvasSize={canvasSize}
             canvasRef={canvasRef}
             designElements={designElements}
+            onCreditsChange={setCreditBalance}
             onFabricReady={(controls) => {
               fabricControlsRef.current = controls
             }}
@@ -2204,6 +2205,7 @@ function ScheduledPostsPageContent() {
             onStartRotate={startElementRotate}
             selectedElementId={selectedElementId}
             selectedPost={selectedPost}
+            workspaceId={activeWorkspaceId}
           />
 
           <EditorSidePanel

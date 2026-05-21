@@ -623,6 +623,46 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     return fabricRef.current?.toDataURL({ format: 'png', multiplier }) || ''
   }, [])
 
+  const replaceCanvasWithImage = useCallback(async (imageUrl: string) => {
+    const canvas = fabricRef.current
+    if (!canvas) return null
+
+    const image = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' })
+    const size = sizeRef.current
+    const coverScale = Math.max(size.w / (image.width || 1), size.h / (image.height || 1))
+    const imageId = `ai-ask-soon-${Date.now()}`
+
+    image.set({
+      evented: true,
+      hasBorders: true,
+      hasControls: true,
+      left: size.w / 2,
+      lockMovementX: false,
+      lockMovementY: false,
+      originX: 'center',
+      originY: 'center',
+      scaleX: coverScale,
+      scaleY: coverScale,
+      selectable: true,
+      top: size.h / 2,
+    })
+
+    const imageObject = image as FabricElementObject
+    imageObject.data = { id: imageId, item: 'image', kind: 'image' }
+    applyControls(imageObject)
+
+    canvas.clear()
+    canvas.backgroundColor = '#ffffff'
+    canvas.add(imageObject)
+    canvas.setActiveObject(imageObject)
+    imageObject.setCoords()
+    canvas.renderAll()
+    canvas.requestRenderAll()
+    snapshotHistory(canvas)
+
+    return imageId
+  }, [snapshotHistory])
+
   return useMemo(
     () => ({
       addDesignElement,
@@ -634,6 +674,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       fabricRef,
       loadDesignElements,
       redo,
+      replaceCanvasWithImage,
       sendBackward,
       undo,
       updateDesignElement,
@@ -647,6 +688,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       exportPNG,
       loadDesignElements,
       redo,
+      replaceCanvasWithImage,
       sendBackward,
       undo,
       updateDesignElement,
