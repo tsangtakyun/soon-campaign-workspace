@@ -422,11 +422,12 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       top: size.h / 2,
     })
     image.setCoords()
-    canvas.set({ backgroundImage: image })
+    canvas.backgroundImage = image
     canvas.backgroundColor = '#ffffff'
     canvas.discardActiveObject()
     canvas.renderAll()
     canvas.requestRenderAll()
+    console.log('background applied, rendering canvas')
     snapshotHistory(canvas)
   }, [snapshotHistory])
 
