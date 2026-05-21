@@ -42,7 +42,7 @@ type EditorSidePanelProps = {
   onAddImage: (url: string, label: string) => void
   onImageUpload: (files: FileList | null) => void
   onTrackUploadedImage: (image: { url: string; label: string }) => void
-  onApplyBackgroundImage: (url: string, label: string) => void
+  onApplyBackgroundImage: (url: string, label: string) => void | Promise<void>
   onCreditsChange: (balance: number) => void
   onApplyTemplate: (template: Template) => void
   onResizeCanvas: (size: CanvasSize) => void
@@ -279,6 +279,15 @@ export function EditorSidePanel({
     })
   }
 
+  const applyAiBackgroundImage = async (image: { url: string; label: string } | null) => {
+    if (!image?.url) return
+    try {
+      await onApplyBackgroundImage(image.url, image.label)
+    } catch (err) {
+      setAiBackgroundError(err instanceof Error ? err.message : '套用背景失敗，請重試')
+    }
+  }
+
   const generateAiBackground = async () => {
     const basePrompt = aiBackgroundPrompt.trim()
     if (!basePrompt) return
@@ -311,7 +320,7 @@ export function EditorSidePanel({
       if (typeof data.creditsRemaining === 'number') onCreditsChange(data.creditsRemaining)
       setAiBackgroundImage(image)
       onTrackUploadedImage(image)
-      onApplyBackgroundImage(image.url, image.label)
+      await applyAiBackgroundImage(image)
     } catch (err) {
       setAiBackgroundError(err instanceof Error ? err.message : '生成失敗，請重試')
     } finally {
@@ -1240,7 +1249,7 @@ export function EditorSidePanel({
                 </div>
                 <button
                   className="background-ai-apply-button"
-                  onClick={() => onApplyBackgroundImage(aiBackgroundImage.url, aiBackgroundImage.label)}
+                  onClick={() => void applyAiBackgroundImage(aiBackgroundImage)}
                   type="button"
                 >
                   套用

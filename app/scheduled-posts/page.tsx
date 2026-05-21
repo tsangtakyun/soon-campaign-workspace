@@ -1850,8 +1850,13 @@ function ScheduledPostsPageContent() {
     setActiveDesignTool('媒體')
   }
 
-  const applyBackgroundImage = (imageUrl: string) => {
-    void fabricControlsRef.current?.applyBackgroundImage(imageUrl)
+  const applyBackgroundImage = async (imageUrl: string) => {
+    const controls = fabricControlsRef.current
+    if (!controls) {
+      console.warn('[AI Background] Fabric controls not ready')
+      return
+    }
+    await controls.applyBackgroundImage(imageUrl)
     setSelectedElementId(null)
     setActiveDesignTool('背景')
   }

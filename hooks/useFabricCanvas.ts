@@ -421,7 +421,8 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       selectable: false,
       top: size.h / 2,
     })
-    canvas.backgroundImage = image
+    image.setCoords()
+    canvas.set({ backgroundImage: image })
     canvas.backgroundColor = '#ffffff'
     canvas.discardActiveObject()
     canvas.renderAll()
