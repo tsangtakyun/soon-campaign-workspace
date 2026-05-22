@@ -191,7 +191,7 @@ export default function HomePage() {
       </section>
 
       <section className="match-block">
-        <div className="match-block__inner">
+        <div className="match-block__inner" style={{ alignItems: 'center' }}>
           <div>
             <p className="section-eyebrow">SOON 獨家功能</p>
             <h2>
@@ -207,7 +207,10 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl" style={{ width: '70%', margin: '0 auto' }}>
+          <div
+            className="relative overflow-hidden rounded-2xl"
+            style={{ width: '70%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             <img
               src="/KOL/kol-hero.png"
               alt="KOL Creator"
