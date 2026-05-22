@@ -159,13 +159,18 @@ export default function SeoPage() {
       <DashboardSidebar activeItem="SEO" />
       <section className="seo-shell">
         {view === 'landing' ? (
-          <section className="landing-card">
+          <section className="landing-full">
             <img
               src="/seo/seo-banner.png"
               alt="SEO Banner"
-              style={{ width: '100%', maxWidth: '936px', borderRadius: '12px', marginBottom: '24px' }}
+              style={{ width: '100%', maxWidth: '100%', borderRadius: '12px' }}
             />
-            <button className="yellow-button large" type="button" onClick={() => setView('scanning')}>
+            <button
+              className="yellow-button large"
+              style={{ marginTop: '24px' }}
+              type="button"
+              onClick={() => setView('scanning')}
+            >
               設定我的 SEO 計劃
             </button>
           </section>
@@ -428,7 +433,6 @@ const styles = `
   padding: 32px;
 }
 
-.landing-card,
 .modal-card,
 .plan-page {
   background: #ffffff;
@@ -437,10 +441,8 @@ const styles = `
   box-shadow: 0 18px 50px rgba(15, 23, 42, .08);
 }
 
-.landing-card {
-  max-width: 720px;
-  margin: 10vh auto 0;
-  padding: 48px;
+.landing-full {
+  width: 100%;
   text-align: center;
 }
 
@@ -960,7 +962,6 @@ const styles = `
     padding: 22px 14px;
   }
 
-  .landing-card,
   .modal-card,
   .plan-page {
     padding: 22px;
