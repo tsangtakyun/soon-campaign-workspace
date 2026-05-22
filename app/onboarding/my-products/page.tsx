@@ -1,23 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Edit3, Gift, ImageIcon, Trash2 } from 'lucide-react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
 
 type ProductTab = 'library' | 'pr' | 'sales'
-type Product = { name: string; price: string; link: string }
+type Product = { description: string; id: string; imageUrl?: string; name: string; price: string }
 
 const platforms = ['IG Story', 'IG Post', 'Reels', 'TikTok', '小紅書', 'YouTube Short']
 
-const products: Product[] = [
-  { name: '玻尿酸精華液', price: 'HK$288', link: 'shopline.com/hyaluronic-serum' },
-  { name: '白松露煥白面膜', price: 'HK$198', link: 'shopline.com/truffle-mask' },
-  { name: '膠原蛋白眼霜', price: 'HK$328', link: 'shopline.com/collagen-eye-cream' },
-  { name: '山茶花修護乳霜', price: 'HK$368', link: 'shopline.com/camellia-cream' },
-  { name: '維他命 C 亮白安瓶', price: 'HK$258', link: 'shopline.com/vitamin-c-ampoule' },
-  { name: '水光保濕防曬霜', price: 'HK$238', link: 'shopline.com/aqua-sunscreen' },
+const initialProducts: Product[] = [
+  { id: 'hyaluronic-serum', name: '玻尿酸精華液', price: 'HK$288', description: '高效補水精華，適合日常保濕護理。' },
+  { id: 'truffle-mask', name: '白松露煥白面膜', price: 'HK$198', description: '提亮暗沉膚色，打造透亮光澤感。' },
+  { id: 'collagen-eye-cream', name: '膠原蛋白眼霜', price: 'HK$328', description: '淡化眼周乾紋，提升緊緻感。' },
+  { id: 'camellia-cream', name: '山茶花修護乳霜', price: 'HK$368', description: '滋潤修護屏障，適合晚間護膚。' },
+  { id: 'vitamin-c-ampoule', name: '維他命 C 亮白安瓶', price: 'HK$258', description: '集中亮白護理，改善暗啞膚況。' },
+  { id: 'aqua-sunscreen', name: '水光保濕防曬霜', price: 'HK$238', description: '清爽防曬，同時保濕提亮。' },
 ]
 
 const salesRows = [
@@ -61,11 +62,24 @@ const prCampaigns = [
 ]
 
 export default function MyProductsPage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<ProductTab>('library')
+  const [productItems, setProductItems] = useState<Product[]>(initialProducts)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editImageUrl, setEditImageUrl] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['IG Story', 'Reels'])
   const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({ 'serum-pr': true })
-  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  function showMessage(message: string) {
+    setToastMessage(message)
+    window.setTimeout(() => setToastMessage(null), 4200)
+  }
 
   function togglePlatform(platform: string) {
     setSelectedPlatforms((current) =>
@@ -76,8 +90,42 @@ export default function MyProductsPage() {
   function publishPrCampaign() {
     setSelectedProduct(null)
     setActiveTab('pr')
-    setShowToast(true)
-    window.setTimeout(() => setShowToast(false), 4200)
+    showMessage('✓ PR Gift Campaign 已上架！KOL 將可在 SOON Creator Network 看到並申請。')
+  }
+
+  function openEditModal(product: Product) {
+    setEditingProduct(product)
+    setEditName(product.name)
+    setEditPrice(product.price.replace(/[^0-9.]/g, ''))
+    setEditDescription(product.description)
+    setEditImageUrl(product.imageUrl || '')
+  }
+
+  function saveProductEdits() {
+    if (!editingProduct) return
+    const nextPrice = editPrice.trim() ? `HK$${editPrice.trim()}` : editingProduct.price
+    setProductItems((current) =>
+      current.map((product) =>
+        product.id === editingProduct.id
+          ? {
+              ...product,
+              description: editDescription.trim(),
+              imageUrl: editImageUrl.trim() || undefined,
+              name: editName.trim() || product.name,
+              price: nextPrice,
+            }
+          : product
+      )
+    )
+    setEditingProduct(null)
+    showMessage('✓ 產品已更新')
+  }
+
+  function confirmDeleteProduct() {
+    if (!deleteProduct) return
+    setProductItems((current) => current.filter((product) => product.id !== deleteProduct.id))
+    setDeleteProduct(null)
+    showMessage('已刪除產品')
   }
 
   return (
@@ -86,8 +134,8 @@ export default function MyProductsPage() {
       <DashboardSidebar activeItem="我的產品" />
 
       <section className="products-shell">
-        {showToast ? (
-          <div className="success-toast">✓ PR Gift Campaign 已上架！KOL 將可在 SOON Creator Network 看到並申請。</div>
+        {toastMessage ? (
+          <div className="success-toast">{toastMessage}</div>
         ) : null}
 
         <div className="products-panel">
@@ -134,22 +182,39 @@ export default function MyProductsPage() {
               </header>
 
               <div className="product-grid">
-                {products.map((product) => (
-                  <article className="product-card" key={product.name}>
-                    <div className="product-image">
-                      <ImageIcon aria-hidden="true" size={34} strokeWidth={1.7} />
-                    </div>
+                {productItems.map((product) => (
+                  <article className="product-card" key={product.id}>
+                    <button
+                      aria-label="前往品牌素材庫"
+                      className="product-image"
+                      onClick={() => router.push('/onboarding/brand-assets')}
+                      title="前往品牌素材庫"
+                      type="button"
+                    >
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} />
+                      ) : (
+                        <ImageIcon aria-hidden="true" size={34} strokeWidth={1.7} />
+                      )}
+                      <span className="image-hover-overlay">
+                        <ImageIcon aria-hidden="true" size={18} />
+                        前往品牌素材庫
+                      </span>
+                    </button>
                     <div className="product-info">
                       <div>
                         <h2>{product.name}</h2>
                         <strong>{product.price}</strong>
-                        <p>{product.link}</p>
+                        <p>
+                          <span>SOON 商店</span>
+                          透過 SOON Creator Network 銷售
+                        </p>
                       </div>
                       <div className="icon-actions" aria-label={`${product.name} 操作`}>
-                        <button aria-label="編輯產品" title="編輯產品" type="button">
+                        <button aria-label="編輯產品" onClick={() => openEditModal(product)} title="編輯產品" type="button">
                           <Edit3 aria-hidden="true" size={16} />
                         </button>
-                        <button aria-label="刪除產品" title="刪除產品" type="button">
+                        <button aria-label="刪除產品" onClick={() => setDeleteProduct(product)} title="刪除產品" type="button">
                           <Trash2 aria-hidden="true" size={16} />
                         </button>
                         <button
@@ -401,6 +466,85 @@ export default function MyProductsPage() {
         </div>
       ) : null}
 
+      {editingProduct ? (
+        <div className="modal-backdrop" onClick={() => setEditingProduct(null)}>
+          <section className="pr-modal edit-product-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <header className="modal-header">
+              <div>
+                <h2>編輯產品</h2>
+                <p>更新 SOON 商店內的產品資訊，方便 Creator Network 使用。</p>
+              </div>
+              <button aria-label="關閉" onClick={() => setEditingProduct(null)} type="button">
+                ×
+              </button>
+            </header>
+
+            <div className="modal-section">
+              <label>
+                <span>產品名稱</span>
+                <input value={editName} onChange={(event) => setEditName(event.target.value)} />
+              </label>
+              <label>
+                <span>價格 HK$</span>
+                <input
+                  min={0}
+                  type="number"
+                  value={editPrice}
+                  onChange={(event) => setEditPrice(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>產品描述</span>
+                <textarea
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  placeholder="簡單描述產品賣點、適合膚質或使用方法..."
+                  rows={4}
+                  value={editDescription}
+                />
+              </label>
+              <label>
+                <span>產品圖片</span>
+                <div className="edit-upload-area">
+                  <ImageIcon aria-hidden="true" size={22} />
+                  <strong>拖放圖片到這裡，或貼上圖片 URL</strong>
+                  <input
+                    placeholder="https://..."
+                    value={editImageUrl}
+                    onChange={(event) => setEditImageUrl(event.target.value)}
+                  />
+                </div>
+              </label>
+            </div>
+
+            <footer className="modal-actions">
+              <button className="cancel-button" onClick={() => setEditingProduct(null)} type="button">
+                取消
+              </button>
+              <button className="publish-button" onClick={saveProductEdits} type="button">
+                儲存變更
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
+      {deleteProduct ? (
+        <div className="modal-backdrop" onClick={() => setDeleteProduct(null)}>
+          <section className="confirm-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>刪除產品</h2>
+            <p>確定要刪除「{deleteProduct.name}」？此動作不可還原。</p>
+            <div className="confirm-actions">
+              <button className="cancel-button" onClick={() => setDeleteProduct(null)} type="button">
+                取消
+              </button>
+              <button className="delete-confirm-button" onClick={confirmDeleteProduct} type="button">
+                確定刪除
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
     </main>
   )
@@ -512,11 +656,43 @@ const styles = `
 
 .product-image {
   aspect-ratio: 1;
+  width: 100%;
+  border: 0;
   background: linear-gradient(135deg, #eeeeF4, #dedee8);
   color: #9ca3af;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+.product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-hover-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, .58);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 900;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.product-image:hover .image-hover-overlay,
+.product-image:focus-visible .image-hover-overlay {
+  opacity: 1;
 }
 
 .product-info {
@@ -542,7 +718,13 @@ const styles = `
   margin: 0;
   color: #8b8f9b;
   font-size: 12px;
-  word-break: break-all;
+  line-height: 1.45;
+}
+
+.product-info p span {
+  display: block;
+  color: #6b7280;
+  font-weight: 800;
 }
 
 .icon-actions {
@@ -965,6 +1147,64 @@ tbody tr:last-child td {
   list-style: none;
   color: #111827;
   font-size: 14px;
+}
+
+.edit-upload-area {
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  background: #f9fafb;
+  color: #6b7280;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.edit-upload-area > svg {
+  color: #7c3aed;
+}
+
+.edit-upload-area strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.confirm-modal {
+  width: min(420px, 100%);
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+  padding: 22px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .32);
+}
+
+.confirm-modal h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.confirm-modal p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.delete-confirm-button {
+  border: 1px solid #dc2626;
+  border-radius: 10px;
+  background: #dc2626;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 11px 18px;
 }
 
 .modal-actions {
