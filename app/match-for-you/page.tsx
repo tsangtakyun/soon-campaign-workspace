@@ -163,7 +163,9 @@ export default function MatchForYouPage() {
 
       <section className="audience-section">
         <div className="section-heading">
-          <h2>為品牌而設 · 為創作者而設</h2>
+          <h2 className="audience-title">
+            為品牌而設<span>·</span>為創作者而設
+          </h2>
         </div>
         <div className="audience-grid">
           <article className="audience-card brand-card">
@@ -214,7 +216,7 @@ export default function MatchForYouPage() {
             }
 
             .hero-section {
-              min-height: 100vh;
+              min-height: 85vh;
               display: grid;
               grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
               align-items: center;
@@ -416,10 +418,13 @@ export default function MatchForYouPage() {
               font-weight: 850;
             }
 
-            .how-section,
             .audience-section,
             .cta-section {
               padding: 110px 7vw;
+            }
+
+            .how-section {
+              padding: 64px 7vw 110px;
             }
 
             .section-heading {
@@ -435,6 +440,14 @@ export default function MatchForYouPage() {
               line-height: 1;
               letter-spacing: 0;
               font-weight: 950;
+            }
+
+            .audience-title {
+              white-space: nowrap;
+            }
+
+            .audience-title span {
+              margin: 0 0.18em;
             }
 
             .section-heading p,
@@ -609,6 +622,11 @@ export default function MatchForYouPage() {
               .hero-section {
                 grid-template-columns: 1fr;
                 padding-top: 210px;
+              }
+
+              .audience-title {
+                white-space: normal;
+                font-size: clamp(2rem, 7vw, 4rem);
               }
 
               .hero-visual {
