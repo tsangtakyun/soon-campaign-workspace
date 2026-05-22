@@ -148,7 +148,8 @@ export default function HomePage() {
               自己說話
             </h1>
             <div className="hero__subtitle">
-              <span className="hero__subtitle-main">相信 AI system，不再浪費金錢在中介身上。</span>
+              <span className="hero__subtitle-main">相信 AI system</span>
+              <span className="hero__subtitle-main">不再浪費金錢在中介身上</span>
               <span className="hero__subtitle-note">每月只需 HK$388 起 · 免費試用七天</span>
             </div>
             <div className="hero__actions">
@@ -213,7 +214,7 @@ export default function HomePage() {
               src="/KOL/kol-hero.png"
               alt="KOL Creator"
               className="w-full h-full object-cover object-center"
-              style={{ transform: 'scale(1.2)', transformOrigin: 'center center', minHeight: '420px' }}
+              style={{ transform: 'scale(0.84)', transformOrigin: 'center center', opacity: 0.6, minHeight: '420px' }}
             />
           </div>
         </div>
@@ -232,7 +233,7 @@ export default function HomePage() {
 
         <div className="relative rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
           <img
-            src="/dashboard-preview.jpg"
+            src="/dashboard-preview.png"
             alt="SOON Dashboard - 銀幸の美學 Ginkgo Beauty"
             className="w-full h-auto"
             style={{ display: 'block' }}
@@ -333,8 +334,9 @@ export default function HomePage() {
 
             .hero__text {
               width: min(100%, 50%);
-              max-width: 50%;
+              max-width: 42%;
               margin-left: auto;
+              margin-right: 5%;
             }
 
             .hero__eyebrow,
