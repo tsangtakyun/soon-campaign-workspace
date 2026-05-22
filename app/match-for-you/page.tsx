@@ -207,70 +207,77 @@ export default function MatchForYouPage() {
           background: '#0a0a0a',
         }}
       />
-      <section className="hero-section">
-        <div className="hero-copy">
-          <p className="eyebrow">SOON 獨家功能 · Exclusive Feature</p>
-          <h1>
-            <span>不需要主動</span>
-            <span>搵 KOL</span>
-            <span>讓 KOL 找你</span>
-          </h1>
-          <p className="hero-subtitle">
-            發布 PR Gift Campaign，讓全亞洲創作者主動申請合作。品牌專注做好產品，SOON 幫你搞掂其餘一切。
-          </p>
-          <div className="hero-actions">
-            <Link className="primary-cta" href="/signup">
-              品牌免費試用
-            </Link>
-            <Link className="secondary-cta" href="https://sooncreator.network/kol">
-              我係創作者 →
-            </Link>
-          </div>
-          <div className="platform-row" aria-label="支援平台">
-            <span>Instagram</span>
-            <span>小紅書</span>
-            <span>TikTok</span>
-            <span>YouTube</span>
-          </div>
+      <section className="relative w-full overflow-hidden hero-background-section" style={{ minHeight: '580px' }}>
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/KOL/kol-hero.png"
+            alt=""
+            className="w-full h-full object-cover object-center"
+            style={{
+              animation: 'float 6s ease-in-out infinite',
+              transform: 'scale(1.4)',
+              transformOrigin: 'center center',
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to right, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.5) 50%, rgba(10,10,10,0.15) 100%)',
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(to top, rgba(10,10,10,0.9) 0%, transparent 40%)',
+            }}
+          />
         </div>
 
-        <div className="hero-visual" aria-label="KOL Creator">
-          <div className="relative w-full h-full min-h-[500px] flex items-center justify-center rounded-2xl overflow-hidden">
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: 'linear-gradient(to right, #0a0a0a 0%, transparent 30%)',
-              }}
-            />
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: 'linear-gradient(to top, #0a0a0a 0%, transparent 25%)',
-              }}
-            />
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: 'linear-gradient(to bottom, #0a0a0a 0%, transparent 20%)',
-              }}
-            />
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: 'linear-gradient(to left, #0a0a0a 0%, transparent 20%)',
-              }}
-            />
-            <img
-              src="/KOL/kol-hero.png"
-              alt="KOL Creator"
-              className="w-full h-full object-cover object-center"
-              style={{
-                animation: 'float 6s ease-in-out infinite',
-                maxHeight: '600px',
-                transform: 'scale(1.4)',
-                transformOrigin: 'center center',
-              }}
-            />
+        <div className="relative z-10 px-12 pt-24 pb-16 max-w-5xl hero-background-content">
+          <p
+            className="text-sm font-medium tracking-widest uppercase mb-6"
+            style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
+          >
+            SOON ???? ? Exclusive Feature
+          </p>
+
+          <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(48px, 7vw, 96px)' }}>
+            ??????KOL
+            <br />
+            ?KOL??
+          </h1>
+
+          <p
+            className="text-white mb-8"
+            style={{ fontSize: '18px', opacity: 0.75, maxWidth: '520px', lineHeight: 1.6 }}
+          >
+            ????????????????????
+            <br />
+            SOON ????????
+          </p>
+
+          <div className="flex gap-3 items-center mb-8">
+            <a className="px-6 py-3 font-semibold text-white rounded-lg text-sm" href="/signup" style={{ background: '#ef4444' }}>
+              ??????
+            </a>
+            <a
+              className="px-6 py-3 font-semibold rounded-lg text-sm"
+              href="#"
+              style={{ background: 'transparent', border: '1.5px solid rgba(255,255,255,0.4)', color: '#fff' }}
+            >
+              ????? ?
+            </a>
+          </div>
+
+          <div className="flex gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <span>Instagram</span>
+            <span>?</span>
+            <span>???</span>
+            <span>?</span>
+            <span>TikTok</span>
+            <span>?</span>
+            <span>YouTube</span>
           </div>
         </div>
       </section>
@@ -467,10 +474,21 @@ export default function MatchForYouPage() {
             .relative { position: relative; }
             .absolute { position: absolute; }
             .inset-0 { inset: 0; }
+            .z-0 { z-index: 0; }
             .z-10 { z-index: 10; }
             .pointer-events-none { pointer-events: none; }
             .w-full { width: 100%; }
             .h-full { height: 100%; }
+            .max-w-5xl { max-width: 1024px; }
+            .px-12 { padding-left: 48px; padding-right: 48px; }
+            .px-6 { padding-left: 24px; padding-right: 24px; }
+            .py-3 { padding-top: 12px; padding-bottom: 12px; }
+            .pt-24 { padding-top: 96px; }
+            .pb-16 { padding-bottom: 64px; }
+            .mb-6 { margin-bottom: 24px; }
+            .mb-8 { margin-bottom: 32px; }
+            .gap-3 { gap: 12px; }
+            .gap-4 { gap: 16px; }
             .min-h-\\[500px\\] { min-height: 500px; }
             .flex { display: flex; }
             .items-center { align-items: center; }
@@ -478,6 +496,15 @@ export default function MatchForYouPage() {
             .overflow-hidden { overflow: hidden; }
             .object-cover { object-fit: cover; }
             .object-center { object-position: center; }
+            .font-bold { font-weight: 950; }
+            .font-medium { font-weight: 700; }
+            .font-semibold { font-weight: 850; }
+            .leading-none { line-height: 1; }
+            .text-white { color: #ffffff; }
+            .text-sm { font-size: 0.875rem; }
+            .tracking-widest { letter-spacing: 0.12em; }
+            .uppercase { text-transform: uppercase; }
+            .rounded-lg { border-radius: 8px; }
             .rounded-2xl { border-radius: 16px; }
 
             .red-glow {
@@ -581,8 +608,8 @@ export default function MatchForYouPage() {
             }
 
             .how-section {
-              margin-top: -64px;
-              padding: 0 7vw 110px;
+              margin-top: 0;
+              padding: 64px 7vw 110px;
               position: relative;
               z-index: 3;
             }
