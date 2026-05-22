@@ -207,14 +207,12 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="relative w-full overflow-hidden rounded-2xl" style={{ minHeight: '420px' }}>
-            <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'linear-gradient(to right, rgba(10,10,10,0.5) 0%, transparent 40%)' }} />
-            <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(10,10,10,0.4) 0%, transparent 30%)' }} />
+          <div className="relative overflow-hidden rounded-2xl" style={{ width: '70%', margin: '0 auto' }}>
             <img
               src="/KOL/kol-hero.png"
               alt="KOL Creator"
-              className="w-full h-full object-cover object-center"
-              style={{ transform: 'scale(0.84)', transformOrigin: 'center center', opacity: 0.6, minHeight: '420px' }}
+              className="w-full h-auto block"
+              style={{ opacity: 0.6 }}
             />
           </div>
         </div>
