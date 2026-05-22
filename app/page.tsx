@@ -200,7 +200,7 @@ export default function HomePage() {
               創作者配對
             </h2>
             <p>
-              品牌發布 PR Gift Campaign，全亞洲創作者主動申請合作。不需要主動尋找 KOL，讓 KOL 找你。支援 Instagram、小紅書、TikTok、YouTube。
+              品牌發布 Campaign 後，創作者主動申請合作。不需要主動尋找 KOL，讓 KOL 找你。支援 Instagram、小紅書、TikTok、YouTube。
             </p>
             <Link href="/match-for-you" className="text-link">
               了解 Match for You →
@@ -247,7 +247,7 @@ export default function HomePage() {
             src="/dashboard-preview.png"
             alt="SOON Dashboard - 銀幸の美學 Ginkgo Beauty"
             className="w-full h-auto"
-            style={{ display: 'block' }}
+            style={{ display: 'block', maxWidth: '50%', margin: '0 auto' }}
           />
         </div>
 
