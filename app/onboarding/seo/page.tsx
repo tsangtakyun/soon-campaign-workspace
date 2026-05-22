@@ -163,18 +163,9 @@ export default function SeoPage() {
             <img
               src="/seo/seo-banner.png"
               alt="SEO Banner"
-              style={{ width: '100%', maxWidth: '480px', borderRadius: '12px', marginBottom: '24px' }}
+              style={{ width: '100%', maxWidth: '624px', borderRadius: '12px', marginBottom: '24px' }}
             />
-            <h1>讓 SOON 幫你增長社交流量</h1>
-            <p>
-              選擇話題集群，SOON 自動生成針對搜尋關鍵詞的社交內容，
-              在 Instagram、小紅書、TikTok 建立自然流量。
-            </p>
-            <div className="feature-pills">
-              <span>🔍 繁中 + 簡中關鍵詞</span>
-              <span>📱 Social SEO 內容</span>
-            </div>
-            <button className="black-button large" type="button" onClick={() => setView('scanning')}>
+            <button className="yellow-button large" type="button" onClick={() => setView('scanning')}>
               設定我的 SEO 計劃
             </button>
           </section>
@@ -478,24 +469,8 @@ const styles = `
   margin: 16px auto 0;
 }
 
-.feature-pills {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 26px 0;
-}
-
-.feature-pills span {
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #f9fafb;
-  color: #374151;
-  font-weight: 800;
-  padding: 9px 13px;
-}
-
 .black-button,
+.yellow-button,
 .disabled-button,
 .purple-button,
 .cancel-button {
@@ -511,7 +486,13 @@ const styles = `
   color: #ffffff;
 }
 
-.black-button.large {
+.yellow-button {
+  background: #facc15;
+  color: #0a0a0a;
+}
+
+.black-button.large,
+.yellow-button.large {
   font-size: 16px;
   padding: 14px 22px;
 }
