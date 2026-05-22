@@ -3,88 +3,28 @@
 import Link from 'next/link'
 import React from 'react'
 
-const applicationCards = [
-  {
-    name: '陳曉彤',
-    platform: 'IG 23.5K',
-    niche: '美妝',
-    status: '✓ 已申請',
-    statusTone: 'green',
-    gradient: 'linear-gradient(135deg, #c084fc, #f472b6)',
-    className: 'kol-card card-a',
-  },
-  {
-    name: '林思穎',
-    platform: '小紅書 41K',
-    niche: '生活風格',
-    status: '待審核',
-    statusTone: 'amber',
-    gradient: 'linear-gradient(135deg, #fb7185, #f97316)',
-    className: 'kol-card card-b',
-  },
-  {
-    name: '梁嘉欣',
-    platform: 'TikTok 89K',
-    niche: '時尚',
-    status: '✓ 已申請',
-    statusTone: 'green',
-    gradient: 'linear-gradient(135deg, #38bdf8, #818cf8)',
-    className: 'kol-card card-c',
-  },
-  {
-    name: '黃芷晴',
-    platform: 'YouTube 16K',
-    niche: '旅遊',
-    status: '待審核',
-    statusTone: 'amber',
-    gradient: 'linear-gradient(135deg, #34d399, #22d3ee)',
-    className: 'kol-card card-d',
-  },
-  {
-    name: '何雅琪',
-    platform: 'IG 52K',
-    niche: '護膚',
-    status: '✓ 已申請',
-    statusTone: 'green',
-    gradient: 'linear-gradient(135deg, #f9a8d4, #ef4444)',
-    className: 'kol-card card-e',
-  },
-  {
-    name: '吳凱琳',
-    platform: '小紅書 67K',
-    niche: '平價好物',
-    status: '✓ 已申請',
-    statusTone: 'green',
-    gradient: 'linear-gradient(135deg, #fde047, #fb7185)',
-    className: 'kol-card card-f',
-  },
-]
-
 const steps = [
   {
     number: '01',
-    icon: '🎁',
     title: '上架 PR Campaign',
     description: '設定產品、預算、目標平台，5 分鐘完成 Campaign 上架',
   },
   {
     number: '02',
-    icon: '📩',
     title: 'KOL 主動申請',
     description: '全亞洲創作者瀏覽你的 Campaign，主動提交申請',
   },
   {
     number: '03',
-    icon: '✅',
     title: '一鍵批准寄貨',
-    description: '審核申請、批准合作、安排寄貨，全部在 SOON 管理',
+    description: '審核申請、批准合作、安排寄貨，全部於 SOON 統一管理',
   },
 ]
 
 const brandPoints = [
-  '唔需要主動聯絡 KOL，坐等申請',
+  '無需主動聯絡 KOL，靜待申請',
   '自訂 Campaign 條件：粉絲數、平台、地區',
-  '一個 dashboard 管理所有申請',
+  '統一管理所有申請',
   '支援香港 · 台灣 · 大陸市場',
 ]
 
@@ -94,6 +34,35 @@ const creatorPoints = [
   '支援 IG · 小紅書 · TikTok · YouTube',
   '亞洲市場優先，中文界面',
 ]
+
+function StepIcon({ step }: { step: string }) {
+  if (step === '01') {
+    return (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="6" width="24" height="20" rx="2" stroke="#ef4444" strokeWidth="2" />
+        <path d="M4 12h24" stroke="#ef4444" strokeWidth="2" />
+        <path d="M16 18v4M14 20h4" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    )
+  }
+
+  if (step === '02') {
+    return (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="11" r="5" stroke="#ef4444" strokeWidth="2" />
+        <path d="M6 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+        <path d="M20 20l3 3 5-5" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="8" width="24" height="18" rx="2" stroke="#ef4444" strokeWidth="2" />
+      <path d="M10 17l4 4 8-8" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function MatchForYouPage() {
   React.useEffect(() => {
@@ -207,42 +176,30 @@ export default function MatchForYouPage() {
           background: '#0a0a0a',
         }}
       />
-      <section className="relative w-full overflow-hidden" style={{ background: '#0a0a0a', minHeight: '620px' }}>
-        <div className="relative z-10 grid grid-cols-2 items-center" style={{ minHeight: '620px' }}>
-          <div className="flex flex-col justify-center pl-24 pr-8 pt-40 pb-24">
-            <p
-              className="text-sm font-medium uppercase mb-6 tracking-widest"
-              style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
-            >
-              SOON 獨家功能 · Exclusive Feature
-            </p>
-            <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(56px, 6vw, 100px)' }}>
+
+      <section className="hero-split">
+        <div className="hero-grid">
+          <div className="hero-copy pl-40">
+            <p className="hero-eyebrow">SOON 獨家功能 · Exclusive Feature</p>
+            <h1>
               不需要主動找KOL
               <br />
               讓KOL找你
             </h1>
-            <p className="text-white mb-8" style={{ fontSize: '17px', opacity: 0.7, lineHeight: 1.7 }}>
-              讓創作者主動申請合作，品牌專注做好產品，
+            <p className="hero-subtitle">
+              讓創作者主動申請合作，品牌專注產品本身，
               <br />
-              SOON 幫你完成其餘一切
+              SOON 協助完成其餘一切
             </p>
-            <div className="flex gap-3 items-center mb-8">
-              <a
-                href="/signup"
-                className="px-6 py-3 font-semibold text-white rounded-lg text-sm"
-                style={{ background: '#ef4444' }}
-              >
+            <div className="hero-actions">
+              <a className="hero-primary" href="/signup" style={{ textDecoration: 'none' }}>
                 品牌免費試用
               </a>
-              <a
-                href="#"
-                className="px-6 py-3 font-semibold rounded-lg text-sm"
-                style={{ background: 'transparent', border: '1.5px solid rgba(255,255,255,0.4)', color: '#fff' }}
-              >
-                我係創作者 →
+              <a className="hero-secondary" href="#" style={{ textDecoration: 'none' }}>
+                我是創作者 →
               </a>
             </div>
-            <div className="flex gap-3 text-sm items-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <div className="platform-row">
               <span>Instagram</span>
               <span>&middot;</span>
               <span>小紅書</span>
@@ -253,31 +210,59 @@ export default function MatchForYouPage() {
             </div>
           </div>
 
-          <div className="relative h-full overflow-hidden" style={{ minHeight: '620px' }}>
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{ background: 'linear-gradient(to right, #0a0a0a 0%, transparent 35%)' }}
-            />
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{ background: 'linear-gradient(to bottom, #0a0a0a 0%, transparent 20%)' }}
-            />
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{ background: 'linear-gradient(to top, #0a0a0a 0%, transparent 20%)' }}
-            />
-            <img
-              src="/KOL/kol-hero.png"
-              alt="KOL Creator"
-              className="w-full h-full object-cover object-center"
-              style={{
-                transform: 'scale(1.4)',
-                transformOrigin: 'center center',
-                animation: 'float 6s ease-in-out infinite',
-                minHeight: '620px',
-              }}
-            />
+          <div className="hero-image-wrap">
+            <div className="hero-fade hero-fade-left" />
+            <div className="hero-fade hero-fade-top" />
+            <div className="hero-fade hero-fade-bottom" />
+            <img src="/KOL/kol-hero.png" alt="KOL Creator" className="hero-image" />
           </div>
+        </div>
+      </section>
+
+      <section className="pain-section">
+        <div className="pain-inner">
+          <p className="section-kicker">Pain Points · 市場痛點</p>
+          <h2>傳統 KOL 合作模式的三大問題</h2>
+
+          <div className="pain-grid">
+            <article className="pain-card">
+              <div className="pain-icon">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="20" cy="20" r="18" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 4" />
+                  <path d="M20 12v9M20 28v1" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3>中間人收取高額佣金</h3>
+              <p>品牌預算大量流向 MCN 及中介機構，實際用於創作者合作的費用嚴重壓縮，投資回報率極低。</p>
+            </article>
+
+            <article className="pain-card">
+              <div className="pain-icon">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="16" cy="14" r="5" stroke="#ef4444" strokeWidth="1.5" />
+                  <path d="M8 32c0-6 16-6 16 0" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M26 18l8-8M34 18l-8-8" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3>KOL 對產品缺乏真實興趣</h3>
+              <p>中介優先推薦旗下創作者，而非最適合的人選。KOL 被動接單，對產品缺乏熱情，內容質素難以保證。</p>
+            </article>
+
+            <article className="pain-card">
+              <div className="pain-icon">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="6" y="10" width="28" height="22" rx="2" stroke="#ef4444" strokeWidth="1.5" />
+                  <path d="M6 18h28" stroke="#ef4444" strokeWidth="1.5" />
+                  <path d="M14 14h2M20 14h2" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M13 26h14" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 3" />
+                </svg>
+              </div>
+              <h3>創作者難以自主尋找合作</h3>
+              <p>獨立創作者缺乏人脈與渠道，只能被動等待。優質 KOL 因無法直接接觸品牌而錯失合作機會。</p>
+            </article>
+          </div>
+
+          <p className="pain-bridge">SOON Match for You 正是為解決以上問題而生 ↓</p>
         </div>
       </section>
 
@@ -290,7 +275,9 @@ export default function MatchForYouPage() {
           {steps.map((step) => (
             <article className="step-card" key={step.number}>
               <span className="step-number">{step.number}</span>
-              <span className="step-icon">{step.icon}</span>
+              <span className="step-icon">
+                <StepIcon step={step.number} />
+              </span>
               <h3>{step.title}</h3>
               <p>{step.description}</p>
             </article>
@@ -300,9 +287,7 @@ export default function MatchForYouPage() {
 
       <section className="audience-section">
         <div className="section-heading">
-          <h2 className="audience-title">
-            為品牌而設<span>·</span>為創作者而設
-          </h2>
+          <h2 className="audience-title">為品牌而設<span>·</span>為創作者而設</h2>
         </div>
         <div className="audience-grid">
           <article className="audience-card brand-card">
@@ -326,11 +311,11 @@ export default function MatchForYouPage() {
 
       <section className="cta-section">
         <h2>準備好開始了嗎？</h2>
-        <p>立即免費上架你的第一個 PR Gift Campaign</p>
+        <p>立即免費試用一星期</p>
         <Link className="primary-cta" href="/signup">
           免費開始
         </Link>
-        <small>無需信用卡 · 免費試用 · 隨時取消</small>
+        <small>無需信用卡 · 免費試用七天 · 隨時取消</small>
       </section>
 
       <footer className="match-footer">
@@ -352,18 +337,8 @@ export default function MatchForYouPage() {
                 "Segoe UI", sans-serif;
             }
 
-            .hero-section {
-              display: grid;
-              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-              align-items: start;
-              gap: 6vw;
-              overflow: hidden;
-              padding: 150px 7vw 64px;
-              position: relative;
-              z-index: 1;
-            }
-
-            .hero-section,
+            .hero-split,
+            .pain-section,
             .how-section,
             .audience-section,
             .cta-section,
@@ -372,253 +347,216 @@ export default function MatchForYouPage() {
               z-index: 1;
             }
 
-            .hero-copy {
-              max-width: 720px;
-              position: relative;
-              z-index: 2;
+            .hero-split {
+              background: #0a0a0a;
+              min-height: 620px;
+              overflow: hidden;
             }
 
-            .eyebrow {
+            .hero-grid {
+              min-height: 620px;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              align-items: center;
+            }
+
+            .hero-copy {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              padding: 160px 32px 96px 160px;
+            }
+
+            .pl-40 {
+              padding-left: 160px;
+            }
+
+            .hero-eyebrow {
+              margin: 0 0 24px;
               color: #D4AF37;
-              font-size: 0.82rem;
-              font-weight: 900;
-              letter-spacing: 0.16em;
-              margin: 0 0 18px;
+              font-size: 0.875rem;
+              font-weight: 800;
+              letter-spacing: 0.12em;
               text-transform: uppercase;
             }
 
             .hero-copy h1 {
-              display: flex;
-              flex-direction: column;
-              gap: 4px;
-              margin: 0;
-              font-size: clamp(4rem, 8vw, 8.8rem);
-              line-height: 0.9;
-              letter-spacing: 0;
+              margin: 0 0 24px;
+              color: #ffffff;
+              font-size: clamp(56px, 6vw, 100px);
+              line-height: 1;
               font-weight: 950;
+              letter-spacing: 0;
             }
 
             .hero-subtitle {
-              max-width: 640px;
-              margin: 28px 0 0;
-              color: #d4d4d8;
-              font-size: clamp(1.1rem, 1.6vw, 1.45rem);
-              line-height: 1.75;
-              font-weight: 550;
+              margin: 0 0 32px;
+              color: rgba(255, 255, 255, 0.7);
+              font-size: 17px;
+              line-height: 1.7;
+              font-weight: 650;
             }
 
             .hero-actions {
               display: flex;
-              flex-wrap: wrap;
-              gap: 14px;
-              margin-top: 36px;
+              align-items: center;
+              gap: 12px;
+              margin-bottom: 32px;
             }
 
-            .primary-cta,
-            .secondary-cta {
+            .hero-primary,
+            .hero-secondary,
+            .primary-cta {
               display: inline-flex;
               align-items: center;
               justify-content: center;
-              min-height: 54px;
+              min-height: 48px;
               padding: 0 24px;
               border-radius: 8px;
+              font-size: 0.875rem;
+              font-weight: 850;
               text-decoration: none;
-              font-size: 1rem;
-              font-weight: 900;
               transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
             }
 
+            .hero-primary,
             .primary-cta {
               background: #ef4444;
               color: #ffffff;
-              box-shadow: 0 18px 42px rgba(239, 68, 68, 0.32);
               border: 1px solid rgba(255, 255, 255, 0.08);
+              box-shadow: 0 18px 42px rgba(239, 68, 68, 0.32);
             }
 
-            .secondary-cta {
+            .hero-secondary {
               color: #ffffff;
-              border: 1px solid rgba(255, 255, 255, 0.72);
-              background: rgba(255, 255, 255, 0.03);
+              border: 1.5px solid rgba(255, 255, 255, 0.4);
+              background: transparent;
             }
 
-            .primary-cta:hover,
-            .secondary-cta:hover {
+            .hero-primary:hover,
+            .hero-secondary:hover,
+            .primary-cta:hover {
               transform: translateY(-2px);
             }
 
             .platform-row {
               display: flex;
-              flex-wrap: wrap;
-              gap: 10px 18px;
-              margin-top: 26px;
-              color: #a1a1aa;
-              font-size: 0.95rem;
+              align-items: center;
+              gap: 12px;
+              color: rgba(255, 255, 255, 0.4);
+              font-size: 0.875rem;
+              font-weight: 750;
+            }
+
+            .hero-image-wrap {
+              position: relative;
+              height: 100%;
+              min-height: 620px;
+              overflow: hidden;
+            }
+
+            .hero-fade {
+              position: absolute;
+              inset: 0;
+              z-index: 10;
+              pointer-events: none;
+            }
+
+            .hero-fade-left {
+              background: linear-gradient(to right, #0a0a0a 0%, transparent 35%);
+            }
+
+            .hero-fade-top {
+              background: linear-gradient(to bottom, #0a0a0a 0%, transparent 20%);
+            }
+
+            .hero-fade-bottom {
+              background: linear-gradient(to top, #0a0a0a 0%, transparent 20%);
+            }
+
+            .hero-image {
+              width: 100%;
+              height: 100%;
+              min-height: 620px;
+              object-fit: cover;
+              object-position: center;
+              transform: scale(1.4);
+              transform-origin: center center;
+              animation: float 6s ease-in-out infinite;
+            }
+
+            .pain-section {
+              padding: 96px 32px;
+              background: transparent;
+            }
+
+            .pain-inner {
+              max-width: 1024px;
+              margin: 0 auto;
+            }
+
+            .section-kicker {
+              margin: 0 0 16px;
+              text-align: center;
+              color: #D4AF37;
+              font-size: 0.875rem;
               font-weight: 800;
+              letter-spacing: 0.12em;
+              text-transform: uppercase;
             }
 
-            .platform-row span:not(:last-child)::after {
-              content: "·";
-              margin-left: 18px;
-              color: #ef4444;
-            }
-
-            .hero-visual {
-              min-height: 640px;
-              position: relative;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            }
-
-            .relative { position: relative; }
-            .absolute { position: absolute; }
-            .inset-0 { inset: 0; }
-            .z-0 { z-index: 0; }
-            .z-10 { z-index: 10; }
-            .pointer-events-none { pointer-events: none; }
-            .w-full { width: 100%; }
-            .h-full { height: 100%; }
-            .max-w-5xl { max-width: 1024px; }
-            .px-12 { padding-left: 48px; padding-right: 48px; }
-            .px-6 { padding-left: 24px; padding-right: 24px; }
-            .py-3 { padding-top: 12px; padding-bottom: 12px; }
-            .pt-24 { padding-top: 96px; }
-            .pt-40 { padding-top: 160px; }
-            .pb-16 { padding-bottom: 64px; }
-            .pb-24 { padding-bottom: 96px; }
-            .pl-24 { padding-left: 96px; }
-            .pr-8 { padding-right: 32px; }
-            .py-24 { padding-top: 96px; padding-bottom: 96px; }
-            .mb-6 { margin-bottom: 24px; }
-            .mb-8 { margin-bottom: 32px; }
-            .gap-3 { gap: 12px; }
-            .gap-4 { gap: 16px; }
-            .min-h-\\[500px\\] { min-height: 500px; }
-            .grid { display: grid; }
-            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .flex { display: flex; }
-            .flex-col { flex-direction: column; }
-            .items-center { align-items: center; }
-            .justify-center { justify-content: center; }
-            .overflow-hidden { overflow: hidden; }
-            .object-cover { object-fit: cover; }
-            .object-center { object-position: center; }
-            .font-bold { font-weight: 950; }
-            .font-medium { font-weight: 700; }
-            .font-semibold { font-weight: 850; }
-            .leading-none { line-height: 1; }
-            .text-white { color: #ffffff; }
-            .text-sm { font-size: 0.875rem; }
-            .tracking-widest { letter-spacing: 0.12em; }
-            .uppercase { text-transform: uppercase; }
-            .rounded-lg { border-radius: 8px; }
-            .rounded-2xl { border-radius: 16px; }
-
-            .red-glow {
-              position: absolute;
-              width: min(42vw, 620px);
-              aspect-ratio: 1;
-              border-radius: 50%;
-              background: radial-gradient(circle, rgba(239, 68, 68, 0.32), rgba(239, 68, 68, 0.08) 42%, transparent 70%);
-              filter: blur(8px);
-              animation: pulseGlow 4s ease-in-out infinite;
-            }
-
-            .card-mosaic {
-              position: relative;
-              width: min(560px, 100%);
-              height: 560px;
-              z-index: 2;
-            }
-
-            .kol-card {
-              position: absolute;
-              width: 210px;
-              border: 1px solid #27272a;
-              border-radius: 18px;
-              background: rgba(26, 26, 26, 0.92);
-              box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
-              padding: 16px;
-              backdrop-filter: blur(18px);
-              animation: floatCard 5.4s ease-in-out infinite;
-            }
-
-            .card-a { top: 18px; left: 42px; transform: rotate(-6deg); animation-delay: 0s; }
-            .card-b { top: 82px; right: 28px; transform: rotate(5deg); animation-delay: -1s; }
-            .card-c { top: 232px; left: 0; transform: rotate(4deg); animation-delay: -2s; }
-            .card-d { top: 272px; right: 6px; transform: rotate(-4deg); animation-delay: -1.8s; }
-            .card-e { bottom: 18px; left: 94px; transform: rotate(-2deg); animation-delay: -3s; }
-            .card-f { bottom: 86px; right: 120px; transform: rotate(7deg); animation-delay: -2.6s; }
-
-            .card-topline {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 10px;
-            }
-
-            .avatar {
-              width: 46px;
-              height: 46px;
-              border-radius: 50%;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
+            .pain-inner h2 {
+              margin: 0 0 64px;
+              text-align: center;
               color: #ffffff;
+              font-size: clamp(32px, 4vw, 52px);
+              line-height: 1.08;
               font-weight: 950;
-              border: 2px solid rgba(255, 255, 255, 0.28);
             }
 
-            .status-badge {
-              border-radius: 999px;
-              padding: 5px 8px;
-              font-size: 0.72rem;
-              font-weight: 900;
-              white-space: nowrap;
+            .pain-grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 32px;
             }
 
-            .status-badge.green {
-              color: #bbf7d0;
-              background: rgba(34, 197, 94, 0.16);
-            }
-
-            .status-badge.amber {
-              color: #fde68a;
-              background: rgba(245, 158, 11, 0.14);
-            }
-
-            .kol-card h2 {
-              margin: 14px 0 10px;
-              font-size: 1.15rem;
-              line-height: 1.2;
-            }
-
-            .card-meta {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 8px;
-            }
-
-            .card-meta span {
+            .pain-card {
+              padding: 32px;
+              border-radius: 16px;
+              background: rgba(255, 255, 255, 0.04);
               border: 1px solid rgba(255, 255, 255, 0.08);
-              border-radius: 999px;
-              background: rgba(255, 255, 255, 0.05);
-              color: #d4d4d8;
-              padding: 6px 9px;
-              font-size: 0.76rem;
-              font-weight: 850;
             }
 
-            .audience-section,
-            .cta-section {
-              padding: 110px 7vw;
+            .pain-icon {
+              margin-bottom: 24px;
+            }
+
+            .pain-card h3 {
+              margin: 0 0 12px;
+              color: #ffffff;
+              font-size: 18px;
+              font-weight: 900;
+            }
+
+            .pain-card p {
+              margin: 0;
+              color: rgba(255, 255, 255, 0.55);
+              font-size: 14px;
+              line-height: 1.8;
+              font-weight: 600;
+            }
+
+            .pain-bridge {
+              margin: 64px 0 0;
+              text-align: center;
+              color: rgba(255, 255, 255, 0.5);
+              font-size: 16px;
+              font-weight: 750;
             }
 
             .how-section {
               margin-top: 0;
               padding: 64px 7vw 110px;
-              position: relative;
-              z-index: 3;
             }
 
             .section-heading {
@@ -630,18 +568,11 @@ export default function MatchForYouPage() {
             .section-heading h2,
             .cta-section h2 {
               margin: 0;
+              color: #ffffff;
               font-size: clamp(2.4rem, 5vw, 5rem);
               line-height: 1;
               letter-spacing: 0;
               font-weight: 950;
-            }
-
-            .audience-title {
-              white-space: nowrap;
-            }
-
-            .audience-title span {
-              margin: 0 0.18em;
             }
 
             .section-heading p,
@@ -678,11 +609,13 @@ export default function MatchForYouPage() {
             .step-icon {
               display: block;
               margin-top: 28px;
-              font-size: 2rem;
+              width: 32px;
+              height: 32px;
             }
 
             .step-card h3 {
               margin: 18px 0 10px;
+              color: #ffffff;
               font-size: 1.45rem;
             }
 
@@ -695,13 +628,32 @@ export default function MatchForYouPage() {
             }
 
             .audience-section {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              padding: 110px 7vw;
               background: #111111;
+            }
+
+            .audience-section .section-heading {
+              width: 100%;
+            }
+
+            .audience-title {
+              width: 100%;
+              text-align: center;
+              white-space: nowrap;
+            }
+
+            .audience-title span {
+              margin: 0 0.18em;
             }
 
             .audience-grid {
               display: grid;
               grid-template-columns: repeat(2, minmax(0, 1fr));
               gap: 22px;
+              width: 100%;
               max-width: 1180px;
               margin: 0 auto;
             }
@@ -723,6 +675,7 @@ export default function MatchForYouPage() {
 
             .audience-card h3 {
               margin: 0 0 22px;
+              color: #ffffff;
               font-size: 2rem;
               line-height: 1.1;
             }
@@ -761,6 +714,7 @@ export default function MatchForYouPage() {
             }
 
             .cta-section {
+              padding: 110px 7vw;
               text-align: center;
               background:
                 radial-gradient(circle at 50% 0%, rgba(239, 68, 68, 0.3), transparent 42%),
@@ -792,15 +746,6 @@ export default function MatchForYouPage() {
               font-weight: 800;
             }
 
-            @keyframes floatCard {
-              0%, 100% {
-                translate: 0 0;
-              }
-              50% {
-                translate: 0 -16px;
-              }
-            }
-
             @keyframes float {
               0%, 100% {
                 transform: translateY(0) scale(1.4);
@@ -810,41 +755,31 @@ export default function MatchForYouPage() {
               }
             }
 
-            @keyframes pulseGlow {
-              0%, 100% {
-                opacity: 0.72;
-                transform: scale(0.98);
-              }
-              50% {
-                opacity: 1;
-                transform: scale(1.05);
-              }
-            }
-
             @media (max-width: 1080px) {
-              .hero-section {
+              .hero-grid,
+              .steps-grid,
+              .pain-grid,
+              .audience-grid {
                 grid-template-columns: 1fr;
-                padding-top: 210px;
-                padding-bottom: 56px;
+              }
+
+              .hero-copy {
+                padding: 130px 32px 56px;
+              }
+
+              .hero-image-wrap {
+                min-height: 520px;
               }
 
               .audience-title {
                 white-space: normal;
                 font-size: clamp(2rem, 7vw, 4rem);
               }
-
-              .hero-visual {
-                min-height: 560px;
-              }
-
-              .steps-grid,
-              .audience-grid {
-                grid-template-columns: 1fr;
-              }
             }
 
             @media (max-width: 720px) {
-              .hero-section,
+              .hero-copy,
+              .pain-section,
               .how-section,
               .audience-section,
               .cta-section {
@@ -852,39 +787,27 @@ export default function MatchForYouPage() {
                 padding-right: 22px;
               }
 
-              .hero-section {
-                padding-top: 230px;
-                padding-bottom: 48px;
+              .hero-copy {
+                padding-top: 118px;
+                padding-bottom: 44px;
               }
 
               .hero-actions {
                 flex-direction: column;
+                align-items: stretch;
               }
 
-              .primary-cta,
-              .secondary-cta {
+              .hero-primary,
+              .hero-secondary,
+              .primary-cta {
                 width: 100%;
               }
 
-              .hero-visual {
-                min-height: 680px;
+              .platform-row {
+                flex-wrap: wrap;
               }
 
-              .card-mosaic {
-                height: 660px;
-              }
-
-              .kol-card {
-                width: min(260px, 82vw);
-              }
-
-              .card-a { top: 0; left: 0; }
-              .card-b { top: 104px; right: 0; }
-              .card-c { top: 226px; left: 18px; }
-              .card-d { top: 346px; right: 12px; }
-              .card-e { bottom: 42px; left: 0; }
-              .card-f { bottom: 0; right: 0; }
-
+              .pain-card,
               .step-card,
               .audience-card {
                 padding: 24px;
