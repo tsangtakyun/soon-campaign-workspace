@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { resolveActiveWorkspace } from '@/lib/workspace-client'
 
 type ViewState = 'landing' | 'scanning' | 'clusters' | 'plan'
 type Frequency = '2篇/週' | '4篇/週' | '每日'
@@ -78,6 +79,8 @@ export default function SeoPage() {
   const [generating, setGenerating] = useState(false)
   const [generatedContent, setGeneratedContent] = useState('')
   const [generationError, setGenerationError] = useState('')
+  const [toast, setToast] = useState('')
+  const [addingToCampaign, setAddingToCampaign] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const selectedClusters = useMemo(
@@ -153,11 +156,51 @@ export default function SeoPage() {
     window.setTimeout(() => setCopied(false), 1800)
   }
 
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(''), 3200)
+  }
+
+  async function addToCampaign() {
+    if (!generationKeyword || !generatedContent) return
+    setAddingToCampaign(true)
+    setGenerationError('')
+    try {
+      const { workspaceId } = await resolveActiveWorkspace()
+      if (!workspaceId) throw new Error('找不到目前工作台。')
+
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: generatedContent,
+          status: 'draft',
+          title: generationKeyword.keyword,
+          type: 'seo',
+          workspace_id: workspaceId,
+        }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.detail || data?.error || '加入宣傳活動失敗')
+
+      showToast('✓ 已加入宣傳活動！')
+      setGenerationKeyword(null)
+      setGeneratedContent('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '加入宣傳活動失敗'
+      setGenerationError(message)
+      showToast(`加入宣傳活動失敗：${message}`)
+    } finally {
+      setAddingToCampaign(false)
+    }
+  }
+
   return (
     <main className="dashboard-page">
       <ClaimOnboardingSession />
       <DashboardSidebar activeItem="SEO" />
       <section className="seo-shell">
+        {toast ? <div className="seo-toast">{toast}</div> : null}
         {view === 'landing' ? (
           <section className="landing-full">
             <img
@@ -404,8 +447,13 @@ export default function SeoPage() {
                     <button className="cancel-button" onClick={() => void copyGeneratedContent()} type="button">
                       {copied ? '已複製' : '複製內容'}
                     </button>
-                    <button className="purple-button" onClick={() => setGenerationKeyword(null)} type="button">
-                      加入宣傳活動 →
+                    <button
+                      className="purple-button"
+                      disabled={addingToCampaign}
+                      onClick={() => void addToCampaign()}
+                      type="button"
+                    >
+                      {addingToCampaign ? '加入中...' : '加入宣傳活動 →'}
                     </button>
                   </footer>
                 </>
@@ -444,6 +492,17 @@ const styles = `
 .landing-full {
   width: 100%;
   text-align: center;
+}
+
+.seo-toast {
+  margin: 0 0 16px;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 12px 14px;
 }
 
 .landing-card h1,
