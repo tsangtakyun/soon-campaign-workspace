@@ -234,24 +234,29 @@ export default function MatchForYouPage() {
           </div>
         </div>
 
-        <div className="hero-visual" aria-label="KOL application cards">
-          <div className="red-glow" />
-          <div className="card-mosaic">
-            {applicationCards.map((card) => (
-              <article className={card.className} key={card.name}>
-                <div className="card-topline">
-                  <span className="avatar" style={{ background: card.gradient }}>
-                    {card.name[0]}
-                  </span>
-                  <span className={`status-badge ${card.statusTone}`}>{card.status}</span>
-                </div>
-                <h2>{card.name}</h2>
-                <div className="card-meta">
-                  <span>{card.platform}</span>
-                  <span>{card.niche}</span>
-                </div>
-              </article>
-            ))}
+        <div className="hero-visual" aria-label="KOL Creator">
+          <div className="relative w-full h-full min-h-[500px] flex items-center justify-center">
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to right, #0a0a0a 0%, transparent 30%)',
+              }}
+            />
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to top, #0a0a0a 0%, transparent 25%)',
+              }}
+            />
+            <img
+              src="/KOL/kol-hero.png"
+              alt="KOL Creator"
+              className="w-full h-full object-cover object-center rounded-2xl"
+              style={{
+                animation: 'float 6s ease-in-out infinite',
+                maxHeight: '600px',
+              }}
+            />
           </div>
         </div>
       </section>
@@ -444,6 +449,21 @@ export default function MatchForYouPage() {
               align-items: center;
               justify-content: center;
             }
+
+            .relative { position: relative; }
+            .absolute { position: absolute; }
+            .inset-0 { inset: 0; }
+            .z-10 { z-index: 10; }
+            .pointer-events-none { pointer-events: none; }
+            .w-full { width: 100%; }
+            .h-full { height: 100%; }
+            .min-h-\\[500px\\] { min-height: 500px; }
+            .flex { display: flex; }
+            .items-center { align-items: center; }
+            .justify-center { justify-content: center; }
+            .object-cover { object-fit: cover; }
+            .object-center { object-position: center; }
+            .rounded-2xl { border-radius: 16px; }
 
             .red-glow {
               position: absolute;
@@ -729,6 +749,15 @@ export default function MatchForYouPage() {
               }
               50% {
                 translate: 0 -16px;
+              }
+            }
+
+            @keyframes float {
+              0%, 100% {
+                transform: translateY(0);
+              }
+              50% {
+                transform: translateY(-12px);
               }
             }
 
