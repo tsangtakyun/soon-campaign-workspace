@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { Edit3, Gift, ImageIcon, Trash2 } from 'lucide-react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { resolveActiveWorkspace } from '@/lib/workspace-client'
 
 type ProductTab = 'library' | 'pr' | 'sales'
 type Product = { description: string; id: string; imageUrl?: string; name: string; price: string }
+type ImagePickerTab = 'library' | 'upload'
+type BrandAsset = { asset_type: string; filename: string | null; id: string; url: string }
 
 const platforms = ['IG Story', 'IG Post', 'Reels', 'TikTok', '小紅書', 'YouTube Short']
 
@@ -61,11 +63,29 @@ const prCampaigns = [
   },
 ]
 
+function normalizeProductImageUrl(value: string) {
+  try {
+    const url = new URL(value)
+    if (/(^|\.)supabase\.co$/i.test(url.hostname)) return value
+    if (/(^|\.)wixstatic\.com$/i.test(url.hostname)) return value
+    return `/api/logo-image?url=${encodeURIComponent(value)}`
+  } catch {
+    return value
+  }
+}
+
 export default function MyProductsPage() {
-  const router = useRouter()
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const [activeTab, setActiveTab] = useState<ProductTab>('library')
   const [productItems, setProductItems] = useState<Product[]>(initialProducts)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [imagePickerProduct, setImagePickerProduct] = useState<Product | null>(null)
+  const [imagePickerTab, setImagePickerTab] = useState<ImagePickerTab>('library')
+  const [brandAssets, setBrandAssets] = useState<BrandAsset[]>([])
+  const [assetsLoading, setAssetsLoading] = useState(false)
+  const [assetSearch, setAssetSearch] = useState('')
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
   const [editName, setEditName] = useState('')
@@ -75,6 +95,44 @@ export default function MyProductsPage() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['IG Story', 'Reels'])
   const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({ 'serum-pr': true })
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const filteredBrandAssets = brandAssets.filter((asset) => {
+    const query = assetSearch.trim().toLowerCase()
+    if (!query) return true
+    return `${asset.filename || ''} ${asset.asset_type}`.toLowerCase().includes(query)
+  })
+
+  useEffect(() => {
+    if (!imagePickerProduct) return
+
+    let cancelled = false
+
+    async function loadBrandAssets() {
+      setAssetsLoading(true)
+      try {
+        const { workspaceId } = await resolveActiveWorkspace()
+        if (!workspaceId) {
+          if (!cancelled) setBrandAssets([])
+          return
+        }
+
+        const response = await fetch(`/api/brand-kit-data?workspace_id=${encodeURIComponent(workspaceId)}`)
+        const payload = await response.json().catch(() => null)
+        if (!cancelled && Array.isArray(payload?.assets)) {
+          setBrandAssets(payload.assets as BrandAsset[])
+        }
+      } catch {
+        if (!cancelled) setBrandAssets([])
+      } finally {
+        if (!cancelled) setAssetsLoading(false)
+      }
+    }
+
+    void loadBrandAssets()
+
+    return () => {
+      cancelled = true
+    }
+  }, [imagePickerProduct])
 
   function showMessage(message: string) {
     setToastMessage(message)
@@ -99,6 +157,39 @@ export default function MyProductsPage() {
     setEditPrice(product.price.replace(/[^0-9.]/g, ''))
     setEditDescription(product.description)
     setEditImageUrl(product.imageUrl || '')
+  }
+
+  function openImagePicker(product: Product) {
+    setImagePickerProduct(product)
+    setImagePickerTab('library')
+    setAssetSearch('')
+    setSelectedImageUrl(product.imageUrl || null)
+    setUploadPreviewUrl(null)
+  }
+
+  function closeImagePicker() {
+    setImagePickerProduct(null)
+    setSelectedImageUrl(null)
+    setUploadPreviewUrl(null)
+  }
+
+  function applyProductImage() {
+    if (!imagePickerProduct) return
+    const imageUrl = uploadPreviewUrl || selectedImageUrl
+    if (!imageUrl) return
+    setProductItems((current) =>
+      current.map((product) => (product.id === imagePickerProduct.id ? { ...product, imageUrl } : product))
+    )
+    closeImagePicker()
+    showMessage('✓ 產品圖片已更新')
+  }
+
+  function handleUploadPreview(file: File | undefined) {
+    if (!file) return
+    if (uploadPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(uploadPreviewUrl)
+    const previewUrl = URL.createObjectURL(file)
+    setUploadPreviewUrl(previewUrl)
+    setSelectedImageUrl(null)
   }
 
   function saveProductEdits() {
@@ -185,20 +276,20 @@ export default function MyProductsPage() {
                 {productItems.map((product) => (
                   <article className="product-card" key={product.id}>
                     <button
-                      aria-label="前往品牌素材庫"
+                      aria-label="選擇產品圖片"
                       className="product-image"
-                      onClick={() => router.push('/onboarding/brand-kit')}
-                      title="前往品牌素材庫"
+                      onClick={() => openImagePicker(product)}
+                      title="選擇產品圖片"
                       type="button"
                     >
                       {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.name} />
+                        <img src={normalizeProductImageUrl(product.imageUrl)} alt={product.name} />
                       ) : (
                         <ImageIcon aria-hidden="true" size={34} strokeWidth={1.7} />
                       )}
                       <span className="image-hover-overlay">
                         <ImageIcon aria-hidden="true" size={18} />
-                        前往品牌素材庫
+                        選擇產品圖片
                       </span>
                     </button>
                     <div className="product-info">
@@ -466,6 +557,130 @@ export default function MyProductsPage() {
         </div>
       ) : null}
 
+      {imagePickerProduct ? (
+        <div className="modal-backdrop" onClick={closeImagePicker}>
+          <section className="image-picker-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <header className="modal-header">
+              <div>
+                <h2>選擇產品圖片</h2>
+                <p>從品牌素材庫選擇，或上傳新的產品圖片。</p>
+              </div>
+              <button aria-label="關閉" onClick={closeImagePicker} type="button">
+                ×
+              </button>
+            </header>
+
+            <div className="picker-tabs" role="tablist" aria-label="產品圖片來源">
+              <button
+                aria-selected={imagePickerTab === 'library'}
+                className={imagePickerTab === 'library' ? 'active' : ''}
+                onClick={() => setImagePickerTab('library')}
+                role="tab"
+                type="button"
+              >
+                素材庫
+              </button>
+              <button
+                aria-selected={imagePickerTab === 'upload'}
+                className={imagePickerTab === 'upload' ? 'active' : ''}
+                onClick={() => setImagePickerTab('upload')}
+                role="tab"
+                type="button"
+              >
+                上傳新圖片
+              </button>
+            </div>
+
+            <div className="image-picker-body">
+              {imagePickerTab === 'library' ? (
+                <>
+                  <input
+                    className="asset-search"
+                    onChange={(event) => setAssetSearch(event.target.value)}
+                    placeholder="搜尋素材..."
+                    value={assetSearch}
+                  />
+                  {assetsLoading ? (
+                    <div className="picker-loading">載入素材中...</div>
+                  ) : filteredBrandAssets.length === 0 ? (
+                    <div className="picker-empty">暫時未有符合條件的素材。</div>
+                  ) : (
+                    <div className="asset-picker-grid">
+                      {filteredBrandAssets.map((asset) => {
+                        const imageUrl = normalizeProductImageUrl(asset.url)
+                        return (
+                        <button
+                          className={selectedImageUrl === imageUrl ? 'selected' : ''}
+                          key={asset.id}
+                          onClick={() => {
+                            setSelectedImageUrl(imageUrl)
+                            setUploadPreviewUrl(null)
+                          }}
+                          type="button"
+                        >
+                          <img src={imageUrl} alt={asset.filename || asset.asset_type} />
+                          {selectedImageUrl === imageUrl ? <span>✓</span> : null}
+                        </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="upload-picker-pane">
+                  <input
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(event) => handleUploadPreview(event.target.files?.[0])}
+                    ref={uploadInputRef}
+                    type="file"
+                    hidden
+                  />
+                  <button
+                    className="upload-dropzone"
+                    onClick={() => uploadInputRef.current?.click()}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      handleUploadPreview(event.dataTransfer.files?.[0])
+                    }}
+                    type="button"
+                  >
+                    {uploadPreviewUrl ? (
+                      <img src={uploadPreviewUrl} alt="已選圖片預覽" />
+                    ) : (
+                      <>
+                        <ImageIcon aria-hidden="true" size={34} />
+                        <strong>拖放圖片到這裡</strong>
+                        <span>或點擊瀏覽檔案，支援 jpg、png、webp、gif</span>
+                      </>
+                    )}
+                  </button>
+                  {uploadPreviewUrl ? (
+                    <button className="inline-purple-button" onClick={applyProductImage} type="button">
+                      使用此圖片
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <footer className="modal-actions">
+              <button className="cancel-button" onClick={closeImagePicker} type="button">
+                取消
+              </button>
+              <button
+                className="publish-button"
+                disabled={!selectedImageUrl && !uploadPreviewUrl}
+                onClick={applyProductImage}
+                type="button"
+              >
+                使用選取的圖片
+              </button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
       {editingProduct ? (
         <div className="modal-backdrop" onClick={() => setEditingProduct(null)}>
           <section className="pr-modal edit-product-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
@@ -632,6 +847,13 @@ const styles = `
   font-weight: 800;
   padding: 11px 18px;
   box-shadow: 0 12px 24px rgba(124, 58, 237, .24);
+}
+
+.publish-button:disabled {
+  background: #e5e7eb;
+  box-shadow: none;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 
 .product-grid {
@@ -1114,6 +1336,169 @@ tbody tr:last-child td {
 .modal-section input::placeholder,
 .modal-section textarea::placeholder {
   color: #9ca3af;
+}
+
+.image-picker-modal {
+  width: min(80vw, 920px);
+  max-height: 70vh;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .32);
+}
+
+.picker-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 14px 24px 0;
+  background: #ffffff;
+}
+
+.picker-tabs button {
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 8px 13px;
+}
+
+.picker-tabs button.active {
+  border-color: #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.image-picker-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px;
+}
+
+.asset-search {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+}
+
+.asset-search::placeholder {
+  color: #9ca3af;
+}
+
+.asset-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.asset-picker-grid button {
+  aspect-ratio: 1;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  background: #f3f4f6;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+.asset-picker-grid button:hover {
+  border-color: #c4b5fd;
+}
+
+.asset-picker-grid button.selected {
+  border-color: #7c3aed;
+}
+
+.asset-picker-grid img,
+.upload-dropzone img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.asset-picker-grid button > span {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #7c3aed;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+
+.picker-loading,
+.picker-empty {
+  border: 1px dashed #d1d5db;
+  border-radius: 12px;
+  color: #6b7280;
+  font-size: 14px;
+  padding: 42px 20px;
+  text-align: center;
+}
+
+.upload-picker-pane {
+  display: grid;
+  gap: 14px;
+}
+
+.upload-dropzone {
+  min-height: 310px;
+  border: 1px dashed #c4b5fd;
+  border-radius: 14px;
+  background: #faf7ff;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.upload-dropzone > svg {
+  color: #7c3aed;
+}
+
+.upload-dropzone strong {
+  color: #111827;
+  font-size: 16px;
+}
+
+.upload-dropzone span {
+  font-size: 13px;
+}
+
+.inline-purple-button {
+  justify-self: end;
+  border: 0;
+  border-radius: 10px;
+  background: #7c3aed;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 10px 16px;
 }
 
 .chip-grid {
