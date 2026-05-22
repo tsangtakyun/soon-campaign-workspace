@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import React from 'react'
 
 const applicationCards = [
   {
@@ -93,8 +96,117 @@ const creatorPoints = [
 ]
 
 export default function MatchForYouPage() {
+  React.useEffect(() => {
+    const canvas = document.getElementById('starfield') as HTMLCanvasElement
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let W = (canvas.width = window.innerWidth)
+    let H = (canvas.height = window.innerHeight)
+    let animId: number
+
+    const stars = Array.from({ length: 220 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.4 + 0.2,
+      a: Math.random() * 0.5 + 0.3,
+      dx: (Math.random() - 0.5) * 0.06,
+      dy: (Math.random() - 0.5) * 0.06,
+    }))
+
+    interface Shooter {
+      x: number
+      y: number
+      vx: number
+      vy: number
+      a: number
+    }
+
+    const shooters: Shooter[] = []
+    let lastShoot = 0
+
+    function mkShooter(): Shooter {
+      return {
+        x: Math.random() * W * 0.7,
+        y: Math.random() * H * 0.5,
+        vx: 4 + Math.random() * 3,
+        vy: 2 + Math.random() * 2,
+        a: 0.9,
+      }
+    }
+
+    function draw(t: number) {
+      ctx.clearRect(0, 0, W, H)
+
+      for (const s of stars) {
+        s.x += s.dx
+        s.y += s.dy
+        if (s.x < 0) s.x = W
+        if (s.x > W) s.x = 0
+        if (s.y < 0) s.y = H
+        if (s.y > H) s.y = 0
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255,255,255,${s.a})`
+        ctx.fill()
+      }
+
+      if (t - lastShoot > 2000 + Math.random() * 1500) {
+        shooters.push(mkShooter())
+        lastShoot = t
+      }
+
+      for (let i = shooters.length - 1; i >= 0; i -= 1) {
+        const sh = shooters[i]
+        const tailLen = 90
+        ctx.beginPath()
+        ctx.moveTo(sh.x, sh.y)
+        ctx.lineTo(sh.x - sh.vx * (tailLen / sh.vx), sh.y - sh.vy * (tailLen / sh.vx))
+        const grad = ctx.createLinearGradient(sh.x - sh.vx * 8, sh.y - sh.vy * 8, sh.x, sh.y)
+        grad.addColorStop(0, 'rgba(255,255,255,0)')
+        grad.addColorStop(1, `rgba(255,255,255,${sh.a})`)
+        ctx.strokeStyle = grad
+        ctx.lineWidth = 1.2
+        ctx.stroke()
+        sh.x += sh.vx
+        sh.y += sh.vy
+        sh.a -= 0.01
+        if (sh.a <= 0 || sh.x > W || sh.y > H) shooters.splice(i, 1)
+      }
+
+      animId = requestAnimationFrame(draw)
+    }
+
+    animId = requestAnimationFrame(draw)
+
+    const onResize = () => {
+      W = canvas.width = window.innerWidth
+      H = canvas.height = window.innerHeight
+    }
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      cancelAnimationFrame(animId)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
   return (
     <main className="match-page">
+      <canvas
+        id="starfield"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          pointerEvents: 'none',
+          background: '#0a0a0a',
+        }}
+      />
       <section className="hero-section">
         <div className="hero-copy">
           <p className="eyebrow">SOON 獨家功能 · Exclusive Feature</p>
@@ -206,7 +318,7 @@ export default function MatchForYouPage() {
           __html: `
             .match-page {
               min-height: 100vh;
-              background: #0a0a0a;
+              background: transparent;
               color: #ffffff;
               overflow: hidden;
               font-family:
@@ -223,6 +335,16 @@ export default function MatchForYouPage() {
               overflow: hidden;
               padding: 150px 7vw 64px;
               position: relative;
+              z-index: 1;
+            }
+
+            .hero-section,
+            .how-section,
+            .audience-section,
+            .cta-section,
+            .match-footer {
+              position: relative;
+              z-index: 1;
             }
 
             .hero-copy {
