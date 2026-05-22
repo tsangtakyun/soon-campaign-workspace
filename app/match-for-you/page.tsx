@@ -242,7 +242,7 @@ export default function MatchForYouPage() {
             SOON 獨家功能 · Exclusive Feature
           </p>
 
-          <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(48px, 7vw, 96px)' }}>
+          <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(56px, 8vw, 110px)' }}>
             不需要主動找KOL
             <br />
             讓KOL找你
@@ -272,11 +272,11 @@ export default function MatchForYouPage() {
 
           <div className="flex gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
             <span>Instagram</span>
-            <span>?</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span>小紅書</span>
-            <span>?</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span>TikTok</span>
-            <span>?</span>
+            <span style={{ opacity: 0.4 }}>·</span>
             <span>YouTube</span>
           </div>
         </div>
