@@ -218,8 +218,9 @@ export default function MatchForYouPage() {
             .hero-section {
               display: grid;
               grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-              align-items: center;
+              align-items: start;
               gap: 6vw;
+              overflow: hidden;
               padding: 150px 7vw 64px;
               position: relative;
             }
@@ -423,7 +424,10 @@ export default function MatchForYouPage() {
             }
 
             .how-section {
-              padding: 64px 7vw 110px;
+              margin-top: -64px;
+              padding: 0 7vw 110px;
+              position: relative;
+              z-index: 3;
             }
 
             .section-heading {
