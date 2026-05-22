@@ -75,10 +75,10 @@ const campaigns = [
 ]
 
 const markets = [
-  '🇭🇰 香港 · IG / 小紅書 / TikTok',
-  '🇹🇼 台灣 · IG / TikTok / YouTube',
-  '🇨🇳 中國大陸 · 小紅書 / 微博 / 抖音',
-  '🇸🇬 新加坡 · IG / TikTok / YouTube',
+  '香港 · IG / 小紅書 / TikTok',
+  '台灣 · IG / TikTok / YouTube',
+  '中國大陸 · 小紅書 / 微博 / 抖音',
+  '新加坡 · IG / TikTok / YouTube',
 ]
 
 function formatCounter(value: number, kind: CounterKind) {
@@ -122,7 +122,9 @@ function LiveCounter({
 
   return (
     <div className="counter-line">
-      <span className="counter-number">{formatCounter(value, kind)}</span>
+      <span className={`counter-number ${kind === 'money' ? 'counter-number--money' : ''}`}>
+        {formatCounter(value, kind)}
+      </span>
       {unit && kind === 'integer' ? <span className="counter-unit">{unit}</span> : null}
       {unit && kind !== 'integer' ? <span className="counter-unit">{unit}</span> : null}
     </div>
@@ -265,7 +267,7 @@ export default function PlatformStatsPage() {
 
       <section className="stats-hero">
         <p className="eyebrow">SOON · 平台實況</p>
-        <h1>數字說話</h1>
+        <h1>平台實況</h1>
         <p>每一個數字，都是品牌與創作者之間真實發生的連結</p>
       </section>
 
@@ -327,7 +329,7 @@ export default function PlatformStatsPage() {
 
       <section className="cta-section">
         <h2>立即加入平台</h2>
-        <p>免費上架首個 PR Gift Campaign，七天內收到創作者申請</p>
+        <p>無需中介，品牌與創作者直接連結</p>
         <Link className="primary-cta" href="/signup">
           免費開始
         </Link>
@@ -346,7 +348,6 @@ export default function PlatformStatsPage() {
               min-height: 100vh;
               background: transparent;
               color: #ffffff;
-              overflow: hidden;
               font-family:
                 "SF Pro Rounded", "SF Pro Display", "Avenir Next", ui-rounded,
                 "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont,
@@ -432,6 +433,12 @@ export default function PlatformStatsPage() {
               line-height: 1;
               font-weight: 950;
               letter-spacing: 0;
+              white-space: nowrap;
+              overflow: hidden;
+            }
+
+            .counter-number--money {
+              font-size: clamp(32px, 3.5vw, 52px);
             }
 
             .counter-unit {
