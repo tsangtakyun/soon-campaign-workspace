@@ -42,7 +42,6 @@ export default function SiteNav() {
           <Link href="/match-for-you">Match for You 創作者配對</Link>
           <Link href="/platform-stats">{'平台實況'}</Link>
           <Link href="/about">關於我們</Link>
-          <Link href="/customers">客戶案例</Link>
           <Link href="/pricing">定價</Link>
           <Link href="/login">登入</Link>
           <Link href="/contact" className="nav-secondary">
