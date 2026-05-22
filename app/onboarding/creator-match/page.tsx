@@ -212,12 +212,20 @@ export default function CreatorMatchPage() {
 }
 
 const styles = `
+.dashboard-page {
+  min-height: 100vh;
+  background: #f7f7f8;
+  color: #202126;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
 .creator-shell {
   min-height: 100vh;
-  margin-left: 280px;
   background: #f7f7fb;
   color: #0a0a0a;
   padding: 32px;
+  min-width: 0;
 }
 
 .hero-header {
@@ -472,8 +480,15 @@ const styles = `
 }
 
 @media (max-width: 1040px) {
+  .dashboard-page {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
   .creator-shell {
-    margin-left: 0;
     padding: 24px;
   }
 
