@@ -160,7 +160,11 @@ export default function SeoPage() {
       <section className="seo-shell">
         {view === 'landing' ? (
           <section className="landing-card">
-            <div className="hero-icon">📈</div>
+            <img
+              src="/seo/seo-banner.png"
+              alt="SEO Banner"
+              style={{ width: '100%', maxWidth: '480px', borderRadius: '12px', marginBottom: '24px' }}
+            />
             <h1>讓 SOON 幫你增長社交流量</h1>
             <p>
               選擇話題集群，SOON 自動生成針對搜尋關鍵詞的社交內容，
@@ -447,17 +451,6 @@ const styles = `
   margin: 10vh auto 0;
   padding: 48px;
   text-align: center;
-}
-
-.hero-icon {
-  width: 66px;
-  height: 66px;
-  border-radius: 20px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 20px;
-  background: #ecfdf5;
-  font-size: 34px;
 }
 
 .landing-card h1,
