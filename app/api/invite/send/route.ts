@@ -94,7 +94,7 @@ async function sendInviteEmail(input: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.INVITE_FROM_EMAIL || 'SOON <noreply@sooncreator.network>',
+      from: process.env.INVITE_FROM_EMAIL || 'SOON <onboarding@resend.dev>',
       to: input.email,
       subject: `${input.workspaceName} 邀請你加入 SOON`,
       html: `
