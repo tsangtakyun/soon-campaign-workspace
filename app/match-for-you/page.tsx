@@ -239,41 +239,41 @@ export default function MatchForYouPage() {
             className="text-sm font-medium tracking-widest uppercase mb-6"
             style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
           >
-            SOON ???? ? Exclusive Feature
+            SOON 獨家功能 · Exclusive Feature
           </p>
 
           <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(48px, 7vw, 96px)' }}>
-            ??????KOL
+            不需要主動找KOL
             <br />
-            ?KOL??
+            讓KOL找你
           </h1>
 
           <p
             className="text-white mb-8"
             style={{ fontSize: '18px', opacity: 0.75, maxWidth: '520px', lineHeight: 1.6 }}
           >
-            ????????????????????
+            讓創作者主動申請合作，品牌專注做好產品，
             <br />
-            SOON ????????
+            SOON 幫你完成其餘一切
           </p>
 
           <div className="flex gap-3 items-center mb-8">
             <a className="px-6 py-3 font-semibold text-white rounded-lg text-sm" href="/signup" style={{ background: '#ef4444' }}>
-              ??????
+              品牌免費試用
             </a>
             <a
               className="px-6 py-3 font-semibold rounded-lg text-sm"
               href="#"
               style={{ background: 'transparent', border: '1.5px solid rgba(255,255,255,0.4)', color: '#fff' }}
             >
-              ????? ?
+              我係創作者 →
             </a>
           </div>
 
           <div className="flex gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
             <span>Instagram</span>
             <span>?</span>
-            <span>???</span>
+            <span>小紅書</span>
             <span>?</span>
             <span>TikTok</span>
             <span>?</span>
