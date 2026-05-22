@@ -208,14 +208,24 @@ export default function HomePage() {
           </div>
 
           <div
-            className="relative overflow-hidden rounded-2xl"
-            style={{ width: '70%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              position: 'relative',
+              height: '400px',
+              overflow: 'hidden',
+              borderRadius: '16px',
+            }}
           >
             <img
               src="/KOL/kol-hero.png"
               alt="KOL Creator"
-              className="w-full h-auto block"
-              style={{ opacity: 0.6 }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center center',
+                opacity: 0.6,
+                display: 'block',
+              }}
             />
           </div>
         </div>
