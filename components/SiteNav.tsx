@@ -6,6 +6,14 @@ import { useEffect, useState } from 'react'
 
 const DASHBOARD_PREFIXES = ['/onboarding', '/scheduled-posts', '/ops']
 const AUTH_ROUTES = ['/signup', '/login', '/forgot-password', '/reset-password']
+const NAV_ITEMS = [
+  { href: '/soon-log', label: 'SOON LOG' },
+  { href: '/match-for-you', label: 'Match for You 創作者配對' },
+  { href: '/platform-stats', label: '平台實況' },
+  { href: '/about', label: '關於我們' },
+  { href: '/pricing', label: '定價' },
+  { href: '/login', label: '登入' },
+]
 
 export default function SiteNav() {
   const pathname = usePathname()
@@ -38,12 +46,11 @@ export default function SiteNav() {
         </Link>
 
         <div className="nav-links">
-          <Link href="/soon-log">SOON LOG</Link>
-          <Link href="/match-for-you">Match for You 創作者配對</Link>
-          <Link href="/platform-stats">{'平台實況'}</Link>
-          <Link href="/about">關於我們</Link>
-          <Link href="/pricing">定價</Link>
-          <Link href="/login">登入</Link>
+          {NAV_ITEMS.map((item) => (
+            <Link href={item.href} key={item.href}>
+              {item.label}
+            </Link>
+          ))}
           <Link href="/contact" className="nav-secondary">
             聯絡我們
           </Link>
@@ -109,6 +116,11 @@ export default function SiteNav() {
 
             .nav-links a:hover {
               color: #ffffff;
+            }
+
+            .nav-links a::before,
+            .nav-links a::after {
+              content: none !important;
             }
 
             .nav-secondary,
