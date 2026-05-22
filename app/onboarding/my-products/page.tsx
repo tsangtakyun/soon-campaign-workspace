@@ -333,7 +333,9 @@ export default function MyProductsPage() {
             <div className="modal-section">
               <h3>產品資訊</h3>
               <div className="readonly-product">
-                <ImageIcon aria-hidden="true" size={22} />
+                <div className="readonly-product-image" aria-hidden="true">
+                  {selectedProduct.name.charAt(0)}
+                </div>
                 <div>
                   <strong>{selectedProduct.name}</strong>
                   <span>{selectedProduct.price}</span>
@@ -383,6 +385,7 @@ export default function MyProductsPage() {
                 <li>✓ 承諾發布平台</li>
                 <li>✓ 承諾發布日期</li>
                 <li>✓ 預計內容方向（選填）</li>
+                <li>✓ 送貨地址</li>
               </ul>
             </div>
 
@@ -870,8 +873,18 @@ tbody tr:last-child td {
   padding: 12px;
 }
 
-.readonly-product > svg {
-  color: #7c3aed;
+.readonly-product-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c3aed, #ec4899);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 22px;
+  font-weight: 900;
 }
 
 .readonly-product strong,
