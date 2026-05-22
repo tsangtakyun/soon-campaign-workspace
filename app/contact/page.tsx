@@ -1,368 +1,765 @@
 'use client'
 
-import type { FormEvent } from 'react'
-import { useState } from 'react'
+import Link from 'next/link'
+import React, { useEffect, useState } from 'react'
 
-type ContactForm = {
-  name: string
-  email: string
-  website: string
-  phone: string
-  location: string
-  budget: string
-  goal: string
+type Identity = 'brand' | 'creator' | 'business'
+
+const platformOptions = ['IG', '小紅書', 'TikTok', 'YouTube']
+
+const identities: Array<{
+  id: Identity
+  title: string
+  subtitle: string
+  icon: React.ReactNode
+}> = [
+  {
+    id: 'brand',
+    title: '我是品牌',
+    subtitle: '想了解 Campaign 合作',
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect x="4" y="8" width="24" height="18" rx="2" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M4 14h24" stroke="#ef4444" strokeWidth="1.5" />
+        <circle cx="16" cy="21" r="2" stroke="#ef4444" strokeWidth="1.5" />
+      </svg>
+    ),
+  },
+  {
+    id: 'creator',
+    title: '我是創作者',
+    subtitle: '想申請加入平台',
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <circle cx="16" cy="12" r="5" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M6 28c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M22 8l2 2-6 6" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'business',
+    title: '商業合作',
+    subtitle: '媒體、投資、夥伴洽談',
+    icon: (
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <path d="M16 4l3 9h9l-7 5 3 9-8-6-8 6 3-9-7-5h9z" stroke="#ef4444" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+]
+
+function SuccessState() {
+  return (
+    <div className="success-state">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="18" stroke="#22c55e" strokeWidth="1.5" />
+        <path d="M13 20l5 5 9-9" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <h3>已成功提交！</h3>
+      <p>我們將於一個工作天內回覆您。</p>
+    </div>
+  )
 }
-
-const initialForm: ContactForm = {
-  name: '',
-  email: '',
-  website: '',
-  phone: '',
-  location: '',
-  budget: '',
-  goal: '',
-}
-
-const locations = ['香港', '台灣', '日本', '韓國', '英國', '美國', '其他地區']
-const budgets = ['HK$8,000 以下', 'HK$8,000 - 15,000', 'HK$15,000 - 30,000', 'HK$30,000 - 50,000', 'HK$50,000 以上']
 
 export default function ContactPage() {
-  const [form, setForm] = useState<ContactForm>(initialForm)
-  const [submitting, setSubmitting] = useState(false)
-  const [message, setMessage] = useState('')
+  const [identity, setIdentity] = useState<Identity | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [platforms, setPlatforms] = useState<string[]>([])
 
-  function updateField<K extends keyof ContactForm>(key: K, value: ContactForm[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }))
+  useEffect(() => {
+    const canvas = document.getElementById('contact-starfield') as HTMLCanvasElement
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let W = (canvas.width = window.innerWidth)
+    let H = (canvas.height = window.innerHeight)
+    let animId: number
+
+    const stars = Array.from({ length: 220 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.4 + 0.2,
+      a: Math.random() * 0.5 + 0.3,
+      dx: (Math.random() - 0.5) * 0.06,
+      dy: (Math.random() - 0.5) * 0.06,
+    }))
+
+    interface Shooter {
+      x: number
+      y: number
+      vx: number
+      vy: number
+      a: number
+    }
+
+    const shooters: Shooter[] = []
+    let lastShoot = 0
+
+    function mkShooter(): Shooter {
+      return {
+        x: Math.random() * W * 0.7,
+        y: Math.random() * H * 0.5,
+        vx: 4 + Math.random() * 3,
+        vy: 2 + Math.random() * 2,
+        a: 0.9,
+      }
+    }
+
+    function draw(t: number) {
+      ctx.clearRect(0, 0, W, H)
+
+      for (const s of stars) {
+        s.x += s.dx
+        s.y += s.dy
+        if (s.x < 0) s.x = W
+        if (s.x > W) s.x = 0
+        if (s.y < 0) s.y = H
+        if (s.y > H) s.y = 0
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255,255,255,${s.a})`
+        ctx.fill()
+      }
+
+      if (t - lastShoot > 2000 + Math.random() * 1500) {
+        shooters.push(mkShooter())
+        lastShoot = t
+      }
+
+      for (let i = shooters.length - 1; i >= 0; i -= 1) {
+        const sh = shooters[i]
+        const tailLen = 90
+        ctx.beginPath()
+        ctx.moveTo(sh.x, sh.y)
+        ctx.lineTo(sh.x - sh.vx * (tailLen / sh.vx), sh.y - sh.vy * (tailLen / sh.vx))
+        const grad = ctx.createLinearGradient(sh.x - sh.vx * 8, sh.y - sh.vy * 8, sh.x, sh.y)
+        grad.addColorStop(0, 'rgba(255,255,255,0)')
+        grad.addColorStop(1, `rgba(255,255,255,${sh.a})`)
+        ctx.strokeStyle = grad
+        ctx.lineWidth = 1.2
+        ctx.stroke()
+        sh.x += sh.vx
+        sh.y += sh.vy
+        sh.a -= 0.01
+        if (sh.a <= 0 || sh.x > W || sh.y > H) shooters.splice(i, 1)
+      }
+
+      animId = requestAnimationFrame(draw)
+    }
+
+    animId = requestAnimationFrame(draw)
+
+    const onResize = () => {
+      W = canvas.width = window.innerWidth
+      H = canvas.height = window.innerHeight
+    }
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      cancelAnimationFrame(animId)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
+  const selectIdentity = (nextIdentity: Identity) => {
+    setIdentity(nextIdentity)
+    setSubmitted(false)
+    if (nextIdentity !== 'brand') setPlatforms([])
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const togglePlatform = (platform: string) => {
+    setPlatforms((current) =>
+      current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform]
+    )
+  }
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSubmitting(true)
-    setMessage('')
-
-    try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const data = await response.json()
-
-      if (!response.ok) throw new Error(data.error || '未能提交資料。')
-
-      setMessage('已收到你的資料，我們會盡快聯絡你。')
-      setForm(initialForm)
-    } catch (error) {
-      console.error(error)
-      setMessage('暫時未能提交資料。請稍後再試，或直接透過 WhatsApp 聯絡我們。')
-    } finally {
-      setSubmitting(false)
-    }
+    setSubmitted(true)
   }
 
   return (
     <main className="contact-page">
-      <section className="contact-shell">
-        <div className="contact-copy">
-          <p className="eyebrow">SOON 宣傳顧問</p>
-          <h1>
-            讓我們了解
-            <br />
-            你的增長目標
-          </h1>
-          <p className="lead">
-            告訴我們你的品牌、預算和希望改善的宣傳問題。我們會根據你的情況，建議最適合的內容策略、創作者合作和廣告方向。
-          </p>
+      <canvas
+        id="contact-starfield"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          pointerEvents: 'none',
+          background: '#0a0a0a',
+        }}
+      />
 
-          <div className="benefits">
-            {[
-              ['策略先行', '先釐清目標、客群和轉換路徑，再決定內容形式。'],
-              ['內容製作', '將宣傳角度變成題材、腳本、拍攝方向和交付清單。'],
-              ['數據回饋', '用表現數據修正下一輪內容，避免每次都重新估。'],
-              ['真人跟進', '適合需要有人協助整理方向、創作者和製作流程的品牌。'],
-            ].map(([title, body]) => (
-              <div className="benefit" key={title}>
-                <span />
-                <div>
-                  <strong>{title}</strong>
-                  <p>{body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-
-        <form className="contact-form" onSubmit={handleSubmit}>
-          <h2>聯絡我們</h2>
-
-          <label>
-            <span>姓名</span>
-            <input required value={form.name} onChange={(event) => updateField('name', event.target.value)} placeholder="你的姓名" />
-          </label>
-
-          <label>
-            <span>公司電郵</span>
-            <input required type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} placeholder="you@company.com" />
-          </label>
-
-          <label>
-            <span>公司網站 / 社交連結</span>
-            <input value={form.website} onChange={(event) => updateField('website', event.target.value)} placeholder="company.com / Instagram / YouTube" />
-          </label>
-
-          <label>
-            <span>電話 / WhatsApp</span>
-            <input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} placeholder="+852 9123 4567" />
-          </label>
-
-          <label>
-            <span>公司所在地</span>
-            <select value={form.location} onChange={(event) => updateField('location', event.target.value)}>
-              <option value="">選擇地區</option>
-              {locations.map((location) => (
-                <option value={location} key={location}>{location}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>每月宣傳預算</span>
-            <select value={form.budget} onChange={(event) => updateField('budget', event.target.value)}>
-              <option value="">選擇預算</option>
-              {budgets.map((budget) => (
-                <option value={budget} key={budget}>{budget}</option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            <span>你希望我們怎樣協助增長？</span>
-            <textarea required value={form.goal} onChange={(event) => updateField('goal', event.target.value)} placeholder="例如希望增加查詢、改善廣告回報、建立內容方向，或尋找合適創作者。" />
-          </label>
-
-          <button type="submit" disabled={submitting}>
-            {submitting ? '提交中...' : '提交'}
-          </button>
-
-          {message && <p className="form-message">{message}</p>}
-        </form>
+      <section className="hero-section">
+        <p className="eyebrow">SOON · 聯絡我們</p>
+        <h1>你好，我們在這裡</h1>
+        <p>告訴我們你是誰，我們為你提供最合適的支援。</p>
       </section>
 
-      <style jsx>{`
-        .contact-page {
-          min-height: 100vh;
-          padding: 64px 7vw 88px;
-          background: #07080b;
-          color: #f7f8fb;
-        }
+      <section className="form-section">
+        <div className="identity-grid">
+          {identities.map((item) => (
+            <button
+              className={`identity-card ${identity === item.id ? 'selected' : ''}`}
+              key={item.id}
+              onClick={() => selectIdentity(item.id)}
+              type="button"
+            >
+              <span className="identity-icon">{item.icon}</span>
+              <strong>{item.title}</strong>
+              <small>{item.subtitle}</small>
+            </button>
+          ))}
+        </div>
 
-        .contact-shell {
-          max-width: 1380px;
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(420px, 0.72fr);
-          gap: clamp(40px, 6vw, 92px);
-          align-items: start;
-        }
+        <div className={`dynamic-form-wrap ${identity ? 'visible' : ''}`}>
+          {identity && submitted ? <SuccessState /> : null}
 
-        .contact-copy {
-          padding-top: 56px;
-        }
+          {identity === 'brand' && !submitted ? (
+            <form className="contact-form" onSubmit={handleSubmit}>
+              <h2>品牌合作查詢</h2>
+              <label>
+                公司 / 品牌名稱 *
+                <input placeholder="例：Botanica Studio" required type="text" />
+              </label>
+              <label>
+                行業類別
+                <select defaultValue="美妝護膚">
+                  <option>美妝護膚</option>
+                  <option>時尚服飾</option>
+                  <option>健康食品</option>
+                  <option>家居生活</option>
+                  <option>科技產品</option>
+                  <option>其他</option>
+                </select>
+              </label>
+              <label>
+                Campaign 預算範圍
+                <select defaultValue="未確定">
+                  <option>HK$5,000 以下</option>
+                  <option>HK$5,000-20,000</option>
+                  <option>HK$20,000-50,000</option>
+                  <option>HK$50,000 以上</option>
+                  <option>未確定</option>
+                </select>
+              </label>
+              <div className="field-group">
+                <span>目標推廣平台</span>
+                <div className="platform-pills">
+                  {platformOptions.map((platform) => (
+                    <label className={`platform-pill ${platforms.includes(platform) ? 'checked' : ''}`} key={platform}>
+                      <input
+                        checked={platforms.includes(platform)}
+                        onChange={() => togglePlatform(platform)}
+                        type="checkbox"
+                      />
+                      {platform}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <label>
+                其他說明（選填）
+                <textarea placeholder="請簡述你的產品及合作需求" rows={3} />
+              </label>
+              <button type="submit">提交查詢</button>
+            </form>
+          ) : null}
 
-        .eyebrow {
-          margin: 0 0 18px;
-          color: rgba(255, 216, 77, 0.9);
-          font-size: 0.8rem;
-          font-weight: 800;
-          letter-spacing: 0.18em;
-        }
+          {identity === 'creator' && !submitted ? (
+            <form className="contact-form" onSubmit={handleSubmit}>
+              <h2>創作者申請</h2>
+              <label>
+                姓名 *
+                <input placeholder="你的名字" required type="text" />
+              </label>
+              <label>
+                主要平台帳號 *
+                <input placeholder="例：@yourhandle" required type="text" />
+              </label>
+              <label>
+                主要平台
+                <select defaultValue="Instagram">
+                  <option>Instagram</option>
+                  <option>小紅書</option>
+                  <option>TikTok</option>
+                  <option>YouTube</option>
+                </select>
+              </label>
+              <label>
+                粉絲數量
+                <select defaultValue="10,000-50,000">
+                  <option>1,000-10,000</option>
+                  <option>10,000-50,000</option>
+                  <option>50,000-200,000</option>
+                  <option>200,000 以上</option>
+                </select>
+              </label>
+              <label>
+                內容類型
+                <select defaultValue="生活風格">
+                  <option>美妝</option>
+                  <option>時尚</option>
+                  <option>生活風格</option>
+                  <option>健身健康</option>
+                  <option>旅遊</option>
+                  <option>科技</option>
+                  <option>美食</option>
+                  <option>其他</option>
+                </select>
+              </label>
+              <label>
+                聯絡電郵 *
+                <input placeholder="your@email.com" required type="email" />
+              </label>
+              <button type="submit">提交申請</button>
+            </form>
+          ) : null}
 
-        h1 {
-          margin: 0;
-          font-size: clamp(3.4rem, 7vw, 7rem);
-          line-height: 0.94;
-          letter-spacing: 0;
-          font-weight: 620;
-          max-width: 900px;
-        }
+          {identity === 'business' && !submitted ? (
+            <form className="contact-form" onSubmit={handleSubmit}>
+              <h2>商業合作洽談</h2>
+              <label>
+                姓名 *
+                <input required type="text" />
+              </label>
+              <label>
+                公司 / 機構
+                <input type="text" />
+              </label>
+              <label>
+                聯絡電郵 *
+                <input placeholder="your@email.com" required type="email" />
+              </label>
+              <label>
+                合作類型
+                <select defaultValue="媒體報道">
+                  <option>媒體報道</option>
+                  <option>投資洽談</option>
+                  <option>品牌夥伴</option>
+                  <option>其他</option>
+                </select>
+              </label>
+              <label>
+                簡短說明 *
+                <textarea placeholder="請簡述合作目的" required rows={4} />
+              </label>
+              <button type="submit">發送訊息</button>
+            </form>
+          ) : null}
+        </div>
+      </section>
 
-        .lead {
-          max-width: 740px;
-          margin: 28px 0 42px;
-          color: rgba(247, 248, 251, 0.78);
-          font-size: clamp(1.08rem, 1.7vw, 1.38rem);
-          line-height: 1.75;
-        }
+      <section className="info-section">
+        <div className="info-card">
+          <div>
+            <h2>直接聯絡我們</h2>
+            <p>如有緊急查詢，歡迎直接電郵聯絡</p>
+          </div>
+          <a href="mailto:hello@sooncreator.network">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="4" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M2 6l7 5 7-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            hello@sooncreator.network
+          </a>
+        </div>
+        <p className="reply-note">通常於一個工作天內回覆 · 週一至週五</p>
+      </section>
 
-        .benefits {
-          display: grid;
-          gap: 18px;
-          max-width: 820px;
-        }
+      <section className="final-cta">
+        <h2>準備好開始了嗎？</h2>
+        <p>無需等待，立即免費試用七天。</p>
+        <Link className="primary-cta" href="/signup">
+          品牌免費試用
+        </Link>
+      </section>
 
-        .benefit {
-          display: grid;
-          grid-template-columns: 26px 1fr;
-          gap: 16px;
-          align-items: start;
-        }
+      <footer className="contact-footer">
+        <span>SOON Creator Network</span>
+        <span>聯絡我們</span>
+      </footer>
 
-        .benefit > span {
-          width: 22px;
-          height: 22px;
-          margin-top: 3px;
-          border-radius: 999px;
-          background: #54c746;
-          position: relative;
-        }
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .contact-page {
+              min-height: 100vh;
+              background: transparent;
+              color: #ffffff;
+              font-family:
+                "SF Pro Rounded", "SF Pro Display", "Avenir Next", ui-rounded,
+                "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", sans-serif;
+            }
 
-        .benefit > span::after {
-          content: "";
-          position: absolute;
-          left: 7px;
-          top: 5px;
-          width: 6px;
-          height: 10px;
-          border: solid #ffffff;
-          border-width: 0 2px 2px 0;
-          transform: rotate(45deg);
-        }
+            .hero-section,
+            .form-section,
+            .info-section,
+            .final-cta,
+            .contact-footer {
+              position: relative;
+              z-index: 1;
+            }
 
-        .benefit strong {
-          display: block;
-          margin-bottom: 4px;
-          color: #ffffff;
-          font-size: 1.08rem;
-        }
+            .hero-section {
+              max-width: 672px;
+              margin: 0 auto;
+              padding: 160px 32px 48px;
+              text-align: center;
+            }
 
-        .benefit p {
-          margin: 0;
-          color: rgba(247, 248, 251, 0.72);
-          font-size: 1rem;
-          line-height: 1.55;
-        }
+            .eyebrow {
+              margin: 0 0 24px;
+              color: #D4AF37;
+              font-size: 12px;
+              font-weight: 850;
+              letter-spacing: 0.16em;
+              text-transform: uppercase;
+            }
 
-        .contact-form {
-          background: #ffffff;
-          color: #111111;
-          border-radius: 8px;
-          padding: clamp(28px, 4vw, 46px);
-          display: grid;
-          gap: 18px;
-          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.34);
-        }
+            .hero-section h1 {
+              margin: 0 0 16px;
+              color: #ffffff;
+              font-size: clamp(36px, 5vw, 60px);
+              line-height: 1.12;
+              font-weight: 950;
+              letter-spacing: 0;
+            }
 
-        .contact-form h2 {
-          margin: 0 0 12px;
-          color: #111111;
-          font-size: clamp(2rem, 3vw, 2.8rem);
-          line-height: 1.05;
-          letter-spacing: 0;
-        }
+            .hero-section p:not(.eyebrow) {
+              margin: 0;
+              color: #a1a1aa;
+              font-size: 17px;
+              line-height: 1.8;
+              font-weight: 650;
+            }
 
-        label {
-          display: grid;
-          gap: 8px;
-          color: #1b1b1f;
-          font-size: 0.98rem;
-          font-weight: 650;
-        }
+            .form-section {
+              max-width: 768px;
+              margin: 0 auto;
+              padding: 64px 32px;
+            }
 
-        input,
-        select,
-        textarea {
-          width: 100%;
-          border: 1px solid #dedfe4;
-          border-radius: 8px;
-          background: #ffffff;
-          color: #111111;
-          font: inherit;
-          font-weight: 500;
-          padding: 15px 16px;
-          outline: none;
-          transition: border-color 160ms ease, box-shadow 160ms ease;
-        }
+            .identity-grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 16px;
+            }
 
-        input::placeholder,
-        textarea::placeholder {
-          color: #9b9da5;
-        }
+            .identity-card {
+              padding: 24px;
+              border-radius: 16px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              background: rgba(255, 255, 255, 0.04);
+              color: #ffffff;
+              cursor: pointer;
+              text-align: center;
+              transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+            }
 
-        select {
-          appearance: auto;
-        }
+            .identity-card:hover {
+              border-color: rgba(255, 255, 255, 0.2);
+              transform: translateY(-2px);
+            }
 
-        textarea {
-          min-height: 132px;
-          resize: vertical;
-          line-height: 1.65;
-        }
+            .identity-card.selected {
+              border: 1.5px solid #ef4444;
+              background: rgba(239, 68, 68, 0.06);
+            }
 
-        input:focus,
-        select:focus,
-        textarea:focus {
-          border-color: #111111;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
-        }
+            .identity-icon {
+              display: flex;
+              justify-content: center;
+              margin-bottom: 16px;
+            }
 
-        button {
-          margin-top: 6px;
-          border: 0;
-          border-radius: 6px;
-          background: #ef3f2f;
-          color: #ffffff;
-          padding: 17px 22px;
-          font-size: 1.08rem;
-          font-weight: 800;
-          cursor: pointer;
-          transition: transform 160ms ease, opacity 160ms ease;
-        }
+            .identity-card strong {
+              display: block;
+              color: #ffffff;
+              font-size: 16px;
+              font-weight: 900;
+            }
 
-        button:hover {
-          transform: translateY(-1px);
-        }
+            .identity-card small {
+              display: block;
+              margin-top: 6px;
+              color: #a1a1aa;
+              font-size: 13px;
+              line-height: 1.5;
+              font-weight: 650;
+            }
 
-        button:disabled {
-          cursor: wait;
-          opacity: 0.68;
-          transform: none;
-        }
+            .dynamic-form-wrap {
+              opacity: 0;
+              transform: translateY(16px);
+              transition: all 0.4s ease;
+              pointer-events: none;
+              margin-top: 34px;
+            }
 
-        .form-message {
-          margin: 0;
-          border-radius: 8px;
-          background: #f7f2d8;
-          color: #6b5d1c;
-          padding: 13px 15px;
-          font-size: 0.95rem;
-          line-height: 1.55;
-        }
+            .dynamic-form-wrap.visible {
+              opacity: 1;
+              transform: translateY(0);
+              pointer-events: auto;
+            }
 
-        @media (max-width: 980px) {
-          .contact-page {
-            padding: 42px 20px 64px;
-          }
+            .contact-form {
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+              padding: 32px;
+              border-radius: 16px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              background: rgba(255, 255, 255, 0.035);
+            }
 
-          .contact-shell {
-            grid-template-columns: 1fr;
-          }
+            .contact-form h2 {
+              margin: 0 0 4px;
+              color: #ffffff;
+              font-size: 20px;
+              font-weight: 950;
+            }
 
-          .contact-copy {
-            padding-top: 10px;
-          }
-        }
+            .contact-form label,
+            .field-group span {
+              display: block;
+              color: #d4d4d8;
+              font-size: 13px;
+              line-height: 1.6;
+              font-weight: 750;
+            }
 
-        @media (max-width: 560px) {
-          h1 {
-            font-size: 3.1rem;
-          }
+            .contact-form input,
+            .contact-form select,
+            .contact-form textarea {
+              width: 100%;
+              margin-top: 8px;
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              border-radius: 12px;
+              background: rgba(255, 255, 255, 0.06);
+              color: #ffffff;
+              padding: 12px 16px;
+              font-size: 15px;
+              outline: none;
+              font-family: inherit;
+            }
 
-          .contact-form {
-            padding: 24px 18px;
-          }
-        }
-      `}</style>
+            .contact-form select {
+              appearance: none;
+            }
+
+            .contact-form textarea {
+              resize: vertical;
+            }
+
+            .contact-form input:focus,
+            .contact-form select:focus,
+            .contact-form textarea:focus {
+              border-color: #ef4444;
+            }
+
+            .contact-form input::placeholder,
+            .contact-form textarea::placeholder {
+              color: #71717a;
+            }
+
+            .platform-pills {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 12px;
+              margin-top: 10px;
+            }
+
+            .platform-pill {
+              display: inline-flex;
+              align-items: center;
+              border-radius: 999px;
+              border: 1px solid rgba(255, 255, 255, 0.14);
+              color: #d4d4d8;
+              cursor: pointer;
+              padding: 8px 16px;
+              font-size: 14px;
+              font-weight: 800;
+            }
+
+            .platform-pill input {
+              display: none;
+            }
+
+            .platform-pill.checked {
+              border-color: #ef4444;
+              background: #ef4444;
+              color: #ffffff;
+            }
+
+            .contact-form > button {
+              width: 100%;
+              margin-top: 8px;
+              border: 0;
+              border-radius: 12px;
+              background: #ef4444;
+              color: #ffffff;
+              cursor: pointer;
+              padding: 16px;
+              font-size: 16px;
+              font-weight: 900;
+            }
+
+            .success-state {
+              padding: 48px 24px;
+              border-radius: 16px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              background: rgba(255, 255, 255, 0.035);
+              text-align: center;
+            }
+
+            .success-state h3 {
+              margin: 16px 0 0;
+              color: #ffffff;
+              font-size: 22px;
+              font-weight: 950;
+            }
+
+            .success-state p {
+              margin: 8px 0 0;
+              color: #a1a1aa;
+              font-size: 15px;
+              font-weight: 650;
+            }
+
+            .info-section {
+              max-width: 768px;
+              margin: 0 auto;
+              padding: 64px 32px;
+            }
+
+            .info-card {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 32px;
+              padding: 32px;
+              border-radius: 16px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              background: rgba(255, 255, 255, 0.03);
+            }
+
+            .info-card h2 {
+              margin: 0 0 8px;
+              color: #ffffff;
+              font-size: 18px;
+              font-weight: 900;
+            }
+
+            .info-card p {
+              margin: 0;
+              color: #a1a1aa;
+              font-size: 14px;
+              font-weight: 650;
+            }
+
+            .info-card a {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              border-radius: 999px;
+              border: 1px solid rgba(255, 255, 255, 0.2);
+              color: #ffffff;
+              padding: 12px 24px;
+              text-decoration: none;
+              font-size: 15px;
+              font-weight: 800;
+              white-space: nowrap;
+            }
+
+            .reply-note {
+              margin: 16px 0 0;
+              color: #71717a;
+              text-align: center;
+              font-size: 13px;
+              font-weight: 700;
+            }
+
+            .final-cta {
+              padding: 80px 32px;
+              text-align: center;
+              background: linear-gradient(135deg, #1a0000, #0a0a0a);
+            }
+
+            .final-cta h2 {
+              margin: 0 0 16px;
+              color: #ffffff;
+              font-size: clamp(28px, 4vw, 44px);
+              line-height: 1.12;
+              font-weight: 950;
+            }
+
+            .final-cta p {
+              margin: 0 0 32px;
+              color: #a1a1aa;
+              font-size: 16px;
+              font-weight: 650;
+            }
+
+            .primary-cta {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 50px;
+              padding: 0 26px;
+              border-radius: 8px;
+              text-decoration: none;
+              background: #ef4444;
+              color: #ffffff;
+              font-size: 0.95rem;
+              font-weight: 850;
+              box-shadow: 0 18px 42px rgba(239, 68, 68, 0.32);
+            }
+
+            .contact-footer {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 18px;
+              padding: 32px 7vw 42px;
+              background: #0a0a0a;
+              border-top: 1px solid rgba(255, 255, 255, 0.08);
+              color: #71717a;
+              font-size: 0.95rem;
+              font-weight: 800;
+            }
+
+            @media (max-width: 760px) {
+              .identity-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .info-card {
+                align-items: flex-start;
+                flex-direction: column;
+              }
+
+              .info-card a {
+                white-space: normal;
+              }
+
+              .contact-footer {
+                flex-direction: column;
+                align-items: flex-start;
+                padding-left: 22px;
+                padding-right: 22px;
+              }
+            }
+          `,
+        }}
+      />
     </main>
   )
 }
