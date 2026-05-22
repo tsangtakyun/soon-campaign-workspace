@@ -216,12 +216,11 @@ export default function MatchForYouPage() {
             }
 
             .hero-section {
-              min-height: 85vh;
               display: grid;
               grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
               align-items: center;
               gap: 6vw;
-              padding: 150px 7vw 80px;
+              padding: 150px 7vw 64px;
               position: relative;
             }
 
@@ -622,6 +621,7 @@ export default function MatchForYouPage() {
               .hero-section {
                 grid-template-columns: 1fr;
                 padding-top: 210px;
+                padding-bottom: 56px;
               }
 
               .audience-title {
@@ -650,6 +650,7 @@ export default function MatchForYouPage() {
 
               .hero-section {
                 padding-top: 230px;
+                padding-bottom: 48px;
               }
 
               .hero-actions {
