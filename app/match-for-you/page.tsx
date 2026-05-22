@@ -209,7 +209,7 @@ export default function MatchForYouPage() {
       />
       <section className="relative w-full overflow-hidden" style={{ background: '#0a0a0a', minHeight: '620px' }}>
         <div className="relative z-10 grid grid-cols-2 items-center" style={{ minHeight: '620px' }}>
-          <div className="flex flex-col justify-center px-12 py-24">
+          <div className="flex flex-col justify-center pl-24 pr-8 pt-40 pb-24">
             <p
               className="text-sm font-medium uppercase mb-6 tracking-widest"
               style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
@@ -483,7 +483,11 @@ export default function MatchForYouPage() {
             .px-6 { padding-left: 24px; padding-right: 24px; }
             .py-3 { padding-top: 12px; padding-bottom: 12px; }
             .pt-24 { padding-top: 96px; }
+            .pt-40 { padding-top: 160px; }
             .pb-16 { padding-bottom: 64px; }
+            .pb-24 { padding-bottom: 96px; }
+            .pl-24 { padding-left: 96px; }
+            .pr-8 { padding-right: 32px; }
             .py-24 { padding-top: 96px; padding-bottom: 96px; }
             .mb-6 { margin-bottom: 24px; }
             .mb-8 { margin-bottom: 32px; }
