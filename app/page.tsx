@@ -147,11 +147,10 @@ export default function HomePage() {
               <br />
               自己說話
             </h1>
-            <p className="hero__subtitle">
-              AI 幫你經營社交媒體，KOL 主動找你合作。
-              <br />
-              不再浪費金錢在中介身上——每月只需 HK$388 起
-            </p>
+            <div className="hero__subtitle">
+              <span className="hero__subtitle-main">相信 AI system，不再浪費金錢在中介身上。</span>
+              <span className="hero__subtitle-note">每月只需 HK$388 起 · 免費試用七天</span>
+            </div>
             <div className="hero__actions">
               <Link href="/signup" className="button button--primary">
                 立即免費試用
@@ -207,23 +206,15 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="application-feed" aria-label="KOL application feed">
-            {kolApplications.map((application) => (
-              <article className="application-card" key={application.name}>
-                <div className="application-avatar" style={{ background: application.gradient }}>
-                  {application.initial}
-                </div>
-                <div className="application-main">
-                  <h3>{application.name}</h3>
-                  <p>{application.meta}</p>
-                </div>
-                <div className={`application-status application-status--${application.statusClass}`}>
-                  <span />
-                  {application.status}
-                </div>
-              </article>
-            ))}
-            <p className="feed-note">實時收到 KOL 申請通知</p>
+          <div className="relative w-full overflow-hidden rounded-2xl" style={{ minHeight: '420px' }}>
+            <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'linear-gradient(to right, rgba(10,10,10,0.5) 0%, transparent 40%)' }} />
+            <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(10,10,10,0.4) 0%, transparent 30%)' }} />
+            <img
+              src="/KOL/kol-hero.png"
+              alt="KOL Creator"
+              className="w-full h-full object-cover object-center"
+              style={{ transform: 'scale(1.2)', transformOrigin: 'center center', minHeight: '420px' }}
+            />
           </div>
         </div>
       </section>
@@ -231,49 +222,21 @@ export default function HomePage() {
       <section className="product-preview">
         <div className="product-preview__header">
           <span>Campaign Workspace</span>
-          <h2>一個工作台，從策略到發布</h2>
+          <h2>
+            一個工作台
+            <br />
+            從策略到發布
+          </h2>
           <p>管理所有社交平台，AI 生成內容，一鍵排程發布。</p>
         </div>
 
-        <div className="workspace-mockup" aria-label="Campaign Workspace dashboard preview">
-          <aside className="mockup-sidebar">
-            <div className="mockup-logo">S</div>
-            {['總覽', '內容', '創作者申請', '排程', '品牌素材'].map((item, index) => (
-              <div key={item} className={index === 1 ? 'mockup-nav-item active' : 'mockup-nav-item'}>
-                <span />
-                {item}
-              </div>
-            ))}
-          </aside>
-          <div className="mockup-main">
-            <div className="mockup-topbar">
-              <div>
-                <p>Campaign Workspace</p>
-                <h3>銀幸護膚五月內容計劃</h3>
-              </div>
-              <button type="button">排程發布</button>
-            </div>
-            <div className="mockup-content">
-              <article className="mockup-campaign-card">
-                <div className="mockup-card-meta">
-                  <div className="mockup-platforms">
-                    <span className="mockup-ig">IG</span>
-                    <span className="mockup-fb">f</span>
-                  </div>
-                  <span>星期五 10:00</span>
-                </div>
-                <h4>AI 已為你整理本週社交內容</h4>
-                <p>最細小的片段，往往承載最真實的感覺。把普通一刻整理成可發布的社交內容。</p>
-                <div className="mockup-image" />
-              </article>
-              <div className="mockup-panel">
-                <h4>內容進度</h4>
-                <div />
-                <div />
-                <div />
-              </div>
-            </div>
-          </div>
+        <div className="relative rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+          <img
+            src="/dashboard-preview.jpg"
+            alt="SOON Dashboard - 銀幸の美學 Ginkgo Beauty"
+            className="w-full h-auto"
+            style={{ display: 'block' }}
+          />
         </div>
 
         <Link href="/signup" className="button button--primary product-preview__cta">
@@ -369,14 +332,16 @@ export default function HomePage() {
             }
 
             .hero__text {
-              width: min(100%, 780px);
+              width: min(100%, 50%);
+              max-width: 50%;
+              margin-left: auto;
             }
 
             .hero__eyebrow,
             .section-eyebrow {
               margin: 0 0 16px;
               color: #a1a1aa;
-              font-size: 13px;
+              font-size: 11px;
               font-weight: 800;
               letter-spacing: 0.18em;
               text-transform: uppercase;
@@ -390,20 +355,31 @@ export default function HomePage() {
             .hero h1 {
               margin: 0;
               max-width: 820px;
-              font-size: clamp(4.7rem, 10vw, 9.6rem);
+              font-size: clamp(38px, 5.5vw, 76px);
               line-height: 0.88;
               letter-spacing: -0.08em;
               font-weight: 720;
             }
 
             .hero__subtitle {
-              margin: 28px 0 34px;
+              display: grid;
+              gap: 4px;
+              margin: 22px 0 28px;
               max-width: 740px;
-              color: rgba(255,255,255,0.82);
-              font-size: clamp(1.12rem, 1.8vw, 1.58rem);
-              line-height: 1.58;
               letter-spacing: -0.02em;
               font-weight: 550;
+            }
+
+            .hero__subtitle-main {
+              color: #ffffff;
+              font-size: 14px;
+              line-height: 1.55;
+            }
+
+            .hero__subtitle-note {
+              color: #a1a1aa;
+              font-size: 13px;
+              line-height: 1.5;
             }
 
             .hero__actions,
@@ -425,6 +401,12 @@ export default function HomePage() {
               font-size: 16px;
               font-weight: 800;
               white-space: nowrap;
+            }
+
+            .hero__actions .button {
+              min-height: 42px;
+              padding: 0 16px;
+              font-size: 13px;
             }
 
             .button--primary {
