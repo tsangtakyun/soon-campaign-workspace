@@ -179,7 +179,7 @@ export default function MatchForYouPage() {
 
       <section className="hero-split">
         <div className="hero-grid">
-          <div className="hero-copy pl-40">
+          <div className="hero-copy pl-28">
             <p className="hero-eyebrow">SOON 獨家功能 · Exclusive Feature</p>
             <h1>
               不需要主動找KOL
@@ -221,7 +221,6 @@ export default function MatchForYouPage() {
 
       <section className="pain-section">
         <div className="pain-inner">
-          <p className="section-kicker">Pain Points · 市場痛點</p>
           <h2>傳統 KOL 合作模式的三大問題</h2>
 
           <div className="pain-grid">
@@ -367,8 +366,8 @@ export default function MatchForYouPage() {
               padding: 160px 32px 96px 160px;
             }
 
-            .pl-40 {
-              padding-left: 160px;
+            .pl-28 {
+              padding-left: 112px;
             }
 
             .hero-eyebrow {
@@ -383,7 +382,7 @@ export default function MatchForYouPage() {
             .hero-copy h1 {
               margin: 0 0 24px;
               color: #ffffff;
-              font-size: clamp(56px, 6vw, 100px);
+              font-size: clamp(48px, 5.5vw, 88px);
               line-height: 1;
               font-weight: 950;
               letter-spacing: 0;
