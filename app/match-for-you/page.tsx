@@ -207,77 +207,76 @@ export default function MatchForYouPage() {
           background: '#0a0a0a',
         }}
       />
-      <section className="relative w-full overflow-hidden hero-background-section" style={{ minHeight: '580px' }}>
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/KOL/kol-hero.png"
-            alt=""
-            className="w-full h-full object-cover object-center"
-            style={{
-              animation: 'float 6s ease-in-out infinite',
-              transform: 'scale(1.4)',
-              transformOrigin: 'center center',
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'linear-gradient(to right, rgba(10,10,10,0.85) 0%, rgba(10,10,10,0.5) 50%, rgba(10,10,10,0.15) 100%)',
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(to top, rgba(10,10,10,0.9) 0%, transparent 40%)',
-            }}
-          />
-        </div>
-
-        <div className="relative z-10 px-12 pt-24 pb-16 max-w-5xl hero-background-content">
-          <p
-            className="text-sm font-medium tracking-widest uppercase mb-6"
-            style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
-          >
-            SOON 獨家功能 · Exclusive Feature
-          </p>
-
-          <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(56px, 8vw, 110px)' }}>
-            不需要主動找KOL
-            <br />
-            讓KOL找你
-          </h1>
-
-          <p
-            className="text-white mb-8"
-            style={{ fontSize: '18px', opacity: 0.75, maxWidth: '520px', lineHeight: 1.6 }}
-          >
-            讓創作者主動申請合作，品牌專注做好產品，
-            <br />
-            SOON 幫你完成其餘一切
-          </p>
-
-          <div className="flex gap-3 items-center mb-8">
-            <a className="px-6 py-3 font-semibold text-white rounded-lg text-sm" href="/signup" style={{ background: '#ef4444' }}>
-              品牌免費試用
-            </a>
-            <a
-              className="px-6 py-3 font-semibold rounded-lg text-sm"
-              href="#"
-              style={{ background: 'transparent', border: '1.5px solid rgba(255,255,255,0.4)', color: '#fff' }}
+      <section className="relative w-full overflow-hidden" style={{ background: '#0a0a0a', minHeight: '620px' }}>
+        <div className="relative z-10 grid grid-cols-2 items-center" style={{ minHeight: '620px' }}>
+          <div className="flex flex-col justify-center px-12 py-24">
+            <p
+              className="text-sm font-medium uppercase mb-6 tracking-widest"
+              style={{ color: '#D4AF37', letterSpacing: '0.12em' }}
             >
-              我係創作者 →
-            </a>
+              SOON 獨家功能 · Exclusive Feature
+            </p>
+            <h1 className="font-bold text-white leading-none mb-6" style={{ fontSize: 'clamp(56px, 6vw, 100px)' }}>
+              不需要主動找KOL
+              <br />
+              讓KOL找你
+            </h1>
+            <p className="text-white mb-8" style={{ fontSize: '17px', opacity: 0.7, lineHeight: 1.7 }}>
+              讓創作者主動申請合作，品牌專注做好產品，
+              <br />
+              SOON 幫你完成其餘一切
+            </p>
+            <div className="flex gap-3 items-center mb-8">
+              <a
+                href="/signup"
+                className="px-6 py-3 font-semibold text-white rounded-lg text-sm"
+                style={{ background: '#ef4444' }}
+              >
+                品牌免費試用
+              </a>
+              <a
+                href="#"
+                className="px-6 py-3 font-semibold rounded-lg text-sm"
+                style={{ background: 'transparent', border: '1.5px solid rgba(255,255,255,0.4)', color: '#fff' }}
+              >
+                我係創作者 →
+              </a>
+            </div>
+            <div className="flex gap-3 text-sm items-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              <span>Instagram</span>
+              <span>&middot;</span>
+              <span>小紅書</span>
+              <span>&middot;</span>
+              <span>TikTok</span>
+              <span>&middot;</span>
+              <span>YouTube</span>
+            </div>
           </div>
 
-          <div className="flex gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            <span>Instagram</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>小紅書</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>TikTok</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>YouTube</span>
+          <div className="relative h-full overflow-hidden" style={{ minHeight: '620px' }}>
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{ background: 'linear-gradient(to right, #0a0a0a 0%, transparent 35%)' }}
+            />
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{ background: 'linear-gradient(to bottom, #0a0a0a 0%, transparent 20%)' }}
+            />
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{ background: 'linear-gradient(to top, #0a0a0a 0%, transparent 20%)' }}
+            />
+            <img
+              src="/KOL/kol-hero.png"
+              alt="KOL Creator"
+              className="w-full h-full object-cover object-center"
+              style={{
+                transform: 'scale(1.4)',
+                transformOrigin: 'center center',
+                animation: 'float 6s ease-in-out infinite',
+                minHeight: '620px',
+              }}
+            />
           </div>
         </div>
       </section>
@@ -485,12 +484,16 @@ export default function MatchForYouPage() {
             .py-3 { padding-top: 12px; padding-bottom: 12px; }
             .pt-24 { padding-top: 96px; }
             .pb-16 { padding-bottom: 64px; }
+            .py-24 { padding-top: 96px; padding-bottom: 96px; }
             .mb-6 { margin-bottom: 24px; }
             .mb-8 { margin-bottom: 32px; }
             .gap-3 { gap: 12px; }
             .gap-4 { gap: 16px; }
             .min-h-\\[500px\\] { min-height: 500px; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .flex { display: flex; }
+            .flex-col { flex-direction: column; }
             .items-center { align-items: center; }
             .justify-center { justify-content: center; }
             .overflow-hidden { overflow: hidden; }
