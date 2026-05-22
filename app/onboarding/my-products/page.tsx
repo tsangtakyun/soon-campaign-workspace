@@ -810,6 +810,7 @@ tbody tr:last-child td {
   overflow: auto;
   border-radius: 16px;
   background: #ffffff;
+  color: #111827;
   box-shadow: 0 28px 80px rgba(0, 0, 0, .32);
 }
 
@@ -818,11 +819,13 @@ tbody tr:last-child td {
   justify-content: space-between;
   gap: 18px;
   padding: 22px 24px 16px;
-  border-bottom: 1px solid #eef0f4;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .modal-header h2 {
   margin: 0 0 6px;
+  color: #111827;
   font-size: 22px;
 }
 
@@ -837,19 +840,22 @@ tbody tr:last-child td {
   height: 34px;
   border: 0;
   border-radius: 999px;
-  background: #f4f4f5;
-  color: #52525b;
+  background: #f9fafb;
+  color: #111827;
   cursor: pointer;
   font-size: 22px;
 }
 
 .modal-section {
   padding: 18px 24px;
-  border-bottom: 1px solid #eef0f4;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
 }
 
 .modal-section h3 {
   margin: 0 0 12px;
+  color: #111827;
   font-size: 14px;
 }
 
@@ -858,7 +864,9 @@ tbody tr:last-child td {
   align-items: center;
   gap: 12px;
   border-radius: 12px;
-  background: #f7f7fb;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #111827;
   padding: 12px;
 }
 
@@ -869,6 +877,10 @@ tbody tr:last-child td {
 .readonly-product strong,
 .readonly-product span {
   display: block;
+}
+
+.readonly-product strong {
+  color: #111827;
 }
 
 .readonly-product span {
@@ -888,7 +900,7 @@ tbody tr:last-child td {
 }
 
 .modal-section label > span {
-  color: #374151;
+  color: #111827;
   font-size: 13px;
   font-weight: 800;
 }
@@ -896,11 +908,17 @@ tbody tr:last-child td {
 .modal-section input,
 .modal-section textarea {
   width: 100%;
-  border: 1px solid #d1d5db;
+  border: 1px solid #e5e7eb;
   border-radius: 9px;
+  background: #ffffff;
   color: #111827;
   font: inherit;
   padding: 10px 12px;
+}
+
+.modal-section input::placeholder,
+.modal-section textarea::placeholder {
+  color: #9ca3af;
 }
 
 .chip-grid {
@@ -912,8 +930,8 @@ tbody tr:last-child td {
 .chip-grid button {
   border: 1px solid #e5e7eb;
   border-radius: 999px;
-  background: #ffffff;
-  color: #6b7280;
+  background: #f9fafb;
+  color: #111827;
   cursor: pointer;
   font-size: 13px;
   font-weight: 800;
@@ -922,8 +940,8 @@ tbody tr:last-child td {
 
 .chip-grid button.selected {
   border-color: #7c3aed;
-  background: rgba(124, 58, 237, .1);
-  color: #6d28d9;
+  background: #7c3aed;
+  color: #ffffff;
 }
 
 .check-list {
@@ -932,7 +950,7 @@ tbody tr:last-child td {
   margin: 0;
   padding: 0;
   list-style: none;
-  color: #374151;
+  color: #111827;
   font-size: 14px;
 }
 
@@ -940,10 +958,11 @@ tbody tr:last-child td {
   justify-content: flex-end;
   gap: 10px;
   padding: 16px 24px 22px;
+  background: #ffffff;
 }
 
 .cancel-button {
-  border: 1px solid #d1d5db;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #ffffff;
   color: #111827;
