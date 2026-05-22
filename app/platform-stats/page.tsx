@@ -418,6 +418,7 @@ export default function PlatformStatsPage() {
             .counter-card {
               padding: 32px;
               min-height: 180px;
+              overflow: visible;
             }
 
             .counter-line {
@@ -434,11 +435,11 @@ export default function PlatformStatsPage() {
               font-weight: 950;
               letter-spacing: 0;
               white-space: nowrap;
-              overflow: hidden;
+              overflow: visible;
             }
 
             .counter-number--money {
-              font-size: clamp(32px, 3.5vw, 52px);
+              font-size: clamp(28px, 3vw, 44px);
             }
 
             .counter-unit {
