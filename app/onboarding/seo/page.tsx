@@ -163,7 +163,7 @@ export default function SeoPage() {
             <img
               src="/seo/seo-banner.png"
               alt="SEO Banner"
-              style={{ width: '100%', maxWidth: '100%', borderRadius: '12px' }}
+              style={{ width: '75%', maxWidth: '75%', borderRadius: '12px' }}
             />
             <button
               className="yellow-button large"
