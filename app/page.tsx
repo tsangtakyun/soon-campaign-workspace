@@ -1,43 +1,5 @@
 import Link from 'next/link'
 
-import { pricingPlans } from '@/lib/pricing'
-
-const primaryButtonStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: '56px',
-  padding: '0 24px',
-  borderRadius: '8px',
-  textDecoration: 'none',
-  background: '#ef3f2f',
-  color: '#ffffff',
-  fontSize: '16px',
-  fontWeight: 700,
-  border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 16px 34px rgba(239, 63, 47, 0.32)',
-} as const
-
-const proofItems = [
-  {
-    value: '2.3x',
-    title: '更快啟動宣傳',
-    body: '由品牌需求到內容方向，減少反覆溝通與人手整理。',
-  },
-  {
-    value: '87%',
-    title: '更清楚配對創作者',
-    body: '根據目標、內容風格與製作需要，整理更合適的創作者方向。',
-  },
-  {
-    value: '99%',
-    title: '減少人手規劃',
-    body: '將策略、內容規劃、分鏡與交付流程集中在同一個工作台。',
-  },
-]
-
-const contentTypes = ['社交內容', '創作者腳本', '影片題材', '宣傳策略', '分鏡規劃', '交付追蹤']
-
 const heroVideoPriorityProps = {
   fetchPriority: 'high',
 } as const
@@ -58,6 +20,102 @@ const platformIcons = [
   {
     label: 'YouTube',
     svg: `<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="#FF0000"/><path d="M10.2 9.1v5.8l5-2.9-5-2.9Z" fill="#fff"/></svg>`,
+  },
+]
+
+const featureCards = [
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <circle cx="14" cy="14" r="11" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M9 14l3 3 7-7" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+    title: '零中介費用',
+    body: '品牌預算直接用於創作者合作，不再有中間人抽成。',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <path d="M14 4C8.477 4 4 8.477 4 14s4.477 10 10 10 10-4.477 10-10S19.523 4 14 4z" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M14 9v5l3 3" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    title: 'KOL 主動申請',
+    body: '真實興趣帶來真實內容，創作者主動選擇品牌，效果自然更好。',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <rect x="3" y="7" width="22" height="15" rx="2" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M3 11h22" stroke="#ef4444" strokeWidth="1.5" />
+        <path d="M8 16h4M16 16h4" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+    title: 'AI 全自動經營',
+    body: 'AI 制定策略、生成內容、排程發布，一個工作台管理所有社交平台。',
+  },
+]
+
+const kolApplications = [
+  {
+    name: '陳曉彤',
+    meta: 'IG 23.5K · 美妝',
+    initial: '陳',
+    gradient: 'linear-gradient(135deg, #a855f7, #ec4899)',
+    status: '已申請',
+    statusClass: 'green',
+  },
+  {
+    name: '林思穎',
+    meta: '小紅書 41K · 生活',
+    initial: '林',
+    gradient: 'linear-gradient(135deg, #10b981, #14b8a6)',
+    status: '已申請',
+    statusClass: 'green',
+  },
+  {
+    name: '梁嘉欣',
+    meta: 'TikTok 89K · 時尚',
+    initial: '梁',
+    gradient: 'linear-gradient(135deg, #f97316, #ef4444)',
+    status: '待審核',
+    statusClass: 'amber',
+  },
+]
+
+const stats = [
+  { value: '1,247', label: '已促成 KOL 合作' },
+  { value: 'HK$2.3M', label: '品牌節省中介費用' },
+  { value: '89M', label: '覆蓋平台總觀看次數' },
+  { value: '3,800+', label: '活躍創作者數目' },
+]
+
+const pricingPreview = [
+  {
+    name: '免費試用',
+    price: 'HK$0',
+    cadence: '/7天',
+    body: '上架 1 個 Campaign，接收 10 個申請',
+    cta: '立即開始',
+    href: '/signup',
+  },
+  {
+    name: 'Starter',
+    price: 'HK$388',
+    cadence: '/月',
+    body: '最多 3 個 Campaign，無限申請',
+    cta: '開始試用',
+    href: '/signup?plan=starter',
+  },
+  {
+    name: 'Growth',
+    price: 'HK$788',
+    cadence: '/月',
+    body: '無限 Campaign，優先排序，進階數據',
+    cta: '開始試用',
+    href: '/signup?plan=growth',
+    highlight: true,
   },
 ]
 
@@ -83,20 +141,25 @@ export default function HomePage() {
 
         <div className="hero__content">
           <div className="hero__text">
-            <div className="rating">廣告策略 + 創作內容流程</div>
+            <p className="hero__eyebrow">SOON Creator Network</p>
             <h1>
-              是時候
+              是時候讓品牌
               <br />
-              自己做廣告
+              自己說話
             </h1>
             <p className="hero__subtitle">
-              SOON 制定你的策略 創造你的內容
+              AI 幫你經營社交媒體，KOL 主動找你合作。
               <br />
-              不需要再請人打理社交媒體——每月只需 HK$588 起
+              不再浪費金錢在中介身上——每月只需 HK$388 起
             </p>
-            <Link href="/signup" className="hero__cta">
-              立即免費試用
-            </Link>
+            <div className="hero__actions">
+              <Link href="/signup" className="button button--primary">
+                立即免費試用
+              </Link>
+              <Link href="/match-for-you" className="button button--outline">
+                了解 KOL 配對 →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -117,9 +180,57 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="feature-strip" aria-label="SOON 核心功能">
+        {featureCards.map((feature) => (
+          <article className="feature-card" key={feature.title}>
+            {feature.icon}
+            <h3>{feature.title}</h3>
+            <p>{feature.body}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="match-block">
+        <div className="match-block__inner">
+          <div>
+            <p className="section-eyebrow">SOON 獨家功能</p>
+            <h2>
+              Match for You
+              <br />
+              創作者配對
+            </h2>
+            <p>
+              品牌發布 PR Gift Campaign，全亞洲創作者主動申請合作。不需要主動尋找 KOL，讓 KOL 找你。支援 Instagram、小紅書、TikTok、YouTube。
+            </p>
+            <Link href="/match-for-you" className="text-link">
+              了解 Match for You →
+            </Link>
+          </div>
+
+          <div className="application-feed" aria-label="KOL application feed">
+            {kolApplications.map((application) => (
+              <article className="application-card" key={application.name}>
+                <div className="application-avatar" style={{ background: application.gradient }}>
+                  {application.initial}
+                </div>
+                <div className="application-main">
+                  <h3>{application.name}</h3>
+                  <p>{application.meta}</p>
+                </div>
+                <div className={`application-status application-status--${application.statusClass}`}>
+                  <span />
+                  {application.status}
+                </div>
+              </article>
+            ))}
+            <p className="feed-note">實時收到 KOL 申請通知</p>
+          </div>
+        </div>
+      </section>
+
       <section className="product-preview">
         <div className="product-preview__header">
-          <span>產品預覽</span>
+          <span>Campaign Workspace</span>
           <h2>一個工作台，從策略到發布</h2>
           <p>管理所有社交平台，AI 生成內容，一鍵排程發布。</p>
         </div>
@@ -127,7 +238,7 @@ export default function HomePage() {
         <div className="workspace-mockup" aria-label="Campaign Workspace dashboard preview">
           <aside className="mockup-sidebar">
             <div className="mockup-logo">S</div>
-            {['首頁', '日曆', '宣傳活動', '整合', '品牌素材庫'].map((item, index) => (
+            {['總覽', '內容', '創作者申請', '排程', '品牌素材'].map((item, index) => (
               <div key={item} className={index === 1 ? 'mockup-nav-item active' : 'mockup-nav-item'}>
                 <span />
                 {item}
@@ -138,7 +249,7 @@ export default function HomePage() {
             <div className="mockup-topbar">
               <div>
                 <p>Campaign Workspace</p>
-                <h3>差點沒拍下來的片段</h3>
+                <h3>銀幸護膚五月內容計劃</h3>
               </div>
               <button type="button">排程發布</button>
             </div>
@@ -149,14 +260,14 @@ export default function HomePage() {
                     <span className="mockup-ig">IG</span>
                     <span className="mockup-fb">f</span>
                   </div>
-                  <span>今天 10:00</span>
+                  <span>星期五 10:00</span>
                 </div>
-                <h4>AI 已為你準備好下一篇內容</h4>
+                <h4>AI 已為你整理本週社交內容</h4>
                 <p>最細小的片段，往往承載最真實的感覺。把普通一刻整理成可發布的社交內容。</p>
                 <div className="mockup-image" />
               </article>
               <div className="mockup-panel">
-                <h4>快速操作</h4>
+                <h4>內容進度</h4>
                 <div />
                 <div />
                 <div />
@@ -165,70 +276,54 @@ export default function HomePage() {
           </div>
         </div>
 
-        <Link href="/signup" className="product-preview__cta">
+        <Link href="/signup" className="button button--primary product-preview__cta">
           立即免費試用
         </Link>
       </section>
 
-      <section id="features" className="growth">
-        <h2>
-          更有效的內容
-          <br />
-          更快的品牌增長
-        </h2>
+      <section className="stats-row" aria-label="SOON 平台數據">
+        {stats.map((stat) => (
+          <div className="stat-item" key={stat.label}>
+            <strong>{stat.value}</strong>
+            <span>{stat.label}</span>
+          </div>
+        ))}
+      </section>
 
-        <div className="proof-grid">
-          {proofItems.map((item) => (
-            <section key={item.title} className="proof-card">
-              <div className="proof-card__value">{item.value}</div>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </section>
+      <section className="pricing-preview">
+        <h2>簡單透明的定價</h2>
+        <p>品牌按需付費，創作者永遠免費。</p>
+        <div className="pricing-preview__grid">
+          {pricingPreview.map((plan) => (
+            <article className={plan.highlight ? 'mini-plan mini-plan--highlight' : 'mini-plan'} key={plan.name}>
+              {plan.highlight ? <div className="mini-plan__badge">最受歡迎</div> : null}
+              <h3>{plan.name}</h3>
+              <div className="mini-plan__price">
+                <strong>{plan.price}</strong>
+                <span>{plan.cadence}</span>
+              </div>
+              <p>{plan.body}</p>
+              <Link href={plan.href} className={plan.highlight ? 'mini-plan__button mini-plan__button--solid' : 'mini-plan__button'}>
+                {plan.cta}
+              </Link>
+            </article>
           ))}
         </div>
-
-        <Link href="/signup" className="growth__cta" style={primaryButtonStyle}>
-          開始 7 日試用
+        <Link href="/pricing" className="pricing-preview__link">
+          查看完整定價方案 →
         </Link>
       </section>
 
-      <section id="about" className="content-strip">
-        <div className="content-strip__title">一個工作台，處理品牌所需的一切內容。</div>
-        <div className="content-types">
-          {contentTypes.map((item) => (
-            <span key={item}>{item}</span>
-          ))}
-        </div>
-      </section>
-
-      <section id="pricing" className="pricing-section">
-        <h2>選擇適合你的增長方式</h2>
-        <p className="pricing-subtitle">
-          不是買一個工具，而是買一套讓宣傳費更有機會回本的決策流程。
-        </p>
-
-        <div className="pricing-grid">
-          {pricingPlans.map((plan) => (
-            <section key={plan.id} className={plan.highlight ? 'pricing-card pricing-card--highlight' : 'pricing-card'}>
-              <div className="pricing-card__label">{plan.label}</div>
-              <h3>{plan.name}</h3>
-              <div className="pricing-card__price">
-                <span>{plan.price}</span>
-                <small>{plan.cadence}</small>
-              </div>
-              <p className="pricing-card__credits">
-                {plan.trialDays ? `${plan.trialDays} 日試用包含 ${plan.trialCredits} credits` : `每月 ${plan.monthlyCredits} credits 起`}
-              </p>
-              <Link href={plan.id === 'creator-campaign' ? '/contact' : `/signup?plan=${plan.id}`} className={plan.highlight ? 'pricing-card__button pricing-card__button--highlight' : 'pricing-card__button'}>
-                {plan.cta}
-              </Link>
-              <div className="pricing-card__features">
-                {plan.features.map((feature) => (
-                  <div key={feature}>✓ {feature}</div>
-                ))}
-              </div>
-            </section>
-          ))}
+      <section className="final-cta">
+        <h2>相信 AI system，不再浪費金錢在中介身上</h2>
+        <p>每月 HK$388 起，讓 SOON 協助你經營社交內容與創作者合作。</p>
+        <div className="final-cta__actions">
+          <Link href="/signup" className="button button--primary">
+            立即免費試用
+          </Link>
+          <Link href="/match-for-you" className="button button--outline">
+            了解 KOL 配對 →
+          </Link>
         </div>
       </section>
 
@@ -251,8 +346,7 @@ export default function HomePage() {
 
             .hero__video {
               position: absolute;
-              top: 0;
-              left: 0;
+              inset: 0;
               width: 100%;
               height: 100%;
               object-fit: cover;
@@ -261,117 +355,305 @@ export default function HomePage() {
             .hero__overlay {
               position: absolute;
               inset: 0;
-              background: rgba(0,0,0,0.5);
+              background:
+                linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.45) 48%, rgba(0, 0, 0, 0.18)),
+                linear-gradient(0deg, rgba(8, 9, 11, 0.9), rgba(8, 9, 11, 0.1) 38%);
             }
 
             .hero__content {
               position: relative;
-              z-index: 10;
-              width: min(1180px, calc(100% - 48px));
+              z-index: 1;
+              width: min(100% - 48px, 1180px);
               margin: 0 auto;
-              padding: 150px 0 72px;
-              display: flex;
-              justify-content: flex-end;
-            }
-
-            .rating {
-              margin: 0 0 18px auto;
-              color: rgba(255,255,255,0.86);
-              font-size: 0.82rem;
-              font-weight: 400;
-              letter-spacing: 0.16em;
-              text-transform: uppercase;
-            }
-
-            h1 {
-              margin: 0;
-              font-size: clamp(4.2rem, 8vw, 7.4rem);
-              line-height: 0.96;
-              letter-spacing: -0.04em;
-              font-weight: 800;
-              color: #ffffff;
+              padding-top: 94px;
             }
 
             .hero__text {
-              width: min(50%, 650px);
-              margin-left: auto;
-              text-align: right;
-              display: flex;
-              flex-direction: column;
-              align-items: flex-end;
+              width: min(100%, 780px);
+            }
+
+            .hero__eyebrow,
+            .section-eyebrow {
+              margin: 0 0 16px;
+              color: #a1a1aa;
+              font-size: 13px;
+              font-weight: 800;
+              letter-spacing: 0.18em;
+              text-transform: uppercase;
+            }
+
+            .section-eyebrow {
+              color: #d4af37;
+              font-size: 11px;
+            }
+
+            .hero h1 {
+              margin: 0;
+              max-width: 820px;
+              font-size: clamp(4.7rem, 10vw, 9.6rem);
+              line-height: 0.88;
+              letter-spacing: -0.08em;
+              font-weight: 720;
             }
 
             .hero__subtitle {
-              margin: 28px 0 30px;
-              max-width: 560px;
-              color: rgba(255,255,255,0.92);
-              font-size: clamp(1rem, 1.45vw, 1.2rem);
+              margin: 28px 0 34px;
+              max-width: 740px;
+              color: rgba(255,255,255,0.82);
+              font-size: clamp(1.12rem, 1.8vw, 1.58rem);
               line-height: 1.58;
-              letter-spacing: 0;
+              letter-spacing: -0.02em;
+              font-weight: 550;
             }
 
-            .hero__cta {
-              min-height: 54px;
+            .hero__actions,
+            .final-cta__actions {
+              display: flex;
+              align-items: center;
+              gap: 14px;
+              flex-wrap: wrap;
+            }
+
+            .button {
+              min-height: 56px;
               display: inline-flex;
               align-items: center;
               justify-content: center;
               padding: 0 24px;
               border-radius: 8px;
-              background: #ef4444;
-              color: #ffffff;
               text-decoration: none;
               font-size: 16px;
               font-weight: 800;
-              box-shadow: 0 16px 34px rgba(239, 68, 68, 0.34);
+              white-space: nowrap;
             }
 
-            .platform-bar {
-              min-height: 80px;
-              background: #08090b;
-              border-top: 1px solid rgba(255,255,255,0.1);
-              border-bottom: 1px solid rgba(255,255,255,0.1);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 0 24px;
+            .button--primary {
+              border: 1px solid rgba(255,255,255,0.08);
+              background: #ef4444;
+              color: #ffffff;
+              box-shadow: 0 16px 34px rgba(239, 68, 68, 0.32);
             }
 
-            .platform-bar__inner {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 28px;
+            .button--outline {
+              border: 1.5px solid rgba(255,255,255,0.5);
+              background: transparent;
               color: #ffffff;
             }
 
+            .platform-bar {
+              min-height: 96px;
+              background: #08090b;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-bottom: 1px solid rgba(255,255,255,0.08);
+            }
+
+            .platform-bar__inner {
+              width: min(100% - 40px, 1120px);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 22px;
+            }
+
             .platform-bar__label {
-              color: rgba(255,255,255,0.62);
-              font-size: 0.9rem;
-              font-weight: 650;
-              letter-spacing: 0.08em;
-              white-space: nowrap;
+              color: rgba(255,255,255,0.58);
+              font-size: 13px;
+              font-weight: 800;
+              letter-spacing: 0.12em;
+              text-transform: uppercase;
             }
 
             .platform-bar__icons {
               display: flex;
               align-items: center;
+              gap: 18px;
+            }
+
+            .platform-icon {
+              display: inline-flex;
+              width: 30px;
+              height: 30px;
+              opacity: 0.9;
+            }
+
+            .platform-icon svg {
+              width: 100%;
+              height: 100%;
+            }
+
+            .feature-strip {
+              width: min(100% - 64px, 1024px);
+              margin: 0 auto;
+              padding: 64px 0;
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
               gap: 24px;
             }
 
-            .platform-icon,
-            .platform-icon svg {
-              display: block;
-              width: 28px;
-              height: 28px;
+            .feature-card,
+            .mini-plan {
+              border: 1px solid rgba(255,255,255,0.08);
+              border-radius: 16px;
+              background: rgba(255,255,255,0.04);
+            }
+
+            .feature-card {
+              padding: 32px;
+            }
+
+            .feature-card h3 {
+              margin: 16px 0 8px;
+              color: #ffffff;
+              font-size: 16px;
+              font-weight: 900;
+            }
+
+            .feature-card p {
+              margin: 0;
+              color: #a1a1aa;
+              font-size: 13px;
+              font-weight: 650;
+              line-height: 1.8;
+            }
+
+            .match-block {
+              padding: 96px 32px;
+              background: rgba(239,68,68,0.04);
+              border-top: 1px solid rgba(239,68,68,0.12);
+              border-bottom: 1px solid rgba(239,68,68,0.12);
+            }
+
+            .match-block__inner {
+              width: min(100%, 1024px);
+              margin: 0 auto;
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              align-items: center;
+              gap: 64px;
+            }
+
+            .match-block h2 {
+              margin: 0 0 24px;
+              color: #ffffff;
+              font-size: clamp(32px, 4vw, 52px);
+              line-height: 1.08;
+              letter-spacing: -0.04em;
+              font-weight: 950;
+            }
+
+            .match-block p {
+              margin: 0 0 32px;
+              color: #a1a1aa;
+              font-size: 16px;
+              font-weight: 650;
+              line-height: 1.9;
+            }
+
+            .text-link,
+            .pricing-preview__link {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              color: #ef4444;
+              text-decoration: none;
+              font-size: 15px;
+              font-weight: 850;
+            }
+
+            .application-feed {
+              display: grid;
+              gap: 12px;
+            }
+
+            .application-card {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              padding: 16px;
+              border-radius: 12px;
+              border: 1px solid rgba(255,255,255,0.1);
+              background: rgba(255,255,255,0.06);
+            }
+
+            .application-avatar {
+              width: 32px;
+              height: 32px;
+              flex: 0 0 32px;
+              border-radius: 999px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #ffffff;
+              font-size: 12px;
+              font-weight: 950;
+            }
+
+            .application-main {
+              min-width: 0;
+              flex: 1;
+            }
+
+            .application-main h3 {
+              margin: 0;
+              color: #ffffff;
+              font-size: 13px;
+              font-weight: 900;
+            }
+
+            .application-main p {
+              margin: 4px 0 0;
+              color: #a1a1aa;
+              font-size: 11px;
+              line-height: 1.2;
+            }
+
+            .application-status {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 11px;
+              font-weight: 850;
+              white-space: nowrap;
+            }
+
+            .application-status span {
+              width: 6px;
+              height: 6px;
+              border-radius: 999px;
+            }
+
+            .application-status--green {
+              color: #4ade80;
+            }
+
+            .application-status--green span {
+              background: #4ade80;
+            }
+
+            .application-status--amber {
+              color: #fbbf24;
+            }
+
+            .application-status--amber span {
+              background: #fbbf24;
+            }
+
+            .feed-note {
+              margin: 8px 0 0;
+              color: #71717a;
+              text-align: center;
+              font-size: 12px;
+              font-weight: 700;
             }
 
             .product-preview {
+              padding: 108px 24px 96px;
               background: #08090b;
-              padding: 112px 24px 118px;
               display: grid;
               justify-items: center;
               gap: 34px;
-              border-bottom: 1px solid rgba(255,255,255,0.08);
             }
 
             .product-preview__header {
@@ -382,68 +664,58 @@ export default function HomePage() {
             }
 
             .product-preview__header span {
-              color: rgba(255,255,255,0.58);
-              font-size: 0.82rem;
-              font-weight: 700;
-              letter-spacing: 0.14em;
+              color: #d4af37;
+              font-size: 12px;
+              font-weight: 850;
+              letter-spacing: 0.18em;
               text-transform: uppercase;
             }
 
             .product-preview__header h2 {
               margin: 0;
-              color: #ffffff;
-              font-size: clamp(2.5rem, 4.4vw, 4.8rem);
-              line-height: 1.06;
-              letter-spacing: -0.045em;
-              font-weight: 700;
+              max-width: 860px;
+              font-size: clamp(2.8rem, 5vw, 5.5rem);
+              line-height: 0.95;
+              letter-spacing: -0.07em;
+              font-weight: 650;
             }
 
             .product-preview__header p {
               margin: 0;
-              color: rgba(255,255,255,0.7);
-              font-size: clamp(1rem, 1.5vw, 1.2rem);
-              line-height: 1.55;
+              color: rgba(255,255,255,0.68);
+              font-size: clamp(1.1rem, 1.5vw, 1.38rem);
             }
 
             .workspace-mockup {
-              width: min(1080px, 100%);
-              min-height: 560px;
+              width: min(1180px, 100%);
+              min-height: 620px;
+              padding: 12px;
+              border-radius: 18px;
               border: 1px solid rgba(255,255,255,0.12);
-              border-radius: 24px;
               background: #101114;
-              box-shadow: 0 34px 90px rgba(0,0,0,0.42);
-              padding: 14px;
+              box-shadow: 0 34px 100px rgba(0,0,0,0.35);
               display: grid;
-              grid-template-columns: 220px 1fr;
-              gap: 14px;
+              grid-template-columns: 230px 1fr;
               overflow: hidden;
             }
 
-            .mockup-sidebar,
-            .mockup-main {
-              border: 1px solid rgba(255,255,255,0.08);
-              background: #f5f6f8;
-              color: #1b1d22;
-            }
-
             .mockup-sidebar {
-              border-radius: 16px;
-              padding: 18px 14px;
-              display: flex;
-              flex-direction: column;
-              gap: 12px;
+              border-radius: 12px 0 0 12px;
+              background: #0b0c0f;
+              padding: 24px;
+              display: grid;
+              align-content: start;
+              gap: 14px;
             }
 
             .mockup-logo {
-              width: 36px;
-              height: 36px;
+              width: 38px;
+              height: 38px;
+              display: grid;
+              place-items: center;
               border-radius: 10px;
-              background: #ffd633;
-              color: #111111;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: 800;
+              background: #ef4444;
+              font-weight: 900;
               margin-bottom: 18px;
             }
 
@@ -451,122 +723,110 @@ export default function HomePage() {
               display: flex;
               align-items: center;
               gap: 10px;
-              padding: 10px 12px;
-              border-radius: 10px;
-              color: #747983;
-              font-size: 0.9rem;
-              font-weight: 700;
-            }
-
-            .mockup-nav-item.active {
-              background: #e8e9ed;
-              color: #1d1f24;
+              border-radius: 9px;
+              padding: 12px;
+              color: rgba(255,255,255,0.54);
+              font-size: 14px;
+              font-weight: 750;
             }
 
             .mockup-nav-item span {
-              width: 13px;
-              height: 13px;
-              border-radius: 4px;
-              border: 2px solid currentColor;
-              opacity: 0.62;
+              width: 8px;
+              height: 8px;
+              border-radius: 999px;
+              background: rgba(255,255,255,0.18);
+            }
+
+            .mockup-nav-item.active {
+              background: rgba(239,68,68,0.12);
+              color: #ffffff;
+            }
+
+            .mockup-nav-item.active span {
+              background: #ef4444;
             }
 
             .mockup-main {
-              border-radius: 16px;
+              min-width: 0;
+              border-radius: 0 12px 12px 0;
+              background: #f5f6f8;
+              color: #111111;
               overflow: hidden;
-              display: grid;
-              grid-template-rows: auto 1fr;
             }
 
             .mockup-topbar {
-              min-height: 82px;
-              padding: 18px 22px;
-              border-bottom: 1px solid #e3e5e9;
+              padding: 26px 32px;
               display: flex;
               align-items: center;
               justify-content: space-between;
-              gap: 18px;
-              background: #ffffff;
-            }
-
-            .mockup-topbar p,
-            .mockup-topbar h3 {
-              margin: 0;
+              border-bottom: 1px solid #e8e9ed;
             }
 
             .mockup-topbar p {
-              color: #8a8f99;
-              font-size: 0.78rem;
-              font-weight: 700;
-              letter-spacing: 0.08em;
-              text-transform: uppercase;
+              margin: 0 0 5px;
+              color: #6b7280;
+              font-size: 13px;
+              font-weight: 800;
             }
 
             .mockup-topbar h3 {
-              color: #17191d;
-              font-size: 1.45rem;
-              letter-spacing: -0.03em;
+              margin: 0;
+              font-size: clamp(1.4rem, 2vw, 2.2rem);
+              letter-spacing: -0.04em;
             }
 
             .mockup-topbar button {
               border: 0;
-              border-radius: 10px;
+              border-radius: 8px;
               background: #111111;
               color: #ffffff;
-              padding: 10px 14px;
-              font: inherit;
-              font-size: 0.9rem;
-              font-weight: 700;
+              padding: 13px 16px;
+              font-weight: 800;
             }
 
             .mockup-content {
-              padding: 30px;
+              padding: 32px;
               display: grid;
-              grid-template-columns: minmax(0, 1fr) 240px;
+              grid-template-columns: minmax(0, 1fr) 260px;
               gap: 22px;
-              align-items: start;
             }
 
             .mockup-campaign-card,
             .mockup-panel {
+              border-radius: 14px;
               background: #ffffff;
-              border: 1px solid #e4e6eb;
-              border-radius: 18px;
-              box-shadow: 0 14px 34px rgba(23,25,29,0.08);
+              border: 1px solid #e5e7eb;
+              box-shadow: 0 18px 40px rgba(17, 24, 39, 0.08);
             }
 
             .mockup-campaign-card {
-              padding: 22px;
-              display: grid;
-              gap: 16px;
+              padding: 24px;
             }
 
             .mockup-card-meta {
               display: flex;
               align-items: center;
               justify-content: space-between;
-              gap: 12px;
-              color: #757b86;
-              font-size: 0.85rem;
-              font-weight: 700;
+              color: #6b7280;
+              font-size: 13px;
+              font-weight: 800;
+              margin-bottom: 28px;
             }
 
             .mockup-platforms {
               display: flex;
-              align-items: center;
               gap: 8px;
             }
 
             .mockup-platforms span {
               width: 30px;
               height: 30px;
-              border-radius: 999px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
+              display: grid;
+              place-items: center;
+              border-radius: 8px;
               color: #ffffff;
-              font-size: 0.72rem;
-              font-weight: 800;
+              font-size: 12px;
+              font-weight: 900;
             }
 
             .mockup-ig {
@@ -578,277 +838,217 @@ export default function HomePage() {
             }
 
             .mockup-campaign-card h4 {
-              margin: 0;
-              color: #17191d;
-              font-size: clamp(1.4rem, 2.2vw, 2.2rem);
-              line-height: 1.12;
-              letter-spacing: -0.04em;
+              margin: 0 0 12px;
+              font-size: clamp(1.6rem, 2.4vw, 2.8rem);
+              line-height: 0.98;
+              letter-spacing: -0.055em;
             }
 
             .mockup-campaign-card p {
-              margin: 0;
-              max-width: 560px;
-              color: #646a75;
-              font-size: 1rem;
+              max-width: 620px;
+              margin: 0 0 26px;
+              color: #52525b;
+              font-size: 1.05rem;
               line-height: 1.55;
             }
 
             .mockup-image {
-              min-height: 190px;
+              min-height: 230px;
               border-radius: 14px;
               background-color: #e3d0bd;
               background-image:
-                radial-gradient(circle at 32% 28%, #d6a05d 0 10%, transparent 12%),
-                radial-gradient(circle at 58% 44%, #6f412b 0 12%, transparent 14%),
-                linear-gradient(135deg, #f0d9bd, #8b5c40 48%, #2a1f1b);
+                radial-gradient(circle at 62% 35%, rgba(239,68,68,0.24), transparent 18%),
+                linear-gradient(135deg, #f5e6d3, #d6b79c);
             }
 
             .mockup-panel {
               padding: 20px;
               display: grid;
+              align-content: start;
               gap: 14px;
             }
 
             .mockup-panel h4 {
-              margin: 0;
-              color: #17191d;
-              font-size: 1rem;
+              margin: 0 0 10px;
+              font-size: 1.1rem;
             }
 
             .mockup-panel div {
-              height: 42px;
+              height: 72px;
               border-radius: 12px;
               background: #eef0f4;
             }
 
             .product-preview__cta {
-              min-height: 54px;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              padding: 0 24px;
-              border-radius: 8px;
-              background: #ef4444;
-              color: #ffffff;
-              text-decoration: none;
-              font-size: 16px;
-              font-weight: 800;
-              box-shadow: 0 16px 34px rgba(239, 68, 68, 0.34);
+              margin-top: 4px;
             }
 
-            .growth {
-              min-height: 92vh;
-              padding: 118px 24px;
-              background: #08090b;
-              display: grid;
-              justify-items: center;
-              align-content: center;
-              gap: 72px;
-            }
-
-            .growth h2 {
-              margin: 0;
-              max-width: 760px;
-              text-align: center;
-              font-size: clamp(2.75rem, 4.4vw, 4.8rem);
-              line-height: 1.08;
-              letter-spacing: -0.045em;
-              font-weight: 650;
-            }
-
-            .proof-grid {
-              width: min(1100px, 100%);
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 80px;
-            }
-
-            .proof-card {
-              color: #ffffff;
-            }
-
-            .proof-card__value {
-              font-size: clamp(4.5rem, 7vw, 7rem);
-              line-height: 0.9;
-              letter-spacing: -0.07em;
-              margin-bottom: 34px;
-            }
-
-            .proof-card h3 {
-              margin: 0 0 18px;
-              font-size: 1.55rem;
-              letter-spacing: -0.04em;
-              font-weight: 500;
-            }
-
-            .proof-card p {
-              margin: 0;
-              color: rgba(255,255,255,0.62);
-              font-size: clamp(1rem, 1.15vw, 1.16rem);
-              line-height: 1.45;
-              max-width: 300px;
-            }
-
-            .growth__cta {
-              margin-top: 18px;
-              justify-self: center;
-            }
-
-            .pricing-section {
-              padding: 118px 24px;
-              background: #08090b;
-              display: grid;
-              justify-items: center;
-              gap: 34px;
-            }
-
-            .pricing-section h2 {
-              margin: 0;
-              max-width: 760px;
-              text-align: center;
-              font-size: clamp(2.7rem, 4.4vw, 4.8rem);
-              line-height: 1.08;
-              letter-spacing: -0.045em;
-              font-weight: 650;
-            }
-
-            .pricing-subtitle {
-              margin: 0 0 36px;
-              max-width: 760px;
-              text-align: center;
-              color: rgba(255,255,255,0.72);
-              font-size: clamp(1.15rem, 1.7vw, 1.5rem);
-              line-height: 1.55;
-              letter-spacing: -0.02em;
-            }
-
-            .pricing-grid {
-              width: min(1100px, 100%);
-              display: grid;
-              grid-template-columns: repeat(3, 1fr);
-              gap: 18px;
-            }
-
-            .pricing-card {
-              min-height: 520px;
-              padding: 30px;
-              border-radius: 10px;
-              border: 1px solid rgba(255,255,255,0.12);
-              background: #1b1b1d;
+            .stats-row {
               display: flex;
-              flex-direction: column;
-              color: #ffffff;
-            }
-
-            .pricing-card--highlight {
-              background: #2b2b2e;
-              border-color: rgba(239,63,47,0.6);
-            }
-
-            .pricing-card__label {
-              width: fit-content;
-              margin-left: auto;
-              margin-bottom: 22px;
-              padding: 8px 12px;
-              border-radius: 6px;
-              background: rgba(255,255,255,0.08);
-              color: rgba(255,255,255,0.82);
-              font-size: 14px;
-              font-weight: 700;
-            }
-
-            .pricing-card h3 {
-              margin: 0 0 18px;
-              font-size: 1.8rem;
-              letter-spacing: -0.04em;
-              font-weight: 500;
-            }
-
-            .pricing-card__price {
-              display: flex;
-              align-items: baseline;
-              gap: 8px;
-              margin-bottom: 30px;
-            }
-
-            .pricing-card__price span {
-              font-size: clamp(3.2rem, 5vw, 4.6rem);
-              line-height: 0.9;
-              letter-spacing: -0.07em;
-            }
-
-            .pricing-card__price small {
-              color: rgba(255,255,255,0.7);
-              font-size: 1.25rem;
-            }
-
-            .pricing-card__credits {
-              margin: -16px 0 24px;
-              color: rgba(255,255,255,0.7);
-              font-size: 0.98rem;
-              line-height: 1.45;
-            }
-
-            .pricing-card__button {
-              min-height: 56px;
-              display: inline-flex;
-              align-items: center;
               justify-content: center;
-              border-radius: 8px;
-              background: rgba(255,255,255,0.08);
-              color: #ffffff;
-              text-decoration: none;
-              font-weight: 800;
-              margin-bottom: 34px;
+              gap: 64px;
+              padding: 64px 32px;
+              border-top: 1px solid rgba(255,255,255,0.06);
+              border-bottom: 1px solid rgba(255,255,255,0.06);
+              background: #08090b;
+              flex-wrap: wrap;
             }
 
-            .pricing-card__button--highlight {
-              background: #ef3f2f;
-              box-shadow: 0 16px 34px rgba(239,63,47,0.32);
-            }
-
-            .pricing-card__features {
-              display: grid;
-              gap: 16px;
-              color: rgba(255,255,255,0.82);
-              font-size: 1.04rem;
-              line-height: 1.55;
-            }
-
-            .content-strip {
-              padding: 92px 24px 120px;
-              background: #f5efe5;
-              color: #111111;
-              display: grid;
-              justify-items: center;
-              gap: 28px;
-            }
-
-            .content-strip__title {
-              max-width: 1280px;
+            .stat-item {
+              min-width: 160px;
               text-align: center;
-              font-size: clamp(2.15rem, 3vw, 3.45rem);
-              line-height: 1.12;
-              letter-spacing: -0.035em;
-              font-weight: 600;
+            }
+
+            .stat-item strong {
+              display: block;
+              color: #ffffff;
+              font-size: 40px;
+              line-height: 1;
+              font-weight: 950;
+              letter-spacing: -0.04em;
               white-space: nowrap;
             }
 
-            .content-types {
-              width: min(960px, 100%);
-              display: flex;
-              flex-wrap: wrap;
-              justify-content: center;
-              gap: 12px;
+            .stat-item span {
+              display: block;
+              margin-top: 8px;
+              color: #a1a1aa;
+              font-size: 13px;
+              font-weight: 750;
             }
 
-            .content-types span {
-              border: 1px solid rgba(17,17,17,0.12);
-              border-radius: 999px;
-              padding: 12px 16px;
-              background: #ffffff;
-              color: #26221f;
+            .pricing-preview {
+              max-width: 896px;
+              margin: 0 auto;
+              padding: 96px 32px;
+              text-align: center;
+            }
+
+            .pricing-preview h2 {
+              margin: 0 0 16px;
+              color: #ffffff;
+              font-size: 32px;
+              font-weight: 950;
+            }
+
+            .pricing-preview > p {
+              margin: 0 0 48px;
+              color: #a1a1aa;
               font-size: 15px;
+              font-weight: 650;
+            }
+
+            .pricing-preview__grid {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 24px;
+            }
+
+            .mini-plan {
+              position: relative;
+              padding: 24px;
+              text-align: left;
+            }
+
+            .mini-plan--highlight {
+              border: 1.5px solid #ef4444;
+              background: rgba(239,68,68,0.06);
+            }
+
+            .mini-plan__badge {
+              width: fit-content;
+              margin: -38px auto 12px;
+              border-radius: 999px;
+              background: #ef4444;
+              color: #ffffff;
+              padding: 4px 12px;
+              font-size: 11px;
+              font-weight: 900;
+            }
+
+            .mini-plan h3 {
+              margin: 0 0 14px;
+              color: #ffffff;
+              font-size: 16px;
+              font-weight: 900;
+            }
+
+            .mini-plan__price {
+              display: flex;
+              align-items: baseline;
+              gap: 6px;
+            }
+
+            .mini-plan__price strong {
+              color: #ffffff;
+              font-size: 36px;
+              line-height: 1;
+              font-weight: 950;
+              letter-spacing: -0.05em;
+            }
+
+            .mini-plan__price span {
+              color: #a1a1aa;
+              font-size: 13px;
+              font-weight: 800;
+            }
+
+            .mini-plan p {
+              min-height: 42px;
+              margin: 16px 0 20px;
+              color: #a1a1aa;
+              font-size: 13px;
+              font-weight: 650;
+              line-height: 1.6;
+            }
+
+            .mini-plan__button {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              min-height: 42px;
+              border-radius: 8px;
+              border: 1px solid rgba(255,255,255,0.28);
+              color: #ffffff;
+              text-decoration: none;
+              font-size: 14px;
+              font-weight: 850;
+            }
+
+            .mini-plan__button--solid {
+              border-color: #ef4444;
+              background: #ef4444;
+            }
+
+            .pricing-preview__link {
+              margin-top: 32px;
+              font-size: 14px;
+            }
+
+            .final-cta {
+              display: grid;
+              justify-items: center;
+              padding: 96px 32px;
+              text-align: center;
+              background: linear-gradient(135deg, #1a0000, #0a0a0a);
+            }
+
+            .final-cta h2 {
+              max-width: 820px;
+              margin: 0 0 18px;
+              color: #ffffff;
+              font-size: clamp(32px, 4vw, 52px);
+              line-height: 1.12;
+              font-weight: 950;
+              letter-spacing: -0.04em;
+            }
+
+            .final-cta p {
+              margin: 0 0 32px;
+              color: #a1a1aa;
+              font-size: 16px;
+              font-weight: 650;
             }
 
             @media (max-width: 900px) {
@@ -857,30 +1057,14 @@ export default function HomePage() {
                 padding-top: 150px;
               }
 
-              .hero__text {
-                width: min(100%, 620px);
+              .hero h1 {
+                font-size: clamp(3.45rem, 15vw, 6rem);
               }
 
-              .proof-grid,
-              .pricing-grid {
+              .feature-strip,
+              .match-block__inner,
+              .pricing-preview__grid {
                 grid-template-columns: 1fr;
-              }
-
-              .proof-grid {
-                gap: 44px;
-              }
-
-              .pricing-grid {
-                gap: 18px;
-              }
-
-              .growth {
-                padding: 86px 20px;
-                gap: 52px;
-              }
-
-              .content-strip__title {
-                white-space: normal;
               }
 
               .workspace-mockup {
@@ -901,14 +1085,6 @@ export default function HomePage() {
                 min-height: 94svh;
               }
 
-              .rating {
-                font-size: 13px;
-              }
-
-              h1 {
-                font-size: clamp(3.25rem, 16vw, 5rem);
-              }
-
               .platform-bar__inner {
                 flex-direction: column;
                 gap: 14px;
@@ -916,6 +1092,21 @@ export default function HomePage() {
 
               .platform-bar {
                 min-height: 112px;
+              }
+
+              .hero__actions,
+              .final-cta__actions {
+                align-items: stretch;
+                flex-direction: column;
+                width: 100%;
+              }
+
+              .button {
+                width: 100%;
+              }
+
+              .feature-strip {
+                width: min(100% - 36px, 1024px);
               }
 
               .product-preview {
@@ -930,6 +1121,20 @@ export default function HomePage() {
               .mockup-topbar,
               .mockup-content {
                 padding: 18px;
+              }
+
+              .mockup-topbar {
+                align-items: flex-start;
+                flex-direction: column;
+              }
+
+              .application-card {
+                align-items: flex-start;
+                flex-wrap: wrap;
+              }
+
+              .application-status {
+                margin-left: 44px;
               }
             }
           `,
