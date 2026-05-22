@@ -1,12 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT, type WorkspaceSummary } from '@/lib/workspace-client'
 
 type InviteTab = 'email' | 'link'
 type RoleKey = 'admin' | 'editor' | 'viewer'
+
+type WorkspaceMember = {
+  workspace_id: string
+  user_id?: string | null
+  email?: string | null
+  display_name?: string | null
+  role?: string | null
+  status?: string | null
+  created_at?: string | null
+}
+
+type WorkspaceInvitation = {
+  id: string
+  workspace_id: string
+  email: string
+  role: RoleKey
+  status: 'pending' | 'accepted' | 'expired'
+  expires_at: string
+  message?: string | null
+  created_at?: string | null
+  token?: string | null
+}
 
 const roleOptions: Array<{ key: RoleKey; label: string; description: string }> = [
   { key: 'admin', label: '管理員', description: '可管理所有內容、成員及設定' },
@@ -14,11 +37,29 @@ const roleOptions: Array<{ key: RoleKey; label: string; description: string }> =
   { key: 'viewer', label: '只讀', description: '只可瀏覽內容及審批' },
 ]
 
-const members = [
-  { name: '你（Tommy）', email: 'tsangtakyun@gmail.com', role: '管理員', status: '擁有者', statusTone: 'owner' },
-  { name: 'Dingding', email: 'dingding@sooncreator.network', role: '編輯', status: '已接受 ✓', statusTone: 'accepted' },
-  { name: 'Renee', email: 'renee@sooncreator.network', role: '只讀', status: '待確認 ⏳', statusTone: 'pending' },
-]
+function roleLabel(role?: string | null) {
+  if (role === 'owner') return '管理員'
+  if (role === 'admin') return '管理員'
+  if (role === 'viewer') return '只讀'
+  return '編輯'
+}
+
+function roleBadgeClass(role?: string | null) {
+  if (role === 'owner' || role === 'admin') return 'admin'
+  if (role === 'viewer') return 'viewer'
+  return 'editor'
+}
+
+function initialFrom(value?: string | null) {
+  return value?.trim().slice(0, 1).toUpperCase() || 'S'
+}
+
+function normalizeEmailList(input: string) {
+  return input
+    .split(/[,\n]/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+}
 
 export default function TeamPage() {
   const [activeTab, setActiveTab] = useState<InviteTab>('email')
@@ -29,8 +70,25 @@ export default function TeamPage() {
   const [linkExpiry, setLinkExpiry] = useState('30 日')
   const [message, setMessage] = useState('')
   const [toast, setToast] = useState('')
+  const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const inviteLink = 'https://sooncreator.network/invite/abc123xyz'
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null)
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([])
+  const [inviteLink, setInviteLink] = useState('')
+
+  const workspaceId = workspace?.id || null
+  const pendingInvites = useMemo(
+    () => invitations.filter((invite) => invite.status === 'pending' && invite.email !== '*'),
+    [invitations]
+  )
+  const linkInvites = useMemo(
+    () => invitations.filter((invite) => invite.status === 'pending' && invite.email === '*'),
+    [invitations]
+  )
+  const memberCount = members.length + pendingInvites.length
 
   function showToast(text: string) {
     setToast(text)
@@ -38,10 +96,7 @@ export default function TeamPage() {
   }
 
   function addEmails(rawValue: string) {
-    const nextEmails = rawValue
-      .split(/[,\n]/)
-      .map((item) => item.trim())
-      .filter(Boolean)
+    const nextEmails = normalizeEmailList(rawValue)
     if (nextEmails.length === 0) return
     setEmailTags((current) => Array.from(new Set([...current, ...nextEmails])))
     setEmailInput('')
@@ -53,19 +108,133 @@ export default function TeamPage() {
     addEmails(emailInput)
   }
 
-  function sendInvites() {
-    if (emailInput.trim()) addEmails(emailInput)
-    showToast('✓ 邀請已發送！')
+  async function loadTeamData(targetWorkspaceId?: string | null) {
+    setLoading(true)
+    setError('')
+    try {
+      const resolved = await resolveActiveWorkspace()
+      const nextWorkspace = resolved.activeWorkspace || null
+      const nextWorkspaceId = targetWorkspaceId || resolved.workspaceId
+      setWorkspace(nextWorkspace)
+
+      if (!nextWorkspaceId) {
+        setMembers([])
+        setInvitations([])
+        return
+      }
+
+      const response = await fetch(`/api/invite/send?workspaceId=${encodeURIComponent(nextWorkspaceId)}`, {
+        cache: 'no-store',
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.error || '無法載入團隊資料')
+
+      setMembers(Array.isArray(data?.members) ? data.members : [])
+      setInvitations(Array.isArray(data?.invitations) ? data.invitations : [])
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '無法載入團隊資料')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  async function copyInviteLink() {
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-    } catch {
-      // Keep the UI optimistic even when clipboard permission is blocked.
+  useEffect(() => {
+    void loadTeamData()
+
+    function handleWorkspaceChange(event: Event) {
+      const nextWorkspaceId = (event as CustomEvent<{ workspaceId?: string | null }>).detail?.workspaceId || null
+      setInviteLink('')
+      void loadTeamData(nextWorkspaceId)
     }
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
+
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChange)
+    return () => window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChange)
+  }, [])
+
+  async function sendInvites(options?: { emails?: string[]; resend?: boolean }) {
+    const nextEmails = Array.from(new Set([...(options?.emails ?? emailTags), ...normalizeEmailList(emailInput)]))
+    if (!workspaceId) {
+      setError('找不到目前工作台。')
+      return
+    }
+    if (!nextEmails.length) {
+      setError('請先輸入 Email。')
+      return
+    }
+
+    setSending(true)
+    setError('')
+    try {
+      const response = await fetch('/api/invite/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emails: nextEmails,
+          role: emailRole,
+          workspaceId,
+          message,
+          resend: options?.resend ?? false,
+        }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.errors?.join('、') || data?.error || '發送邀請失敗')
+
+      setEmailTags([])
+      setEmailInput('')
+      showToast(data?.errors?.length ? `邀請已處理：${data.errors.join('、')}` : '✓ 邀請已發送！已寄出邀請 Email。')
+      await loadTeamData(workspaceId)
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : '發送邀請失敗')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function copyInviteLink(forceNew = false) {
+    if (!workspaceId) {
+      setError('找不到目前工作台。')
+      return
+    }
+
+    setSending(true)
+    setError('')
+    try {
+      const existingToken = forceNew ? null : linkInvites[0]?.token
+      let nextLink = forceNew ? '' : inviteLink || (existingToken ? `${window.location.origin}/invite/${existingToken}` : '')
+
+      if (!nextLink) {
+        const response = await fetch('/api/invite/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            linkOnly: true,
+            role: linkRole,
+            workspaceId,
+            message,
+            expiresIn: linkExpiry,
+          }),
+        })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(data?.error || '建立邀請連結失敗')
+        nextLink = data.inviteUrl
+        setInviteLink(nextLink)
+        await loadTeamData(workspaceId)
+      }
+
+      await navigator.clipboard.writeText(nextLink)
+      setCopied(true)
+      showToast('✓ 已複製邀請連結')
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch (copyError) {
+      setError(copyError instanceof Error ? copyError.message : '複製邀請連結失敗')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function regenerateInviteLink() {
+    setInviteLink('')
+    await copyInviteLink(true)
   }
 
   return (
@@ -85,7 +254,14 @@ export default function TeamPage() {
             </div>
           </header>
 
+          {error ? <div className="error-banner">{error}</div> : null}
+
           <section className="invite-card">
+            <div className="workspace-context">
+              <span>目前工作台</span>
+              <strong>{workspace?.brandName || workspace?.name || (loading ? '載入中...' : '未選擇工作台')}</strong>
+            </div>
+
             <div className="tab-row" role="tablist" aria-label="邀請方式">
               <button
                 aria-selected={activeTab === 'email'}
@@ -129,7 +305,7 @@ export default function TeamPage() {
                           onClick={() => setEmailTags((current) => current.filter((item) => item !== email))}
                           type="button"
                         >
-                          ×
+                          x
                         </button>
                       </span>
                     ))}
@@ -163,8 +339,13 @@ export default function TeamPage() {
                   />
                 </label>
 
-                <button className="primary-button full-width" onClick={sendInvites} type="button">
-                  發送邀請 →
+                <button
+                  className="primary-button full-width"
+                  disabled={sending || !workspaceId}
+                  onClick={() => void sendInvites()}
+                  type="button"
+                >
+                  {sending ? '發送中...' : '發送邀請 ->'}
                 </button>
               </div>
             ) : (
@@ -172,8 +353,8 @@ export default function TeamPage() {
                 <label>
                   <span>邀請連結</span>
                   <div className="link-box">
-                    <code>{inviteLink}</code>
-                    <button onClick={() => void copyInviteLink()} type="button">
+                    <code>{inviteLink || (linkInvites[0]?.token ? `${typeof window !== 'undefined' ? window.location.origin : 'https://sooncreator.network'}/invite/${linkInvites[0].token}` : '按「複製連結」建立邀請連結')}</code>
+                    <button disabled={sending || !workspaceId} onClick={() => void copyInviteLink()} type="button">
                       {copied ? '✓ 已複製！' : '複製連結'}
                     </button>
                   </div>
@@ -200,17 +381,17 @@ export default function TeamPage() {
                   <select onChange={(event) => setLinkRole(event.target.value as RoleKey)} value={linkRole}>
                     {roleOptions.map((role) => (
                       <option key={role.key} value={role.key}>
-                        {role.label} — {role.description}
+                        {role.label} - {role.description}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <div className="link-footer-row">
-                  <button className="secondary-button" type="button">
+                  <button className="secondary-button" disabled={sending || !workspaceId} onClick={() => void regenerateInviteLink()} type="button">
                     重新生成連結
                   </button>
-                  <p>任何持有此連結的人都可以加入你的工作台</p>
+                  <p>任何持有此連結的人都可以加入你的工作台。</p>
                 </div>
               </div>
             )}
@@ -219,7 +400,7 @@ export default function TeamPage() {
           <section className="members-card">
             <header>
               <h2>現有成員</h2>
-              <span>{members.length}</span>
+              <span>{memberCount}</span>
             </header>
 
             <div className="member-table">
@@ -230,34 +411,67 @@ export default function TeamPage() {
                 <span>操作</span>
               </div>
 
-              {members.map((member) => (
-                <div className="member-row" key={member.email}>
-                  <div className="member-profile">
-                    <div className="avatar">{member.name.charAt(0).toUpperCase()}</div>
-                    <div>
-                      <strong>{member.name}</strong>
-                      <small>{member.email}</small>
+              {loading ? (
+                <div className="empty-row">載入團隊資料中...</div>
+              ) : memberCount === 0 ? (
+                <div className="empty-row">暫時未有成員資料。</div>
+              ) : (
+                <>
+                  {members.map((member) => {
+                    const isOwner = member.role === 'owner'
+                    const name = member.display_name || member.email || 'SOON 成員'
+                    return (
+                      <div className="member-row" key={`${member.workspace_id}-${member.user_id || member.email}`}>
+                        <div className="member-profile">
+                          <div className="avatar">{initialFrom(name)}</div>
+                          <div>
+                            <strong>{isOwner ? `你（${name}）` : name}</strong>
+                            <small>{member.email}</small>
+                          </div>
+                        </div>
+                        <span className={`role-badge ${roleBadgeClass(member.role)}`}>{roleLabel(member.role)}</span>
+                        <span className={`status-badge ${isOwner ? 'owner' : 'accepted'}`}>
+                          {isOwner ? '擁有者' : '已接受 ✓'}
+                        </span>
+                        <div className="member-actions">
+                          {isOwner ? (
+                            <span className="no-action">-</span>
+                          ) : (
+                            <>
+                              <button type="button">更改身份</button>
+                              <button className="danger-link" type="button">移除</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {pendingInvites.map((invite) => (
+                    <div className="member-row" key={invite.id}>
+                      <div className="member-profile">
+                        <div className="avatar pending">{initialFrom(invite.email)}</div>
+                        <div>
+                          <strong>{invite.email}</strong>
+                          <small>邀請已發送</small>
+                        </div>
+                      </div>
+                      <span className={`role-badge ${roleBadgeClass(invite.role)}`}>{roleLabel(invite.role)}</span>
+                      <span className="status-badge pending">待確認</span>
+                      <div className="member-actions">
+                        <button
+                          disabled={sending}
+                          onClick={() => void sendInvites({ emails: [invite.email], resend: true })}
+                          type="button"
+                        >
+                          重發邀請
+                        </button>
+                        <button className="danger-link" type="button">移除</button>
+                      </div>
                     </div>
-                  </div>
-                  <span className="role-badge">{member.role}</span>
-                  <span className={`status-badge ${member.statusTone}`}>{member.status}</span>
-                  <div className="member-actions">
-                    {member.statusTone === 'owner' ? (
-                      <span className="no-action">—</span>
-                    ) : member.statusTone === 'pending' ? (
-                      <>
-                        <button type="button">重發邀請</button>
-                        <button className="danger-link" type="button">移除</button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button">更改身份 ▼</button>
-                        <button className="danger-link" type="button">移除</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  ))}
+                </>
+              )}
             </div>
           </section>
         </div>
@@ -321,6 +535,27 @@ const styles = `
   padding: 7px 11px;
 }
 
+.success-toast,
+.error-banner {
+  margin: 0 0 16px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.success-toast {
+  background: #ecfdf5;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.error-banner {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
 .invite-card,
 .members-card {
   background: #ffffff;
@@ -332,6 +567,31 @@ const styles = `
 .invite-card {
   margin-bottom: 20px;
   padding: 20px;
+}
+
+.workspace-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 11px 13px;
+}
+
+.workspace-context span {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.workspace-context strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab-row {
@@ -417,7 +677,7 @@ const styles = `
   background: transparent;
   color: #ffffff;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   padding: 0;
 }
@@ -467,6 +727,14 @@ const styles = `
   font-weight: 900;
   padding: 13px 18px;
   box-shadow: 0 12px 24px rgba(124, 58, 237, .24);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.link-box button:disabled,
+.member-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .full-width {
@@ -594,6 +862,12 @@ const styles = `
   border-top: 1px solid #f1f2f5;
 }
 
+.empty-row {
+  padding: 24px 20px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
 .member-profile {
   display: flex;
   align-items: center;
@@ -614,15 +888,21 @@ const styles = `
   font-weight: 900;
 }
 
+.avatar.pending {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+}
+
 .member-profile strong,
 .member-profile small {
   display: block;
 }
 
 .member-profile small {
-  color: #9ca3af;
-  font-size: 12px;
+  color: #6b7280;
   margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .role-badge,
@@ -631,17 +911,27 @@ const styles = `
   border-radius: 999px;
   font-size: 12px;
   font-weight: 900;
-  padding: 6px 10px;
+  padding: 6px 9px;
 }
 
-.role-badge {
-  background: #f4f4f5;
-  color: #374151;
+.role-badge.admin {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.role-badge.editor {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.role-badge.viewer {
+  background: #f3f4f6;
+  color: #4b5563;
 }
 
 .status-badge.owner {
-  background: #eef2ff;
-  color: #4338ca;
+  background: #111827;
+  color: #ffffff;
 }
 
 .status-badge.accepted {
@@ -656,13 +946,14 @@ const styles = `
 
 .member-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .member-actions button {
   border: 1px solid #e5e7eb;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #ffffff;
   color: #374151;
   cursor: pointer;
@@ -672,53 +963,26 @@ const styles = `
 }
 
 .member-actions .danger-link {
-  border-color: #fecaca;
   color: #dc2626;
 }
 
 .no-action {
   color: #9ca3af;
+  font-size: 13px;
 }
 
-.success-toast {
-  position: sticky;
-  top: 18px;
-  z-index: 20;
-  max-width: 1080px;
-  margin: 0 auto 16px;
-  border: 1px solid #bbf7d0;
-  border-radius: 12px;
-  background: #f0fdf4;
-  color: #15803d;
-  font-size: 14px;
-  font-weight: 900;
-  padding: 12px 16px;
-  box-shadow: 0 10px 24px rgba(22, 163, 74, .12);
-}
-
-@media (max-width: 1040px) {
+@media (max-width: 980px) {
   .dashboard-page {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    display: none;
-  }
-
   .team-shell {
-    padding: 24px;
-  }
-}
-
-@media (max-width: 760px) {
-  .team-shell {
-    padding: 18px;
+    padding: 24px 16px;
   }
 
   .role-grid,
   .member-table-head,
-  .member-row,
-  .link-box {
+  .member-row {
     grid-template-columns: 1fr;
   }
 
@@ -726,9 +990,10 @@ const styles = `
     display: none;
   }
 
+  .link-box,
   .link-footer-row {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    display: grid;
   }
 }
 `
