@@ -242,7 +242,7 @@ export default function HomePage() {
           <p>管理所有社交平台，AI 生成內容，一鍵排程發布。</p>
         </div>
 
-        <div className="relative rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
+        <div className="relative rounded-2xl overflow-hidden" style={{ border: 'none', boxShadow: '0 24px 80px rgba(0,0,0,0.4)' }}>
           <img
             src="/dashboard-preview.png"
             alt="SOON Dashboard - 銀幸の美學 Ginkgo Beauty"
