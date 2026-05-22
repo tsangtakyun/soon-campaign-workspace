@@ -85,37 +85,71 @@ async function sendInviteEmail(input: {
   workspaceName: string
 }) {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return { sent: false, error: 'RESEND_API_KEY 未設定' }
+  console.log('RESEND_API_KEY exists:', Boolean(apiKey))
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.INVITE_FROM_EMAIL || 'SOON <noreply@sooncreator.network>',
-      to: input.email,
-      subject: `${input.workspaceName} 邀請你加入 SOON`,
-      html: `
-        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;line-height:1.7;padding:24px;">
-          <h2 style="margin:0 0 12px;font-size:22px;">你收到一個 SOON 工作台邀請！</h2>
-          <p>${input.inviterName} 邀請你以「${roleLabel(input.role)}」身份加入 ${input.workspaceName}。</p>
-          ${input.message ? `<p style="padding:12px 14px;background:#f5f3ff;border-radius:8px;">留言：${input.message}</p>` : ''}
-          <a href="${input.inviteUrl}" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:700;">
-            接受邀請
-          </a>
-          <p style="color:#6b7280;font-size:12px;margin-top:18px;">此邀請連結將於 30 日後失效</p>
-        </div>
-      `,
-    }),
-  })
-
-  if (!response.ok) {
-    return { sent: false, error: await response.text() }
+  if (!apiKey) {
+    console.error('[invite/send] Missing RESEND_API_KEY')
+    return { sent: false, error: 'RESEND_API_KEY is not configured' }
   }
 
-  return { sent: true, error: '' }
+  try {
+    console.log(`Attempting to send email to: ${input.email}`)
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.INVITE_FROM_EMAIL || 'SOON <noreply@sooncreator.network>',
+        to: input.email,
+        subject: `${input.workspaceName} 邀請你加入 SOON`,
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;line-height:1.7;padding:24px;">
+            <h2 style="margin:0 0 12px;font-size:22px;">你收到一個 SOON 工作台邀請！</h2>
+            <p>${input.inviterName} 邀請你以「${roleLabel(input.role)}」身份加入「${input.workspaceName}」。</p>
+            ${
+              input.message
+                ? `<p style="padding:12px 14px;background:#f5f3ff;border-radius:8px;">留言：${input.message}</p>`
+                : ''
+            }
+            <a href="${input.inviteUrl}" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:700;">
+              接受邀請
+            </a>
+            <p style="color:#6b7280;font-size:12px;margin-top:18px;">此邀請連結將於 30 日後失效</p>
+          </div>
+        `,
+      }),
+    })
+
+    const responseText = await response.text()
+    let responseBody: unknown = responseText
+
+    try {
+      responseBody = JSON.parse(responseText)
+    } catch {
+      // Keep the raw response text for logging.
+    }
+
+    console.log('[invite/send] Resend response:', {
+      ok: response.ok,
+      status: response.status,
+      body: responseBody,
+    })
+
+    if (!response.ok) {
+      return {
+        sent: false,
+        error: typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody),
+      }
+    }
+
+    return { sent: true, error: '' }
+  } catch (error) {
+    console.error('[invite/send] Resend send failed:', error)
+    return { sent: false, error: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 export async function GET(request: Request) {
@@ -155,7 +189,7 @@ export async function GET(request: Request) {
     console.error('[invite/send] GET', error)
     return NextResponse.json(
       { error: 'Failed to load invitations', detail: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
@@ -213,6 +247,7 @@ export async function POST(request: Request) {
     }
 
     const errors: string[] = []
+    const emailErrors: string[] = []
     let sent = 0
 
     for (const email of emails) {
@@ -225,7 +260,7 @@ export async function POST(request: Request) {
         .maybeSingle()
 
       if (existingMember) {
-        errors.push(`${email} 已經係工作台成員`)
+        errors.push(`${email} 已經是此工作台成員`)
         continue
       }
 
@@ -280,11 +315,26 @@ export async function POST(request: Request) {
       if (emailResult.sent) {
         sent += 1
       } else {
-        errors.push(`${email}: ${emailResult.error}`)
+        const errorMessage = `${email}: ${emailResult.error}`
+        errors.push(errorMessage)
+        emailErrors.push(errorMessage)
       }
     }
 
-    if (sent === 0 && errors.some((error) => error.includes('已經係工作台成員'))) {
+    if (emailErrors.length) {
+      console.error('[invite/send] Email sending failed:', emailErrors)
+      return NextResponse.json(
+        {
+          success: false,
+          sent,
+          errors,
+          error: 'EMAIL_SEND_FAILED',
+        },
+        { status: 502 },
+      )
+    }
+
+    if (sent === 0 && errors.length) {
       return NextResponse.json({ success: false, sent, errors }, { status: 400 })
     }
 
@@ -293,7 +343,7 @@ export async function POST(request: Request) {
     console.error('[invite/send] POST', error)
     return NextResponse.json(
       { error: 'Failed to send invite', detail: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
