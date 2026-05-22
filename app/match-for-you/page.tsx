@@ -235,7 +235,7 @@ export default function MatchForYouPage() {
         </div>
 
         <div className="hero-visual" aria-label="KOL Creator">
-          <div className="relative w-full h-full min-h-[500px] flex items-center justify-center">
+          <div className="relative w-full h-full min-h-[500px] flex items-center justify-center rounded-2xl overflow-hidden">
             <div
               className="absolute inset-0 z-10 pointer-events-none"
               style={{
@@ -248,10 +248,22 @@ export default function MatchForYouPage() {
                 background: 'linear-gradient(to top, #0a0a0a 0%, transparent 25%)',
               }}
             />
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to bottom, #0a0a0a 0%, transparent 20%)',
+              }}
+            />
+            <div
+              className="absolute inset-0 z-10 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to left, #0a0a0a 0%, transparent 20%)',
+              }}
+            />
             <img
               src="/KOL/kol-hero.png"
               alt="KOL Creator"
-              className="w-full h-full object-cover object-center rounded-2xl"
+              className="w-full h-full object-cover object-center"
               style={{
                 animation: 'float 6s ease-in-out infinite',
                 maxHeight: '600px',
@@ -461,6 +473,7 @@ export default function MatchForYouPage() {
             .flex { display: flex; }
             .items-center { align-items: center; }
             .justify-center { justify-content: center; }
+            .overflow-hidden { overflow: hidden; }
             .object-cover { object-fit: cover; }
             .object-center { object-position: center; }
             .rounded-2xl { border-radius: 16px; }
