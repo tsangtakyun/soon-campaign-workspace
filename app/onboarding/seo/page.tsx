@@ -163,7 +163,7 @@ export default function SeoPage() {
             <img
               src="/seo/seo-banner.png"
               alt="SEO Banner"
-              style={{ width: '100%', maxWidth: '624px', borderRadius: '12px', marginBottom: '24px' }}
+              style={{ width: '100%', maxWidth: '936px', borderRadius: '12px', marginBottom: '24px' }}
             />
             <button className="yellow-button large" type="button" onClick={() => setView('scanning')}>
               設定我的 SEO 計劃
