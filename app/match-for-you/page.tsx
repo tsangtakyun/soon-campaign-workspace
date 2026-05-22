@@ -267,6 +267,8 @@ export default function MatchForYouPage() {
               style={{
                 animation: 'float 6s ease-in-out infinite',
                 maxHeight: '600px',
+                transform: 'scale(1.4)',
+                transformOrigin: 'center center',
               }}
             />
           </div>
@@ -371,7 +373,7 @@ export default function MatchForYouPage() {
             }
 
             .eyebrow {
-              color: #ef4444;
+              color: #D4AF37;
               font-size: 0.82rem;
               font-weight: 900;
               letter-spacing: 0.16em;
@@ -767,10 +769,10 @@ export default function MatchForYouPage() {
 
             @keyframes float {
               0%, 100% {
-                transform: translateY(0);
+                transform: translateY(0) scale(1.4);
               }
               50% {
-                transform: translateY(-12px);
+                transform: translateY(-12px) scale(1.4);
               }
             }
 
