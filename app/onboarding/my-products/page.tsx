@@ -187,7 +187,7 @@ export default function MyProductsPage() {
                     <button
                       aria-label="前往品牌素材庫"
                       className="product-image"
-                      onClick={() => router.push('/onboarding/brand-assets')}
+                      onClick={() => router.push('/onboarding/brand-kit')}
                       title="前往品牌素材庫"
                       type="button"
                     >

@@ -291,8 +291,8 @@ function voiceTagsValue(voice: BrandVoice | null, field: BrandVoiceTagField) {
 function normalizeMediaImageUrl(value: string | null | undefined) {
   if (!value) return ''
   const trimmed = value.trim()
-  if (/^https?:\/\//i.test(trimmed)) return normalizeWixImageUrl(trimmed)
-  if (trimmed.startsWith('//')) return normalizeWixImageUrl(`https:${trimmed}`)
+  if (/^https?:\/\//i.test(trimmed)) return proxyExternalMediaUrl(normalizeWixImageUrl(trimmed))
+  if (trimmed.startsWith('//')) return proxyExternalMediaUrl(normalizeWixImageUrl(`https:${trimmed}`))
   if (trimmed.startsWith('static.wixstatic.com/') || trimmed.startsWith('media.wixstatic.com/')) {
     return normalizeWixImageUrl(`https://${trimmed}`)
   }
@@ -301,6 +301,17 @@ function normalizeMediaImageUrl(value: string | null | undefined) {
   }
   if (trimmed.startsWith('/')) return trimmed
   return trimmed
+}
+
+function proxyExternalMediaUrl(value: string) {
+  try {
+    const url = new URL(value)
+    if (/(^|\.)supabase\.co$/i.test(url.hostname)) return value
+    if (/(^|\.)wixstatic\.com$/i.test(url.hostname)) return value
+    return `/api/logo-image?url=${encodeURIComponent(value)}`
+  } catch {
+    return value
+  }
 }
 
 function normalizeWixImageUrl(value: string) {
@@ -1932,12 +1943,14 @@ const brandKitStyles = `
   .brand-kit-media-card {
     border: 1px solid #e8e9ec;
     border-radius: 10px;
+    background: #ffffff;
     overflow: hidden;
     position: relative;
   }
 
   .brand-kit-media-card img {
     width: 100%;
+    height: 100%;
     aspect-ratio: 1;
     object-fit: cover;
     display: block;
