@@ -4,6 +4,9 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'SOON | AI 宣傳策略與內容製作平台',
   description: 'SOON 將品牌需求、創作者配對、腳本、分鏡與製作流程串成同一套內容宣傳系統。',
+  icons: {
+    icon: '/icon',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
