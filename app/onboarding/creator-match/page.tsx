@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { createClient } from '@/lib/supabase'
 import { resolveActiveWorkspace, type WorkspaceSummary } from '@/lib/workspace-client'
 
 type KOL = {
@@ -254,6 +255,13 @@ export default function CreatorMatchPage() {
     setInviteLoading(true)
     setInviteError('')
 
+    const supabase = createClient()
+    const { data: brandProfile } = await supabase
+      .from('brand_profiles')
+      .select('business_overview')
+      .eq('workspace_id', campaign.workspace_id)
+      .single()
+
     const res = await fetch('/api/public/invitations', {
       method: 'POST',
       headers: {
@@ -271,6 +279,9 @@ export default function CreatorMatchPage() {
         theme: campaign.theme,
         call_to_action: campaign.call_to_action,
         starts_on: campaign.starts_on,
+        brand_overview: brandProfile?.business_overview ?? null,
+        duration_weeks: campaign.duration_weeks ?? null,
+        budget_range: null,
         message: inviteMessage,
       }),
     })
