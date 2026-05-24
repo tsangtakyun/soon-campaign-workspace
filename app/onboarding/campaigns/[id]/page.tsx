@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { type MouseEvent, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
@@ -23,6 +23,7 @@ type CampaignDetail = {
   starts_on: string | null
   duration_weeks: number | null
   campaign_themes: unknown
+  kol_open?: boolean | null
 }
 
 type CampaignPost = {
@@ -54,6 +55,7 @@ const fallbackCampaign: CampaignDetail = {
   target_link: 'https://sooncreator.network/',
   starts_on: '2026-05-01',
   duration_weeks: 1,
+  kol_open: false,
   campaign_themes: [
     { id: '1', title: '差點沒拍下來的片段', body: '最細小的片段，往往承載最真實的感覺。' },
     { id: '2', title: '一個簡單房間，幾段短片', body: '和朋友聚在一起，本來可以很平常。' },
@@ -167,6 +169,61 @@ function contentPerWeekSummary(posts: CampaignPost[]) {
 function audienceText(value?: string | null) {
   const trimmed = value?.trim()
   return trimmed ? trimmed : '點擊新增目標受眾'
+}
+
+function KolOpenToggle({
+  campaign,
+  onUpdate,
+}: {
+  campaign: CampaignDetail
+  onUpdate: (kolOpen: boolean) => void
+}) {
+  const [enabled, setEnabled] = useState(campaign.kol_open ?? false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setEnabled(campaign.kol_open ?? false)
+  }, [campaign.kol_open])
+
+  async function toggle(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setLoading(true)
+
+    const nextEnabled = !enabled
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('marketing_campaigns')
+        .update({ kol_open: nextEnabled })
+        .eq('id', campaign.id)
+
+      if (error) throw error
+
+      setEnabled(nextEnabled)
+      onUpdate(nextEnabled)
+    } catch (error) {
+      console.error('[CampaignDetail] failed to update kol_open:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="kol-open-toggle">
+      <span>開放 KOL 申請</span>
+      <button
+        aria-label={enabled ? '關閉 KOL 申請' : '開放 KOL 申請'}
+        className={`kol-open-switch ${enabled ? 'enabled' : ''}`}
+        disabled={loading}
+        onClick={(event) => void toggle(event)}
+        type="button"
+      >
+        <span />
+      </button>
+      {enabled ? <em>已開放</em> : null}
+    </div>
+  )
 }
 
 export default function CampaignDetailPage() {
@@ -296,6 +353,10 @@ export default function CampaignDetailPage() {
                 ) : null}
                 {connections.length === 0 ? <span className="action-badge disconnected">尚未連接帳號</span> : null}
                 <span className={`campaign-status ${getStatusClass(campaign.status)}`}>{getStatusLabel(campaign.status)}</span>
+                <KolOpenToggle
+                  campaign={campaign}
+                  onUpdate={(kolOpen) => setCampaign((current) => ({ ...current, kol_open: kolOpen }))}
+                />
               </div>
               <p>請於 {startDateLabel} 前審批以準時發布</p>
             </div>
@@ -629,6 +690,63 @@ const campaignDetailStyles = `
     background: #fffbeb;
     border: 1px solid #fde68a;
     color: #a16207;
+  }
+
+  .kol-open-toggle {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+  }
+
+  .kol-open-toggle > span {
+    color: #6f737d;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .kol-open-toggle em {
+    color: #7c3aed;
+    font-size: 12px;
+    font-style: normal;
+    white-space: nowrap;
+  }
+
+  .kol-open-switch {
+    background: #d1d5db;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    height: 20px;
+    padding: 0;
+    position: relative;
+    transition: background 150ms ease;
+    width: 40px;
+  }
+
+  .kol-open-switch:disabled {
+    cursor: wait;
+    opacity: 0.5;
+  }
+
+  .kol-open-switch.enabled {
+    background: #7c3aed;
+  }
+
+  .kol-open-switch span {
+    background: #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+    height: 16px;
+    left: 2px;
+    position: absolute;
+    top: 2px;
+    transform: translateX(0);
+    transition: transform 150ms ease;
+    width: 16px;
+  }
+
+  .kol-open-switch.enabled span {
+    transform: translateX(20px);
   }
 
   .campaign-review-btn {

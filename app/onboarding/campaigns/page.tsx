@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { type MouseEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
@@ -18,6 +18,7 @@ type CampaignListItem = {
   strategy_title: string | null
   starts_on: string | null
   duration_weeks: number | null
+  kol_open?: boolean | null
   status: string
   thumbnail_url?: string | null
   posts?: CampaignPostSummary[]
@@ -103,6 +104,61 @@ function categoryGradient(campaign: CampaignListItem) {
   return 'default'
 }
 
+function KolOpenToggle({
+  campaign,
+  onUpdate,
+}: {
+  campaign: CampaignListItem
+  onUpdate: (campaignId: string, kolOpen: boolean) => void
+}) {
+  const [enabled, setEnabled] = useState(campaign.kol_open ?? false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setEnabled(campaign.kol_open ?? false)
+  }, [campaign.kol_open])
+
+  async function toggle(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    setLoading(true)
+
+    const nextEnabled = !enabled
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('marketing_campaigns')
+        .update({ kol_open: nextEnabled })
+        .eq('id', campaign.id)
+
+      if (error) throw error
+
+      setEnabled(nextEnabled)
+      onUpdate(campaign.id, nextEnabled)
+    } catch (error) {
+      console.error('[Campaigns] failed to update kol_open:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="kol-open-toggle" onClick={(event) => event.stopPropagation()}>
+      <span>開放 KOL 申請</span>
+      <button
+        aria-label={enabled ? '關閉 KOL 申請' : '開放 KOL 申請'}
+        className={`kol-open-switch ${enabled ? 'enabled' : ''}`}
+        disabled={loading}
+        onClick={(event) => void toggle(event)}
+        type="button"
+      >
+        <span />
+      </button>
+      {enabled ? <em>已開放</em> : null}
+    </div>
+  )
+}
+
 export default function CampaignsPage() {
   const router = useRouter()
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
@@ -126,7 +182,7 @@ export default function CampaignsPage() {
         let workspaceId: string | null = null
 
         const campaignSelect =
-          'id,source_key,name,strategy_emoji,strategy_title,starts_on,duration_weeks,status,created_at,cover_image_url'
+          'id,source_key,name,strategy_emoji,strategy_title,starts_on,duration_weeks,status,created_at,cover_image_url,kol_open'
         const fallbackCampaignSelect =
           'id,source_key,name,strategy_emoji,strategy_title,starts_on,duration_weeks,status,created_at'
         let query = supabase
@@ -325,6 +381,7 @@ export default function CampaignsPage() {
                 <span>活動</span>
                 <span>時間</span>
                 <span>狀態</span>
+                <span>KOL 申請</span>
                 <span />
               </div>
               {campaigns.map((campaign) => {
@@ -365,6 +422,14 @@ export default function CampaignsPage() {
                   <span className={`campaign-status ${status.kind}`}>
                     {status.label}
                   </span>
+                  <KolOpenToggle
+                    campaign={campaign}
+                    onUpdate={(campaignId, kolOpen) => {
+                      setCampaigns((current) =>
+                        current.map((item) => (item.id === campaignId ? { ...item, kol_open: kolOpen } : item))
+                      )
+                    }}
+                  />
                   <button type="button" className="campaign-arrow" aria-label="查看活動">
                     ›
                   </button>
@@ -566,7 +631,7 @@ const campaignsStyles = `
   .campaigns-table-head,
   .campaign-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 160px 170px 32px;
+    grid-template-columns: minmax(0, 1fr) 160px 170px 190px 32px;
     gap: 12px;
     align-items: center;
   }
@@ -686,6 +751,64 @@ const campaignsStyles = `
   .campaign-status.failed {
     background: #fee2e2;
     color: #991b1b;
+  }
+
+  .kol-open-toggle {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .kol-open-toggle > span {
+    color: #6f737d;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .kol-open-toggle em {
+    color: #7c3aed;
+    font-size: 12px;
+    font-style: normal;
+    white-space: nowrap;
+  }
+
+  .kol-open-switch {
+    background: #d1d5db;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    height: 20px;
+    padding: 0;
+    position: relative;
+    transition: background 150ms ease;
+    width: 40px;
+  }
+
+  .kol-open-switch:disabled {
+    cursor: wait;
+    opacity: 0.5;
+  }
+
+  .kol-open-switch.enabled {
+    background: #7c3aed;
+  }
+
+  .kol-open-switch span {
+    background: #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+    height: 16px;
+    left: 2px;
+    position: absolute;
+    top: 2px;
+    transform: translateX(0);
+    transition: transform 150ms ease;
+    width: 16px;
+  }
+
+  .kol-open-switch.enabled span {
+    transform: translateX(20px);
   }
 
   .campaign-arrow {

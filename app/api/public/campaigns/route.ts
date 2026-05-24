@@ -23,8 +23,10 @@ export async function GET(req: Request) {
       cover_image_url,
       workspace_id,
       created_at,
+      kol_open,
       workspaces!inner(name)
     `)
+    .eq('kol_open', true)
     .in('status', ['active', 'generating', 'draft'])
     .order('created_at', { ascending: false })
     .limit(50)
