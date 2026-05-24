@@ -824,11 +824,17 @@ const styles = `
   box-sizing: border-box;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
+  background: #ffffff;
   color: #111827;
   font-size: 14px;
   margin-bottom: 16px;
   outline: none;
   padding: 10px 12px;
+}
+
+.invite-modal select::placeholder,
+.invite-modal textarea::placeholder {
+  color: #9ca3af;
 }
 
 .invite-modal textarea {
