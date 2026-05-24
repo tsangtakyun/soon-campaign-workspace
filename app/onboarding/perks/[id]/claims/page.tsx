@@ -99,6 +99,7 @@ const sidebarStyles = `
     position: relative;
     border-bottom: 1px solid #e2e3e6;
     padding-bottom: 14px;
+    background: #f2f3f5 !important;
   }
 
   .workspace-switcher {
@@ -106,25 +107,28 @@ const sidebarStyles = `
     grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
-    border: 0;
-    background: transparent;
+    appearance: none;
+    border: 0 !important;
+    background: transparent !important;
     width: 100%;
     padding: 8px 6px 4px;
     text-align: left;
     cursor: pointer;
-    color: #202126;
+    color: #202126 !important;
+    font: inherit;
   }
 
   .workspace-mark {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    background: #ffd946;
-    color: #111111;
-    display: grid;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 7px !important;
+    background: #ffd946 !important;
+    color: #111111 !important;
+    display: grid !important;
     place-items: center;
-    font-weight: 800;
-    font-size: 13px;
+    font-weight: 800 !important;
+    font-size: 13px !important;
+    flex: 0 0 auto;
   }
 
   .workspace-switcher strong,
@@ -139,10 +143,11 @@ const sidebarStyles = `
   .workspace-switcher strong {
     font-size: 14px;
     font-weight: 550;
+    color: #202126 !important;
   }
 
   .workspace-switcher span {
-    color: #9a9da4;
+    color: #9a9da4 !important;
   }
 
   .workspace-menu {
