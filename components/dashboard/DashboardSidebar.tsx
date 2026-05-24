@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bell, FileText, Package, Users } from 'lucide-react'
+import { Bell, FileText, Gift, Package, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import {
   clearActiveWorkspaceId,
@@ -26,6 +26,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: '▱', label: '宣傳活動', href: '/onboarding/campaigns' },
   { icon: <Users aria-hidden="true" size={16} strokeWidth={2} />, label: '創作者配對', href: '/onboarding/creator-match' },
   { icon: <FileText aria-hidden="true" size={16} strokeWidth={2} />, label: '\u9805\u76ee\u7c21\u5831', href: '/onboarding/project-briefs' },
+  { icon: <Gift aria-hidden="true" size={16} strokeWidth={2} />, label: '探索品牌', href: '/onboarding/perks' },
   { icon: <Package aria-hidden="true" size={16} strokeWidth={2} />, label: '我的產品', href: '/onboarding/my-products' },
   { icon: '↯', label: '整合', href: '/onboarding/integrations', meta: '0/4' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
