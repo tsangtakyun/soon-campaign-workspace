@@ -305,6 +305,7 @@ const styles = `
 .editor-card textarea {
   width: 100%;
   box-sizing: border-box;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   color: #111827;
