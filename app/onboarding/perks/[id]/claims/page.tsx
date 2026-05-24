@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { createAdminSupabase } from '@/lib/server-supabase'
 import { ClaimRow } from './ClaimRow'
 
@@ -75,10 +75,252 @@ export default async function PerkClaimsPage({ params }: { params: Promise<{ id:
           )}
         </div>
       </section>
-      <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
+      <style dangerouslySetInnerHTML={{ __html: `${sidebarStyles}\n${styles}` }} />
     </main>
   )
 }
+
+const sidebarStyles = `
+  .sidebar {
+    min-height: 100vh;
+    border-right: 1px solid #e6e7ea;
+    background: #f2f3f5;
+    padding: 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+    z-index: 30;
+    pointer-events: auto;
+    overflow: hidden;
+  }
+
+  .workspace-switcher-wrap {
+    position: relative;
+    border-bottom: 1px solid #e2e3e6;
+    padding-bottom: 14px;
+  }
+
+  .workspace-switcher {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    width: 100%;
+    padding: 8px 6px 4px;
+    text-align: left;
+    cursor: pointer;
+    color: #202126;
+  }
+
+  .workspace-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: #ffd946;
+    color: #111111;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 13px;
+  }
+
+  .workspace-switcher strong,
+  .sidebar-nav strong,
+  .workspace-menu-list strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-switcher strong {
+    font-size: 14px;
+    font-weight: 550;
+  }
+
+  .workspace-switcher span {
+    color: #9a9da4;
+  }
+
+  .workspace-menu {
+    position: absolute;
+    left: 0;
+    right: -8px;
+    top: calc(100% + 8px);
+    border: 1px solid #dedfe3;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 18px 42px rgba(18, 19, 24, 0.14);
+    padding: 10px;
+    z-index: 80;
+  }
+
+  .workspace-menu p {
+    margin: 4px 8px 8px;
+    color: #9a9da4;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .workspace-menu-list,
+  .workspace-menu-actions,
+  .sidebar-nav,
+  .sidebar-group,
+  .sidebar-footer {
+    display: grid;
+    gap: 5px;
+  }
+
+  .workspace-menu-list {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+
+  .workspace-menu-list button,
+  .workspace-menu-actions button {
+    border: 0;
+    background: transparent;
+    border-radius: 10px;
+    color: #202126;
+    cursor: pointer;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 8px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .workspace-menu-list button:hover,
+  .workspace-menu-list button.active,
+  .workspace-menu-actions button:hover {
+    background: #f2f3f5;
+  }
+
+  .workspace-menu-list em,
+  .workspace-menu-empty {
+    color: #7d8088;
+    display: block;
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.35;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-menu-actions {
+    border-top: 1px solid #eceef1;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .workspace-menu-actions button.logout {
+    color: #991b1b;
+  }
+
+  .sidebar-nav a,
+  .sidebar-group a,
+  .sidebar-footer a {
+    min-height: 34px;
+    border-radius: 9px;
+    color: #6f7278;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    text-decoration: none;
+    font-size: 14px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .sidebar-group a,
+  .sidebar-footer a {
+    display: flex;
+  }
+
+  .sidebar-nav a.active {
+    background: #e5e7eb;
+    color: #202126;
+  }
+
+  .sidebar-nav strong {
+    font-weight: 500;
+  }
+
+  .sidebar-nav em {
+    color: #9b9ea6;
+    font-style: normal;
+  }
+
+  .sidebar-nav em.notification-badge {
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    display: inline-grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 5px;
+  }
+
+  .sidebar-credit-card {
+    border: 1px solid #dfe1e6;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #202126;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 11px 12px;
+    text-decoration: none !important;
+    white-space: normal;
+  }
+
+  .sidebar-credit-balance {
+    color: #202126;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+
+  .sidebar-credit-action {
+    color: #6f7278;
+    font-size: 11px;
+    line-height: 1.25;
+    text-decoration: none;
+  }
+
+  .sidebar-credit-card.warning {
+    border-color: #fecaca;
+    background: #fef2f2;
+  }
+
+  .sidebar-credit-card.warning .sidebar-credit-balance,
+  .sidebar-credit-card.warning .sidebar-credit-action {
+    color: #b91c1c;
+  }
+
+  .sidebar-group p {
+    margin: 8px 10px 4px;
+    color: #9a9da4;
+    font-size: 12px;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    border-top: 1px solid #e2e3e6;
+    padding-top: 12px;
+  }
+`
 
 const styles = `
 .dashboard-page {
