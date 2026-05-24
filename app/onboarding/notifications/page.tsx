@@ -15,6 +15,7 @@ type WorkspaceNotification = {
   meta: {
     campaign_id?: string | null
     status?: string | null
+    creator_username?: string | null
     creator_mediakit_url?: string | null
   } | null
   is_read: boolean | null
@@ -107,15 +108,15 @@ export default function NotificationsPage() {
                     <small>{new Date(notification.created_at).toLocaleString('zh-HK')}</small>
                   ) : null}
                 </span>
-                {notification.meta?.creator_mediakit_url ? (
+                {notification.meta?.status === 'accepted' ? (
                   <a
                     className="notification-link"
-                    href={notification.meta.creator_mediakit_url}
+                    href={`/onboarding/project-briefs/new?creator=${encodeURIComponent(
+                      notification.meta.creator_username || ''
+                    )}&campaign_id=${encodeURIComponent(notification.meta.campaign_id || '')}`}
                     onClick={(event) => event.stopPropagation()}
-                    rel="noopener noreferrer"
-                    target="_blank"
                   >
-                    Media Kit
+                    發送 Project Brief
                   </a>
                 ) : null}
               </button>
