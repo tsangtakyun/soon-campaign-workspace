@@ -43,6 +43,8 @@ export async function POST(req: Request) {
   })
 
   const eggData = await eggRes.json().catch(() => null)
+  console.log('[update-claim] EGG sync:', eggRes.status, eggData)
+
   if (!eggRes.ok) {
     console.error('[perks/update-claim] EGG sync failed:', eggRes.status, eggData)
     return NextResponse.json({ error: 'EGG sync failed', detail: eggData }, { status: 502 })
