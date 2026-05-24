@@ -6,10 +6,10 @@ import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard
 import { createClient } from '@/lib/supabase'
 import { resolveActiveWorkspace } from '@/lib/workspace-client'
 
-type PerkType = 'service' | 'product'
+type PrProjectType = 'service' | 'product'
 
-type PerkForm = {
-  type: PerkType
+type PrProjectForm = {
+  type: PrProjectType
   title: string
   description: string
   requirements: string
@@ -21,7 +21,7 @@ type PerkForm = {
   contact_email: string
 }
 
-const initialForm: PerkForm = {
+const initialForm: PrProjectForm = {
   type: 'service',
   title: '',
   description: '',
@@ -34,35 +34,35 @@ const initialForm: PerkForm = {
   contact_email: '',
 }
 
-export default function NewPerkPage() {
+export default function NewPrProjectPage() {
   return (
     <Suspense fallback={<div />}>
-      <NewPerkForm />
+      <NewPrProjectForm />
     </Suspense>
   )
 }
 
-function NewPerkForm() {
+function NewPrProjectForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const perkId = searchParams.get('id')
+  const prProjectId = searchParams.get('id')
   const supabase = useMemo(() => createClient(), [])
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [form, setForm] = useState<PerkForm>(initialForm)
+  const [form, setForm] = useState<PrProjectForm>(initialForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
 
-    async function loadPerk() {
+    async function loadPrProject() {
       const { workspaceId: resolvedWorkspaceId } = await resolveActiveWorkspace()
       if (cancelled) return
       setWorkspaceId(resolvedWorkspaceId)
 
-      if (!perkId) return
+      if (!prProjectId) return
 
-      const { data } = await supabase.from('brand_perks').select('*').eq('id', perkId).maybeSingle()
+      const { data } = await supabase.from('brand_perks').select('*').eq('id', prProjectId).maybeSingle()
       if (!cancelled && data) {
         setForm({
           type: data.type === 'product' ? 'product' : 'service',
@@ -79,25 +79,25 @@ function NewPerkForm() {
       }
     }
 
-    void loadPerk()
+    void loadPrProject()
 
     return () => {
       cancelled = true
     }
-  }, [perkId, supabase])
+  }, [prProjectId, supabase])
 
-  function updateForm<K extends keyof PerkForm>(key: K, value: PerkForm[K]) {
+  function updateForm<K extends keyof PrProjectForm>(key: K, value: PrProjectForm[K]) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  async function savePerk() {
+  async function savePrProject() {
     if (!workspaceId) {
       setError('請先選擇工作空間。')
       return
     }
 
     if (!form.title.trim()) {
-      setError('請填寫標題。')
+      setError('請填寫公關項目標題。')
       return
     }
 
@@ -123,8 +123,8 @@ function NewPerkForm() {
       contact_email: form.contact_email.trim() || null,
     }
 
-    const result = perkId
-      ? await supabase.from('brand_perks').update(payload).eq('id', perkId)
+    const result = prProjectId
+      ? await supabase.from('brand_perks').update(payload).eq('id', prProjectId)
       : await supabase.from('brand_perks').insert(payload)
 
     setSaving(false)
@@ -139,11 +139,11 @@ function NewPerkForm() {
 
   return (
     <main className="dashboard-page">
-      <DashboardSidebar activeItem="探索品牌優惠" />
+      <DashboardSidebar activeItem="探索品牌" />
       <section className="perk-form-main">
         <header>
-          <h1>{perkId ? '編輯優惠' : '新增優惠'}</h1>
-          <p>建立免費服務或產品，讓 KOL 主動申請體驗。</p>
+          <h1>{prProjectId ? '編輯公關項目' : '新增公關項目'}</h1>
+          <p>透過免費服務或產品，讓 KOL 主動體驗你的品牌。</p>
         </header>
 
         <div className="perk-form-card">
@@ -205,7 +205,7 @@ function NewPerkForm() {
           <div className="toggle-row">
             <div>
               <strong>啟用</strong>
-              <span>啟用後會出現在 SOON-EGG 探索品牌優惠頁</span>
+              <span>啟用後會出現在 SOON-EGG 探索品牌公關宣傳頁</span>
             </div>
             <button
               className={form.is_active ? 'toggle active' : 'toggle'}
@@ -249,7 +249,7 @@ function NewPerkForm() {
           {error ? <p className="form-error">{error}</p> : null}
 
           <div className="actions">
-            <button disabled={saving} onClick={() => void savePerk()} type="button">
+            <button disabled={saving} onClick={() => void savePrProject()} type="button">
               {saving ? '儲存中...' : '儲存'}
             </button>
             <button onClick={() => router.push('/onboarding/perks')} type="button">

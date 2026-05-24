@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
 import { createAdminSupabase } from '@/lib/server-supabase'
 
-type BrandPerk = {
+type BrandPrProject = {
   id: string
   type: 'service' | 'product'
   title: string | null
@@ -11,11 +11,11 @@ type BrandPerk = {
   is_active: boolean | null
 }
 
-type PerkClaim = {
+type PrProjectClaim = {
   perk_id: string | null
 }
 
-export default async function PerksPage() {
+export default async function PublicRelationsPage() {
   const supabaseAdmin = createAdminSupabase()
 
   const [{ data: perks }, { data: claims }] = await Promise.all([
@@ -23,7 +23,7 @@ export default async function PerksPage() {
     supabaseAdmin.from('perk_claims').select('perk_id'),
   ])
 
-  const claimCounts = ((claims ?? []) as PerkClaim[]).reduce<Record<string, number>>((acc, claim) => {
+  const claimCounts = ((claims ?? []) as PrProjectClaim[]).reduce<Record<string, number>>((acc, claim) => {
     if (!claim.perk_id) return acc
     acc[claim.perk_id] = (acc[claim.perk_id] || 0) + 1
     return acc
@@ -31,36 +31,36 @@ export default async function PerksPage() {
 
   return (
     <main className="dashboard-page">
-      <DashboardSidebar activeItem="探索品牌優惠" />
+      <DashboardSidebar activeItem="探索品牌" />
       <section className="perks-main">
         <header className="perks-header">
           <div>
-            <h1>探索品牌優惠</h1>
-            <p>提供免費服務或產品，讓 KOL 主動了解你的品牌</p>
+            <h1>探索品牌公關宣傳</h1>
+            <p>透過免費服務或產品，讓 KOL 主動體驗你的品牌</p>
           </div>
           <Link className="primary-action" href="/onboarding/perks/new">
-            + 新增優惠
+            + 新增公關項目
           </Link>
         </header>
 
         <div className="perks-card">
           {!perks || perks.length === 0 ? (
             <div className="perks-empty">
-              未有優惠，<Link href="/onboarding/perks/new">立即新增</Link>
+              未有公關項目，<Link href="/onboarding/perks/new">立即新增</Link>
             </div>
           ) : (
             <>
               <div className="perks-row head">
-                <span>優惠</span>
+                <span>公關項目</span>
                 <span>類型</span>
                 <span>名額</span>
                 <span>狀態</span>
                 <span />
               </div>
-              {(perks as BrandPerk[]).map((perk) => (
+              {(perks as BrandPrProject[]).map((perk) => (
                 <div className="perks-row" key={perk.id}>
                   <div>
-                    <strong>{perk.title || '未命名優惠'}</strong>
+                    <strong>{perk.title || '未命名公關項目'}</strong>
                     {perk.valid_until ? <em>有效至 {perk.valid_until}</em> : null}
                   </div>
                   <span>{perk.type === 'service' ? '服務' : '產品'}</span>
