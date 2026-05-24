@@ -89,6 +89,80 @@ const styles = `
   grid-template-columns: 260px minmax(0, 1fr);
 }
 
+.dashboard-page .sidebar {
+  box-sizing: border-box !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
+  overflow: hidden !important;
+}
+
+.dashboard-page .workspace-switcher {
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) auto !important;
+}
+
+.dashboard-page .workspace-switcher strong,
+.dashboard-page .sidebar-nav strong,
+.dashboard-page .workspace-menu-list strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.dashboard-page .sidebar-nav,
+.dashboard-page .sidebar-group,
+.dashboard-page .sidebar-footer {
+  display: grid !important;
+  gap: 5px !important;
+}
+
+.dashboard-page .sidebar-nav a,
+.dashboard-page .sidebar-group a,
+.dashboard-page .sidebar-footer a {
+  align-items: center !important;
+  border-radius: 9px !important;
+  color: #6f7278 !important;
+  display: grid !important;
+  font-size: 14px !important;
+  gap: 8px !important;
+  grid-template-columns: 24px minmax(0, 1fr) auto !important;
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+}
+
+.dashboard-page .sidebar-group a,
+.dashboard-page .sidebar-footer a {
+  display: flex !important;
+}
+
+.dashboard-page .sidebar-nav a.active {
+  background: #e5e7eb !important;
+  color: #202126 !important;
+}
+
+.dashboard-page .sidebar-credit-card {
+  border: 1px solid #dfe1e6 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  color: #202126 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 11px 12px !important;
+  text-decoration: none !important;
+  white-space: normal !important;
+}
+
+.dashboard-page .sidebar-footer {
+  margin-top: auto !important;
+  border-top: 1px solid #e2e3e6 !important;
+  padding-top: 12px !important;
+}
+
 .claims-main { padding: 48px; background: #f7f7f8; min-height: 100vh; }
 .claims-header { margin-bottom: 24px; }
 .claims-header a { color: #6f737d; font-size: 13px; text-decoration: none; }
