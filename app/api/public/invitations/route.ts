@@ -6,17 +6,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const baseUrl = process.env.EGG_BASE_URL
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  if (!body.egg_creator_id || !body.cw_campaign_id) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  const eggBaseUrl = process.env.EGG_BASE_URL
   const internalKey = process.env.SOON_INTERNAL_API_KEY
 
-  if (!baseUrl || !internalKey) {
+  if (!eggBaseUrl || !internalKey) {
+    console.error('[invitations] SOON-EGG integration env is missing')
     return NextResponse.json({ error: 'SOON-EGG integration is not configured' }, { status: 500 })
   }
 
-  const body = await req.json()
-
+  let eggRes: Response
   try {
-    const res = await fetch(`${baseUrl}/api/invitations/receive`, {
+    eggRes = await fetch(`${eggBaseUrl}/api/invitations/receive`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,22 +35,23 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify(body),
     })
-    const data = await res.json().catch(() => null)
-
-    if (!res.ok) {
-      console.error('[public/invitations] SOON-EGG forward failed', {
-        status: res.status,
-        baseUrl,
-        error: data?.error,
-      })
-    }
-
-    return NextResponse.json(data ?? { error: 'Invalid SOON-EGG response' }, { status: res.status })
-  } catch (error) {
-    console.error('[public/invitations] SOON-EGG forward error', {
-      baseUrl,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return NextResponse.json({ error: 'Failed to forward invitation' }, { status: 500 })
+  } catch (err) {
+    console.error('[invitations] fetch to EGG failed:', err)
+    return NextResponse.json({ error: 'Failed to reach SOON-EGG' }, { status: 502 })
   }
+
+  let eggData: unknown
+  try {
+    eggData = await eggRes.json()
+  } catch {
+    eggData = null
+  }
+
+  console.log('[invitations] EGG response status:', eggRes.status, 'body:', eggData)
+
+  if (!eggRes.ok) {
+    return NextResponse.json({ error: 'EGG rejected invitation', detail: eggData }, { status: 502 })
+  }
+
+  return NextResponse.json({ success: true })
 }
