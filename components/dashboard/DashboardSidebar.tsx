@@ -317,6 +317,7 @@ export const dashboardSidebarStyles = `
     position: relative;
     z-index: 30;
     pointer-events: auto;
+    overflow: hidden;
   }
 
   .workspace-switcher-wrap {
@@ -327,7 +328,7 @@ export const dashboardSidebarStyles = `
 
   .workspace-switcher {
     display: grid;
-    grid-template-columns: 28px 1fr auto;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px;
     border: 0;
@@ -414,7 +415,7 @@ export const dashboardSidebarStyles = `
     color: #202126;
     cursor: pointer;
     display: grid;
-    grid-template-columns: 18px 1fr;
+    grid-template-columns: 18px minmax(0, 1fr);
     gap: 8px;
     padding: 9px 8px;
     text-align: left;
@@ -438,6 +439,10 @@ export const dashboardSidebarStyles = `
     font-size: 13px;
     font-weight: 600;
     line-height: 1.25;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace-menu-list em {
@@ -490,7 +495,7 @@ export const dashboardSidebarStyles = `
     border-radius: 9px;
     color: #6f7278;
     display: grid;
-    grid-template-columns: 24px 1fr auto;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     padding: 0 10px;
@@ -512,6 +517,10 @@ export const dashboardSidebarStyles = `
 
   .sidebar-nav strong {
     font-weight: 500;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .sidebar-nav em {
