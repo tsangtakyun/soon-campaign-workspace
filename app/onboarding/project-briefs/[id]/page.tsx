@@ -113,7 +113,7 @@ export default function ProjectBriefEditorPage() {
         setForm({
           title: data.title || '',
           campaign_id: data.campaign_id || '',
-          creator_username: data.creator_username || '',
+          creator_username: normalizeCreatorUsername(data.creator_username || ''),
           background: data.background || '',
           objectives: data.objectives || '',
           deliverablesText: listToText(data.deliverables),
@@ -144,7 +144,7 @@ export default function ProjectBriefEditorPage() {
     const payload = {
       workspace_id: workspaceId,
       campaign_id: form.campaign_id || null,
-      creator_username: form.creator_username || null,
+      creator_username: normalizeCreatorUsername(form.creator_username) || null,
       title: form.title || '未命名簡報',
       background: form.background || null,
       objectives: form.objectives || null,
