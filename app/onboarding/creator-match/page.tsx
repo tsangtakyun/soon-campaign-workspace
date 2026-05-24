@@ -1,96 +1,272 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { resolveActiveWorkspace, type WorkspaceSummary } from '@/lib/workspace-client'
 
-const platforms = ['全部', 'Instagram', '小紅書', 'TikTok', 'YouTube'] as const
-const fanRanges = ['全部', '1K-10K', '10K-100K', '100K+'] as const
-const industries = ['全部', '美容', '時尚', '生活', '健康'] as const
+type KOL = {
+  id: string
+  username: string
+  display_name: string | null
+  bio: string | null
+  avatar_url: string | null
+  instagram_handle: string | null
+  instagram_followers: number | null
+  youtube_handle: string | null
+  youtube_subscribers: number | null
+  tiktok_handle: string | null
+  tiktok_followers: number | null
+  xiaohongshu_handle: string | null
+  xiaohongshu_followers: number | null
+  facebook_handle?: string | null
+  facebook_followers?: number | null
+  threads_handle?: string | null
+  threads_followers?: number | null
+  content_categories: string[] | null
+  ai_profile_summary: string | null
+}
 
-const creators = [
-  {
-    name: '@beautyby.mia',
-    platforms: ['Instagram', '小紅書'],
-    fans: '28.4K',
-    fanRange: '10K-100K',
-    industry: '美容',
-    tags: ['#美容', '#護膚', '#平價好物'],
-    score: 87,
-    gradient: 'linear-gradient(135deg, #f472b6, #7c3aed)',
-  },
-  {
-    name: '@glow.with.yan',
-    platforms: ['TikTok', 'Instagram'],
-    fans: '64.1K',
-    fanRange: '10K-100K',
-    industry: '美容',
-    tags: ['#底妝', '#敏感肌', '#成分黨'],
-    score: 91,
-    gradient: 'linear-gradient(135deg, #38bdf8, #7c3aed)',
-  },
-  {
-    name: '@dailychic.hk',
-    platforms: ['Instagram', 'YouTube'],
-    fans: '132K',
-    fanRange: '100K+',
-    industry: '時尚',
-    tags: ['#穿搭', '#輕奢', '#OL日常'],
-    score: 82,
-    gradient: 'linear-gradient(135deg, #fb7185, #f59e0b)',
-  },
-  {
-    name: '@skincare.iris',
-    platforms: ['小紅書', 'TikTok'],
-    fans: '9.8K',
-    fanRange: '1K-10K',
-    industry: '美容',
-    tags: ['#護膚', '#開架推介', '#真實測評'],
-    score: 78,
-    gradient: 'linear-gradient(135deg, #34d399, #0f766e)',
-  },
-  {
-    name: '@wellness.amy',
-    platforms: ['YouTube', 'Instagram'],
-    fans: '45.7K',
-    fanRange: '10K-100K',
-    industry: '健康',
-    tags: ['#健康生活', '#保健', '#自律日常'],
-    score: 84,
-    gradient: 'linear-gradient(135deg, #a3e635, #22c55e)',
-  },
-  {
-    name: '@citylife.karen',
-    platforms: ['TikTok', '小紅書'],
-    fans: '73.2K',
-    fanRange: '10K-100K',
-    industry: '生活',
-    tags: ['#生活美學', '#咖啡店', '#女生好物'],
-    score: 88,
-    gradient: 'linear-gradient(135deg, #c084fc, #ec4899)',
-  },
-]
+type Campaign = {
+  id: string
+  name: string
+  theme: string | null
+  status: string | null
+  starts_on: string | null
+  duration_weeks: number | null
+  target_audience: string | null
+  call_to_action: string | null
+  cover_image_url: string | null
+  workspace_id: string
+  created_at: string
+  workspaces?: {
+    name?: string | null
+  } | null
+}
+
+const platformFilters = ['全部', 'Instagram', 'YouTube', 'TikTok', '小紅書'] as const
+const followerFilters = ['全部', '1K 以下', '1K-10K', '10K-100K', '100K+'] as const
+
+function apiHeaders() {
+  const key = process.env.NEXT_PUBLIC_SOON_INTERNAL_API_KEY
+  return key ? { 'x-soon-api-key': key } : {}
+}
+
+function totalFollowers(kol: KOL) {
+  return (
+    (kol.instagram_followers ?? 0) +
+    (kol.youtube_subscribers ?? 0) +
+    (kol.tiktok_followers ?? 0) +
+    (kol.xiaohongshu_followers ?? 0) +
+    (kol.facebook_followers ?? 0) +
+    (kol.threads_followers ?? 0)
+  )
+}
+
+function followerRange(count: number) {
+  if (count >= 100000) return '100K+'
+  if (count >= 10000) return '10K-100K'
+  if (count >= 1000) return '1K-10K'
+  return '1K 以下'
+}
+
+function platformsFor(kol: KOL) {
+  return [
+    kol.instagram_handle ? 'Instagram' : null,
+    kol.youtube_handle ? 'YouTube' : null,
+    kol.tiktok_handle ? 'TikTok' : null,
+    kol.xiaohongshu_handle ? '小紅書' : null,
+  ].filter(Boolean) as string[]
+}
+
+function matchScore(kol: KOL, campaigns: Campaign[]) {
+  const categories = (kol.content_categories ?? []).map((category) => category.toLowerCase())
+  const audienceText = campaigns
+    .map((campaign) => `${campaign.target_audience ?? ''} ${campaign.theme ?? ''} ${campaign.name ?? ''}`)
+    .join(' ')
+    .toLowerCase()
+
+  if (!categories.length || !audienceText.trim()) return 72
+
+  const matches = categories.filter((category) => audienceText.includes(category)).length
+  return Math.min(96, 72 + matches * 8)
+}
 
 function PlatformBadge({ platform }: { platform: string }) {
-  const label = platform === 'Instagram' ? 'IG' : platform === 'TikTok' ? 'TT' : platform === 'YouTube' ? 'YT' : '小紅書'
-  return <span className={`platform-badge ${platform.toLowerCase()}`}>{label}</span>
+  const label = platform === 'Instagram' ? 'IG' : platform === 'YouTube' ? 'YT' : platform === 'TikTok' ? 'TT' : 'XHS'
+  return <span className={`platform-badge ${platform.toLowerCase().replace('小紅書', 'xhs')}`}>{label}</span>
+}
+
+function InviteModal({
+  kol,
+  campaigns,
+  workspaceName,
+  onClose,
+  onSuccess,
+}: {
+  kol: KOL
+  campaigns: Campaign[]
+  workspaceName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [selectedCampaign, setSelectedCampaign] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSend() {
+    const campaign = campaigns.find((item) => item.id === selectedCampaign)
+    if (!campaign) return
+
+    setLoading(true)
+    setError('')
+
+    const res = await fetch('/api/public/invitations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiHeaders(),
+      },
+      body: JSON.stringify({
+        egg_creator_id: kol.id,
+        creator_username: kol.username,
+        cw_campaign_id: campaign.id,
+        cw_workspace_id: campaign.workspace_id,
+        campaign_name: campaign.name,
+        brand_name: campaign.workspaces?.name ?? workspaceName,
+        cover_image_url: campaign.cover_image_url,
+        theme: campaign.theme,
+        call_to_action: campaign.call_to_action,
+        starts_on: campaign.starts_on,
+        message,
+      }),
+    })
+    const data = await res.json().catch(() => null)
+
+    setLoading(false)
+    if (res.ok && data?.success) {
+      onSuccess()
+    } else {
+      setError(data?.error || '發送失敗，請重試')
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <div className="invite-modal">
+        <h3>邀請 {kol.display_name || kol.username}</h3>
+        <p>@{kol.username}</p>
+
+        <label>選擇 Campaign</label>
+        <select value={selectedCampaign} onChange={(event) => setSelectedCampaign(event.target.value)}>
+          <option value="">請選擇...</option>
+          {campaigns.map((campaign) => (
+            <option key={campaign.id} value={campaign.id}>
+              {campaign.name}
+            </option>
+          ))}
+        </select>
+
+        <label>邀請訊息（可選）</label>
+        <textarea
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="向 KOL 說明合作詳情..."
+          rows={3}
+        />
+
+        {error && <div className="modal-error">{error}</div>}
+
+        <div className="modal-actions">
+          <button onClick={handleSend} disabled={!selectedCampaign || loading} type="button">
+            {loading ? '發送中...' : '發送邀請'}
+          </button>
+          <button onClick={onClose} className="secondary" type="button">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function CreatorMatchPage() {
-  const [selectedPlatform, setSelectedPlatform] = useState<(typeof platforms)[number]>('全部')
-  const [selectedFanRange, setSelectedFanRange] = useState<(typeof fanRanges)[number]>('全部')
-  const [selectedIndustry, setSelectedIndustry] = useState<(typeof industries)[number]>('全部')
+  const [kols, setKols] = useState<KOL[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceSummary | null>(null)
+  const [selectedPlatform, setSelectedPlatform] = useState<(typeof platformFilters)[number]>('全部')
+  const [selectedFollowerRange, setSelectedFollowerRange] = useState<(typeof followerFilters)[number]>('全部')
+  const [selectedCategory, setSelectedCategory] = useState('全部')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [invitingKol, setInvitingKol] = useState<KOL | null>(null)
+  const [successMessage, setSuccessMessage] = useState('')
 
-  const filteredCreators = useMemo(
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadData() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const [workspaceResult, kolRes, campaignRes] = await Promise.all([
+          resolveActiveWorkspace().catch(() => ({ activeWorkspace: null })),
+          fetch('/api/public/kols', { headers: apiHeaders() }),
+          fetch('/api/public/campaigns', { headers: apiHeaders() }),
+        ])
+
+        const [kolData, campaignData] = await Promise.all([
+          kolRes.json().catch(() => null),
+          campaignRes.json().catch(() => null),
+        ])
+
+        if (!kolRes.ok) throw new Error(kolData?.error || '未能載入創作者')
+        if (!campaignRes.ok) throw new Error(campaignData?.error || '未能載入 Campaign')
+
+        if (!cancelled) {
+          setActiveWorkspace(workspaceResult.activeWorkspace ?? null)
+          setKols(kolData?.kols ?? [])
+          setCampaigns(campaignData?.campaigns ?? [])
+        }
+      } catch (loadError) {
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : '未能載入 Creator Match')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadData()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const workspaceCampaigns = useMemo(() => {
+    if (!activeWorkspace?.id) return campaigns
+    const filtered = campaigns.filter((campaign) => campaign.workspace_id === activeWorkspace.id)
+    return filtered.length ? filtered : campaigns
+  }, [activeWorkspace?.id, campaigns])
+
+  const categoryFilters = useMemo(() => {
+    const categories = new Set<string>()
+    kols.forEach((kol) => (kol.content_categories ?? []).forEach((category) => categories.add(category)))
+    return ['全部', ...Array.from(categories).slice(0, 12)]
+  }, [kols])
+
+  const filteredKols = useMemo(
     () =>
-      creators.filter((creator) => {
-        const platformMatch = selectedPlatform === '全部' || creator.platforms.includes(selectedPlatform)
-        const fanMatch = selectedFanRange === '全部' || creator.fanRange === selectedFanRange
-        const industryMatch = selectedIndustry === '全部' || creator.industry === selectedIndustry
-        return platformMatch && fanMatch && industryMatch
+      kols.filter((kol) => {
+        const kolPlatforms = platformsFor(kol)
+        const followerCount = totalFollowers(kol)
+        const platformMatch = selectedPlatform === '全部' || kolPlatforms.includes(selectedPlatform)
+        const followerMatch = selectedFollowerRange === '全部' || followerRange(followerCount) === selectedFollowerRange
+        const categoryMatch = selectedCategory === '全部' || (kol.content_categories ?? []).includes(selectedCategory)
+        return platformMatch && followerMatch && categoryMatch
       }),
-    [selectedFanRange, selectedIndustry, selectedPlatform]
+    [kols, selectedCategory, selectedFollowerRange, selectedPlatform]
   )
 
   return (
@@ -101,15 +277,15 @@ export default function CreatorMatchPage() {
       <section className="creator-shell">
         <header className="hero-header">
           <p>Creator Match</p>
-          <h1>創作者配對</h1>
-          <span>搵啱 KOL，放大你的品牌影響力</span>
+          <h1>搵啱創作者，放大品牌影響力</h1>
+          <span>即時瀏覽 SOON-EGG 創作者資料，查看 Media Kit 並向合適人選發送合作邀請。</span>
         </header>
 
-        <section className="filter-card" aria-label="創作者篩選">
+        <section className="filter-card" aria-label="Creator filters">
           <div className="filter-group">
             <strong>平台</strong>
             <div>
-              {platforms.map((platform) => (
+              {platformFilters.map((platform) => (
                 <button
                   className={selectedPlatform === platform ? 'active' : ''}
                   key={platform}
@@ -122,13 +298,13 @@ export default function CreatorMatchPage() {
             </div>
           </div>
           <div className="filter-group">
-            <strong>粉絲數</strong>
+            <strong>粉絲</strong>
             <div>
-              {fanRanges.map((range) => (
+              {followerFilters.map((range) => (
                 <button
-                  className={selectedFanRange === range ? 'active' : ''}
+                  className={selectedFollowerRange === range ? 'active' : ''}
                   key={range}
-                  onClick={() => setSelectedFanRange(range)}
+                  onClick={() => setSelectedFollowerRange(range)}
                   type="button"
                 >
                   {range}
@@ -137,74 +313,118 @@ export default function CreatorMatchPage() {
             </div>
           </div>
           <div className="filter-group">
-            <strong>行業</strong>
+            <strong>類別</strong>
             <div>
-              {industries.map((industry) => (
+              {categoryFilters.map((category) => (
                 <button
-                  className={selectedIndustry === industry ? 'active' : ''}
-                  key={industry}
-                  onClick={() => setSelectedIndustry(industry)}
+                  className={selectedCategory === category ? 'active' : ''}
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
                   type="button"
                 >
-                  {industry}
+                  {category}
                 </button>
               ))}
             </div>
           </div>
         </section>
 
-        {filteredCreators.length > 0 ? (
+        {successMessage && <div className="success-banner">{successMessage}</div>}
+
+        {loading ? (
+          <div className="empty-state">
+            <strong>載入創作者中...</strong>
+          </div>
+        ) : error ? (
+          <div className="empty-state error">
+            <strong>{error}</strong>
+            <p>請確認 CW / SOON-EGG internal API 設定完成。</p>
+          </div>
+        ) : filteredKols.length > 0 ? (
           <div className="creator-grid">
-            {filteredCreators.map((creator) => (
-              <article className="creator-card" key={creator.name}>
-                <div className="creator-top">
-                  <div className="avatar" style={{ background: creator.gradient }}>
-                    {creator.name.replace('@', '').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h2>{creator.name}</h2>
-                    <div className="platform-list">
-                      {creator.platforms.map((platform) => (
-                        <PlatformBadge key={platform} platform={platform} />
-                      ))}
+            {filteredKols.map((kol) => {
+              const count = totalFollowers(kol)
+              const score = matchScore(kol, workspaceCampaigns)
+              const displayName = kol.display_name || kol.username
+              const kolPlatforms = platformsFor(kol)
+
+              return (
+                <article className="creator-card" key={kol.id}>
+                  <div className="creator-top">
+                    <div className="avatar">
+                      {kol.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={kol.avatar_url} alt={displayName} />
+                      ) : (
+                        <span>{displayName.slice(0, 1).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <h2>{displayName}</h2>
+                      <p>@{kol.username}</p>
+                      <div className="platform-list">
+                        {kolPlatforms.map((platform) => (
+                          <PlatformBadge key={platform} platform={platform} />
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="creator-meta">
-                  <span>粉絲數</span>
-                  <strong>{creator.fans}</strong>
-                </div>
+                  <p className="creator-bio">{kol.bio || kol.ai_profile_summary || 'SOON-EGG 創作者'}</p>
 
-                <div className="tag-row">
-                  {creator.tags.map((tag) => (
-                    <span key={tag}>{tag}</span>
-                  ))}
-                </div>
-
-                <div className="match-row">
-                  <div>
-                    <span>配對度</span>
-                    <strong>{creator.score}%</strong>
+                  <div className="creator-meta">
+                    <span>總觸及 / 粉絲</span>
+                    <strong>{count.toLocaleString()}</strong>
                   </div>
-                  <div className="progress-track" aria-hidden="true">
-                    <span style={{ width: `${creator.score}%` }} />
-                  </div>
-                </div>
 
-                <button className="invite-button" type="button">
-                  發送邀請
-                </button>
-              </article>
-            ))}
+                  <div className="tag-row">
+                    {(kol.content_categories ?? []).slice(0, 5).map((tag) => (
+                      <span key={tag}>#{tag}</span>
+                    ))}
+                  </div>
+
+                  <div className="match-row">
+                    <div>
+                      <span>配對分數</span>
+                      <strong>{score}%</strong>
+                    </div>
+                    <div className="progress-track" aria-hidden="true">
+                      <span style={{ width: `${score}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="card-actions">
+                    <a href={`https://egg.sooncreator.network/${kol.username}/mediakit`} target="_blank" rel="noopener noreferrer">
+                      查看 Media Kit
+                    </a>
+                    <button onClick={() => setInvitingKol(kol)} disabled={workspaceCampaigns.length === 0} type="button">
+                      發送邀請
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         ) : (
           <div className="empty-state">
-            <strong>暫時未有符合條件的創作者</strong>
-            <p>試下放寬平台、粉絲數或行業篩選，SOON 會幫你搵更多合適人選。</p>
+            <strong>未找到符合條件的創作者</strong>
+            <p>調整平台、粉絲或類別篩選，尋找更多合適 KOL。</p>
           </div>
         )}
       </section>
+
+      {invitingKol && (
+        <InviteModal
+          kol={invitingKol}
+          campaigns={workspaceCampaigns}
+          workspaceName={activeWorkspace?.name || 'SOON Campaign Workspace'}
+          onClose={() => setInvitingKol(null)}
+          onSuccess={() => {
+            setSuccessMessage(`已向 ${invitingKol.display_name || invitingKol.username} 發送邀請。`)
+            setInvitingKol(null)
+          }}
+        />
+      )}
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
     </main>
@@ -235,7 +455,7 @@ const styles = `
 
 .hero-header p {
   margin: 0 0 8px;
-  color: #7c3aed;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: .08em;
@@ -256,7 +476,8 @@ const styles = `
 
 .filter-card,
 .creator-grid,
-.empty-state {
+.empty-state,
+.success-banner {
   max-width: 1180px;
   margin-left: auto;
   margin-right: auto;
@@ -304,9 +525,20 @@ const styles = `
 }
 
 .filter-group button.active {
-  border-color: #7c3aed;
-  background: rgba(124, 58, 237, .1);
-  color: #6d28d9;
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, .1);
+  color: #1d4ed8;
+}
+
+.success-banner {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .creator-grid {
@@ -327,13 +559,14 @@ const styles = `
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .avatar {
-  width: 54px;
-  height: 54px;
+  width: 58px;
+  height: 58px;
   border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -341,13 +574,25 @@ const styles = `
   flex-shrink: 0;
   font-size: 20px;
   font-weight: 900;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .42);
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .creator-top h2 {
-  margin: 0 0 8px;
+  margin: 0 0 3px;
   color: #111827;
   font-size: 17px;
+}
+
+.creator-top p {
+  margin: 0 0 8px;
+  color: #9ca3af;
+  font-size: 12px;
 }
 
 .platform-list {
@@ -379,6 +624,18 @@ const styles = `
 
 .platform-badge.youtube {
   background: #ef4444;
+}
+
+.platform-badge.xhs {
+  background: #ef4444;
+}
+
+.creator-bio {
+  min-height: 40px;
+  margin: 0 0 14px;
+  color: #52525b;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .creator-meta {
@@ -429,14 +686,14 @@ const styles = `
 }
 
 .match-row strong {
-  color: #7c3aed;
+  color: #2563eb;
   font-size: 14px;
 }
 
 .progress-track {
   height: 8px;
   border-radius: 999px;
-  background: #ece9f8;
+  background: #dbeafe;
   overflow: hidden;
 }
 
@@ -444,19 +701,41 @@ const styles = `
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  background: linear-gradient(90deg, #2563eb, #14b8a6);
 }
 
-.invite-button {
-  width: 100%;
-  border: 1px solid #7c3aed;
+.card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.card-actions a,
+.card-actions button {
   border-radius: 10px;
-  background: #ffffff;
-  color: #7c3aed;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
-  padding: 11px 14px;
+  padding: 11px 10px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.card-actions a {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #111827;
+}
+
+.card-actions button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.card-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
 }
 
 .empty-state {
@@ -468,6 +747,11 @@ const styles = `
   text-align: center;
 }
 
+.empty-state.error {
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
 .empty-state strong {
   display: block;
   color: #111827;
@@ -477,6 +761,100 @@ const styles = `
 
 .empty-state p {
   margin: 0;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, .52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.invite-modal {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 24px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, .22);
+}
+
+.invite-modal h3 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 20px;
+}
+
+.invite-modal > p {
+  margin: 0 0 18px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.invite-modal label {
+  display: block;
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.invite-modal select,
+.invite-modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #111827;
+  font-size: 14px;
+  margin-bottom: 16px;
+  outline: none;
+  padding: 10px 12px;
+}
+
+.invite-modal textarea {
+  resize: none;
+}
+
+.modal-error {
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.modal-actions button {
+  border: 0;
+  border-radius: 12px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 11px 14px;
+}
+
+.modal-actions button.secondary {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+}
+
+.modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 
 @media (max-width: 1040px) {
