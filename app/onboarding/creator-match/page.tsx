@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
@@ -111,13 +111,14 @@ function InviteModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [selectedCampaign, setSelectedCampaign] = useState<string>('')
+  const campaignRef = useRef<HTMLSelectElement>(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSend() {
-    const campaign = campaigns.find((item) => item.id === selectedCampaign)
+    const campaignId = campaignRef.current?.value
+    const campaign = campaigns.find((item) => item.id === campaignId)
     if (!campaign) return
 
     setLoading(true)
@@ -161,11 +162,8 @@ function InviteModal({
 
         <label>選擇 Campaign</label>
         <select
-          value={selectedCampaign}
-          onChange={(event) => {
-            event.stopPropagation()
-            setSelectedCampaign(event.target.value)
-          }}
+          ref={campaignRef}
+          defaultValue=""
         >
           <option value="">請選擇...</option>
           {campaigns.map((campaign) => (
@@ -188,9 +186,9 @@ function InviteModal({
         <div className="modal-actions">
           <button
             onClick={handleSend}
-            disabled={!selectedCampaign || loading}
+            disabled={loading}
             className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition ${
-              !selectedCampaign || loading
+              loading
                 ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                 : 'cursor-pointer bg-black text-white hover:bg-gray-800'
             }`}
