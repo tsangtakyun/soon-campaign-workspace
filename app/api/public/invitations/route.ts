@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createAdminSupabase } from '@/lib/server-supabase'
 
 export async function POST(req: Request) {
   const apiKey = req.headers.get('x-soon-api-key')
@@ -25,6 +26,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'SOON-EGG integration is not configured' }, { status: 500 })
   }
 
+  const supabase = createAdminSupabase()
+  const workspaceId = typeof body.cw_workspace_id === 'string' ? body.cw_workspace_id : null
+  let brandOverview: string | null = null
+
+  if (workspaceId) {
+    let { data: brandProfile } = await supabase
+      .from('brand_profiles')
+      .select('business_name, business_overview')
+      .eq('workspace_id', workspaceId)
+      .single()
+
+    if (!brandProfile?.business_overview && brandProfile?.business_name) {
+      const { data: fallback } = await supabase
+        .from('brand_profiles')
+        .select('business_overview')
+        .eq('business_name', brandProfile.business_name)
+        .not('business_overview', 'is', null)
+        .limit(1)
+        .single()
+
+      if (fallback?.business_overview) {
+        brandProfile = { ...brandProfile, business_overview: fallback.business_overview }
+      }
+    }
+
+    brandOverview = brandProfile?.business_overview ?? null
+  }
+
+  const forwardedBody = {
+    ...body,
+    brand_overview: brandOverview,
+  }
+
   let eggRes: Response
   try {
     eggRes = await fetch(`${eggBaseUrl}/api/invitations/receive`, {
@@ -33,7 +67,7 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json',
         'x-soon-api-key': internalKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(forwardedBody),
     })
   } catch (err) {
     console.error('[invitations] fetch to EGG failed:', err)

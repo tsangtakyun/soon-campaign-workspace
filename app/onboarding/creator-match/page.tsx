@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
-import { createClient } from '@/lib/supabase'
 import { resolveActiveWorkspace, type WorkspaceSummary } from '@/lib/workspace-client'
 
 type KOL = {
@@ -255,27 +254,6 @@ export default function CreatorMatchPage() {
     setInviteLoading(true)
     setInviteError('')
 
-    const supabase = createClient()
-    let { data: brandProfile } = await supabase
-      .from('brand_profiles')
-      .select('business_name, business_overview')
-      .eq('workspace_id', campaign.workspace_id)
-      .single()
-
-    if (!brandProfile?.business_overview && brandProfile?.business_name) {
-      const { data: fallback } = await supabase
-        .from('brand_profiles')
-        .select('business_overview')
-        .eq('business_name', brandProfile.business_name)
-        .not('business_overview', 'is', null)
-        .limit(1)
-        .single()
-
-      if (fallback?.business_overview) {
-        brandProfile = { ...brandProfile, business_overview: fallback.business_overview }
-      }
-    }
-
     const res = await fetch('/api/public/invitations', {
       method: 'POST',
       headers: {
@@ -293,7 +271,6 @@ export default function CreatorMatchPage() {
         theme: campaign.theme,
         call_to_action: campaign.call_to_action,
         starts_on: campaign.starts_on,
-        brand_overview: brandProfile?.business_overview ?? null,
         duration_weeks: campaign.duration_weeks ?? null,
         budget_range: null,
         message: inviteMessage,
