@@ -106,6 +106,8 @@ function InviteModal({
   onSelectCampaign,
   budget,
   onBudgetChange,
+  customBudget,
+  onCustomBudgetChange,
   formats,
   onFormatsChange,
   message,
@@ -121,6 +123,8 @@ function InviteModal({
   onSelectCampaign: (campaignId: string) => void
   budget: string
   onBudgetChange: (budget: string) => void
+  customBudget: string
+  onCustomBudgetChange: (budget: string) => void
   formats: string[]
   onFormatsChange: (formats: string[]) => void
   message: string
@@ -154,8 +158,17 @@ function InviteModal({
           <option value="HK$8,000-15,000">HK$8,000-15,000</option>
           <option value="HK$15,000-30,000">HK$15,000-30,000</option>
           <option value="HK$30,000+">HK$30,000+</option>
-          <option value="面議">面議</option>
+          <option value="自訂">自訂</option>
         </select>
+
+        {budget === '自訂' && (
+          <input
+            value={customBudget}
+            onChange={(event) => onCustomBudgetChange(event.target.value)}
+            placeholder="輸入預算，例如 HK$5,000"
+            type="text"
+          />
+        )}
 
         <label>合作形式（可多選）</label>
         <div className="format-grid">
@@ -220,6 +233,7 @@ export default function CreatorMatchPage() {
   const [invitingKol, setInvitingKol] = useState<KOL | null>(null)
   const [inviteSelectedCampaign, setInviteSelectedCampaign] = useState('')
   const [inviteBudget, setInviteBudget] = useState('')
+  const [inviteCustomBudget, setInviteCustomBudget] = useState('')
   const [inviteFormats, setInviteFormats] = useState<string[]>([])
   const [inviteMessage, setInviteMessage] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
@@ -276,6 +290,7 @@ export default function CreatorMatchPage() {
     setInvitingKol(kol)
     setInviteSelectedCampaign('')
     setInviteBudget('')
+    setInviteCustomBudget('')
     setInviteFormats([])
     setInviteMessage('')
     setInviteError('')
@@ -285,6 +300,7 @@ export default function CreatorMatchPage() {
     setInvitingKol(null)
     setInviteSelectedCampaign('')
     setInviteBudget('')
+    setInviteCustomBudget('')
     setInviteFormats([])
     setInviteMessage('')
     setInviteError('')
@@ -318,7 +334,7 @@ export default function CreatorMatchPage() {
         call_to_action: campaign.call_to_action,
         starts_on: campaign.starts_on,
         duration_weeks: campaign.duration_weeks ?? null,
-        budget_range: inviteBudget || null,
+        budget_range: inviteBudget === '自訂' ? inviteCustomBudget : inviteBudget || null,
         collab_formats: inviteFormats.length > 0 ? inviteFormats : null,
         message: inviteMessage,
       }),
@@ -505,6 +521,8 @@ export default function CreatorMatchPage() {
           onSelectCampaign={setInviteSelectedCampaign}
           budget={inviteBudget}
           onBudgetChange={setInviteBudget}
+          customBudget={inviteCustomBudget}
+          onCustomBudgetChange={setInviteCustomBudget}
           formats={inviteFormats}
           onFormatsChange={setInviteFormats}
           message={inviteMessage}
@@ -894,6 +912,7 @@ const styles = `
 }
 
 .invite-modal select,
+.invite-modal input[type="text"],
 .invite-modal textarea {
   width: 100%;
   box-sizing: border-box;
@@ -908,6 +927,7 @@ const styles = `
 }
 
 .invite-modal select::placeholder,
+.invite-modal input[type="text"]::placeholder,
 .invite-modal textarea::placeholder {
   color: #9ca3af;
 }
