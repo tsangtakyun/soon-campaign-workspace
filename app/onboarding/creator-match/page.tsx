@@ -111,7 +111,7 @@ function InviteModal({
   onClose: () => void
   onSuccess: () => void
 }) {
-  const [selectedCampaign, setSelectedCampaign] = useState('')
+  const [selectedCampaign, setSelectedCampaign] = useState<string>('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -160,7 +160,13 @@ function InviteModal({
         <p>@{kol.username}</p>
 
         <label>選擇 Campaign</label>
-        <select value={selectedCampaign} onChange={(event) => setSelectedCampaign(event.target.value)}>
+        <select
+          value={selectedCampaign}
+          onChange={(event) => {
+            event.stopPropagation()
+            setSelectedCampaign(event.target.value)
+          }}
+        >
           <option value="">請選擇...</option>
           {campaigns.map((campaign) => (
             <option key={campaign.id} value={campaign.id}>
@@ -180,7 +186,12 @@ function InviteModal({
         {error && <div className="modal-error">{error}</div>}
 
         <div className="modal-actions">
-          <button onClick={handleSend} disabled={!selectedCampaign || loading} type="button">
+          <button
+            onClick={handleSend}
+            disabled={!selectedCampaign || loading}
+            className={!selectedCampaign || loading ? 'send-button disabled' : 'send-button enabled'}
+            type="button"
+          >
             {loading ? '發送中...' : '發送邀請'}
           </button>
           <button onClick={onClose} className="secondary" type="button">
@@ -836,14 +847,29 @@ const styles = `
 }
 
 .modal-actions button {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 12px;
-  background: #111827;
-  color: #ffffff;
   cursor: pointer;
   font-size: 14px;
   font-weight: 800;
   padding: 11px 14px;
+  transition: background .18s ease, color .18s ease, border-color .18s ease;
+}
+
+.modal-actions button.send-button.enabled {
+  border-color: #111827;
+  background: #ffffff;
+  color: #111827;
+}
+
+.modal-actions button.send-button.enabled:hover {
+  background: #f9fafb;
+}
+
+.modal-actions button.send-button.disabled {
+  border-color: #e5e7eb;
+  background: #e5e7eb;
+  color: #9ca3af;
 }
 
 .modal-actions button.secondary {

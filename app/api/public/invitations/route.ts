@@ -15,15 +15,31 @@ export async function POST(req: Request) {
 
   const body = await req.json()
 
-  const res = await fetch(`${baseUrl}/api/invitations/receive`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-soon-api-key': internalKey,
-    },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
+  try {
+    const res = await fetch(`${baseUrl}/api/invitations/receive`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-soon-api-key': internalKey,
+      },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => null)
 
-  return NextResponse.json(data, { status: res.status })
+    if (!res.ok) {
+      console.error('[public/invitations] SOON-EGG forward failed', {
+        status: res.status,
+        baseUrl,
+        error: data?.error,
+      })
+    }
+
+    return NextResponse.json(data ?? { error: 'Invalid SOON-EGG response' }, { status: res.status })
+  } catch (error) {
+    console.error('[public/invitations] SOON-EGG forward error', {
+      baseUrl,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return NextResponse.json({ error: 'Failed to forward invitation' }, { status: 500 })
+  }
 }
