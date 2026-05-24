@@ -62,5 +62,8 @@ export async function GET() {
     })
   )
 
-  return NextResponse.json({ perks: enriched })
+  return NextResponse.json(
+    { perks: enriched },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
 }
