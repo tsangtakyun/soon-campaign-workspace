@@ -52,6 +52,19 @@ function listToText(value: unknown) {
   return Array.isArray(value) ? value.join('\n') : ''
 }
 
+function normalizeCreatorUsername(value: string | null) {
+  const username = (value || '').trim().replace(/^@+/, '')
+
+  if (username.length % 2 === 0) {
+    const midpoint = username.length / 2
+    const firstHalf = username.slice(0, midpoint)
+    const secondHalf = username.slice(midpoint)
+    if (firstHalf && firstHalf === secondHalf) return firstHalf
+  }
+
+  return username
+}
+
 export default function ProjectBriefEditorPage() {
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
@@ -64,6 +77,9 @@ export default function ProjectBriefEditorPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [form, setForm] = useState<BriefForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+
+  const creatorUsername = normalizeCreatorUsername(searchParams.get('creator'))
+  const campaignId = searchParams.get('campaign_id') || ''
 
   useEffect(() => {
     let cancelled = false
@@ -86,8 +102,8 @@ export default function ProjectBriefEditorPage() {
       if (isNew) {
         setForm({
           ...emptyForm,
-          creator_username: searchParams.get('creator') || '',
-          campaign_id: searchParams.get('campaign_id') || '',
+          creator_username: creatorUsername,
+          campaign_id: campaignId,
         })
         return
       }
@@ -115,7 +131,7 @@ export default function ProjectBriefEditorPage() {
     return () => {
       cancelled = true
     }
-  }, [briefId, isNew, searchParams, supabase])
+  }, [briefId, isNew, creatorUsername, campaignId, supabase])
 
   function updateForm(field: keyof BriefForm, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -202,7 +218,7 @@ export default function ProjectBriefEditorPage() {
           </label>
           <label>
             KOL
-            <input value={form.creator_username} onChange={(event) => updateForm('creator_username', event.target.value)} />
+            <input value={form.creator_username} readOnly />
           </label>
           <label>
             背景介紹
