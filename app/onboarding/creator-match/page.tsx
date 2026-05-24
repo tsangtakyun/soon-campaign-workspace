@@ -256,11 +256,25 @@ export default function CreatorMatchPage() {
     setInviteError('')
 
     const supabase = createClient()
-    const { data: brandProfile } = await supabase
+    let { data: brandProfile } = await supabase
       .from('brand_profiles')
-      .select('business_overview')
+      .select('business_name, business_overview')
       .eq('workspace_id', campaign.workspace_id)
       .single()
+
+    if (!brandProfile?.business_overview && brandProfile?.business_name) {
+      const { data: fallback } = await supabase
+        .from('brand_profiles')
+        .select('business_overview')
+        .eq('business_name', brandProfile.business_name)
+        .not('business_overview', 'is', null)
+        .limit(1)
+        .single()
+
+      if (fallback?.business_overview) {
+        brandProfile = { ...brandProfile, business_overview: fallback.business_overview }
+      }
+    }
 
     const res = await fetch('/api/public/invitations', {
       method: 'POST',
