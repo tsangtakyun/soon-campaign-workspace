@@ -16,6 +16,9 @@ type PerkForm = {
   quota: number
   valid_until: string
   is_active: boolean
+  contact_name: string
+  contact_phone: string
+  contact_email: string
 }
 
 const initialForm: PerkForm = {
@@ -26,6 +29,9 @@ const initialForm: PerkForm = {
   quota: 10,
   valid_until: '',
   is_active: true,
+  contact_name: '',
+  contact_phone: '',
+  contact_email: '',
 }
 
 export default function NewPerkPage() {
@@ -66,6 +72,9 @@ function NewPerkForm() {
           quota: data.quota ?? 10,
           valid_until: data.valid_until || '',
           is_active: data.is_active ?? true,
+          contact_name: data.contact_name || '',
+          contact_phone: data.contact_phone || '',
+          contact_email: data.contact_email || '',
         })
       }
     }
@@ -92,6 +101,11 @@ function NewPerkForm() {
       return
     }
 
+    if (!form.contact_name.trim()) {
+      setError('請填寫聯絡人姓名。')
+      return
+    }
+
     setSaving(true)
     setError('')
 
@@ -104,6 +118,9 @@ function NewPerkForm() {
       quota: form.quota,
       valid_until: form.valid_until || null,
       is_active: form.is_active,
+      contact_name: form.contact_name.trim() || null,
+      contact_phone: form.contact_phone.trim() || null,
+      contact_email: form.contact_email.trim() || null,
     }
 
     const result = perkId
@@ -122,10 +139,10 @@ function NewPerkForm() {
 
   return (
     <main className="dashboard-page">
-      <DashboardSidebar activeItem="探索品牌" />
+      <DashboardSidebar activeItem="探索品牌優惠" />
       <section className="perk-form-main">
         <header>
-          <h1>{perkId ? '編輯 Perk' : '新增 Perk'}</h1>
+          <h1>{perkId ? '編輯優惠' : '新增優惠'}</h1>
           <p>建立免費服務或產品，讓 KOL 主動申請體驗。</p>
         </header>
 
@@ -188,7 +205,7 @@ function NewPerkForm() {
           <div className="toggle-row">
             <div>
               <strong>啟用</strong>
-              <span>啟用後會出現在 SOON-EGG 探索品牌頁</span>
+              <span>啟用後會出現在 SOON-EGG 探索品牌優惠頁</span>
             </div>
             <button
               className={form.is_active ? 'toggle active' : 'toggle'}
@@ -197,6 +214,36 @@ function NewPerkForm() {
             >
               <span />
             </button>
+          </div>
+
+          <div className="form-section">
+            <h3>聯絡人資料</h3>
+            <p className="hint">KOL 申請後，我們會通知你安排跟進</p>
+
+            <Field label="聯絡人姓名 *">
+              <input
+                value={form.contact_name}
+                onChange={(event) => updateForm('contact_name', event.target.value)}
+                placeholder="例如：市場部 Mary"
+              />
+            </Field>
+
+            <Field label="聯絡電話">
+              <input
+                value={form.contact_phone}
+                onChange={(event) => updateForm('contact_phone', event.target.value)}
+                placeholder="例如：9123 4567"
+              />
+            </Field>
+
+            <Field label="聯絡電郵">
+              <input
+                type="email"
+                value={form.contact_email}
+                onChange={(event) => updateForm('contact_email', event.target.value)}
+                placeholder="例如：marketing@brand.com"
+              />
+            </Field>
           </div>
 
           {error ? <p className="form-error">{error}</p> : null}
@@ -264,6 +311,24 @@ const styles = `
   padding: 24px;
 }
 
+.form-section {
+  border-top: 1px solid #eef0f3;
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.form-section h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.form-section .hint {
+  color: #7d8088;
+  font-size: 13px;
+  margin: -8px 0 0;
+}
+
 .type-options {
   display: grid;
   gap: 10px;
@@ -301,7 +366,12 @@ const styles = `
 }
 
 .field input,
-.field textarea {
+.field select,
+.field textarea,
+.perk-form-card input,
+.perk-form-card select,
+.perk-form-card textarea {
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   color: #111827;

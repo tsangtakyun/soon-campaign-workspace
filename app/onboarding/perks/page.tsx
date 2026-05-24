@@ -31,27 +31,27 @@ export default async function PerksPage() {
 
   return (
     <main className="dashboard-page">
-      <DashboardSidebar activeItem="探索品牌" />
+      <DashboardSidebar activeItem="探索品牌優惠" />
       <section className="perks-main">
         <header className="perks-header">
           <div>
-            <h1>探索品牌 Perks</h1>
+            <h1>探索品牌優惠</h1>
             <p>提供免費服務或產品，讓 KOL 主動了解你的品牌</p>
           </div>
           <Link className="primary-action" href="/onboarding/perks/new">
-            + 新增 Perk
+            + 新增優惠
           </Link>
         </header>
 
         <div className="perks-card">
           {!perks || perks.length === 0 ? (
             <div className="perks-empty">
-              未有 Perk，<Link href="/onboarding/perks/new">立即新增</Link>
+              未有優惠，<Link href="/onboarding/perks/new">立即新增</Link>
             </div>
           ) : (
             <>
               <div className="perks-row head">
-                <span>Perk</span>
+                <span>優惠</span>
                 <span>類型</span>
                 <span>名額</span>
                 <span>狀態</span>
@@ -60,7 +60,7 @@ export default async function PerksPage() {
               {(perks as BrandPerk[]).map((perk) => (
                 <div className="perks-row" key={perk.id}>
                   <div>
-                    <strong>{perk.title || '未命名 Perk'}</strong>
+                    <strong>{perk.title || '未命名優惠'}</strong>
                     {perk.valid_until ? <em>有效至 {perk.valid_until}</em> : null}
                   </div>
                   <span>{perk.type === 'service' ? '服務' : '產品'}</span>
