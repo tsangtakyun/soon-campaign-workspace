@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Package, Users } from 'lucide-react'
+import { Bell, Package, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import {
   clearActiveWorkspaceId,
@@ -48,6 +48,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
 
   const activeWorkspace =
@@ -135,6 +136,36 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     }
   }, [workspaceMenuOpen])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadUnreadNotifications() {
+      if (!activeWorkspaceId) {
+        setUnreadNotifications(0)
+        return
+      }
+
+      try {
+        const supabase = createClient()
+        const { count } = await supabase
+          .from('workspace_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', activeWorkspaceId)
+          .eq('is_read', false)
+
+        if (!cancelled) setUnreadNotifications(count ?? 0)
+      } catch {
+        if (!cancelled) setUnreadNotifications(0)
+      }
+    }
+
+    void loadUnreadNotifications()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeWorkspaceId])
+
   function switchWorkspace(workspaceId: string) {
     setActiveWorkspaceId(workspaceId)
     setActiveWorkspaceIdState(workspaceId)
@@ -211,6 +242,21 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
+        <Link
+          aria-current={pathname === '/onboarding/notifications' ? 'page' : undefined}
+          className={pathname === '/onboarding/notifications' ? 'active' : ''}
+          href="/onboarding/notifications"
+          onClick={(event) => {
+            event.preventDefault()
+            router.push('/onboarding/notifications')
+          }}
+        >
+          <span>
+            <Bell aria-hidden="true" size={16} strokeWidth={2} />
+          </span>
+          <strong>通知</strong>
+          {unreadNotifications > 0 ? <em className="notification-badge">{unreadNotifications}</em> : null}
+        </Link>
         {sidebarItems.map((item) => {
           const isActive = item.label === activeItem || pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
@@ -469,6 +515,19 @@ export const dashboardSidebarStyles = `
   .sidebar-nav em {
     color: #9b9ea6;
     font-style: normal;
+  }
+
+  .sidebar-nav em.notification-badge {
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    display: inline-grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 0 5px;
   }
 
   .sidebar-credit-card {
