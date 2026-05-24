@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { createAdminSupabase } from '@/lib/server-supabase'
 import { ClaimRow } from './ClaimRow'
 
@@ -42,41 +43,52 @@ export default async function PerkClaimsPage({ params }: { params: Promise<{ id:
   const typedClaims = (claims ?? []) as Claim[]
 
   return (
-    <main className="claims-main">
-      <header className="claims-header">
-        <Link href="/onboarding/perks">← 返回公關項目</Link>
-        <div>
-          <h1>{typedPerk?.title || '公關項目申請'}</h1>
-          <p>
-            {typedPerk?.type === 'service' ? '服務類' : '產品類'} · {typedClaims.length} 個申請
-          </p>
-        </div>
-      </header>
+    <main className="dashboard-page">
+      <DashboardSidebar activeItem="探索品牌" />
+      <section className="claims-main">
+        <header className="claims-header">
+          <Link href="/onboarding/perks">← 返回公關項目</Link>
+          <div>
+            <h1>{typedPerk?.title || '公關項目申請'}</h1>
+            <p>
+              {typedPerk?.type === 'service' ? '服務類' : '產品類'} · {typedClaims.length} 個申請
+            </p>
+          </div>
+        </header>
 
-      <div className="claims-card">
-        {typedClaims.length === 0 ? (
-          <div className="claims-empty">暫未有申請</div>
-        ) : (
-          <>
-            <div className="claims-row head">
-              <span>創作者</span>
-              <span>{typedPerk?.type === 'service' ? '預約詳情' : '寄送資料'}</span>
-              <span>申請時間</span>
-              <span>狀態</span>
-              <span>操作</span>
-            </div>
-            {typedClaims.map((claim) => (
-              <ClaimRow key={claim.id} claim={claim} perkType={typedPerk?.type || 'product'} />
-            ))}
-          </>
-        )}
-      </div>
-      <style dangerouslySetInnerHTML={{ __html: styles }} />
+        <div className="claims-card">
+          {typedClaims.length === 0 ? (
+            <div className="claims-empty">暫未有申請</div>
+          ) : (
+            <>
+              <div className="claims-row head">
+                <span>創作者</span>
+                <span>{typedPerk?.type === 'service' ? '預約詳情' : '寄送資料'}</span>
+                <span>申請時間</span>
+                <span>狀態</span>
+                <span>操作</span>
+              </div>
+              {typedClaims.map((claim) => (
+                <ClaimRow key={claim.id} claim={claim} perkType={typedPerk?.type || 'product'} />
+              ))}
+            </>
+          )}
+        </div>
+      </section>
+      <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
     </main>
   )
 }
 
 const styles = `
+.dashboard-page {
+  min-height: 100vh;
+  background: #f7f7f8;
+  color: #202126;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
 .claims-main { padding: 48px; background: #f7f7f8; min-height: 100vh; }
 .claims-header { margin-bottom: 24px; }
 .claims-header a { color: #6f737d; font-size: 13px; text-decoration: none; }
@@ -109,6 +121,7 @@ const styles = `
 .notes-editor textarea { border: 1px solid #e5e7eb; border-radius: 8px; font: inherit; font-size: 12px; padding: 8px; resize: vertical; }
 .notes-editor button { background: #111; border: 0; color: #fff; }
 @media (max-width: 900px) {
+  .dashboard-page { grid-template-columns: 1fr; }
   .claims-main { padding: 28px 18px; }
   .claims-row { grid-template-columns: 1fr; align-items: start; }
 }
