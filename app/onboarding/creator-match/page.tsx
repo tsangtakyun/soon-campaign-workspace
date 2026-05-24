@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
@@ -101,59 +101,26 @@ function PlatformBadge({ platform }: { platform: string }) {
 function InviteModal({
   kol,
   campaigns,
-  workspaceName,
+  selectedCampaign,
+  onSelectCampaign,
+  message,
+  onMessageChange,
+  loading,
+  error,
+  onSend,
   onClose,
-  onSuccess,
 }: {
   kol: KOL
   campaigns: Campaign[]
-  workspaceName: string
+  selectedCampaign: string
+  onSelectCampaign: (campaignId: string) => void
+  message: string
+  onMessageChange: (message: string) => void
+  loading: boolean
+  error: string
+  onSend: () => void
   onClose: () => void
-  onSuccess: () => void
 }) {
-  const campaignRef = useRef<HTMLSelectElement>(null)
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleSend() {
-    const campaignId = campaignRef.current?.value
-    const campaign = campaigns.find((item) => item.id === campaignId)
-    if (!campaign) return
-
-    setLoading(true)
-    setError('')
-
-    const res = await fetch('/api/public/invitations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...apiHeaders(),
-      },
-      body: JSON.stringify({
-        egg_creator_id: kol.id,
-        creator_username: kol.username,
-        cw_campaign_id: campaign.id,
-        cw_workspace_id: campaign.workspace_id,
-        campaign_name: campaign.name,
-        brand_name: campaign.workspaces?.name ?? workspaceName,
-        cover_image_url: campaign.cover_image_url,
-        theme: campaign.theme,
-        call_to_action: campaign.call_to_action,
-        starts_on: campaign.starts_on,
-        message,
-      }),
-    })
-    const data = await res.json().catch(() => null)
-
-    setLoading(false)
-    if (res.ok && data?.success) {
-      onSuccess()
-    } else {
-      setError(data?.error || '發送失敗，請重試')
-    }
-  }
-
   return (
     <div className="modal-backdrop">
       <div className="invite-modal">
@@ -161,10 +128,7 @@ function InviteModal({
         <p>@{kol.username}</p>
 
         <label>選擇 Campaign</label>
-        <select
-          ref={campaignRef}
-          defaultValue=""
-        >
+        <select value={selectedCampaign} onChange={(event) => onSelectCampaign(event.target.value)}>
           <option value="">請選擇...</option>
           {campaigns.map((campaign) => (
             <option key={campaign.id} value={campaign.id}>
@@ -176,7 +140,7 @@ function InviteModal({
         <label>邀請訊息（可選）</label>
         <textarea
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(event) => onMessageChange(event.target.value)}
           placeholder="向 KOL 說明合作詳情..."
           rows={3}
         />
@@ -185,10 +149,10 @@ function InviteModal({
 
         <div className="modal-actions">
           <button
-            onClick={handleSend}
-            disabled={loading}
+            onClick={onSend}
+            disabled={!selectedCampaign || loading}
             className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition ${
-              loading
+              !selectedCampaign || loading
                 ? 'cursor-not-allowed bg-gray-100 text-gray-400'
                 : 'cursor-pointer bg-black text-white hover:bg-gray-800'
             }`}
@@ -204,7 +168,6 @@ function InviteModal({
     </div>
   )
 }
-
 export default function CreatorMatchPage() {
   const [kols, setKols] = useState<KOL[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -215,6 +178,10 @@ export default function CreatorMatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [invitingKol, setInvitingKol] = useState<KOL | null>(null)
+  const [inviteSelectedCampaign, setInviteSelectedCampaign] = useState('')
+  const [inviteMessage, setInviteMessage] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
@@ -262,6 +229,61 @@ export default function CreatorMatchPage() {
     const filtered = campaigns.filter((campaign) => campaign.workspace_id === activeWorkspace.id)
     return filtered.length ? filtered : campaigns
   }, [activeWorkspace?.id, campaigns])
+
+  function openInviteModal(kol: KOL) {
+    setInvitingKol(kol)
+    setInviteSelectedCampaign('')
+    setInviteMessage('')
+    setInviteError('')
+  }
+
+  function closeInviteModal() {
+    setInvitingKol(null)
+    setInviteSelectedCampaign('')
+    setInviteMessage('')
+    setInviteError('')
+    setInviteLoading(false)
+  }
+
+  async function handleSendInvite() {
+    if (!inviteSelectedCampaign || !invitingKol) return
+
+    const campaign = workspaceCampaigns.find((item) => item.id === inviteSelectedCampaign)
+    if (!campaign) return
+
+    setInviteLoading(true)
+    setInviteError('')
+
+    const res = await fetch('/api/public/invitations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...apiHeaders(),
+      },
+      body: JSON.stringify({
+        egg_creator_id: invitingKol.id,
+        creator_username: invitingKol.username,
+        cw_campaign_id: campaign.id,
+        cw_workspace_id: campaign.workspace_id,
+        campaign_name: campaign.name,
+        brand_name: campaign.workspaces?.name ?? activeWorkspace?.name ?? 'SOON Campaign Workspace',
+        cover_image_url: campaign.cover_image_url,
+        theme: campaign.theme,
+        call_to_action: campaign.call_to_action,
+        starts_on: campaign.starts_on,
+        message: inviteMessage,
+      }),
+    })
+    const data = await res.json().catch(() => null)
+
+    setInviteLoading(false)
+    if (res.ok && data?.success) {
+      setSuccessMessage(`已向 ${invitingKol.display_name || invitingKol.username} 發送邀請。`)
+      closeInviteModal()
+    } else {
+      setInviteError(data?.error || '發送失敗，請重試')
+    }
+  }
 
   const categoryFilters = useMemo(() => {
     const categories = new Set<string>()
@@ -410,7 +432,7 @@ export default function CreatorMatchPage() {
                     <a href={`https://egg.sooncreator.network/${kol.username}/mediakit`} target="_blank" rel="noopener noreferrer">
                       查看 Media Kit
                     </a>
-                    <button onClick={() => setInvitingKol(kol)} disabled={workspaceCampaigns.length === 0} type="button">
+                    <button onClick={() => openInviteModal(kol)} disabled={workspaceCampaigns.length === 0} type="button">
                       發送邀請
                     </button>
                   </div>
@@ -430,12 +452,14 @@ export default function CreatorMatchPage() {
         <InviteModal
           kol={invitingKol}
           campaigns={workspaceCampaigns}
-          workspaceName={activeWorkspace?.name || 'SOON Campaign Workspace'}
-          onClose={() => setInvitingKol(null)}
-          onSuccess={() => {
-            setSuccessMessage(`已向 ${invitingKol.display_name || invitingKol.username} 發送邀請。`)
-            setInvitingKol(null)
-          }}
+          selectedCampaign={inviteSelectedCampaign}
+          onSelectCampaign={setInviteSelectedCampaign}
+          message={inviteMessage}
+          onMessageChange={setInviteMessage}
+          loading={inviteLoading}
+          error={inviteError}
+          onSend={handleSendInvite}
+          onClose={closeInviteModal}
         />
       )}
 
