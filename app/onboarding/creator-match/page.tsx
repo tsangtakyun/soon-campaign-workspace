@@ -189,7 +189,11 @@ function InviteModal({
           <button
             onClick={handleSend}
             disabled={!selectedCampaign || loading}
-            className={!selectedCampaign || loading ? 'send-button disabled' : 'send-button enabled'}
+            className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition ${
+              !selectedCampaign || loading
+                ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                : 'cursor-pointer bg-black text-white hover:bg-gray-800'
+            }`}
             type="button"
           >
             {loading ? '發送中...' : '發送邀請'}
@@ -880,7 +884,7 @@ const styles = `
 
 .modal-actions button:disabled {
   cursor: not-allowed;
-  opacity: .45;
+  opacity: 1;
 }
 
 @media (max-width: 1040px) {
