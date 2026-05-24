@@ -415,7 +415,7 @@ const styles = `
 .claims-header a { color: #6f737d; font-size: 13px; text-decoration: none; }
 .claims-header h1 { font-size: 28px; margin: 8px 0 4px; }
 .claims-header p { color: #6f737d; font-size: 14px; margin: 0; }
-.claims-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; overflow: hidden; }
+.claims-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; overflow: visible; }
 .claims-empty { padding: 48px; text-align: center; color: #9a9da4; }
 .claims-row { display: grid; grid-template-columns: 180px minmax(0, 1fr) 100px 100px 190px; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #f0f1f3; }
 .claims-row:last-child { border-bottom: 0; }
@@ -433,14 +433,45 @@ const styles = `
 .status-rejected { background: #f3f4f6; color: #6b7280; }
 .claim-actions { display: flex; gap: 6px; flex-wrap: wrap; position: relative; }
 .claim-actions button { border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+.status-select:disabled { opacity: 0.6; cursor: not-allowed !important; }
 .btn-confirm { background: #111; color: #fff; border: 0; }
 .btn-reject, .btn-notes { background: #fff; color: #6b7280; border: 1px solid #e5e7eb; }
 .btn-progress { background: #7c3aed; color: #fff; border: 0; }
 .btn-complete { background: #16a34a; color: #fff; border: 0; }
 .done-label { font-size: 12px; color: #9a9da4; }
-.notes-editor { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12); display: grid; gap: 8px; padding: 10px; position: absolute; right: 0; top: 34px; width: 220px; z-index: 20; }
-.notes-editor textarea { border: 1px solid #e5e7eb; border-radius: 8px; font: inherit; font-size: 12px; padding: 8px; resize: vertical; }
-.notes-editor button { background: #111; border: 0; color: #fff; }
+.notes-inline {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 0 4px;
+}
+.notes-inline textarea {
+  flex: 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  padding: 8px;
+  resize: vertical;
+  background: #fff;
+  color: #111;
+}
+.notes-inline button {
+  background: #111;
+  border: 0;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.notes-inline button:last-child {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #6b7280;
+}
 @media (max-width: 900px) {
   .dashboard-page { grid-template-columns: 1fr; }
   .claims-main { padding: 28px 18px; }

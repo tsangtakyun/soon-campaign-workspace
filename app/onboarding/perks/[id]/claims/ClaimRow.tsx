@@ -21,6 +21,14 @@ type Claim = {
 
 type PerkType = 'service' | 'product'
 
+const statusOptions = [
+  { value: 'pending', label: '待處理' },
+  { value: 'confirmed', label: '已確認' },
+  { value: 'in_progress', label: '進行中' },
+  { value: 'completed', label: '已完成' },
+  { value: 'rejected', label: '已婉拒' },
+]
+
 const statusLabels: Record<string, { label: string; className: string }> = {
   pending: { label: '待處理', className: 'status-pending' },
   confirmed: { label: '已確認', className: 'status-confirmed' },
@@ -50,8 +58,13 @@ export function ClaimRow({ claim, perkType }: { claim: Claim; perkType: PerkType
     })
     const data = await res.json().catch(() => null)
     if (data?.success) setStatus(newStatus)
-    else alert(data?.error || '更新失敗，請重試')
+    else alert(data?.error || '更新失敗，請稍後再試')
     setLoading(false)
+  }
+
+  async function saveNotes() {
+    await updateStatus(status)
+    setShowNotes(false)
   }
 
   const badge = statusLabels[status] ?? statusLabels.pending
@@ -60,7 +73,7 @@ export function ClaimRow({ claim, perkType }: { claim: Claim; perkType: PerkType
   return (
     <div className="claims-row">
       <div>
-        <strong>{claim.egg_creator_username || '未命名創作者'}</strong>
+        <strong>{claim.egg_creator_username || '未知創作者'}</strong>
         {claim.egg_creator_username ? (
           <a href={`https://egg.sooncreator.network/${claim.egg_creator_username}/mediakit`} target="_blank" className="mediakit-link">
             Media Kit ↗
@@ -89,41 +102,43 @@ export function ClaimRow({ claim, perkType }: { claim: Claim; perkType: PerkType
       <span className={`status-badge ${badge.className}`}>{badge.label}</span>
 
       <div className="claim-actions">
-        {status === 'pending' ? (
-          <>
-            <button onClick={() => updateStatus('confirmed')} disabled={loading} className="btn-confirm" type="button">
-              確認
-            </button>
-            <button onClick={() => updateStatus('rejected')} disabled={loading} className="btn-reject" type="button">
-              婉拒
-            </button>
-          </>
-        ) : null}
-        {status === 'confirmed' ? (
-          <button onClick={() => updateStatus('in_progress')} disabled={loading} className="btn-progress" type="button">
-            {perkType === 'service' ? '標記進行中' : '已寄出'}
-          </button>
-        ) : null}
-        {status === 'in_progress' ? (
-          <button onClick={() => updateStatus('completed')} disabled={loading} className="btn-complete" type="button">
-            標記完成
-          </button>
-        ) : null}
-        {status === 'completed' || status === 'rejected' ? (
-          <span className="done-label">{status === 'completed' ? '✓ 完成' : '✗ 已婉拒'}</span>
-        ) : null}
+        <select
+          value={status}
+          onChange={(event) => updateStatus(event.target.value)}
+          disabled={loading}
+          className="status-select"
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            padding: '6px 10px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            color: '#111',
+          }}
+        >
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <button className="btn-notes" onClick={() => setShowNotes((current) => !current)} type="button">
           備注
         </button>
-        {showNotes ? (
-          <div className="notes-editor">
-            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="內部備注" rows={2} />
-            <button onClick={() => updateStatus(status)} disabled={loading} type="button">
-              儲存
-            </button>
-          </div>
-        ) : null}
       </div>
+
+      {showNotes ? (
+        <div className="notes-inline">
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="內部備注..." rows={3} />
+          <button onClick={saveNotes} disabled={loading} type="button">
+            儲存備注
+          </button>
+          <button onClick={() => setShowNotes(false)} type="button">
+            關閉
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
