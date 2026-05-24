@@ -54,11 +54,12 @@ export default async function PublicRelationsPage() {
                 <span>公關項目</span>
                 <span>類型</span>
                 <span>名額</span>
+                <span>申請人數</span>
                 <span>狀態</span>
                 <span />
               </div>
               {(perks as BrandPrProject[]).map((perk) => (
-                <div className="perks-row" key={perk.id}>
+                <Link className="perks-row" href={`/onboarding/perks/${perk.id}/claims`} key={perk.id}>
                   <div>
                     <strong>{perk.title || '未命名公關項目'}</strong>
                     {perk.valid_until ? <em>有效至 {perk.valid_until}</em> : null}
@@ -67,17 +68,16 @@ export default async function PublicRelationsPage() {
                   <span>
                     {claimCounts[perk.id] ?? 0} / {perk.quota ?? 0}
                   </span>
+                  <span>{claimCounts[perk.id] ?? 0} 人申請</span>
                   <span>
                     <em className={`status ${perk.is_active ? 'active' : 'paused'}`}>
                       {perk.is_active ? '進行中' : '已停用'}
                     </em>
                   </span>
                   <div className="perks-actions">
-                    <Link href={`/onboarding/perks/new?id=${perk.id}`}>
-                      編輯
-                    </Link>
+                    <span>查看申請</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </>
           )}
@@ -399,8 +399,9 @@ const styles = `
   border-bottom: 1px solid #f0f1f3;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1fr) 100px 100px 100px 100px;
+  grid-template-columns: minmax(0, 1fr) 90px 90px 110px 100px 110px;
   padding: 16px 20px;
+  text-decoration: none;
 }
 
 .perks-row:last-child {
@@ -458,10 +459,15 @@ const styles = `
   justify-content: flex-end;
 }
 
-.perks-actions a {
+.perks-actions span {
   background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
   border-color: #e5e7eb;
   color: #202126;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
   padding: 7px 10px;
 }
 
