@@ -14,9 +14,17 @@ type WorkspaceNotification = {
   body: string | null
   meta: {
     campaign_id?: string | null
+    campaign_name?: string | null
     status?: string | null
     creator_username?: string | null
+    creator_display_name?: string | null
     creator_mediakit_url?: string | null
+    creator_ig_followers?: number | null
+    brief_title?: string | null
+    brand_name?: string | null
+    first_submission_date?: string | null
+    final_submission_date?: string | null
+    notes?: string | null
   } | null
   is_read: boolean | null
   created_at: string | null
@@ -93,34 +101,68 @@ export default function NotificationsPage() {
           ) : notifications.length === 0 ? (
             <div className="notifications-empty">暫時未有通知。</div>
           ) : (
-            notifications.map((notification) => (
-              <button
-                className={`notification-row ${notification.is_read ? 'read' : ''}`}
-                key={notification.id}
-                onClick={() => void openNotification(notification)}
-                type="button"
-              >
-                <span className="notification-dot" />
-                <span className="notification-content">
-                  <strong>{notification.title || '新通知'}</strong>
-                  {notification.body ? <em>{notification.body}</em> : null}
-                  {notification.created_at ? (
-                    <small>{new Date(notification.created_at).toLocaleString('zh-HK')}</small>
+            notifications.map((notification) => {
+              const isDealConfirmed = notification.type === 'deal_confirmed'
+
+              return (
+                <button
+                  className={`notification-row ${notification.is_read ? 'read' : ''} ${
+                    isDealConfirmed ? 'deal-confirmed' : ''
+                  }`}
+                  key={notification.id}
+                  onClick={() => void openNotification(notification)}
+                  type="button"
+                >
+                  <span className="notification-dot">{isDealConfirmed ? '✓' : ''}</span>
+                  <span className="notification-content">
+                    <strong>{notification.title || '新通知'}</strong>
+                    {notification.body ? <em>{notification.body}</em> : null}
+                    {isDealConfirmed ? (
+                      <span className="deal-confirmed-details">
+                        {notification.meta?.creator_display_name || notification.meta?.creator_username ? (
+                          <span>
+                            KOL：{notification.meta.creator_display_name || notification.meta.creator_username}
+                            {notification.meta.creator_ig_followers
+                              ? ` · ${notification.meta.creator_ig_followers.toLocaleString()} followers`
+                              : ''}
+                          </span>
+                        ) : null}
+                        {notification.meta?.first_submission_date ? (
+                          <span>首次交稿：{notification.meta.first_submission_date}</span>
+                        ) : null}
+                        {notification.meta?.final_submission_date ? (
+                          <span>最終交稿：{notification.meta.final_submission_date}</span>
+                        ) : null}
+                        {notification.meta?.notes ? <span>備注：{notification.meta.notes}</span> : null}
+                      </span>
+                    ) : null}
+                    {notification.created_at ? (
+                      <small>{new Date(notification.created_at).toLocaleString('zh-HK')}</small>
+                    ) : null}
+                  </span>
+                  {notification.meta?.status === 'accepted' ? (
+                    <a
+                      className="notification-link"
+                      href={`/onboarding/project-briefs/new?creator=${encodeURIComponent(
+                        notification.meta.creator_username || ''
+                      )}&campaign_id=${encodeURIComponent(notification.meta.campaign_id || '')}`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      發送 Project Brief
+                    </a>
                   ) : null}
-                </span>
-                {notification.meta?.status === 'accepted' ? (
-                  <a
-                    className="notification-link"
-                    href={`/onboarding/project-briefs/new?creator=${encodeURIComponent(
-                      notification.meta.creator_username || ''
-                    )}&campaign_id=${encodeURIComponent(notification.meta.campaign_id || '')}`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    發送 Project Brief
-                  </a>
-                ) : null}
-              </button>
-            ))
+                  {isDealConfirmed ? (
+                    <button
+                      className="notification-link invoice"
+                      onClick={(event) => event.stopPropagation()}
+                      type="button"
+                    >
+                      發送 Invoice
+                    </button>
+                  ) : null}
+                </button>
+              )
+            })
           )}
         </div>
       </section>
@@ -201,6 +243,10 @@ const styles = `
   height: 8px;
   border-radius: 999px;
   background: #2563eb;
+  color: #ffffff;
+  display: grid;
+  font-size: 7px;
+  place-items: center;
 }
 
 .notification-row.read .notification-dot {
@@ -228,6 +274,18 @@ const styles = `
   font-size: 12px;
 }
 
+.deal-confirmed-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 4px;
+}
+
+.deal-confirmed-details span {
+  color: #4b5563;
+  font-size: 12px;
+}
+
 .notification-link {
   border: 1px solid #e5e7eb;
   border-radius: 999px;
@@ -236,6 +294,12 @@ const styles = `
   font-weight: 600;
   padding: 8px 12px;
   text-decoration: none;
+}
+
+.notification-link.invoice {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
 }
 
 @media (max-width: 900px) {
