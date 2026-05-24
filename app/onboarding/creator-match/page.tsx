@@ -47,6 +47,7 @@ type Campaign = {
 
 const platformFilters = ['全部', 'Instagram', 'YouTube', 'TikTok', '小紅書'] as const
 const followerFilters = ['全部', '1K 以下', '1K-10K', '10K-100K', '100K+'] as const
+const collabFormatOptions = ['IG 貼文', 'IG Story', 'IG Reel', 'YouTube 影片', 'TikTok', '硬照拍攝', '小紅書', '其他']
 
 function apiHeaders() {
   const key = process.env.NEXT_PUBLIC_SOON_INTERNAL_API_KEY
@@ -103,6 +104,10 @@ function InviteModal({
   campaigns,
   selectedCampaign,
   onSelectCampaign,
+  budget,
+  onBudgetChange,
+  formats,
+  onFormatsChange,
   message,
   onMessageChange,
   loading,
@@ -114,6 +119,10 @@ function InviteModal({
   campaigns: Campaign[]
   selectedCampaign: string
   onSelectCampaign: (campaignId: string) => void
+  budget: string
+  onBudgetChange: (budget: string) => void
+  formats: string[]
+  onFormatsChange: (formats: string[]) => void
   message: string
   onMessageChange: (message: string) => void
   loading: boolean
@@ -136,6 +145,37 @@ function InviteModal({
             </option>
           ))}
         </select>
+
+        <label>預算範圍</label>
+        <select value={budget} onChange={(event) => onBudgetChange(event.target.value)}>
+          <option value="">請選擇...</option>
+          <option value="HK$1,000-3,000">HK$1,000-3,000</option>
+          <option value="HK$3,000-8,000">HK$3,000-8,000</option>
+          <option value="HK$8,000-15,000">HK$8,000-15,000</option>
+          <option value="HK$15,000-30,000">HK$15,000-30,000</option>
+          <option value="HK$30,000+">HK$30,000+</option>
+          <option value="面議">面議</option>
+        </select>
+
+        <label>合作形式（可多選）</label>
+        <div className="format-grid">
+          {collabFormatOptions.map((format) => (
+            <label className="format-option" key={format}>
+              <input
+                checked={formats.includes(format)}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    onFormatsChange([...formats, format])
+                  } else {
+                    onFormatsChange(formats.filter((item) => item !== format))
+                  }
+                }}
+                type="checkbox"
+              />
+              {format}
+            </label>
+          ))}
+        </div>
 
         <label>邀請訊息（可選）</label>
         <textarea
@@ -179,6 +219,8 @@ export default function CreatorMatchPage() {
   const [error, setError] = useState('')
   const [invitingKol, setInvitingKol] = useState<KOL | null>(null)
   const [inviteSelectedCampaign, setInviteSelectedCampaign] = useState('')
+  const [inviteBudget, setInviteBudget] = useState('')
+  const [inviteFormats, setInviteFormats] = useState<string[]>([])
   const [inviteMessage, setInviteMessage] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError] = useState('')
@@ -233,6 +275,8 @@ export default function CreatorMatchPage() {
   function openInviteModal(kol: KOL) {
     setInvitingKol(kol)
     setInviteSelectedCampaign('')
+    setInviteBudget('')
+    setInviteFormats([])
     setInviteMessage('')
     setInviteError('')
   }
@@ -240,6 +284,8 @@ export default function CreatorMatchPage() {
   function closeInviteModal() {
     setInvitingKol(null)
     setInviteSelectedCampaign('')
+    setInviteBudget('')
+    setInviteFormats([])
     setInviteMessage('')
     setInviteError('')
     setInviteLoading(false)
@@ -272,7 +318,8 @@ export default function CreatorMatchPage() {
         call_to_action: campaign.call_to_action,
         starts_on: campaign.starts_on,
         duration_weeks: campaign.duration_weeks ?? null,
-        budget_range: null,
+        budget_range: inviteBudget || null,
+        collab_formats: inviteFormats.length > 0 ? inviteFormats : null,
         message: inviteMessage,
       }),
     })
@@ -456,6 +503,10 @@ export default function CreatorMatchPage() {
           campaigns={workspaceCampaigns}
           selectedCampaign={inviteSelectedCampaign}
           onSelectCampaign={setInviteSelectedCampaign}
+          budget={inviteBudget}
+          onBudgetChange={setInviteBudget}
+          formats={inviteFormats}
+          onFormatsChange={setInviteFormats}
           message={inviteMessage}
           onMessageChange={setInviteMessage}
           loading={inviteLoading}
@@ -863,6 +914,29 @@ const styles = `
 
 .invite-modal textarea {
   resize: none;
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.invite-modal .format-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #111827;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.format-option input {
+  width: auto;
+  margin: 0;
 }
 
 .modal-error {

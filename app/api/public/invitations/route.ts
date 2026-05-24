@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   const supabase = createAdminSupabase()
   const workspaceId = typeof body.cw_workspace_id === 'string' ? body.cw_workspace_id : null
   let brandOverview: string | null = null
+  let brandWebsite: string | null = null
 
   if (workspaceId) {
     let { data: brandProfile } = await supabase
@@ -52,11 +53,24 @@ export async function POST(req: Request) {
     }
 
     brandOverview = brandProfile?.business_overview ?? null
+
+    const { data: brandKit } = await supabase
+      .from('brand_kits')
+      .select('website_url')
+      .eq('workspace_id', workspaceId)
+      .not('website_url', 'is', null)
+      .limit(1)
+      .single()
+
+    brandWebsite = brandKit?.website_url ?? null
   }
 
   const forwardedBody = {
     ...body,
     brand_overview: brandOverview,
+    brand_website: brandWebsite,
+    budget_range: body.budget_range ?? null,
+    collab_formats: body.collab_formats ?? null,
   }
 
   let eggRes: Response
