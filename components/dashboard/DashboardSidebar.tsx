@@ -189,12 +189,48 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           aria-expanded={workspaceMenuOpen}
           className="workspace-switcher"
           onClick={() => setWorkspaceMenuOpen((open) => !open)}
+          style={{
+            alignItems: 'center',
+            appearance: 'none',
+            background: 'transparent',
+            border: 0,
+            color: '#202126',
+            cursor: 'pointer',
+            display: 'grid',
+            font: 'inherit',
+            gap: 10,
+            gridTemplateColumns: '28px minmax(0, 1fr) auto',
+            padding: '8px 6px 4px',
+            textAlign: 'left',
+            width: '100%',
+          }}
           type="button"
         >
-          <div className="workspace-mark">{workspaceInitial(activeWorkspaceLabel)}</div>
+          <div
+            className="workspace-mark"
+            style={{
+              alignItems: 'center',
+              background: '#ffd946',
+              borderRadius: 7,
+              color: '#111111',
+              display: 'grid',
+              flex: '0 0 auto',
+              fontSize: 13,
+              fontWeight: 800,
+              height: 24,
+              justifyItems: 'center',
+              placeItems: 'center',
+              width: 24,
+            }}
+          >
+            {workspaceInitial(activeWorkspaceLabel)}
+          </div>
           <strong
             style={{
+              color: '#202126',
               display: 'block',
+              fontSize: 14,
+              fontWeight: 550,
               minWidth: 0,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -203,7 +239,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           >
             {activeWorkspaceLabel}
           </strong>
-          <span>⌄</span>
+          <span style={{ color: '#9a9da4' }}>⌄</span>
         </button>
 
         {workspaceMenuOpen ? (
