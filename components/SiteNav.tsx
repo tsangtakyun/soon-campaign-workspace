@@ -54,6 +54,9 @@ export default function SiteNav() {
           <Link href="/contact" className="nav-secondary">
             聯絡我們
           </Link>
+          <a href="https://egg.sooncreator.network" target="_blank" rel="noopener noreferrer" className="nav-kol-entry">
+            創作者加入 →
+          </a>
           <Link href="/signup" className="nav-primary">
             開始試用
           </Link>
@@ -124,6 +127,7 @@ export default function SiteNav() {
             }
 
             .nav-secondary,
+            .nav-kol-entry,
             .nav-primary {
               text-decoration: none;
               border-radius: 6px;
@@ -138,6 +142,17 @@ export default function SiteNav() {
               color: #ffffff;
               border: 1px solid rgba(255, 255, 255, 0.82);
               background: transparent;
+            }
+
+            .nav-kol-entry {
+              color: #d1d5db;
+              border: 1px solid #4b5563;
+              background: transparent;
+            }
+
+            .nav-kol-entry:hover {
+              color: #ffffff;
+              border-color: #9ca3af;
             }
 
             .nav-primary {
@@ -163,6 +178,7 @@ export default function SiteNav() {
               }
 
               .nav-secondary,
+              .nav-kol-entry,
               .nav-primary {
                 flex: 1;
                 text-align: center;
