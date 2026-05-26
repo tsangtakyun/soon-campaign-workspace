@@ -267,7 +267,7 @@ export default function HomePage() {
 
       <section className="pricing-preview">
         <h2>簡單透明的定價</h2>
-        <p>品牌按需付費，創作者永遠免費。</p>
+        <p>品牌按需付費，創作者免費入台</p>
         <div className="pricing-preview__grid">
           {pricingPreview.map((plan) => (
             <article className={plan.highlight ? 'mini-plan mini-plan--highlight' : 'mini-plan'} key={plan.name}>

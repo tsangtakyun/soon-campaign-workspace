@@ -145,14 +145,15 @@ export default function SiteNav() {
             }
 
             .nav-kol-entry {
-              color: #d1d5db;
-              border: 1px solid #4b5563;
-              background: transparent;
+              color: #000000;
+              border: 0;
+              background: #facc15;
+              font-weight: 500;
             }
 
             .nav-kol-entry:hover {
-              color: #ffffff;
-              border-color: #9ca3af;
+              color: #000000;
+              background: #fde047;
             }
 
             .nav-primary {

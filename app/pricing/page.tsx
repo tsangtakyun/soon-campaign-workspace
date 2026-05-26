@@ -72,7 +72,7 @@ const faqs = [
   },
   {
     question: 'KOL 申請合作需要付費嗎？',
-    answer: '創作者使用 SOON 平台永遠免費。品牌發布 Campaign 並接收 KOL 申請，按品牌計劃收費。',
+    answer: '創作者可免費加入 SOON 平台；創作工具按需付費。品牌發布 Campaign 並接收 KOL 申請，按品牌計劃收費。',
   },
   {
     question: '年付方案如何計算？',
@@ -222,7 +222,7 @@ export default function PricingPage() {
       <section className="hero-section">
         <p className="eyebrow">SOON · 定價方案</p>
         <h1>簡單透明的定價</h1>
-        <p>品牌按需付費，創作者永遠免費。</p>
+        <p>品牌按需付費，創作者免費入台</p>
 
         <div className="billing-toggle" aria-label="付款週期">
           <button className={billing === 'monthly' ? 'active' : ''} onClick={() => setBilling('monthly')} type="button">
@@ -277,8 +277,8 @@ export default function PricingPage() {
       <section className="kol-section">
         <div className="kol-card">
           <p className="gold-label">創作者方案</p>
-          <h2>創作者永遠免費</h2>
-          <p>無需付費，主動發現品牌合作機會。真實興趣，帶來真實內容。</p>
+          <h2>創作者免費加入</h2>
+          <p>免費入台，主動發現品牌合作機會。新用戶獲贈 300 Credits 立即使用創作工具。</p>
           <div className="kol-features">
             {kolFeatures.map((feature) => (
               <span key={feature}>
@@ -287,7 +287,7 @@ export default function PricingPage() {
               </span>
             ))}
           </div>
-          <Link className="creator-cta" href="#">
+          <Link className="creator-cta" href="https://egg.sooncreator.network" target="_blank">
             以創作者身份加入
           </Link>
         </div>
