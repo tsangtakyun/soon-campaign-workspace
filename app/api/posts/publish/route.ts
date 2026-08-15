@@ -5,7 +5,7 @@ import { appUrl, assertWorkspaceAccess, isUuid } from '@/lib/oauth-connections'
 import { publishPostToConnectedPlatforms, shouldPublishNow } from '@/lib/post-publishing'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function POST(req: Request) {
   const baseUrl = appUrl(req)

@@ -13,6 +13,7 @@ export type PublishResult = {
 
 type CampaignPost = {
   body: string | null
+  captions?: Record<string, unknown> | null
   id: string
   image_url: string | null
   scheduled_at: string | null
@@ -74,6 +75,23 @@ function absoluteUrl(value: string, baseUrl: string) {
   return new URL(value, baseUrl).toString()
 }
 
+function mediaUrlFromAsset(asset: unknown) {
+  if (typeof asset === 'string') return asset
+  if (!asset || typeof asset !== 'object' || Array.isArray(asset)) return ''
+
+  const item = asset as Record<string, unknown>
+  const value = item.url || item.image_url || item.src || item.imageUrl
+  return typeof value === 'string' ? value : ''
+}
+
+function imageUrlsForPost(post: CampaignPost, baseUrl: string) {
+  const assets = Array.isArray(post.captions?.assets) ? post.captions.assets : []
+  const assetUrls = assets.map(mediaUrlFromAsset).filter(Boolean)
+  const urls = assetUrls.length ? assetUrls : post.image_url ? [post.image_url] : []
+
+  return Array.from(new Set(urls.map((url) => absoluteUrl(url, baseUrl)))).slice(0, 10)
+}
+
 function instagramGraphOrigin(connection: SocialConnection) {
   return connection.page_id ? 'https://graph.facebook.com/v18.0' : 'https://graph.instagram.com/v18.0'
 }
@@ -104,6 +122,43 @@ async function readGraphJson(res: Response) {
     throw new Error(message)
   }
   return json as Record<string, unknown>
+}
+
+async function createInstagramContainer({
+  accountId,
+  graphOrigin,
+  params,
+}: {
+  accountId: string
+  graphOrigin: string
+  params: URLSearchParams
+}) {
+  const container = await readGraphJson(
+    await fetch(`${graphOrigin}/${accountId}/media`, {
+      body: params,
+      method: 'POST',
+    })
+  )
+  const creationId = typeof container.id === 'string' ? container.id : ''
+  if (!creationId) throw new Error('Instagram media container 建立失敗。')
+  return creationId
+}
+
+async function waitForInstagramContainer(graphOrigin: string, creationId: string, accessToken: string) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const statusUrl = new URL(`${graphOrigin}/${creationId}`)
+    statusUrl.searchParams.set('fields', 'status_code')
+    statusUrl.searchParams.set('access_token', accessToken)
+
+    const status = await readGraphJson(await fetch(statusUrl.toString()))
+    const statusCode = typeof status.status_code === 'string' ? status.status_code : ''
+    if (statusCode === 'FINISHED') return
+    if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+      throw new Error(`Instagram media container 狀態異常：${statusCode}`)
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+  }
 }
 
 async function fetchFacebookPageCredentials(connection: SocialConnection) {
@@ -184,14 +239,14 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
   if (!connection.account_id || !tokens.length) {
     throw new Error('請重新連接你的 Instagram 帳戶')
   }
-  if (!post.image_url) throw new Error('Instagram 發布需要圖片。')
+  const imageUrls = imageUrlsForPost(post, baseUrl)
+  if (!imageUrls.length) throw new Error('Instagram 發布需要圖片。')
 
   // Instagram publishing requires Meta approval for the Instagram Business publishing permission.
   if (process.env.INSTAGRAM_PUBLISHING_ENABLED !== 'true') {
     throw new Error('Instagram 自動發布需要 Meta App Review 批准 instagram_business_content_publish 後重新連接。')
   }
 
-  const imageUrl = absoluteUrl(post.image_url, baseUrl)
   const caption = post.body || post.title || ''
   const errors: string[] = []
   const graphOrigin = instagramGraphOrigin(connection)
@@ -200,22 +255,30 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
     try {
       console.log('[posts/publish] Instagram publish token attempt:', {
         accountId: connection.account_id,
+        mediaCount: imageUrls.length,
         token_source: label,
         token_preview: tokenPreview(token),
       })
 
-      const container = await readGraphJson(
-        await fetch(`${graphOrigin}/${connection.account_id}/media`, {
-          body: new URLSearchParams({
-            access_token: token,
-            caption,
-            image_url: imageUrl,
-          }),
-          method: 'POST',
-        })
-      )
-      const creationId = typeof container.id === 'string' ? container.id : ''
-      if (!creationId) throw new Error('Instagram media container 建立失敗。')
+      const creationId =
+        imageUrls.length > 1
+          ? await createInstagramCarouselContainer({
+              accountId: connection.account_id,
+              caption,
+              graphOrigin,
+              imageUrls,
+              token,
+            })
+          : await createInstagramContainer({
+              accountId: connection.account_id,
+              graphOrigin,
+              params: new URLSearchParams({
+                access_token: token,
+                caption,
+                image_url: imageUrls[0],
+              }),
+            })
+      await waitForInstagramContainer(graphOrigin, creationId, token)
 
       const published = await readGraphJson(
         await fetch(`${graphOrigin}/${connection.account_id}/media_publish`, {
@@ -239,6 +302,47 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
   }
 
   throw new Error(`Instagram 發布失敗。${errors.join(' | ')}`)
+}
+
+async function createInstagramCarouselContainer({
+  accountId,
+  caption,
+  graphOrigin,
+  imageUrls,
+  token,
+}: {
+  accountId: string
+  caption: string
+  graphOrigin: string
+  imageUrls: string[]
+  token: string
+}) {
+  const childIds: string[] = []
+
+  for (const imageUrl of imageUrls) {
+    const childId = await createInstagramContainer({
+      accountId,
+      graphOrigin,
+      params: new URLSearchParams({
+        access_token: token,
+        image_url: imageUrl,
+        is_carousel_item: 'true',
+      }),
+    })
+    await waitForInstagramContainer(graphOrigin, childId, token)
+    childIds.push(childId)
+  }
+
+  return createInstagramContainer({
+    accountId,
+    graphOrigin,
+    params: new URLSearchParams({
+      access_token: token,
+      caption,
+      children: childIds.join(','),
+      media_type: 'CAROUSEL',
+    }),
+  })
 }
 
 async function publishToFacebook(post: CampaignPost, connection: SocialConnection, baseUrl: string) {

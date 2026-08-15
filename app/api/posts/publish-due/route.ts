@@ -45,7 +45,7 @@ async function handlePublishDue(req: Request) {
 
     const { data: posts, error } = await supabase
       .from('campaign_posts')
-      .select('id,user_id,title,body,image_url,scheduled_at,workspace_id')
+      .select('id,user_id,title,body,image_url,scheduled_at,workspace_id,captions')
       .in('status', ['approved', 'scheduled'])
       .lte('scheduled_at', now)
       .in('workspace_id', workspaceIds)
