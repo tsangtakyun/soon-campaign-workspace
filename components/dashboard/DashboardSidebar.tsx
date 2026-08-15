@@ -539,4 +539,77 @@ export const dashboardSidebarStyles = `
     border-top: 1px solid #e2e3e6;
     padding-top: 12px;
   }
+
+  @media (max-width: 980px) {
+    .sidebar {
+      min-height: auto;
+      border-bottom: 1px solid #e1e3e8;
+      border-right: 0;
+      display: block;
+      overflow: visible;
+      padding: 10px 12px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+
+    .workspace-switcher-wrap {
+      border-bottom: 0;
+      padding-bottom: 8px;
+    }
+
+    .workspace-switcher {
+      background: #ffffff;
+      border: 1px solid #dedfe3;
+      border-radius: 12px;
+      min-height: 44px;
+      padding: 7px 10px;
+    }
+
+    .workspace-menu {
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+    }
+
+    .sidebar-nav {
+      display: flex;
+      gap: 8px;
+      margin: 0 -12px;
+      overflow-x: auto;
+      padding: 0 12px 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+      display: none;
+    }
+
+    .sidebar-nav a {
+      background: #ffffff;
+      border: 1px solid #e2e4e8;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      grid-template-columns: auto auto;
+      min-height: 36px;
+      padding: 0 12px;
+    }
+
+    .sidebar-nav a.active {
+      background: #111111;
+      border-color: #111111;
+      color: #ffffff;
+    }
+
+    .sidebar-nav a em {
+      display: none;
+    }
+
+    .sidebar-credit-card,
+    .sidebar-group,
+    .sidebar-footer {
+      display: none;
+    }
+  }
 `
