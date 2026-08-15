@@ -37,6 +37,46 @@ function metricValue(value: unknown) {
   }, 0)
 }
 
+function rowMetricValue(row: Record<string, unknown>) {
+  const totalValue = row.total_value
+  if (totalValue && typeof totalValue === 'object' && !Array.isArray(totalValue)) {
+    const value = (totalValue as { value?: unknown }).value
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+
+  return metricValue(row.values)
+}
+
+function followMetricValue(row: Record<string, unknown>) {
+  const totalValue = row.total_value
+  if (!totalValue || typeof totalValue !== 'object' || Array.isArray(totalValue)) {
+    return rowMetricValue(row)
+  }
+
+  const breakdowns = (totalValue as { breakdowns?: unknown }).breakdowns
+  if (!Array.isArray(breakdowns)) return rowMetricValue(row)
+
+  for (const breakdown of breakdowns) {
+    if (!breakdown || typeof breakdown !== 'object') continue
+    const results = (breakdown as { results?: unknown }).results
+    if (!Array.isArray(results)) continue
+
+    const followResult = results.find((item) => {
+      if (!item || typeof item !== 'object') return false
+      const dimensionValues = (item as { dimension_values?: unknown }).dimension_values
+      return Array.isArray(dimensionValues)
+        ? dimensionValues.some((value) => String(value).toLowerCase().includes('follow'))
+        : false
+    })
+
+    if (followResult && typeof (followResult as { value?: unknown }).value === 'number') {
+      return (followResult as { value: number }).value
+    }
+  }
+
+  return rowMetricValue(row)
+}
+
 function numericField(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
@@ -75,6 +115,65 @@ async function withToken(connection: SocialConnection, callback: (token: string,
   }
 
   throw new Error(errors.join(' | ') || 'No usable Instagram token')
+}
+
+async function fetchAccountInsightMetrics(connection: SocialConnection) {
+  const now = new Date()
+  const since = new Date(now)
+  since.setDate(since.getDate() - 29)
+  since.setHours(0, 0, 0, 0)
+
+  const baseParams = {
+    since: String(Math.floor(since.getTime() / 1000)),
+    until: String(Math.floor(now.getTime() / 1000)),
+  }
+  const metrics: Record<string, number> = {}
+  const tokenSources: string[] = []
+  const errors: string[] = []
+
+  const attempts = [
+    { key: 'basic', metric: 'reach,profile_views,follower_count', period: 'day' },
+    { key: 'views', metric: 'views', metric_type: 'total_value', period: 'day' },
+    { key: 'follows_and_unfollows', metric: 'follows_and_unfollows', metric_type: 'total_value', period: 'day' },
+    { key: 'fallback_impressions', metric: 'impressions,reach,profile_views,follower_count', period: 'day' },
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const result = await withToken(connection, (token) =>
+        graphGet(connection, `${connection.account_id}/insights`, token, {
+          ...baseParams,
+          metric: attempt.metric,
+          ...(attempt.metric_type ? { metric_type: attempt.metric_type } : {}),
+          period: attempt.period,
+        })
+      )
+      tokenSources.push(result.tokenSource)
+
+      const rows = Array.isArray(result.data.data) ? result.data.data : []
+      rows.forEach((row) => {
+        if (!row || typeof row !== 'object') return
+        const typedRow = row as Record<string, unknown>
+        const name = typedRow.name
+        if (typeof name !== 'string') return
+        metrics[name] = name === 'follows_and_unfollows' ? followMetricValue(typedRow) : rowMetricValue(typedRow)
+      })
+    } catch (error) {
+      errors.push(`${attempt.key}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  if (!Object.keys(metrics).length) throw new Error(errors.join(' | '))
+
+  if (!metrics.views && metrics.impressions) metrics.views = metrics.impressions
+  if (!metrics.follower_count && metrics.follows_and_unfollows) {
+    metrics.follower_count = metrics.follows_and_unfollows
+  }
+
+  return {
+    metrics,
+    tokenSource: tokenSources[0] || null,
+  }
 }
 
 async function fetchMediaInsights(connection: SocialConnection, mediaId: string, token: string) {
@@ -146,33 +245,8 @@ export async function GET(req: Request) {
       })
     )
 
-    const insightResult = await withToken(typedConnection, async (token) => {
-      const attempts = [
-        { metric: 'reach,profile_views', period: 'day' },
-        { metric: 'impressions,reach,profile_views', period: 'day' },
-        { metric: 'reach', period: 'day' },
-      ]
-      const errors: string[] = []
-
-      for (const params of attempts) {
-        try {
-          return await graphGet(typedConnection, `${typedConnection.account_id}/insights`, token, params)
-        } catch (error) {
-          errors.push(error instanceof Error ? error.message : String(error))
-        }
-      }
-
-      throw new Error(errors.join(' | '))
-    })
-
-    const insightRows = Array.isArray(insightResult.data.data) ? insightResult.data.data : []
-    const metrics = insightRows.reduce<Record<string, number>>((acc, row) => {
-      if (!row || typeof row !== 'object') return acc
-      const name = (row as { name?: unknown }).name
-      if (typeof name !== 'string') return acc
-      acc[name] = metricValue((row as { values?: unknown }).values)
-      return acc
-    }, {})
+    const insightResult = await fetchAccountInsightMetrics(typedConnection)
+    const metrics = insightResult.metrics
 
     const mediaResult = await withToken(typedConnection, (token) =>
       graphGet(typedConnection, `${typedConnection.account_id}/media`, token, {

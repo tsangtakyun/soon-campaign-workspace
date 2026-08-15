@@ -311,8 +311,10 @@ export default function InsightsPage() {
   const businessName = payload?.brandKit?.business_name || '目前工作台'
   const instagramMetrics = instagramInsights?.metrics || {}
   const profile = instagramInsights?.account?.profile || {}
-  const displayReach = instagramInsights ? (instagramMetrics.reach || 0) : summary.impressions
-  const displayProfileViews = instagramInsights ? (instagramMetrics.profile_views || 0) : summary.likes
+  const displayViews = instagramInsights ? (instagramMetrics.views || instagramMetrics.impressions || summary.impressions) : summary.impressions
+  const displayNewFollowers = instagramInsights
+    ? (instagramMetrics.follower_count || instagramMetrics.follows_and_unfollows || 0)
+    : summary.publishedPosts
   const displayFollowers =
     typeof profile.followers_count === 'number' ? profile.followers_count : summary.publishedPosts
   const displayMediaCount =
@@ -380,14 +382,14 @@ export default function InsightsPage() {
 
               <section className="metric-grid" aria-label="Instagram 表現">
                 <article>
-                  <span>{instagramInsights ? 'Instagram Reach' : '觸及估算'}</span>
-                  <strong>{displayReach.toLocaleString('en-US')}</strong>
-                  <em>{instagramInsights ? 'Meta Graph API' : '等待 Meta 真實數據同步'}</em>
+                  <span>{instagramInsights ? '瀏覽次數' : '瀏覽估算'}</span>
+                  <strong>{displayViews.toLocaleString('en-US')}</strong>
+                  <em>{instagramInsights ? '最近 30 日 Instagram views' : '等待 Meta 真實數據同步'}</em>
                 </article>
                 <article>
-                  <span>{instagramInsights ? 'Profile Views' : '互動率'}</span>
-                  <strong>{instagramInsights ? displayProfileViews.toLocaleString('en-US') : `${summary.engagement}%`}</strong>
-                  <em>{instagramInsights ? '最近同步數據' : 'Likes、留言、收藏綜合'}</em>
+                  <span>{instagramInsights ? '新粉絲' : '互動率'}</span>
+                  <strong>{instagramInsights ? displayNewFollowers.toLocaleString('en-US') : `${summary.engagement}%`}</strong>
+                  <em>{instagramInsights ? '最近 30 日 follower growth' : 'Likes、留言、收藏綜合'}</em>
                 </article>
                 <article>
                   <span>{instagramInsights ? 'Followers' : '已發布內容'}</span>
