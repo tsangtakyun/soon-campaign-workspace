@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
-const AVATAR_BUCKET = 'avatars'
+const AVATAR_BUCKET = 'brand-assets'
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024
 
 function safeFilePart(value: string) {
@@ -14,27 +14,6 @@ function storageErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   if (error && typeof error === 'object' && 'message' in error) return String(error.message)
   return String(error || '')
-}
-
-function isMissingBucketError(error: unknown) {
-  const message = storageErrorMessage(error).toLowerCase()
-  return message.includes('not found') || message.includes('does not exist') || message.includes('bucket not found')
-}
-
-async function ensureAvatarBucket(supabase: ReturnType<typeof createAdminSupabase>) {
-  const { error } = await supabase.storage.getBucket(AVATAR_BUCKET)
-
-  if (!error) {
-    await supabase.storage.updateBucket(AVATAR_BUCKET, { public: true }).catch(() => null)
-    return
-  }
-
-  if (!isMissingBucketError(error)) throw error
-
-  const { error: createError } = await supabase.storage.createBucket(AVATAR_BUCKET, { public: true })
-  if (createError && !storageErrorMessage(createError).toLowerCase().includes('already exists')) {
-    throw createError
-  }
 }
 
 async function currentUser() {
@@ -85,13 +64,12 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: '圖片太大，請選擇較細圖片。' }, { status: 413 })
       }
 
-      await ensureAvatarBucket(supabase)
-
       const ext = safeFilePart(avatar.name.split('.').pop() || 'jpg')
-      const path = `${user.id}/${Date.now()}-${safeFilePart(avatar.name.replace(/\.[^.]+$/, ''))}.${ext}`
+      const path = `${user.id}/avatars/${Date.now()}-${safeFilePart(avatar.name.replace(/\.[^.]+$/, ''))}.${ext}`
+      const avatarBytes = Buffer.from(await avatar.arrayBuffer())
       const { error: uploadError } = await supabase.storage
         .from(AVATAR_BUCKET)
-        .upload(path, avatar, {
+        .upload(path, avatarBytes, {
           cacheControl: '3600',
           contentType: avatar.type || 'image/jpeg',
           upsert: true,
