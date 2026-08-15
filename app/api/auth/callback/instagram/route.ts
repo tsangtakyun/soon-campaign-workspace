@@ -32,6 +32,10 @@ function instagramAppSecret() {
   return process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET || ''
 }
 
+function instagramRedirectUri(req: Request) {
+  return new URL('/api/auth/callback/instagram', new URL(req.url).origin).toString()
+}
+
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
@@ -72,7 +76,7 @@ export async function GET(req: Request) {
       workspaceId,
     })
 
-    const redirectUri = `${baseUrl}/api/auth/callback/instagram`
+    const redirectUri = instagramRedirectUri(req)
     const shortTokenData = (await readJson(
       await fetch('https://api.instagram.com/oauth/access_token', {
         body: new URLSearchParams({
