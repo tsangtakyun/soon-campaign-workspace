@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult] = await Promise.all([
       supabase
         .from('campaign_posts')
-        .select('id,campaign_id,title,body,post_type,scheduled_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
+        .select('id,campaign_id,title,body,post_type,scheduled_at,posted_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
         .eq('workspace_id', workspaceId)
         .order('scheduled_at', { ascending: true })
         .limit(30),

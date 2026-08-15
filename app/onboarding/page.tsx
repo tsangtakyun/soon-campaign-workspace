@@ -38,6 +38,12 @@ type HomeCampaign = {
   image: string | null
 }
 
+type PublishedPostSummary = {
+  count: number
+  latestTitle: string
+  latestTime: string
+}
+
 const fallbackUpcomingPosts: HomePost[] = [
   {
     id: '1',
@@ -116,6 +122,38 @@ function formatDashboardDate(value: unknown) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '準備中'
   return `${date.getMonth() + 1}月${date.getDate()}日開始`
+}
+
+function formatPublishedTime(value: unknown) {
+  if (typeof value !== 'string') return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('zh-HK', {
+    dateStyle: 'medium',
+    hour12: false,
+    timeStyle: 'short',
+  })
+}
+
+function summarizePublishedPosts(posts: any[] | null | undefined): PublishedPostSummary {
+  const now = Date.now()
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+  const publishedPosts = (posts || [])
+    .filter((post) => post?.status === 'published' || post?.status === 'posted')
+    .map((post) => {
+      const publishedAt = typeof post?.posted_at === 'string' ? post.posted_at : post?.scheduled_at
+      const publishedTime = typeof publishedAt === 'string' ? new Date(publishedAt).getTime() : NaN
+      return { post, publishedAt, publishedTime }
+    })
+    .filter((item) => Number.isFinite(item.publishedTime) && item.publishedTime >= sevenDaysAgo && item.publishedTime <= now)
+    .sort((a, b) => b.publishedTime - a.publishedTime)
+
+  const latest = publishedPosts[0]
+  return {
+    count: publishedPosts.length,
+    latestTime: latest ? formatPublishedTime(latest.publishedAt) : '',
+    latestTitle: latest?.post?.title || '',
+  }
 }
 
 function mapPostType(type: unknown): Pick<HomePost, 'type' | 'typeKind'> {
@@ -706,6 +744,11 @@ export default function OnboardingHomePage() {
   const [brandName, setBrandName] = useState('')
   const [dashboardPosts, setDashboardPosts] = useState<HomePost[]>([])
   const [dashboardCampaigns, setDashboardCampaigns] = useState<HomeCampaign[]>([])
+  const [publishedPostSummary, setPublishedPostSummary] = useState<PublishedPostSummary>({
+    count: 0,
+    latestTime: '',
+    latestTitle: '',
+  })
   const [connectedSocialAccount, setConnectedSocialAccount] = useState<string | null>(null)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
@@ -732,6 +775,7 @@ export default function OnboardingHomePage() {
           if (!cancelled) {
             setDashboardPosts([])
             setDashboardCampaigns([])
+            setPublishedPostSummary({ count: 0, latestTime: '', latestTitle: '' })
             setCreditBalance(TRIAL_CREDITS)
             setActiveWorkspaceIdState(null)
             setIsBechillActive(false)
@@ -800,7 +844,7 @@ export default function OnboardingHomePage() {
         } else {
           let postsQuery = supabase
             .from('campaign_posts')
-            .select('id,campaign_id,title,body,post_type,scheduled_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
+            .select('id,campaign_id,title,body,post_type,scheduled_at,posted_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
             .order('scheduled_at', { ascending: true })
             .limit(30)
 
@@ -869,6 +913,8 @@ export default function OnboardingHomePage() {
         } else {
           setCreditBalance(TRIAL_CREDITS)
         }
+
+        setPublishedPostSummary(summarizePublishedPosts(postsData))
 
         if (!postsError && postsData?.length) {
           const postsMissingImages = postsData.filter((post: any) => isPlaceholderImage(post.image_url || null))
@@ -986,6 +1032,7 @@ export default function OnboardingHomePage() {
           hasGeneratingImagesRef.current = false
           setDashboardPosts([])
           setDashboardCampaigns([])
+          setPublishedPostSummary({ count: 0, latestTime: '', latestTitle: '' })
           setActiveWorkspaceIdState(null)
           setIsBechillActive(false)
         }
@@ -1081,7 +1128,7 @@ export default function OnboardingHomePage() {
               <h3>過去 7 天</h3>
               <div className="stats-grid">
                 <div className="stat-card">
-                  <span className="stat-number">{isBechillActive ? '1' : '0'}</span>
+                  <span className="stat-number">{isBechillActive ? '1' : publishedPostSummary.count}</span>
                   <span className="stat-label">已發布貼文</span>
                 </div>
               </div>
@@ -1090,8 +1137,15 @@ export default function OnboardingHomePage() {
                   <strong>《煩惱可以分兩種》</strong>
                   <span>2026年8月12日 18:00 HKT</span>
                 </div>
+              ) : publishedPostSummary.latestTitle ? (
+                <div className="published-post-mini">
+                  <strong>{publishedPostSummary.latestTitle}</strong>
+                  <span>{publishedPostSummary.latestTime || '最近 7 天已發布'}</span>
+                </div>
               ) : null}
-              <p className="stats-hint">連接帳戶後即可查看更完整數據分析</p>
+              <p className="stats-hint">
+                {connectedSocialAccount ? '已連接帳戶，完整互動數據可到洞察頁查看。' : '連接帳戶後即可查看更完整數據分析'}
+              </p>
             </section>
 
             <section className="home-aside-section">
