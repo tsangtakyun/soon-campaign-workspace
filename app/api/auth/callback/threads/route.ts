@@ -98,7 +98,9 @@ export async function GET(req: Request) {
       workspace_id: workspaceId,
     })
 
-    return NextResponse.redirect(`${baseUrl}/onboarding/integrations?connected=threads`)
+    return NextResponse.redirect(
+      `${baseUrl}/onboarding/integrations?connected=threads&workspaceId=${encodeURIComponent(workspaceId)}`
+    )
   } catch (err) {
     console.error('[threads/callback] error:', err)
     return NextResponse.redirect(`${baseUrl}/onboarding/integrations?error=threads_auth_failed`)

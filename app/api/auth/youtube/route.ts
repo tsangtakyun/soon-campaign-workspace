@@ -16,6 +16,7 @@ function normalizeSessionId(value: string) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const sessionId = normalizeSessionId(searchParams.get('sessionId') || '')
+  const workspaceId = searchParams.get('workspaceId') || ''
   const clientId = process.env.GOOGLE_CLIENT_ID
 
   if (!clientId) {
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
   }
 
   const redirectUri = `${appUrl(req)}/api/auth/youtube/callback`
-  const state = JSON.stringify({ platform: 'youtube', sessionId })
+  const state = JSON.stringify({ platform: 'youtube', sessionId, workspaceId })
   const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
 
   oauthUrl.searchParams.set('client_id', clientId)

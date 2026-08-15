@@ -4,17 +4,25 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
+import { PlatformIcon } from '@/components/dashboard/PlatformIcon'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
 import { getOrCreateOnboardingSessionId, getStoredOnboardingSessionId } from '@/lib/onboarding-session'
 import { createClient } from '@/lib/supabase'
-import { resolveActiveWorkspace } from '@/lib/workspace-client'
+import { resolveActiveWorkspace, setActiveWorkspaceId, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
+
+const TRACKING_PLATFORMS = [
+  { id: 'google-analytics', label: 'Google Analytics', order: 1, unavailable: true },
+]
 
 const SOCIAL_PLATFORMS = [
   { id: 'instagram', label: 'Instagram', order: 1 },
   { id: 'facebook', label: 'Facebook', order: 2 },
   { id: 'threads', label: 'Threads', order: 3 },
-  { id: 'youtube', label: 'YouTube', order: 4 },
+  { id: 'youtube', label: 'YouTube', order: 4, unavailable: true },
 ]
+
+const ALL_PLATFORMS = [...TRACKING_PLATFORMS, ...SOCIAL_PLATFORMS]
+const AVAILABLE_SOCIAL_PLATFORMS = SOCIAL_PLATFORMS.filter((platform) => !platform.unavailable)
 
 type SocialConnection = {
   account_id?: string
@@ -22,96 +30,6 @@ type SocialConnection = {
   connected_at?: string
   platform: string
   workspace_id?: string
-}
-
-function PlatformIcon({ id }: { id: string }) {
-  if (id === 'google-analytics') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <rect x="4" y="11" width="4.5" height="8" rx="2.25" fill="#F9AB00" />
-        <rect x="9.75" y="7" width="4.5" height="12" rx="2.25" fill="#E37400" />
-        <rect x="15.5" y="4" width="4.5" height="15" rx="2.25" fill="#F9AB00" />
-      </svg>
-    )
-  }
-
-  if (id === 'instagram') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <defs>
-          <radialGradient id="ig-platform-grad" cx="30%" cy="107%" r="150%">
-            <stop offset="0%" stopColor="#fdf497" />
-            <stop offset="5%" stopColor="#fdf497" />
-            <stop offset="45%" stopColor="#fd5949" />
-            <stop offset="60%" stopColor="#d6249f" />
-            <stop offset="90%" stopColor="#285AEB" />
-          </radialGradient>
-        </defs>
-        <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#ig-platform-grad)" />
-        <circle cx="12" cy="12" r="4.4" stroke="white" strokeWidth="1.7" />
-        <circle cx="17.4" cy="6.7" r="1.25" fill="white" />
-      </svg>
-    )
-  }
-
-  if (id === 'facebook') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <circle cx="12" cy="12" r="10" fill="#1877F2" />
-        <path
-          d="M13.2 18v-5.3h1.8l.3-2.1h-2.1V9.2c0-.6.2-1 1.1-1h1.1V6.3c-.2 0-.9-.1-1.7-.1-1.7 0-2.8 1-2.8 2.8v1.6H9v2.1h1.9V18h2.3Z"
-          fill="#fff"
-        />
-      </svg>
-    )
-  }
-
-  if (id === 'linkedin') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <rect x="3" y="3" width="18" height="18" rx="3" fill="#0A66C2" />
-        <path
-          d="M8 10.1h2.2V17H8v-6.9Zm1.1-3.4a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM11.7 10.1h2.1v.9c.3-.5 1-1.1 2.1-1.1 2.2 0 2.6 1.5 2.6 3.4V17h-2.2v-3.3c0-.8 0-1.8-1.1-1.8s-1.3.9-1.3 1.7V17h-2.2v-6.9Z"
-          fill="#fff"
-        />
-      </svg>
-    )
-  }
-
-  if (id === 'threads') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <rect x="3" y="3" width="18" height="18" rx="5" fill="#111111" />
-        <path
-          d="M12.1 18.3c-3.1 0-5.2-1.8-5.2-4.4 0-2.4 1.8-4.1 4.5-4.1 1.2 0 2.2.3 3 .8-.3-1.5-1.2-2.3-2.7-2.3-1.1 0-2 .4-2.8 1.1L7.8 8.1c1-.9 2.3-1.4 3.9-1.4 2.9 0 4.5 1.8 4.8 5.2 1 .5 1.5 1.3 1.5 2.3 0 1.5-1.1 2.5-2.8 2.5-.7 1-1.8 1.6-3.1 1.6Zm-.6-6.9c-1.6 0-2.7 1-2.7 2.4 0 1.6 1.3 2.8 3.3 2.8.6 0 1.1-.1 1.6-.4-1.8-.3-2.9-1.2-2.9-2.3 0-1.2 1-2 2.5-2 .5 0 1 .1 1.5.2-.6-.5-1.7-.7-3.3-.7Zm1.9 2c-.7 0-1 .2-1 .6s.6.8 1.8.8h.4c.1-.2.1-.5.1-.7v-.3c-.4-.3-.8-.4-1.3-.4Z"
-          fill="#fff"
-        />
-      </svg>
-    )
-  }
-
-  if (id === 'youtube') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <rect x="3" y="6" width="18" height="12" rx="4" fill="#FF0000" />
-        <path d="M10.4 9.3v5.4l4.8-2.7-4.8-2.7Z" fill="#fff" />
-      </svg>
-    )
-  }
-
-  if (id === 'twitter') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <rect x="3" y="3" width="18" height="18" rx="3" fill="#111111" />
-        <path
-          d="M13.4 10.9 18 6h-1.4l-3.8 4.1L9.8 6H6l4.8 6.3L6 18h1.4l4-4.6 3.4 4.6H18l-4.6-7.1Zm-1.5 1.6-.5-.7-3.6-4.7h1.4l2.9 3.8.5.7 3.8 5.1H15l-3.1-4.2Z"
-          fill="#fff"
-        />
-      </svg>
-    )
-  }
-
-  return null
 }
 
 function ProgressCircle({ connected, total }: { connected: number; total: number }) {
@@ -137,6 +55,20 @@ function ProgressCircle({ connected, total }: { connected: number; total: number
   )
 }
 
+function IntegrationLoadingRows({ count = 4 }: { count?: number }) {
+  return (
+    <div className="integration-loading-list" aria-busy="true">
+      {Array.from({ length: count }).map((_, index) => (
+        <div className="integration-loading-row" key={index}>
+          <i />
+          <span />
+          <strong />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function IntegrationsPage() {
   const router = useRouter()
   const settingsPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -151,10 +83,14 @@ export default function IntegrationsPage() {
   const [settingsOpenPlatform, setSettingsOpenPlatform] = useState<string | null>(null)
   const [autoRepliesEnabled, setAutoRepliesEnabled] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
-  const connectedCount = Object.keys(connections).length
+  const [connectionsLoading, setConnectionsLoading] = useState(true)
+  const connectedCount = AVAILABLE_SOCIAL_PLATFORMS.filter((platform) => connections[platform.id]).length
 
   useEffect(() => {
+    let cancelled = false
+
     async function loadConnections() {
+      setConnectionsLoading(true)
       try {
         const supabase = createClient()
         const { workspaceId } = await resolveActiveWorkspace()
@@ -174,19 +110,20 @@ export default function IntegrationsPage() {
         } else if (sessionId) {
           query = query.eq('onboarding_session_id', sessionId)
         } else {
+          setConnections({})
           return
         }
 
         const { data } = await query
-        if (data) {
-          const nextConnections: Record<string, SocialConnection> = {}
-          data.forEach((connection) => {
-            nextConnections[connection.platform] = connection
-          })
-          setConnections(nextConnections)
-        }
+        const nextConnections: Record<string, SocialConnection> = {}
+        ;(data || []).forEach((connection) => {
+          nextConnections[connection.platform] = connection
+        })
+        if (!cancelled) setConnections(nextConnections)
       } catch (err) {
         console.warn('[integrations] failed to load connections:', err)
+      } finally {
+        if (!cancelled) setConnectionsLoading(false)
       }
     }
 
@@ -194,15 +131,23 @@ export default function IntegrationsPage() {
     const error = params.get('error')
     const warning = params.get('warning')
     const connected = params.get('connected')
+    const callbackWorkspaceId = params.get('workspaceId')
+    const hasCallbackParams = Boolean(error || warning || connected || callbackWorkspaceId)
+
+    if (callbackWorkspaceId) {
+      setActiveWorkspaceId(callbackWorkspaceId)
+    }
 
     if (connected === 'instagram') {
-      setNotice({ kind: 'success', text: 'Instagram 已連接。' })
+      setNotice({ kind: 'success', text: 'Instagram 已連接；自動發布需待 Meta 開通發布權限後啟用。' })
     } else if (connected === 'facebook') {
       setNotice({ kind: 'success', text: 'Facebook 專頁已連接。' })
     } else if (connected === 'threads') {
       setNotice({ kind: 'success', text: 'Threads 已連接。' })
     } else if (connected === 'youtube') {
       setNotice({ kind: 'success', text: 'YouTube 頻道已連接。' })
+    } else if (connected === 'google-analytics') {
+      setNotice({ kind: 'success', text: 'Google Analytics 已連接。' })
     } else if (connected === 'facebook_profile' || warning === 'no_pages') {
       setNotice({
         kind: 'warning',
@@ -227,9 +172,35 @@ export default function IntegrationsPage() {
       setNotice({ kind: 'error', text: '未找到可用 YouTube 頻道。請確認你的 Google 帳號已建立 YouTube 頻道。' })
     } else if (error === 'youtube_auth_failed') {
       setNotice({ kind: 'error', text: 'YouTube 連接流程未完成，請稍後再試。' })
+    } else if (error === 'no_google_analytics_account') {
+      setNotice({ kind: 'error', text: '未找到可用 Google Analytics 帳戶。請確認你的 Google 帳號有 GA 權限。' })
+    } else if (error === 'google_analytics_auth_failed') {
+      setNotice({ kind: 'error', text: 'Google Analytics 連接流程未完成，請稍後再試。' })
+    }
+
+    if (hasCallbackParams) {
+      const cleanParams = new URLSearchParams(window.location.search)
+      ;['connected', 'error', 'warning', 'workspaceId'].forEach((key) => cleanParams.delete(key))
+      const nextSearch = cleanParams.toString()
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`
+      )
     }
 
     void loadConnections()
+
+    function handleWorkspaceChanged() {
+      setConnections({})
+      void loadConnections()
+    }
+
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
+    return () => {
+      cancelled = true
+      window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
+    }
   }, [])
 
   useEffect(() => {
@@ -248,24 +219,26 @@ export default function IntegrationsPage() {
   }, [])
 
   async function handleConnect(platform: string) {
-    if (!SOCIAL_PLATFORMS.some((item) => item.id === platform)) return
+    if (!ALL_PLATFORMS.some((item) => item.id === platform)) return
     setConnecting(platform)
 
     try {
-      if (platform === 'youtube') {
-        const sessionId = getOrCreateOnboardingSessionId() || ''
-        window.location.href = `/api/auth/${platform}?sessionId=${encodeURIComponent(sessionId)}`
-        return
-      }
-
       const { workspaceId } = await resolveActiveWorkspace()
-      if (!workspaceId) {
+      if (!workspaceId && platform !== 'youtube') {
         setNotice({ kind: 'error', text: '未找到目前工作台，請先重新整理或選擇工作台。' })
         setConnecting(null)
         return
       }
 
-      window.location.href = `/api/auth/${platform}?workspaceId=${encodeURIComponent(workspaceId)}`
+      if (platform === 'youtube') {
+        const sessionId = getOrCreateOnboardingSessionId() || ''
+        const params = new URLSearchParams({ sessionId })
+        if (workspaceId) params.set('workspaceId', workspaceId)
+        window.location.href = `/api/auth/${platform}?${params.toString()}`
+        return
+      }
+
+      window.location.href = `/api/auth/${platform}?workspaceId=${encodeURIComponent(workspaceId || '')}`
     } catch (err) {
       console.warn(`[integrations] failed to start ${platform} OAuth:`, err)
       setNotice({ kind: 'error', text: '未能開始連接流程，請稍後再試。' })
@@ -334,33 +307,62 @@ export default function IntegrationsPage() {
             <div className="integrations-header-left">
               <h2>連接你的帳戶以自動化行銷</h2>
               <p>SOON 發布你的內容、從效果中學習，並根據這些洞察生成內容。</p>
-              <div className="integrations-header-actions">
-                <button className="integrations-help-btn" type="button">
-                  獲取即時協助
-                </button>
-                <button
-                  className="integrations-campaigns-btn"
-                  onClick={() => router.push('/onboarding/campaigns')}
-                  type="button"
-                >
-                  開啟宣傳活動
-                </button>
-              </div>
+              {!connectionsLoading ? (
+                <span className="integrations-header-note">
+                  已連接 {connectedCount}/{AVAILABLE_SOCIAL_PLATFORMS.length} 個社交帳戶；Google Analytics 與 YouTube 暫未開放。
+                </span>
+              ) : null}
             </div>
-            <ProgressCircle connected={connectedCount} total={SOCIAL_PLATFORMS.length} />
+            {connectionsLoading ? (
+              <div className="integrations-progress-loading" aria-label="正在載入連接狀態" />
+            ) : (
+              <ProgressCircle connected={connectedCount} total={AVAILABLE_SOCIAL_PLATFORMS.length} />
+            )}
           </div>
 
           <section className="integrations-section">
             <h3>網站流量</h3>
-            <div className="integration-row">
-              <span className="integration-icon">
-                <PlatformIcon id="google-analytics" />
-              </span>
-              <span className="integration-label">Google Analytics</span>
-              <button className="integration-connect-btn" type="button">
-                連接
-              </button>
-            </div>
+            {connectionsLoading ? <IntegrationLoadingRows count={1} /> : TRACKING_PLATFORMS.map((platform) => {
+              const connection = connections[platform.id]
+              return (
+                <div className={connection ? 'integration-row connected' : 'integration-row'} key={platform.id}>
+                  <span className="integration-icon">
+                    <PlatformIcon id={platform.id} />
+                  </span>
+                  <span className="integration-label">{platform.label}</span>
+                  {platform.unavailable ? (
+                    <>
+                      <span className="integration-unavailable-badge">暫未開放</span>
+                      <button className="integration-connect-btn primary" disabled type="button">
+                        未開放
+                      </button>
+                    </>
+                  ) : connection ? (
+                    <>
+                      <span className="integration-connected-name">{connection.account_name || platform.label}</span>
+                      <span className="integration-connected-badge">✓ 已連接</span>
+                      <button
+                        className="integration-disconnect-btn"
+                        disabled={disconnecting}
+                        onClick={() => disconnectConnection(platform.id)}
+                        type="button"
+                      >
+                        {disconnecting ? '斷開中...' : '斷開連接'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="integration-connect-btn primary"
+                      disabled={connecting === platform.id}
+                      onClick={() => handleConnect(platform.id)}
+                      type="button"
+                    >
+                      {connecting === platform.id ? '連接中...' : 'Connect'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </section>
 
           <section className="integrations-section">
@@ -369,7 +371,7 @@ export default function IntegrationsPage() {
 
             <div className="integrations-sub-section">
               <p className="integrations-sub-label">社交媒體</p>
-              {SOCIAL_PLATFORMS.map((platform, index) => {
+              {connectionsLoading ? <IntegrationLoadingRows count={4} /> : SOCIAL_PLATFORMS.map((platform, index) => {
                 const connection = connections[platform.id]
                 const isConnectedExpandable = Boolean(connection)
                 const isExpanded = Boolean(expandedPlatforms[platform.id])
@@ -421,7 +423,14 @@ export default function IntegrationsPage() {
                       <PlatformIcon id={platform.id} />
                     </span>
                     <span className="integration-label">{platform.label}</span>
-                    {connection ? (
+                    {platform.unavailable ? (
+                      <>
+                        <span className="integration-unavailable-badge">暫未開放</span>
+                        <button className="integration-connect-btn primary" disabled type="button">
+                          未開放
+                        </button>
+                      </>
+                    ) : connection ? (
                       <>
                         <span className="integration-connected-name">@{connection.account_name || platform.label}</span>
                         <span className="integration-connected-badge">✓ 已連接</span>
@@ -853,27 +862,11 @@ const styles = `
     line-height: 1.5;
   }
 
-  .integrations-header-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .integrations-help-btn,
-  .integrations-campaigns-btn {
-    padding: 7px 14px;
-    border: 1px solid #e2e3e7;
-    border-radius: 8px;
-    background: #ffffff;
-    color: #374151;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 150ms;
-  }
-
-  .integrations-help-btn:hover,
-  .integrations-campaigns-btn:hover {
-    background: #f0f0f0;
+  .integrations-header-note {
+    display: block;
+    color: #4b5563;
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   .integrations-progress-circle {
@@ -892,6 +885,69 @@ const styles = `
 
   .integrations-progress-circle span {
     position: absolute;
+  }
+
+  .integrations-progress-loading {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background:
+      radial-gradient(circle at center, #f8f8f9 0 46%, transparent 47%),
+      conic-gradient(from 0deg, #e7e8eb, #f7f7f8, #e7e8eb);
+    animation: integrationsPulse 1.2s ease-in-out infinite;
+  }
+
+  .integration-loading-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .integration-loading-row {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e7e8eb;
+    border-radius: 10px;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 36px 1fr 120px;
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+
+  .integration-loading-row i,
+  .integration-loading-row span,
+  .integration-loading-row strong {
+    display: block;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f1f2f4 0%, #fbfbfc 45%, #f1f2f4 100%);
+    background-size: 220% 100%;
+    animation: integrationsSkeleton 1.2s ease-in-out infinite;
+  }
+
+  .integration-loading-row i {
+    height: 28px;
+    width: 28px;
+  }
+
+  .integration-loading-row span {
+    height: 15px;
+    width: min(180px, 70%);
+  }
+
+  .integration-loading-row strong {
+    height: 34px;
+    width: 100%;
+  }
+
+  @keyframes integrationsSkeleton {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+  }
+
+  @keyframes integrationsPulse {
+    0%, 100% { opacity: 0.72; }
+    50% { opacity: 1; }
   }
 
   .progress-ring {
@@ -1226,6 +1282,17 @@ const styles = `
   .integration-next-badge {
     font-size: 12px;
     color: #6f737d;
+  }
+
+  .integration-unavailable-badge {
+    background: #f4f4f5;
+    border: 1px solid #e4e5e9;
+    border-radius: 999px;
+    color: #6f737d;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    white-space: nowrap;
   }
 
   .integration-connect-btn {

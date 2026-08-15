@@ -4,6 +4,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import {
+  assertWorkspaceAccess,
+  isUuid,
+  saveWorkspaceSocialConnection,
+} from '@/lib/oauth-connections'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 function appUrl(req: Request) {
@@ -31,6 +36,7 @@ async function saveYouTubeConnection({
   refreshToken,
   sessionId,
   userId,
+  workspaceId,
 }: {
   accountId: string
   accountName: string
@@ -38,7 +44,22 @@ async function saveYouTubeConnection({
   refreshToken: string | null
   sessionId: string
   userId: string | null
+  workspaceId?: string | null
 }) {
+  if (workspaceId && userId) {
+    await saveWorkspaceSocialConnection({
+      access_token: accessToken,
+      account_id: accountId,
+      account_name: accountName,
+      platform: 'youtube',
+      refresh_token: refreshToken,
+      token_expires_at: null,
+      user_id: userId,
+      workspace_id: workspaceId,
+    })
+    return
+  }
+
   const supabase = createAdminSupabase()
   const connection = {
     access_token: accessToken,
@@ -86,11 +107,14 @@ export async function GET(req: Request) {
   }
 
   let sessionId = ''
+  let workspaceId = ''
   try {
-    const state = JSON.parse(stateRaw || '{}') as { sessionId?: string }
+    const state = JSON.parse(stateRaw || '{}') as { sessionId?: string; workspaceId?: string }
     sessionId = normalizeSessionId(state.sessionId || '')
+    workspaceId = isUuid(state.workspaceId) ? state.workspaceId || '' : ''
   } catch {
     sessionId = ''
+    workspaceId = ''
   }
 
   try {
@@ -107,6 +131,14 @@ export async function GET(req: Request) {
       data: { user },
     } = await serverSupabase.auth.getUser()
     const userId = user?.id || null
+
+    if (workspaceId && user?.id) {
+      await assertWorkspaceAccess({
+        email: user.email,
+        userId: user.id,
+        workspaceId,
+      })
+    }
 
     const tokenData = await readJson(
       await fetch('https://oauth2.googleapis.com/token', {
@@ -149,9 +181,12 @@ export async function GET(req: Request) {
       refreshToken,
       sessionId,
       userId,
+      workspaceId,
     })
 
-    return NextResponse.redirect(`${baseUrl}/onboarding/integrations?connected=youtube`)
+    return NextResponse.redirect(
+      `${baseUrl}/onboarding/integrations?connected=youtube${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ''}`
+    )
   } catch (err) {
     console.error('[youtube/callback] error:', err)
     return NextResponse.redirect(`${baseUrl}/onboarding/integrations?error=youtube_auth_failed`)

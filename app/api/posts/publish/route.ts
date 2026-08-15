@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       body.platform === 'instagram' || body.platform === 'facebook' || body.platform === 'threads'
         ? body.platform
         : null
+    const publishNow = body.publishNow === true
     console.log('Starting publish for post:', postId)
     console.log('[posts/publish] request workspace:', { postId, workspaceId })
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     const supabase = createAdminSupabase()
     const { data: post, error: postError } = await supabase
       .from('campaign_posts')
-      .select('id,user_id,title,body,image_url,scheduled_at,workspace_id')
+      .select('id,user_id,title,body,image_url,scheduled_at,workspace_id,captions')
       .eq('id', postId)
       .eq('workspace_id', workspaceId)
       .maybeSingle()
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
 
     const now = new Date().toISOString()
-    const dueNow = shouldPublishNow(post.scheduled_at)
+    const dueNow = publishNow || shouldPublishNow(post.scheduled_at)
     console.log('[posts/publish] post loaded:', {
       hasImageUrl: Boolean(post.image_url),
       imageUrl: post.image_url,
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
       now,
       scheduledAt: post.scheduled_at,
       window: 'now + 30 minutes',
+      publishNow,
     })
 
     await supabase
@@ -92,39 +94,74 @@ export async function POST(req: Request) {
       workspaceId,
     })
 
-    if (publishResult.errors.length) {
+    if (!publishResult.platforms_published.length) {
       return NextResponse.json(
         {
           ...publishResult,
+          message: publishResult.errors.length
+            ? publishResult.errors.map((item) => `${item.platform}: ${item.message}`).join('；')
+            : '貼文已批准，但目前沒有已連接的發布平台。',
           status: 'approved',
-          success: false,
+          success: !publishResult.errors.length,
         },
-        { status: 207 }
+        { status: publishResult.errors.length ? 207 : 200 }
       )
     }
 
-    if (!publishResult.platforms_published.length) {
-      return NextResponse.json({
-        ...publishResult,
-        message: '貼文已批准，但目前沒有已連接的發布平台。',
-        status: 'approved',
-        success: true,
-      })
-    }
+    const captions = post.captions && typeof post.captions === 'object' && !Array.isArray(post.captions)
+      ? (post.captions as Record<string, unknown>)
+      : {}
+    const existingPublishStatus =
+      captions.publish_status && typeof captions.publish_status === 'object' && !Array.isArray(captions.publish_status)
+        ? (captions.publish_status as Record<string, unknown>)
+        : {}
+    const publishedAt = new Date().toISOString()
+    const nextPublishStatus: Record<string, unknown> = { ...existingPublishStatus }
 
-    await supabase
-      .from('campaign_posts')
-      .update({
-        posted_at: new Date().toISOString(),
-        status: 'published',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', postId)
-      .eq('workspace_id', workspaceId)
+    publishResult.platforms_published.forEach((item) => {
+      nextPublishStatus[item] = { at: publishedAt, status: 'published' }
+    })
+    publishResult.errors.forEach((item) => {
+      nextPublishStatus[item.platform] = {
+        at: publishedAt,
+        message: item.message,
+        status: 'failed',
+      }
+    })
+
+    const nextCaptions = {
+      ...captions,
+      publish_status: nextPublishStatus,
+    }
+    const fullyPublished = publishResult.platforms_published.length > 0 && publishResult.errors.length === 0
+
+    if (fullyPublished) {
+      await supabase
+        .from('campaign_posts')
+        .update({
+          captions: nextCaptions,
+          posted_at: new Date().toISOString(),
+          status: 'published',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', postId)
+        .eq('workspace_id', workspaceId)
+    } else {
+      await supabase
+        .from('campaign_posts')
+        .update({
+          approved_at: now,
+          captions: nextCaptions,
+          status: 'approved',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', postId)
+        .eq('workspace_id', workspaceId)
+    }
 
     return NextResponse.json({
       ...publishResult,
-      status: 'published',
+      status: fullyPublished ? 'published' : 'partial_published',
       success: true,
     })
   } catch (error) {

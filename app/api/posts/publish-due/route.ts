@@ -25,7 +25,7 @@ async function handlePublishDue(req: Request) {
     const { data: connectionWorkspaces, error: connectionWorkspaceError } = await supabase
       .from('social_connections')
       .select('workspace_id')
-      .in('platform', ['instagram', 'facebook'])
+      .in('platform', ['instagram', 'facebook', 'threads'])
       .not('workspace_id', 'is', null)
 
     if (connectionWorkspaceError) throw connectionWorkspaceError
@@ -46,7 +46,7 @@ async function handlePublishDue(req: Request) {
     const { data: posts, error } = await supabase
       .from('campaign_posts')
       .select('id,user_id,title,body,image_url,scheduled_at,workspace_id')
-      .eq('status', 'approved')
+      .in('status', ['approved', 'scheduled'])
       .lte('scheduled_at', now)
       .in('workspace_id', workspaceIds)
       .is('posted_at', null)

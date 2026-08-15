@@ -142,7 +142,9 @@ export async function GET(req: Request) {
         workspace_id: workspaceId,
       })
 
-      return NextResponse.redirect(`${baseUrl}/onboarding/integrations?connected=facebook`)
+      return NextResponse.redirect(
+        `${baseUrl}/onboarding/integrations?connected=facebook&workspaceId=${encodeURIComponent(workspaceId)}`
+      )
     }
 
     const pageWithInstagram = pages.find(
@@ -171,7 +173,9 @@ export async function GET(req: Request) {
       workspace_id: workspaceId,
     })
 
-    return NextResponse.redirect(`${baseUrl}/onboarding/integrations?connected=instagram`)
+    return NextResponse.redirect(
+      `${baseUrl}/onboarding/integrations?connected=instagram&workspaceId=${encodeURIComponent(workspaceId)}`
+    )
   } catch (err) {
     console.error('[facebook/callback] error:', err)
     return NextResponse.redirect(`${baseUrl}/onboarding/integrations?error=callback_failed`)

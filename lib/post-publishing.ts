@@ -38,6 +38,15 @@ function tokenPreview(value: string | null) {
   return value ? `${value.slice(0, 20)}...` : null
 }
 
+function connectionTokens(connection: SocialConnection) {
+  return [
+    { label: 'user_access_token', token: connection.access_token },
+    { label: 'page_access_token', token: connection.page_access_token },
+  ].filter((item, index, items) => {
+    return item.token && items.findIndex((candidate) => candidate.token === item.token) === index
+  }) as { label: string; token: string }[]
+}
+
 function sanitizeConnection(connection: SocialConnection) {
   return {
     id: connection.id,
@@ -167,42 +176,64 @@ async function resolveFacebookPageCredentials(connection: SocialConnection) {
 
 async function publishToInstagram(post: CampaignPost, connection: SocialConnection, baseUrl: string) {
   if (isTokenExpired(connection)) throw tokenExpiredError('instagram')
-  if (!connection.account_id || !connection.access_token) {
+  const tokens = connectionTokens(connection)
+  if (!connection.account_id || !tokens.length) {
     throw new Error('請重新連接你的 Instagram 帳戶')
   }
   if (!post.image_url) throw new Error('Instagram 發布需要圖片。')
 
-  // Instagram Graph publishing requires Meta approval for an Instagram publishing permission.
-  // The current OAuth flow intentionally omits that scope while the app is in development.
+  // Instagram Graph publishing requires Meta approval for the content publishing permission.
   if (process.env.INSTAGRAM_PUBLISHING_ENABLED !== 'true') {
     throw new Error('Instagram 自動發布需要 Meta App Review 批准 instagram_content_publish 後重新連接。')
   }
 
   const imageUrl = absoluteUrl(post.image_url, baseUrl)
   const caption = post.body || post.title || ''
-  const container = await readGraphJson(
-    await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media`, {
-      body: new URLSearchParams({
-        access_token: connection.access_token,
-        caption,
-        image_url: imageUrl,
-      }),
-      method: 'POST',
-    })
-  )
-  const creationId = typeof container.id === 'string' ? container.id : ''
-  if (!creationId) throw new Error('Instagram media container 建立失敗。')
+  const errors: string[] = []
 
-  const published = await readGraphJson(
-    await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media_publish`, {
-      body: new URLSearchParams({
-        access_token: connection.access_token,
-        creation_id: creationId,
-      }),
-      method: 'POST',
-    })
-  )
-  if (!published.id) throw new Error('Instagram 發布失敗。')
+  for (const { label, token } of tokens) {
+    try {
+      console.log('[posts/publish] Instagram publish token attempt:', {
+        accountId: connection.account_id,
+        token_source: label,
+        token_preview: tokenPreview(token),
+      })
+
+      const container = await readGraphJson(
+        await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media`, {
+          body: new URLSearchParams({
+            access_token: token,
+            caption,
+            image_url: imageUrl,
+          }),
+          method: 'POST',
+        })
+      )
+      const creationId = typeof container.id === 'string' ? container.id : ''
+      if (!creationId) throw new Error('Instagram media container 建立失敗。')
+
+      const published = await readGraphJson(
+        await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media_publish`, {
+          body: new URLSearchParams({
+            access_token: token,
+            creation_id: creationId,
+          }),
+          method: 'POST',
+        })
+      )
+      if (!published.id) throw new Error('Instagram 發布失敗。')
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      errors.push(`${label}: ${message}`)
+      console.error('[posts/publish] Instagram publish token failed:', {
+        error: message,
+        token_source: label,
+      })
+    }
+  }
+
+  throw new Error(`Instagram 發布失敗。${errors.join(' | ')}`)
 }
 
 async function publishToFacebook(post: CampaignPost, connection: SocialConnection, baseUrl: string) {
@@ -268,13 +299,13 @@ async function publishToFacebook(post: CampaignPost, connection: SocialConnectio
         token_preview: tokenPreview(fallbackCredentials.pageAccessToken),
       })
       const retryResponse = await fetch(`https://graph.facebook.com/v18.0/${fallbackCredentials.pageId}/photos`, {
-      body: new URLSearchParams({
+        body: new URLSearchParams({
           access_token: fallbackCredentials.pageAccessToken,
-        caption,
-        url: imageUrl,
-      }),
-      method: 'POST',
-    })
+          caption,
+          url: imageUrl,
+        }),
+        method: 'POST',
+      })
       const retryData = await retryResponse.json().catch(() => ({}))
       console.log('Facebook API response:', {
         ok: retryResponse.ok,
