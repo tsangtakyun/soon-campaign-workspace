@@ -5,35 +5,32 @@ import { appUrl, isUuid } from '@/lib/oauth-connections'
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const workspaceId = searchParams.get('workspaceId')
-  const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
+  const appId = process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
 
   if (!appId) {
-    return NextResponse.json({ error: 'Missing NEXT_PUBLIC_FACEBOOK_APP_ID' }, { status: 500 })
+    return NextResponse.json({ error: 'Missing Instagram OAuth app id' }, { status: 500 })
   }
 
   if (!isUuid(workspaceId)) {
     return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 })
   }
 
-  const redirectUri = `${appUrl(req)}/api/auth/callback/facebook`
+  const redirectUri = `${appUrl(req)}/api/auth/callback/instagram`
   const scope = [
-    'instagram_basic',
-    'instagram_content_publish',
-    'instagram_manage_insights',
-    'instagram_manage_comments',
-    'pages_show_list',
-    'pages_read_engagement',
-    'pages_manage_posts',
+    'instagram_business_basic',
+    'instagram_business_content_publish',
+    'instagram_business_manage_insights',
+    'instagram_business_manage_comments',
   ].join(',')
-  const oauthUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth')
+  const oauthUrl = new URL('https://www.instagram.com/oauth/authorize')
 
   oauthUrl.searchParams.set('client_id', appId)
   oauthUrl.searchParams.set('redirect_uri', redirectUri)
   oauthUrl.searchParams.set('scope', scope)
   oauthUrl.searchParams.set('state', workspaceId)
   oauthUrl.searchParams.set('response_type', 'code')
-  oauthUrl.searchParams.set('auth_type', 'rerequest')
-  oauthUrl.searchParams.set('enable_profile_selector', 'true')
+  oauthUrl.searchParams.set('enable_fb_login', '0')
+  oauthUrl.searchParams.set('force_authentication', '1')
 
   return NextResponse.redirect(oauthUrl.toString())
 }

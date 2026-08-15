@@ -74,6 +74,10 @@ function absoluteUrl(value: string, baseUrl: string) {
   return new URL(value, baseUrl).toString()
 }
 
+function instagramGraphOrigin(connection: SocialConnection) {
+  return connection.page_id ? 'https://graph.facebook.com/v18.0' : 'https://graph.instagram.com/v18.0'
+}
+
 function isTokenExpired(connection: SocialConnection) {
   if (!connection.token_expires_at) return false
   const expiresAt = new Date(connection.token_expires_at).getTime()
@@ -182,14 +186,15 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
   }
   if (!post.image_url) throw new Error('Instagram 發布需要圖片。')
 
-  // Instagram Graph publishing requires Meta approval for the content publishing permission.
+  // Instagram publishing requires Meta approval for the Instagram Business publishing permission.
   if (process.env.INSTAGRAM_PUBLISHING_ENABLED !== 'true') {
-    throw new Error('Instagram 自動發布需要 Meta App Review 批准 instagram_content_publish 後重新連接。')
+    throw new Error('Instagram 自動發布需要 Meta App Review 批准 instagram_business_content_publish 後重新連接。')
   }
 
   const imageUrl = absoluteUrl(post.image_url, baseUrl)
   const caption = post.body || post.title || ''
   const errors: string[] = []
+  const graphOrigin = instagramGraphOrigin(connection)
 
   for (const { label, token } of tokens) {
     try {
@@ -200,7 +205,7 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
       })
 
       const container = await readGraphJson(
-        await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media`, {
+        await fetch(`${graphOrigin}/${connection.account_id}/media`, {
           body: new URLSearchParams({
             access_token: token,
             caption,
@@ -213,7 +218,7 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
       if (!creationId) throw new Error('Instagram media container 建立失敗。')
 
       const published = await readGraphJson(
-        await fetch(`https://graph.facebook.com/v18.0/${connection.account_id}/media_publish`, {
+        await fetch(`${graphOrigin}/${connection.account_id}/media_publish`, {
           body: new URLSearchParams({
             access_token: token,
             creation_id: creationId,

@@ -15,6 +15,7 @@ type ReviewConnection = {
   account_name?: string | null
   has_access_token?: boolean
   has_page_access_token?: boolean
+  login_type?: string
   platform?: string
 } | null
 
@@ -67,7 +68,8 @@ export default function MetaReviewTestPage() {
     const parts = []
     if (connection?.has_access_token) parts.push('user token')
     if (connection?.has_page_access_token) parts.push('page token')
-    return parts.length ? parts.join(' + ') : '未找到 token'
+    const tokenText = parts.length ? parts.join(' + ') : '未找到 token'
+    return connection?.login_type ? `${tokenText} · ${connection.login_type}` : tokenText
   }, [connection])
 
   useEffect(() => {
@@ -231,7 +233,7 @@ export default function MetaReviewTestPage() {
                   </div>
                 </div>
                 <p className="warning-copy">
-                  注意：這個測試會嘗試真實發布到已連接 Instagram。未獲批 `instagram_content_publish` 前，Meta 可能會回傳權限錯誤。
+                  注意：這個測試會嘗試真實發布到已連接 Instagram。未獲批 `instagram_business_content_publish` 前，Meta 可能會回傳權限錯誤。
                 </p>
 
                 <label>

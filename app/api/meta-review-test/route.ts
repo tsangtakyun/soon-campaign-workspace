@@ -10,6 +10,7 @@ type SocialConnection = {
   account_id: string | null
   account_name: string | null
   access_token: string | null
+  page_id: string | null
   page_access_token: string | null
   platform: string
   workspace_id: string | null
@@ -68,6 +69,10 @@ function connectionTokens(connection: SocialConnection) {
   }[]
 }
 
+function instagramGraphOrigin(connection: SocialConnection) {
+  return connection.page_id ? 'https://graph.facebook.com' : 'https://graph.instagram.com'
+}
+
 async function withConnectionToken<T>(
   connection: SocialConnection,
   label: string,
@@ -93,16 +98,26 @@ async function withConnectionToken<T>(
   throw new Error(`${label} failed. ${errors.join(' | ')}`)
 }
 
-async function graphGet(path: string, token: string, searchParams?: Record<string, string>) {
-  const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${path}`)
+async function graphGet(
+  connection: SocialConnection,
+  path: string,
+  token: string,
+  searchParams?: Record<string, string>
+) {
+  const url = new URL(`${instagramGraphOrigin(connection)}/${GRAPH_VERSION}/${path}`)
   url.searchParams.set('access_token', token)
   Object.entries(searchParams || {}).forEach(([key, value]) => url.searchParams.set(key, value))
   return readGraphJson(await fetch(url.toString(), { cache: 'no-store' }), `GET /${path}`)
 }
 
-async function graphPost(path: string, body: Record<string, string>, token: string) {
+async function graphPost(
+  connection: SocialConnection,
+  path: string,
+  body: Record<string, string>,
+  token: string
+) {
   return readGraphJson(
-    await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${path}`, {
+    await fetch(`${instagramGraphOrigin(connection)}/${GRAPH_VERSION}/${path}`, {
       body: new URLSearchParams({ ...body, access_token: token }),
       method: 'POST',
     }),
@@ -112,8 +127,8 @@ async function graphPost(path: string, body: Record<string, string>, token: stri
 
 async function runProfileTest(connection: SocialConnection) {
   return withConnectionToken(connection, 'Profile test', (token) => {
-    return graphGet(connection.account_id as string, token, {
-      fields: 'id,username,profile_picture_url,followers_count,media_count',
+    return graphGet(connection, connection.account_id as string, token, {
+      fields: 'id,user_id,username,account_type,profile_picture_url,followers_count,media_count',
     })
   })
 }
@@ -129,7 +144,7 @@ async function runInsightsTest(connection: SocialConnection) {
 
     for (const params of attempts) {
       try {
-        return await graphGet(`${connection.account_id}/insights`, token, params)
+        return await graphGet(connection, `${connection.account_id}/insights`, token, params)
       } catch (error) {
         errors.push(errorMessage(error))
       }
@@ -165,6 +180,7 @@ async function runPublishTest(input: {
 }) {
   return withConnectionToken(input.connection, 'Publish test', async (token) => {
     const container = await graphPost(
+      input.connection,
       `${input.connection.account_id}/media`,
       {
         caption: input.caption,
@@ -177,11 +193,12 @@ async function runPublishTest(input: {
 
     await wait(2500)
 
-    const containerStatus = await graphGet(creationId, token, {
+    const containerStatus = await graphGet(input.connection, creationId, token, {
       fields: 'id,status,status_code',
     }).catch((error) => ({ warning: errorMessage(error) }))
 
     const published = await graphPost(
+      input.connection,
       `${input.connection.account_id}/media_publish`,
       { creation_id: creationId },
       token
@@ -225,7 +242,7 @@ export async function GET(req: Request) {
     const [{ data: connection }, post] = await Promise.all([
       supabase
         .from('social_connections')
-        .select('platform,workspace_id,account_id,account_name,access_token,page_access_token')
+        .select('platform,workspace_id,account_id,account_name,access_token,page_access_token,page_id')
         .eq('workspace_id', workspaceId)
         .eq('platform', 'instagram')
         .maybeSingle(),
@@ -239,6 +256,7 @@ export async function GET(req: Request) {
             account_name: connection.account_name,
             has_access_token: Boolean(connection.access_token),
             has_page_access_token: Boolean(connection.page_access_token),
+            login_type: connection.page_id ? 'facebook_login' : 'instagram_login',
             platform: connection.platform,
           }
         : null,
@@ -288,7 +306,7 @@ export async function POST(req: Request) {
     const supabase = createAdminSupabase()
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
-      .select('platform,workspace_id,account_id,account_name,access_token,page_access_token')
+      .select('platform,workspace_id,account_id,account_name,access_token,page_access_token,page_id')
       .eq('workspace_id', workspaceId)
       .eq('platform', 'instagram')
       .maybeSingle()
