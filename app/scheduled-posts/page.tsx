@@ -694,7 +694,7 @@ function ScheduledPostsPageContent() {
   const [postsLoading, setPostsLoading] = useState(true)
   const [postsLoadError, setPostsLoadError] = useState('')
   const clientReadyPosts = persistedScheduledPosts.filter((post) =>
-    ['已批准', '已確認', '已排程', '已發布'].includes(post.status)
+    ['已批准', '已確認', '已排程'].includes(post.status)
   )
   const [isBechillActive, setIsBechillActive] = useState(false)
   const scheduledPosts = clientReadyPosts.length > 0 ? clientReadyPosts : isBechillActive ? bechillConfirmedSchedulePosts : []
@@ -741,6 +741,7 @@ function ScheduledPostsPageContent() {
   const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
   const [cardCaptionDrafts, setCardCaptionDrafts] = useState<Record<string, string>>({})
   const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
+  const [cancellingPostId, setCancellingPostId] = useState<string | null>(null)
   const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
   const connectedPublishPlatforms = PUBLISH_PLATFORMS.filter((platform) => platformConnections[platform.id])
   const hasPublishConnection = connectedPublishPlatforms.length > 0
@@ -852,6 +853,39 @@ function ScheduledPostsPageContent() {
       setToolbarMessage(error instanceof Error ? error.message : 'Caption 儲存失敗，請再試一次。')
     } finally {
       setSavingCaptionPostId(null)
+    }
+  }
+
+  async function cancelScheduledPost(post: ScheduledPost) {
+    if (cancellingPostId) return
+    const confirmed = window.confirm('刪除這個排程？貼文會從已排程內容移除。')
+    if (!confirmed) return
+
+    setCancellingPostId(post.id)
+    setToolbarMessage('')
+
+    try {
+      const { workspaceId } = await resolveActiveWorkspace()
+      if (!workspaceId) throw new Error('找不到目前工作台。')
+
+      const response = await fetch('/api/posts/reject', {
+        body: JSON.stringify({ postId: post.id, workspaceId }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.detail || result?.error || '未能刪除排程，請再試一次。')
+      }
+
+      setPersistedScheduledPosts((current) => current.filter((item) => item.id !== post.id))
+      setPostStatuses((current) => ({ ...current, [post.id]: 'rejected' }))
+      if (selectedPost?.id === post.id) setSelectedPost(null)
+      setToolbarMessage('排程已刪除。')
+    } catch (error) {
+      setToolbarMessage(error instanceof Error ? error.message : '未能刪除排程，請再試一次。')
+    } finally {
+      setCancellingPostId(null)
     }
   }
 
@@ -1126,6 +1160,10 @@ function ScheduledPostsPageContent() {
         : ''
 
       setPostStatuses((current) => ({ ...current, [post.id]: status }))
+      if (status === 'published') {
+        setPersistedScheduledPosts((current) => current.filter((item) => item.id !== post.id))
+        if (selectedPost?.id === post.id) setSelectedPost(null)
+      }
       if (platformsPublished.length) {
         setPublishedPlatforms((current) => {
           const next = { ...current }
@@ -2487,6 +2525,14 @@ function ScheduledPostsPageContent() {
                       </button>
                     )
                   })}
+                  <button
+                    type="button"
+                    className="post-delete-schedule-button"
+                    disabled={publishing || cancellingPostId === post.id}
+                    onClick={() => void cancelScheduledPost(post)}
+                  >
+                    {cancellingPostId === post.id ? '刪除中...' : '刪除排程'}
+                  </button>
                   {!hasPublishConnection ? <span>請先連接發布帳戶</span> : null}
                 </div>
               </article>
@@ -3134,6 +3180,29 @@ const styles = `${dashboardSidebarStyles}
   .post-publish-now-button.is-published {
     background: #e8fff1;
     color: #146c36;
+  }
+
+  .post-delete-schedule-button {
+    border: 1px solid #ffd6d6;
+    border-radius: 8px;
+    background: #fff7f7;
+    color: #b42318;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    min-height: 34px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .post-delete-schedule-button:hover {
+    background: #ffefef;
+  }
+
+  .post-delete-schedule-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
   }
 
   .publish-platform-icon {
