@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -32,10 +30,6 @@ function instagramAppId() {
 
 function instagramAppSecret() {
   return process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET || ''
-}
-
-function shortHash(value: string) {
-  return value ? crypto.createHash('sha256').update(value).digest('hex').slice(0, 12) : ''
 }
 
 function instagramRedirectUri(req: Request) {
@@ -102,12 +96,6 @@ export async function GET(req: Request) {
     })
 
     const redirectUri = state.redirectUri || instagramRedirectUri(req)
-    console.info('[instagram/callback] token exchange', {
-      appId,
-      redirectUri,
-      secretHash: shortHash(appSecret),
-      stateRedirectUri: state.redirectUri,
-    })
     const shortTokenData = (await readJson(
       await fetch('https://api.instagram.com/oauth/access_token', {
         body: new URLSearchParams({
