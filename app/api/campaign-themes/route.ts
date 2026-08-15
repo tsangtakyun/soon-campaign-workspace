@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { anthropicModel } from '@/lib/anthropic-models'
+
 type CampaignThemesRequestBody = {
   profile?: any
   strategy?: any
@@ -148,7 +150,7 @@ export async function POST(request: Request) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_CAMPAIGN_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+        model: anthropicModel(process.env.ANTHROPIC_CAMPAIGN_MODEL),
         max_tokens: 1500,
         temperature: typeof input.regenerateIndex === 'number' ? 0.65 : 0.45,
         system: systemPrompt,

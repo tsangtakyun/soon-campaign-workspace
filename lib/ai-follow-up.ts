@@ -1,4 +1,5 @@
 import { explainAnalysisPoint, type CampaignFormInput } from '@/lib/analysis'
+import { anthropicModel } from '@/lib/anthropic-models'
 
 export type FollowUpPayload = {
   form: CampaignFormInput
@@ -24,7 +25,7 @@ async function generateAnthropicFollowUp(payload: FollowUpPayload) {
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
 
-  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+  const model = anthropicModel()
   const brand = payload.form.businessName || '品牌'
   const contextExplanation = explainAnalysisPoint(payload.form, payload.sectionTitle, payload.item)
 

@@ -1,3 +1,4 @@
+import { anthropicModel } from '@/lib/anthropic-models'
 import { createAdminSupabase } from '@/lib/server-supabase'
 
 export type BrandAnalysis = {
@@ -154,7 +155,7 @@ async function analyzeWithClaude(text: string, url: string, cssColors: string[])
           role: 'user',
         },
       ],
-      model: process.env.ANTHROPIC_BRAND_SOURCE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+      model: anthropicModel(process.env.ANTHROPIC_BRAND_SOURCE_MODEL),
       system: 'You are a senior brand strategist for SOON. Return only valid JSON. No markdown.',
       temperature: 0.2,
     }),

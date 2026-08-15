@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { anthropicModel } from '@/lib/anthropic-models'
+
 type ContentMixItem = {
   id?: string
   title?: string
@@ -157,7 +159,7 @@ export async function POST(req: Request) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: anthropicModel(process.env.ANTHROPIC_TOPIC_MODEL),
         max_tokens: 1300,
         temperature: 0.55,
         system: systemPrompt,

@@ -1,0 +1,69 @@
+[
+  {
+    "workspace": "Egg.soon",
+    "status": "pending_approval",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "carousel",
+    "title": "《蜘蛛俠：重生日》英國拍攝地點解構",
+    "caption": "你以為蜘蛛俠一直在曼哈頓飛？\n\n《蜘蛛俠：重生日》中很多紐約街景，其實不是在紐約完成，而是由英國和蘇格蘭多個地點一起拼出來。格拉斯哥可以扮演紐約街道，Pinewood Studios 接住棚拍與特效，連 Brookwood Cemetery、Basingstoke 的 Fanum House 一帶，都成為這個電影城市的一部分。\n\n這不是電影騙人，而是電影最迷人的地方：用真實地點，拼出另一個讓觀眾相信的世界\n\n資料來源：Sony Pictures、Filming in England、Time Out、GQ Taiwan、Box Office Mojo\n\n————\n點讚關注 @egg.soon，和我們一起看懂每天的奇怪與美好\n\n#蜘蛛俠 #SpiderManBrandNewDay #TomHolland #電影拍攝地 #電影幕後",
+    "scheduled_at_hkt": "2026-08-13 21:30",
+    "platforms": ["Instagram", "Facebook", "Threads"],
+    "assets": [
+      {
+        "filename": "p1_cover_spider-man-uk-filming.png",
+        "slide_number": 1,
+        "image_prompt": "滿版電影片場照片封面，保留蜘蛛俠、片場設備與煙霧；白色大標題放在相片天然煙霧暗位，不加黑色 overlay，不加文字 shadow；右上加入 Entertainment / 日期及黃色片名標籤；左下 egg.soon，右下 01/09",
+        "visual_notes": "封面，主 hook：觀眾以為蜘蛛俠在曼哈頓飛，其實很多紐約街景由英國及蘇格蘭拼出"
+      },
+      {
+        "filename": "p2_background.png",
+        "slide_number": 2,
+        "image_prompt": "上半使用 Tom Holland 與導演街頭片場照片，下半暖白資訊區；深啡粗體標題與正文，黃色片名標籤，保持 editorial 新聞解說感",
+        "visual_notes": "事件背景，不只是 Tom Holland 回歸，而是拆解電影如何用英國地點拍出紐約感"
+      },
+      {
+        "filename": "p3_glasgow_city-double.png",
+        "slide_number": 3,
+        "image_prompt": "上半使用格拉斯哥街頭拍攝現場圖，保留車輛、拍攝設備與街景線索；下半暖白資訊區解釋 Glasgow 作為城市替身",
+        "visual_notes": "第一個地點：格拉斯哥扮演紐約街景"
+      },
+      {
+        "filename": "p4_how-to-build-new-york.png",
+        "slide_number": 4,
+        "image_prompt": "上半使用蜘蛛俠街景拍攝照片，下半暖白資訊區；不使用黑色 overlay 或 shadow，清楚解釋城市替身需要道路、建築、封路與大型器材配合",
+        "visual_notes": "核心知識頁，解釋電影不是隨便找一條街就能扮紐約"
+      },
+      {
+        "filename": "p5_pinewood_studios.png",
+        "slide_number": 5,
+        "image_prompt": "使用較暗的室內動作場面照片作滿版背景，白色文字直接放在自然暗位，黃色標籤標示棚拍與後製；保持電影幕後感",
+        "visual_notes": "Pinewood Studios 頁，說明製片廠如何接住外景、棚拍與特效"
+      },
+      {
+        "filename": "p6_brookwood_cemetery.png",
+        "slide_number": 6,
+        "image_prompt": "上半使用 Tom Holland 於墓園拍攝相關照片，下半暖白資訊區；語氣克制，不獵奇，不寫死墓園具體劇情用途",
+        "visual_notes": "Brookwood Cemetery 頁，交代薩里郡墓園一帶被報道為拍攝地點"
+      },
+      {
+        "filename": "p7_basingstoke_fanum-house.png",
+        "slide_number": 7,
+        "image_prompt": "上半使用 Basingstoke / Fanum House 相關動作拍攝照片，下半暖白資訊區；保留蜘蛛俠、器材及動作場面線索",
+        "visual_notes": "Basingstoke 頁，說明普通城市角落也可成為超級英雄大片現場"
+      },
+      {
+        "filename": "p8_not-fake-film-magic.png",
+        "slide_number": 8,
+        "image_prompt": "上半使用劇組或拍攝現場照片，下半暖白資訊區；解釋城市替身、製片廠與後製如何拼出電影城市",
+        "visual_notes": "觀念澄清頁，不是電影騙人，而是電影製作方法"
+      },
+      {
+        "filename": "p9_ending_question.png",
+        "slide_number": 9,
+        "image_prompt": "上半使用蜘蛛俠在城市高樓之間飛過的電影感照片，下半暖白結尾區；以提問式收結，保持安靜 editorial ending",
+        "visual_notes": "收結頁，引導觀眾下次看電影時思考真正拍攝城市在哪裡"
+      }
+    ],
+    "approval_note": "這則內容以《蜘蛛俠：重生日》的英國及蘇格蘭拍攝地點為切入點，將娛樂話題轉化成電影幕後知識，適合引起影迷互動與收藏。"
+  }
+]

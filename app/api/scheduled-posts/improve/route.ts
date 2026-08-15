@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { anthropicModel } from '@/lib/anthropic-models'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 export const maxDuration = 60
@@ -60,7 +61,7 @@ async function improveWithClaude(input: {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
 
-  const model = process.env.ANTHROPIC_SCHEDULED_POSTS_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+  const model = anthropicModel(process.env.ANTHROPIC_SCHEDULED_POSTS_MODEL)
   const targetField = input.mode === 'copy' ? 'body' : 'improvedImagePrompt'
   const instruction =
     input.mode === 'copy'

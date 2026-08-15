@@ -3,6 +3,7 @@ import {
   normalizeContentStrategyLibrary,
   type ContentStrategyLibraryItem,
 } from '@/lib/content-strategy-library'
+import { anthropicModel } from '@/lib/anthropic-models'
 import type { StrategyLibraryState } from '@/lib/strategy-library'
 
 export type ContentStrategyProfile = {
@@ -60,7 +61,7 @@ export async function recommendContentStrategy(
   contentStrategies: ContentStrategyLibraryItem[] = defaultContentStrategyLibrary
 ): Promise<ContentStrategyRecommendation> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  const model = process.env.ANTHROPIC_STRATEGY_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+  const model = anthropicModel(process.env.ANTHROPIC_STRATEGY_MODEL)
   const fullCatalog = strategyCatalog(contentStrategies)
   const candidateIds = getCandidateStrategies(profile.businessType || '', profile.budget || '')
   const catalog = fullCatalog.filter((item) => candidateIds.includes(item.id))

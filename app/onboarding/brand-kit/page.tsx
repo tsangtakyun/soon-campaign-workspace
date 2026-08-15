@@ -12,11 +12,93 @@ import {
 import { createClient } from '@/lib/supabase'
 import { typefaces } from '@/lib/typefaces'
 import { visualStylePresets } from '@/lib/visual-styles'
-import { resolveActiveWorkspace, workspaceInitial, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
+import {
+  isBechillWorkspace,
+  isEggWorkspace,
+  resolveActiveWorkspace,
+  workspaceInitial,
+  WORKSPACE_CHANGED_EVENT,
+} from '@/lib/workspace-client'
 
 const tabs = ['來源素材', '媒體素材', '品牌樣式', '品牌聲音', '品牌資料'] as const
 
 type BrandTab = (typeof tabs)[number]
+
+const bunchillLogoUrl = '/brand-assets/bechilltogether/bunchill-logo.png'
+const bunchillBrandColors = [
+  { hex: '#F7F1EC', name: '奶白底色' },
+  { hex: '#CFE3F1', name: '睡衣粉藍' },
+  { hex: '#F1B8C6', name: '柔粉紅' },
+  { hex: '#EFE3D2', name: '暖米色' },
+  { hex: '#171717', name: '墨黑線條' },
+]
+const bunchillVisualStyle = '柔和手繪故事卡'
+const bunchillTypeface = 'NaniFont'
+
+const eggSoonLogoUrl = '/brand-assets/eggsoon/soon-egg.png'
+const eggSoonBrandColors = [
+  { hex: '#F4D547', name: 'Eggy 黃' },
+  { hex: '#111111', name: '新聞黑' },
+  { hex: '#F6F1E7', name: '米白紙感' },
+  { hex: '#E24B35', name: '警示紅橙' },
+  { hex: '#FFFFFF', name: '留白底色' },
+]
+const eggSoonVisualStyle = 'Editorial news carousel'
+const eggSoonTypeface = 'GenSenRounded2 / 系統圓體'
+
+const bunchillCoreAssets = [
+  {
+    category: '角色設定',
+    description: '2D 平面角色比例、正面設定與基本造型，用於故事卡及平面內容。',
+    image: '/brand-assets/bechilltogether/bunchill-2D-character-sheet.png',
+    title: 'Bunchill 2D 角色設定',
+  },
+  {
+    category: '角色設定',
+    description: '3D 角色比例與毛感參考，用於 AI 短片、動態場景及立體演繹。',
+    image: '/brand-assets/bechilltogether/bunchill-3D-character-sheet.png',
+    title: 'Bunchill 3D 角色設定',
+  },
+  {
+    category: '表情與動作',
+    description: '常用情緒、表情和反應參考，方便內容維持同一個角色性格。',
+    image: '/brand-assets/bechilltogether/bunchill-expression-library.png',
+    title: 'Bunchill 表情庫',
+  },
+  {
+    category: '視覺語言',
+    description: '故事卡、金句、柔和留白和情緒畫面方向，用於保持內容一致。',
+    image: '/brand-assets/bechilltogether/bunchill-visualexpression.png',
+    title: 'Bunchill 視覺表現',
+  },
+]
+
+const eggSoonCoreAssets = [
+  {
+    category: '角色設定',
+    description: 'Eggy 固定角色比例、蛋白輪廓、蛋黃五官、手腳與整體質感。',
+    image: '/brand-assets/eggsoon/eggy-character-sheet.png',
+    title: 'Eggy 角色設定',
+  },
+  {
+    category: '表情與動作',
+    description: '可用表情與動作庫；Eggy 只作情緒輔助或觀眾視角，不需要每頁出現。',
+    image: '/brand-assets/eggsoon/eggy-expression-library.png',
+    title: 'Eggy 表情庫',
+  },
+  {
+    category: '視覺語言',
+    description: 'Egg.soon 的 news carousel 色彩、排版、資訊層次與品牌氣質。',
+    image: '/brand-assets/eggsoon/egg-soon-visual-language.png',
+    title: 'Egg.soon 視覺語言',
+  },
+  {
+    category: '封面參考',
+    description: '黑底緊急新聞、情緒人物、米白權威新聞、黃色好奇知識型等封面方向。',
+    image: '/brand-assets/eggsoon/approved-carousel-references/01_cover-hooks/cover-yellow-curiosity-animal-fact.png',
+    title: 'Approved Cover Hooks',
+  },
+]
 
 type BrandKit = {
   business_name: string | null
@@ -377,6 +459,9 @@ export default function BrandKitPage() {
   const [sources, setSources] = useState<BrandSource[]>([])
   const [workspaceStyle, setWorkspaceStyle] = useState<WorkspaceBrandStyle | null>(null)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+  const [workspaceLabel, setWorkspaceLabel] = useState('你的工作台')
+  const [isBechillActive, setIsBechillActive] = useState(false)
+  const [isEggActive, setIsEggActive] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisNotice, setAnalysisNotice] = useState('')
@@ -408,46 +493,30 @@ export default function BrandKitPage() {
     return assets
   }, [assets, mediaFilter])
   const brandColorItems = useMemo(() => colorSwatches(workspaceStyle?.brand_colors), [workspaceStyle?.brand_colors])
-
-  useEffect(() => {
-    if (activeTab !== '媒體素材') return
-    console.log(
-      '[BrandKit] rendering media asset URLs',
-      filteredAssets.map((asset) => ({
-        id: asset.id,
-        normalizedUrl: normalizeMediaImageUrl(asset.url),
-        sourceUrl: asset.source_url,
-        type: asset.asset_type,
-        url: asset.url,
-      }))
-    )
-  }, [activeTab, filteredAssets])
+  const workspaceCoreAssets = isEggActive ? eggSoonCoreAssets : isBechillActive ? bunchillCoreAssets : []
+  const workspaceFallbackColors = isEggActive ? eggSoonBrandColors : isBechillActive ? bunchillBrandColors : []
+  const fallbackLogoUrl = isEggActive ? eggSoonLogoUrl : isBechillActive ? bunchillLogoUrl : ''
+  const fallbackVisualStyle = isEggActive ? eggSoonVisualStyle : isBechillActive ? bunchillVisualStyle : '尚未設定'
+  const fallbackTypeface = isEggActive ? eggSoonTypeface : isBechillActive ? bunchillTypeface : '尚未設定'
+  const visualStyleNote = isEggActive
+    ? '資料核查、強 hook、4:5 editorial 排版，適合新聞、熱話、文化現象及品牌空間分析。'
+    : isBechillActive
+      ? '溫柔、留白、手繪感，適合人生金句故事卡及情緒共鳴內容。'
+      : ''
 
   useEffect(() => {
     setVisualIdentityDraft(workspaceStyle?.visual_identity_description || '')
   }, [workspaceStyle?.visual_identity_description])
 
   useEffect(() => {
-    if (!workspaceStyle) return
-    console.log('[BrandKit] workspaceStyle state:', JSON.stringify(workspaceStyle))
-  }, [workspaceStyle])
-
-  useEffect(() => {
-    console.log('[BrandKit] addingVoiceTag state:', addingVoiceTag)
-  }, [addingVoiceTag])
-
-  useEffect(() => {
     if (!workspaceId) return
-    console.log('[BrandKit eager] workspaceId:', workspaceId, 'fetching settings')
     fetch(`/api/workspace-settings?workspace_id=${encodeURIComponent(workspaceId)}`, {
       cache: 'no-store',
     })
       .then((response) => response.json())
       .then((data) => {
         const nextWorkspaceStyle = (data?.workspace || data || null) as WorkspaceBrandStyle | null
-        console.log('[BrandKit eager] workspaceStyle response:', JSON.stringify(nextWorkspaceStyle))
         if (nextWorkspaceStyle?.brand_colors || nextWorkspaceStyle?.visual_identity_description) {
-          console.log('[BrandKit] eager workspaceStyle set:', JSON.stringify(nextWorkspaceStyle))
           setWorkspaceStyle(nextWorkspaceStyle)
         }
       })
@@ -457,7 +526,6 @@ export default function BrandKitPage() {
   async function refreshBrandKit(targetWorkspaceId?: string | null) {
     const resolvedWorkspaceId = targetWorkspaceId || workspaceId
     if (!resolvedWorkspaceId) return
-    console.log('[BrandKit] fetching brand data with workspaceId:', resolvedWorkspaceId)
 
     const [response, workspaceResponse] = await Promise.all([
       fetch(`/api/brand-kit-data?workspace_id=${encodeURIComponent(resolvedWorkspaceId)}`, {
@@ -471,20 +539,6 @@ export default function BrandKitPage() {
     const workspacePayload = await workspaceResponse.json().catch(() => null)
     const nextWorkspaceStyle = (workspacePayload?.workspace || workspacePayload || null) as WorkspaceBrandStyle | null
 
-    console.log('[BrandKit] brand data fetch result', {
-      workspaceId: resolvedWorkspaceId,
-      ok: response.ok,
-      workspaceSettingsOk: workspaceResponse.ok,
-      sourcesCount: payload?.sources?.length || 0,
-      hasProfile: Boolean(payload?.brandProfile),
-      hasVoice: Boolean(payload?.brandVoice),
-      workspaceBrandColors: nextWorkspaceStyle?.brand_colors,
-      workspaceVisualIdentityDescription: nextWorkspaceStyle?.visual_identity_description,
-      error: payload?.error,
-      workspaceError: workspacePayload?.error,
-      errors: payload?.errors,
-    })
-    console.log('[BrandKit] workspaceStyle set:', JSON.stringify(nextWorkspaceStyle))
     if (workspaceResponse.ok && nextWorkspaceStyle) setWorkspaceStyle(nextWorkspaceStyle)
 
     if (!response.ok || !payload) return
@@ -696,7 +750,6 @@ export default function BrandKitPage() {
   }
 
   function startVoiceScalarEdit(field: BrandVoiceScalarField) {
-    console.log('[BrandKit] brand voice scalar add/edit clicked:', field)
     setAddingVoiceTag(null)
     setEditingVoiceScalar(field)
     setVoiceScalarDraft(voiceScalarValue(brandVoice, field))
@@ -733,7 +786,6 @@ export default function BrandKitPage() {
   }
 
   function startVoiceTagAdd(field: BrandVoiceTagField) {
-    console.log('[BrandKit] brand voice tag add clicked:', field)
     setEditingVoiceScalar(null)
     setAddingVoiceTag(field)
     setVoiceTagDraft('')
@@ -869,9 +921,15 @@ export default function BrandKitPage() {
         let assetsQuery = supabase.from('brand_assets').select('*').order('created_at', { ascending: false })
 
         if (user?.id) {
-          ;({ workspaceId } = await resolveActiveWorkspace())
+          const resolvedWorkspace = await resolveActiveWorkspace()
+          workspaceId = resolvedWorkspace.workspaceId
           if (!workspaceId) return
-          if (!cancelled) setWorkspaceId(workspaceId)
+          if (!cancelled) {
+            setWorkspaceId(workspaceId)
+            setWorkspaceLabel(resolvedWorkspace.activeWorkspace?.brandName || resolvedWorkspace.activeWorkspace?.name || '你的工作台')
+            setIsBechillActive(isBechillWorkspace(resolvedWorkspace.activeWorkspace))
+            setIsEggActive(isEggWorkspace(resolvedWorkspace.activeWorkspace))
+          }
 
           brandQuery = brandQuery.eq('workspace_id', workspaceId)
           assetsQuery = buildAssetsQuery().eq('workspace_id', workspaceId)
@@ -907,8 +965,8 @@ export default function BrandKitPage() {
         }
 
         if (cancelled) return
-        if (!brandError && nextBrandData) setBrand(nextBrandData as BrandKit)
-        if (!assetError && nextAssetData) setAssets(nextAssetData as BrandAsset[])
+        setBrand(!brandError && nextBrandData ? (nextBrandData as BrandKit) : fallbackBrand)
+        setAssets(!assetError && nextAssetData ? (nextAssetData as BrandAsset[]) : [])
         if (workspaceId) await refreshBrandKit(workspaceId)
       } catch {
         // Keep fallback until onboarding data is persisted.
@@ -934,7 +992,6 @@ export default function BrandKitPage() {
 
   useEffect(() => {
     if (!workspaceId) return
-    console.log('[BrandKit] workspaceId resolved, refreshing brand kit:', workspaceId)
     void refreshBrandKit(workspaceId)
   }, [workspaceId])
 
@@ -955,7 +1012,119 @@ export default function BrandKitPage() {
           </div>
         </header>
 
-        <div className="brand-kit-layout">
+        {loading ? (
+          <div className="brand-kit-loading" aria-busy="true">
+            <section className="brand-kit-loading-hero">
+              <div>
+                <span />
+                <strong>正在載入品牌素材庫</strong>
+                <p>SOON 正在讀取目前工作台的 Logo、角色設定及品牌視覺方向。</p>
+              </div>
+              <i />
+            </section>
+            <section className="brand-kit-loading-grid">
+              <i />
+              <i />
+              <i />
+            </section>
+          </div>
+        ) : (
+        <div className="simple-brand-kit">
+          {saveNotice ? <div className="brand-save-toast">{saveNotice}</div> : null}
+          {analysisError ? <div className="simple-brand-alert">{analysisError}</div> : null}
+
+          <section className="brand-hero-panel">
+            <div>
+              <span className="brand-kicker">{workspaceLabel}</span>
+              <h2>品牌素材庫</h2>
+              <p>此頁集中管理 Logo、角色設定、表情動作及品牌視覺方向，SOON 之後會依照這套素材生成內容。</p>
+            </div>
+            <div className="brand-logo-card">
+              <span>Logo</span>
+              {workspaceStyle?.logo_url || brand.logo_url || fallbackLogoUrl ? (
+                <img
+                  src={displayImageUrl(workspaceStyle?.logo_url || brand.logo_url || fallbackLogoUrl)}
+                  alt={`${workspaceLabel} Logo`}
+                />
+              ) : (
+                <div className="brand-logo-placeholder">{workspaceInitial(workspaceLabel)}</div>
+              )}
+              <label>
+                {uploadingLogo ? '上傳中...' : '上傳 / 更換 Logo'}
+                <input accept="image/*" type="file" onChange={handleLogoUpload} disabled={uploadingLogo || !workspaceId} />
+              </label>
+            </div>
+          </section>
+
+          <section className="simple-brand-section">
+            <div className="simple-section-head">
+              <div>
+                <span className="brand-kicker">核心素材</span>
+                <h3>角色、表情、視覺方向</h3>
+              </div>
+              <p>{workspaceCoreAssets.length ? `${workspaceCoreAssets.length} 個固定參考` : '尚未加入固定參考'}</p>
+            </div>
+            {workspaceCoreAssets.length ? (
+              <div className="brand-asset-grid">
+                {workspaceCoreAssets.map((asset) => (
+                <article className="brand-asset-card" key={asset.title}>
+                  <div className="brand-asset-image">
+                    <img src={asset.image} alt={asset.title} loading="lazy" />
+                  </div>
+                  <div>
+                    <span>{asset.category}</span>
+                    <h4>{asset.title}</h4>
+                    <p>{asset.description}</p>
+                  </div>
+                </article>
+                ))}
+              </div>
+            ) : (
+              <div className="simple-empty-panel">
+                <strong>核心素材準備中</strong>
+                <p>上傳 Logo、產品圖或視覺 reference 後，SOON 會在這裡整理成可跟隨的品牌素材。</p>
+              </div>
+            )}
+          </section>
+
+          <section className="simple-brand-section">
+            <div className="simple-section-head">
+              <div>
+                <span className="brand-kicker">品牌設定</span>
+                <h3>顏色、視覺風格、字體</h3>
+              </div>
+            </div>
+            <div className="simple-settings-grid">
+              <div>
+                <label>品牌色</label>
+                <div className="simple-color-row">
+                  {(brandColorItems.length > 0 ? brandColorItems : workspaceFallbackColors).map((color) => (
+                    <span className="simple-color-chip" key={color.hex}>
+                      <i style={{ backgroundColor: color.hex }} />
+                      <strong>{color.name}</strong>
+                      <em>{color.hex}</em>
+                    </span>
+                  ))}
+                  {brandColorItems.length === 0 && workspaceFallbackColors.length === 0 ? <span className="simple-unset">尚未設定</span> : null}
+                </div>
+              </div>
+              <div>
+                <label>視覺風格</label>
+                <p>{workspaceStyle?.visual_style ? visualStyleDisplayName(workspaceStyle.visual_style, brand) : fallbackVisualStyle}</p>
+                {visualStyleNote || workspaceStyle?.visual_style ? <em>{visualStyleNote}</em> : null}
+              </div>
+              <div>
+                <label>字體</label>
+                <p style={{ fontFamily: workspaceStyle?.font_style || 'NaniFont-Regular', fontSize: '20px' }}>
+                  {workspaceStyle?.font_style ? typefaceDisplayName(workspaceStyle.font_style, brand) : fallbackTypeface}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+        )}
+
+        {!loading ? <div className="brand-kit-layout">
           <nav className="brand-kit-subnav" aria-label="品牌素材庫分類">
             {tabs.map((tab) => (
               <button
@@ -1101,16 +1270,11 @@ export default function BrandKitPage() {
                             <span />
                           </div>
                         ) : (
-                          <img
-                            src={normalizeMediaImageUrl(asset.url)}
-                            alt={asset.filename ?? asset.asset_type}
-                            loading="lazy"
-                            onError={() => {
-                              console.warn('[BrandKit] media image failed to load', {
-                                id: asset.id,
-                                normalizedUrl: normalizeMediaImageUrl(asset.url),
-                                url: asset.url,
-                              })
+                            <img
+                              src={normalizeMediaImageUrl(asset.url)}
+                              alt={asset.filename ?? asset.asset_type}
+                              loading="lazy"
+                              onError={() => {
                               setFailedAssetIds((current) => current.includes(asset.id) ? current : [...current, asset.id])
                             }}
                           />
@@ -1129,12 +1293,6 @@ export default function BrandKitPage() {
 
             {activeTab === '品牌樣式' ? (
               <section className="brand-style-content">
-                {(() => {
-                  console.log('[BrandKit render] activeTab:', activeTab)
-                  console.log('[BrandKit render] brand_colors:', workspaceStyle?.brand_colors)
-                  console.log('[BrandKit render] brandColorItems:', brandColorItems)
-                  return null
-                })()}
                 <h2>品牌樣式</h2>
                 <div className="brand-style-grid">
                   <div className="brand-style-card">
@@ -1398,7 +1556,6 @@ export default function BrandKitPage() {
                                   onClick={(event) => {
                                     event.preventDefault()
                                     event.stopPropagation()
-                                    console.log('+ 新增 clicked for:', field.label, field.key)
                                     startVoiceTagAdd(field.key as BrandVoiceTagField)
                                   }}
                                 >
@@ -1595,7 +1752,7 @@ export default function BrandKitPage() {
               </section>
             ) : null}
           </div>
-        </div>
+        </div> : null}
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${brandKitStyles}` }} />
@@ -1604,6 +1761,14 @@ export default function BrandKitPage() {
 }
 
 const brandKitStyles = `
+  @font-face {
+    font-family: 'NaniFont-Regular';
+    src: url('/fonts/max32002/NaniFont-Regular.woff2') format('woff2');
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+  }
+
   .site-nav {
     display: none;
   }
@@ -2668,6 +2833,426 @@ const brandKitStyles = `
 
     .source-materials-form {
       flex-direction: column;
+    }
+  }
+
+  .simple-brand-kit {
+    display: grid;
+    gap: 18px;
+    padding: 28px;
+  }
+
+  .brand-kit-loading {
+    display: grid;
+    gap: 18px;
+    padding: 28px;
+  }
+
+  .brand-kit-loading-hero {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e4e5e9;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(32, 33, 38, 0.04);
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    min-height: 190px;
+    padding: 28px 30px;
+  }
+
+  .brand-kit-loading-hero div {
+    display: grid;
+    gap: 10px;
+  }
+
+  .brand-kit-loading-hero span,
+  .brand-kit-loading-hero i,
+  .brand-kit-loading-grid i {
+    display: block;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #f1f2f4 0%, #fbfbfc 45%, #f1f2f4 100%);
+    background-size: 220% 100%;
+    animation: brandKitSkeleton 1.2s ease-in-out infinite;
+  }
+
+  .brand-kit-loading-hero span {
+    height: 14px;
+    width: 120px;
+  }
+
+  .brand-kit-loading-hero strong {
+    color: #202126;
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  .brand-kit-loading-hero p {
+    color: #6f737d;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .brand-kit-loading-hero i {
+    flex: 0 0 auto;
+    height: 118px;
+    width: 190px;
+  }
+
+  .brand-kit-loading-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .brand-kit-loading-grid i {
+    min-height: 170px;
+  }
+
+  @keyframes brandKitSkeleton {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+  }
+
+  .brand-kit-layout {
+    display: none;
+  }
+
+  .simple-brand-alert {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #991b1b;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .brand-hero-panel,
+  .simple-brand-section {
+    background: #ffffff;
+    border: 1px solid #e6e7eb;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, 0.04);
+  }
+
+  .brand-hero-panel {
+    align-items: stretch;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    padding: 24px;
+  }
+
+  .brand-kicker {
+    color: #7b7f88;
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .brand-hero-panel h2,
+  .simple-section-head h3 {
+    color: #202126;
+    font-size: 24px;
+    font-weight: 750;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .brand-hero-panel p,
+  .simple-section-head p,
+  .brand-asset-card p,
+  .simple-empty-panel p,
+  .simple-settings-grid p {
+    color: #6f737d;
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 8px 0 0;
+  }
+
+  .brand-logo-card {
+    align-items: center;
+    background: #f8f8f9;
+    border: 1px solid #ebecef;
+    border-radius: 12px;
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+    padding: 18px;
+    text-align: center;
+  }
+
+  .brand-logo-card > span,
+  .simple-settings-grid label {
+    color: #8a8d94;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .brand-logo-card img {
+    max-height: 92px;
+    max-width: 180px;
+    object-fit: contain;
+  }
+
+  .brand-logo-mark,
+  .brand-logo-placeholder {
+    align-items: center;
+    background: #ffe15c;
+    border-radius: 14px;
+    color: #202126;
+    display: flex;
+    font-size: 32px;
+    font-weight: 800;
+    height: 92px;
+    justify-content: center;
+    width: 92px;
+  }
+
+  .simple-unset {
+    color: #777b84;
+    font-size: 14px;
+  }
+
+  .brand-logo-card label,
+  .simple-upload-button {
+    align-items: center;
+    background: #111111;
+    border: 1px solid #111111;
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 12px;
+    position: relative;
+  }
+
+  .brand-logo-card input,
+  .simple-upload-button input,
+  .simple-color-add input {
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    width: 1px;
+  }
+
+  .simple-brand-section {
+    display: grid;
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .simple-section-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+  }
+
+  .brand-asset-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .brand-asset-card {
+    border: 1px solid #ebecef;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .brand-asset-image {
+    align-items: center;
+    aspect-ratio: 1;
+    background: #f5f5f6;
+    display: flex;
+    justify-content: center;
+  }
+
+  .brand-asset-image img {
+    display: block;
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+  }
+
+  .brand-asset-card div:last-child {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .brand-asset-card span {
+    color: #8a8d94;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .brand-asset-card h4 {
+    color: #202126;
+    font-size: 15px;
+    font-weight: 750;
+    line-height: 1.3;
+    margin: 0;
+  }
+
+  .brand-asset-card p {
+    font-size: 12px;
+    margin: 0;
+  }
+
+  .simple-upload-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .simple-upload-grid article {
+    border: 1px solid #ebecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .simple-upload-grid img {
+    aspect-ratio: 1;
+    display: block;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .simple-upload-grid span {
+    background: rgba(17, 17, 17, 0.82);
+    border-radius: 999px;
+    bottom: 8px;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    left: 8px;
+    padding: 4px 8px;
+    position: absolute;
+  }
+
+  .simple-empty-panel {
+    border: 1px dashed #dfe1e6;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .simple-settings-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .simple-settings-grid > div {
+    background: #f8f8f9;
+    border: 1px solid #ebecef;
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .simple-color-row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .simple-color-row button,
+  .simple-color-add {
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 999px;
+    cursor: pointer;
+    height: 34px;
+    width: 34px;
+  }
+
+  .simple-color-add {
+    align-items: center;
+    background: #ffffff;
+    color: #6f737d;
+    display: inline-flex;
+    justify-content: center;
+    position: relative;
+  }
+
+  .simple-color-chip {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e3e4e8;
+    border-radius: 999px;
+    color: #202126;
+    display: inline-grid;
+    gap: 6px;
+    grid-template-columns: 22px auto auto;
+    min-height: 36px;
+    padding: 6px 10px 6px 7px;
+  }
+
+  .simple-color-chip i {
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 999px;
+    display: block;
+    height: 22px;
+    width: 22px;
+  }
+
+  .simple-color-chip strong {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .simple-color-chip em {
+    color: #8a8d94;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .simple-settings-grid > div em {
+    color: #7b7f88;
+    display: block;
+    font-size: 12px;
+    font-style: normal;
+    line-height: 1.45;
+    margin-top: 8px;
+  }
+
+  @media (max-width: 1180px) {
+    .brand-asset-grid,
+    .simple-upload-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 720px) {
+    .simple-brand-kit {
+      padding: 16px;
+    }
+
+    .brand-hero-panel,
+    .simple-settings-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .simple-section-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .brand-asset-grid,
+    .simple-upload-grid {
+      grid-template-columns: 1fr;
     }
   }
 `

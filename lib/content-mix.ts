@@ -1,5 +1,6 @@
 import type { CampaignTheme } from '@/lib/campaign-theme'
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
+import { anthropicModel } from '@/lib/anthropic-models'
 import { getPricingPlan } from '@/lib/pricing'
 
 export type ContentMixItem = {
@@ -139,7 +140,7 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_CONTENT_MIX_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+        model: anthropicModel(process.env.ANTHROPIC_CONTENT_MIX_MODEL),
         max_tokens: 900,
         temperature: 0.25,
         system: systemPrompt,

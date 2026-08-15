@@ -1,3 +1,5 @@
+import { anthropicModel } from '@/lib/anthropic-models'
+
 export type WebsiteAnalysisInput = {
   website: string
   language: string
@@ -142,7 +144,7 @@ export async function analyzeWebsiteWithClaude(input: WebsiteAnalysisInput): Pro
   }
 
   const website = await scrapeWebsite(input.website)
-  const model = process.env.ANTHROPIC_WEBSITE_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514'
+  const model = anthropicModel(process.env.ANTHROPIC_WEBSITE_MODEL)
 
   const systemPrompt = [
     'You are a senior marketing strategist building an onboarding profile for SOON, an AI marketing and content commerce platform.',

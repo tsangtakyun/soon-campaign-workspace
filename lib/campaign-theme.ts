@@ -1,4 +1,5 @@
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
+import { anthropicModel } from '@/lib/anthropic-models'
 
 export type CampaignThemeInput = {
   profile?: ContentStrategyProfile
@@ -91,7 +92,7 @@ The campaign should be practical enough to direct social, video, newsletter, and
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: process.env.ANTHROPIC_CAMPAIGN_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+        model: anthropicModel(process.env.ANTHROPIC_CAMPAIGN_MODEL),
         max_tokens: 1100,
         temperature: 0.35,
         system: systemPrompt,
