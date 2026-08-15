@@ -321,15 +321,21 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   )
   const [notes, setNotes] = useState(() => week.posts.map(() => ''))
   const [slides, setSlides] = useState(() => week.posts.map(() => 0))
+  const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
   const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null)
   const [toast, setToast] = useState('')
+  const visiblePosts = week.posts.filter(
+    (post) => post.status !== 'published' && (!post.id || !hiddenPostIds.includes(post.id))
+  )
 
-  const completed = week.posts.filter((post, index) => {
-    if (post.status === 'published' || post.status === 'confirmed') return true
+  const completed = visiblePosts.filter((post) => {
+    const index = week.posts.findIndex((item) => item === post)
+    if (post.status === 'confirmed') return true
     const decision = decisions[index]
     return decision === 'ok' || (decision && notes[index].trim())
   }).length
-  const progressPercent = week.posts.length ? (completed / week.posts.length) * 100 : 0
+  const progressPercent = visiblePosts.length ? (completed / visiblePosts.length) * 100 : 0
 
   function showToast(message: string) {
     setToast(message)
@@ -361,6 +367,30 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   function handleDecision(index: number, decision: ApprovalDecision) {
     setDecision(index, decision)
     void persistDecision(index, decision)
+  }
+
+  async function deleteScheduledPost(post: ApprovalPost) {
+    if (!post.id || !week.workspaceId || deletingPostId) return
+    const confirmed = window.confirm('刪除這個排程？貼文會從首頁和已排程內容移除。')
+    if (!confirmed) return
+
+    setDeletingPostId(post.id)
+    try {
+      const response = await fetch('/api/posts/reject', {
+        body: JSON.stringify({ postId: post.id, workspaceId: week.workspaceId }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '刪除失敗')
+
+      setHiddenPostIds((current) => [...current, post.id as string])
+      showToast('排程已刪除')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '未能刪除排程')
+    } finally {
+      setDeletingPostId(null)
+    }
   }
 
   function setNote(index: number, value: string) {
@@ -406,13 +436,12 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
       '',
     ]
 
-    week.posts.forEach((post, index) => {
+    visiblePosts.forEach((post) => {
+      const index = week.posts.findIndex((item) => item === post)
       const decision = decisions[index]
       lines.push(`${post.no}. ${post.kind}${post.title}`)
       lines.push(
-        post.status === 'published'
-          ? `已發布：${post.publishedAt}`
-          : post.status === 'confirmed'
+        post.status === 'confirmed'
             ? '已確認：可以出'
             : decision
               ? approvalLabels[decision]
@@ -422,10 +451,10 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
       lines.push('')
     })
 
-    const ok = week.posts.filter(
-      (post, index) => post.status === 'published' || post.status === 'confirmed' || decisions[index] === 'ok'
+    const ok = visiblePosts.filter(
+      (post) => post.status === 'confirmed' || decisions[week.posts.findIndex((item) => item === post)] === 'ok'
     ).length
-    lines.push(`小結：${ok}/${week.posts.length} 條可以出，${week.posts.length - ok} 條要跟進。`)
+    lines.push(`小結：${ok}/${visiblePosts.length} 條可以出，${visiblePosts.length - ok} 條要跟進。`)
     lines.push('—— 由 SOON 審批頁自動產生')
     return lines.join('\n')
   }
@@ -460,7 +489,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
       <div className="approval-progress-card">
         <div>
           <strong>
-            本週確認 {completed}/{week.posts.length} 條
+            本週確認 {completed}/{visiblePosts.length} 條
           </strong>
           <span>{week.completedText}</span>
         </div>
@@ -486,7 +515,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
           const isConfirmed = post.status === 'confirmed'
           const needsNote = decision === 'edit' || decision === 'no'
 
-          if (isPublished) return null
+          if (isPublished || (post.id && hiddenPostIds.includes(post.id))) return null
 
           return (
             <article key={post.no} className={`approval-post ${decision ? `is-${decision}` : ''} ${isConfirmed ? 'is-confirmed' : ''}`}>
@@ -503,6 +532,16 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                   <small>{post.goal}</small>
                 </div>
                 <h3>{post.title}</h3>
+                {post.id && week.workspaceId ? (
+                  <button
+                    type="button"
+                    className="approval-delete-btn"
+                    disabled={deletingPostId === post.id}
+                    onClick={() => void deleteScheduledPost(post)}
+                  >
+                    {deletingPostId === post.id ? '刪除中...' : '刪除排程'}
+                  </button>
+                ) : null}
               </div>
 
               <div className="approval-gallery">
@@ -839,6 +878,7 @@ export default function OnboardingHomePage() {
           const displayPosts = postsData
             .filter((post: any) => {
               const sourceKey = String(post.source_key || '')
+              if (post.status === 'published' || post.status === 'posted' || post.status === 'rejected') return false
               return (
                 sourceKey.startsWith('campaign-1-') ||
                 !isPlaceholderImage(post.image_url || null) ||
@@ -1690,10 +1730,38 @@ const homeStyles = `
   }
 
   .approval-post-head {
+    position: relative;
     padding: 15px 17px 13px;
   }
 
+  .approval-delete-btn {
+    position: absolute;
+    top: 13px;
+    right: 15px;
+    border: 1px solid #ffd6d6;
+    border-radius: 8px;
+    background: #fff7f7;
+    color: #b42318;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 750;
+    min-height: 30px;
+    padding: 6px 9px;
+    white-space: nowrap;
+  }
+
+  .approval-delete-btn:hover {
+    background: #ffefef;
+  }
+
+  .approval-delete-btn:disabled {
+    cursor: wait;
+    opacity: 0.6;
+  }
+
   .approval-tagrow {
+    padding-right: 88px;
     display: flex;
     align-items: center;
     gap: 10px;
