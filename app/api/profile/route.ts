@@ -3,8 +3,38 @@ import { NextResponse } from 'next/server'
 
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
+const AVATAR_BUCKET = 'avatars'
+const MAX_AVATAR_BYTES = 3 * 1024 * 1024
+
 function safeFilePart(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'avatar'
+}
+
+function storageErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error) return String(error.message)
+  return String(error || '')
+}
+
+function isMissingBucketError(error: unknown) {
+  const message = storageErrorMessage(error).toLowerCase()
+  return message.includes('not found') || message.includes('does not exist') || message.includes('bucket not found')
+}
+
+async function ensureAvatarBucket(supabase: ReturnType<typeof createAdminSupabase>) {
+  const { error } = await supabase.storage.getBucket(AVATAR_BUCKET)
+
+  if (!error) {
+    await supabase.storage.updateBucket(AVATAR_BUCKET, { public: true }).catch(() => null)
+    return
+  }
+
+  if (!isMissingBucketError(error)) throw error
+
+  const { error: createError } = await supabase.storage.createBucket(AVATAR_BUCKET, { public: true })
+  if (createError && !storageErrorMessage(createError).toLowerCase().includes('already exists')) {
+    throw createError
+  }
 }
 
 async function currentUser() {
@@ -48,10 +78,19 @@ export async function PATCH(req: Request) {
     let avatarUrl = typeof form.get('avatarUrl') === 'string' ? String(form.get('avatarUrl')).trim() : ''
 
     if (avatar instanceof File && avatar.size > 0) {
+      if (!avatar.type.startsWith('image/')) {
+        return NextResponse.json({ error: '請上傳圖片檔案。' }, { status: 400 })
+      }
+      if (avatar.size > MAX_AVATAR_BYTES) {
+        return NextResponse.json({ error: '圖片太大，請選擇較細圖片。' }, { status: 413 })
+      }
+
+      await ensureAvatarBucket(supabase)
+
       const ext = safeFilePart(avatar.name.split('.').pop() || 'jpg')
       const path = `${user.id}/${Date.now()}-${safeFilePart(avatar.name.replace(/\.[^.]+$/, ''))}.${ext}`
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
+        .from(AVATAR_BUCKET)
         .upload(path, avatar, {
           cacheControl: '3600',
           contentType: avatar.type || 'image/jpeg',
@@ -59,7 +98,7 @@ export async function PATCH(req: Request) {
         })
 
       if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
       avatarUrl = data.publicUrl
     }
 
@@ -94,6 +133,12 @@ export async function PATCH(req: Request) {
     })
   } catch (error) {
     console.error('[api/profile] PATCH error', error)
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+    return NextResponse.json(
+      {
+        detail: storageErrorMessage(error),
+        error: '未能儲存設定。',
+      },
+      { status: 500 }
+    )
   }
 }

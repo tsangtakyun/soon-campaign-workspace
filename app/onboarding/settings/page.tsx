@@ -5,10 +5,71 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
 
+const AVATAR_MAX_DIMENSION = 1024
+const AVATAR_TARGET_BYTES = 2 * 1024 * 1024
+
 type Profile = {
   avatarUrl?: string | null
   displayName?: string | null
   email?: string | null
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob)
+      } else {
+        reject(new Error('未能處理圖片。'))
+      }
+    }, 'image/jpeg', quality)
+  })
+}
+
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('未能讀取圖片。'))
+    image.src = src
+  })
+}
+
+async function prepareAvatarFile(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('請選擇圖片檔案。')
+  }
+
+  const objectUrl = URL.createObjectURL(file)
+
+  try {
+    const image = await loadImage(objectUrl)
+    const sourceWidth = image.naturalWidth || image.width
+    const sourceHeight = image.naturalHeight || image.height
+    const scale = Math.min(1, AVATAR_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight))
+    const width = Math.max(1, Math.round(sourceWidth * scale))
+    const height = Math.max(1, Math.round(sourceHeight * scale))
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+
+    if (!context) throw new Error('未能處理圖片。')
+
+    canvas.width = width
+    canvas.height = height
+    context.drawImage(image, 0, 0, width, height)
+
+    let blob = await canvasToBlob(canvas, 0.86)
+    if (blob.size > AVATAR_TARGET_BYTES) blob = await canvasToBlob(canvas, 0.72)
+    if (blob.size > AVATAR_TARGET_BYTES) blob = await canvasToBlob(canvas, 0.58)
+    if (blob.size > AVATAR_TARGET_BYTES) {
+      throw new Error('圖片太大，請選擇較細圖片。')
+    }
+
+    const filename = `${file.name.replace(/\.[^.]+$/, '') || 'avatar'}.jpg`
+    return new File([blob], filename, { type: 'image/jpeg' })
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
 }
 
 export default function SettingsPage() {
@@ -44,12 +105,23 @@ export default function SettingsPage() {
     }
   }, [])
 
-  function handleAvatarChange(file: File | null) {
-    setAvatarFile(file)
-    if (file) {
-      setPreviewUrl(URL.createObjectURL(file))
-    } else {
+  async function handleAvatarChange(file: File | null) {
+    setMessage('')
+
+    if (!file) {
+      setAvatarFile(null)
       setPreviewUrl(profile?.avatarUrl || '')
+      return
+    }
+
+    try {
+      const preparedFile = await prepareAvatarFile(file)
+      setAvatarFile(preparedFile)
+      setPreviewUrl(URL.createObjectURL(preparedFile))
+    } catch (error) {
+      setAvatarFile(null)
+      setPreviewUrl(profile?.avatarUrl || '')
+      setMessage(error instanceof Error ? error.message : '未能處理圖片。')
     }
   }
 
@@ -70,7 +142,7 @@ export default function SettingsPage() {
     const payload = await response.json().catch(() => null)
 
     if (!response.ok) {
-      setMessage(payload?.error || '未能儲存設定。')
+      setMessage(payload?.detail || payload?.error || '未能儲存設定。')
       setSaving(false)
       return
     }
@@ -122,7 +194,7 @@ export default function SettingsPage() {
               <input
                 accept="image/*"
                 disabled={loading || saving}
-                onChange={(event) => handleAvatarChange(event.target.files?.[0] || null)}
+                onChange={(event) => void handleAvatarChange(event.target.files?.[0] || null)}
                 type="file"
               />
             </label>
