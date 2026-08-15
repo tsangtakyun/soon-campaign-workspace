@@ -32,6 +32,22 @@ type InsightsPayload = {
   posts?: DashboardPost[]
 }
 
+type InstagramInsightsPayload = {
+  account?: {
+    login_type?: string
+    name?: string | null
+    profile?: {
+      followers_count?: number
+      media_count?: number
+      username?: string
+    }
+  }
+  metrics?: Record<string, number>
+  ok?: boolean
+  token_source?: string
+  updated_at?: string
+}
+
 type TopPost = {
   comments: number
   engagement: string
@@ -134,6 +150,8 @@ function buildSummary(posts: DashboardPost[], hasInstagram: boolean) {
 export default function InsightsPage() {
   const router = useRouter()
   const [payload, setPayload] = useState<InsightsPayload | null>(null)
+  const [instagramInsights, setInstagramInsights] = useState<InstagramInsightsPayload | null>(null)
+  const [instagramInsightsError, setInstagramInsightsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -153,14 +171,18 @@ export default function InsightsPage() {
           return
         }
 
-        const response = await fetch(`/api/dashboard-data?workspace_id=${workspaceId}`, { cache: 'no-store' })
-        const data = await response.json().catch(() => null)
-        if (!response.ok) {
-          throw new Error(data?.error || '未能讀取洞察資料')
-        }
+        const [dashboardResponse, instagramResponse] = await Promise.all([
+          fetch(`/api/dashboard-data?workspace_id=${workspaceId}`, { cache: 'no-store' }),
+          fetch(`/api/instagram/insights?workspace_id=${workspaceId}`, { cache: 'no-store' }),
+        ])
+        const data = await dashboardResponse.json().catch(() => null)
+        const instagramData = await instagramResponse.json().catch(() => null)
+        if (!dashboardResponse.ok) throw new Error(data?.error || '未能讀取洞察資料')
 
         if (!cancelled) {
           setPayload(data)
+          setInstagramInsights(instagramResponse.ok ? instagramData : null)
+          setInstagramInsightsError(instagramResponse.ok ? null : instagramData?.error || '未能同步 Instagram 洞察')
         }
       } catch (err) {
         if (!cancelled) {
@@ -191,6 +213,14 @@ export default function InsightsPage() {
   const instagramConnection = connections.find((connection) => connection.platform === 'instagram')
   const summary = useMemo(() => buildSummary(posts, Boolean(instagramConnection)), [instagramConnection, posts])
   const businessName = payload?.brandKit?.business_name || '目前工作台'
+  const instagramMetrics = instagramInsights?.metrics || {}
+  const profile = instagramInsights?.account?.profile || {}
+  const displayReach = instagramInsights ? (instagramMetrics.reach || 0) : summary.impressions
+  const displayProfileViews = instagramInsights ? (instagramMetrics.profile_views || 0) : summary.likes
+  const displayFollowers =
+    typeof profile.followers_count === 'number' ? profile.followers_count : summary.publishedPosts
+  const displayMediaCount =
+    typeof profile.media_count === 'number' ? profile.media_count : summary.totalPosts
 
   return (
     <main className="dashboard-page">
@@ -218,6 +248,11 @@ export default function InsightsPage() {
           ) : (
             <>
               {error ? <div className="insights-alert warning">{error}</div> : null}
+              {instagramInsightsError && summary.hasInstagram ? (
+                <div className="insights-alert warning">
+                  Instagram 真實洞察暫時未能同步：{instagramInsightsError}
+                </div>
+              ) : null}
 
               <section className="insights-hero">
                 <div>
@@ -225,7 +260,9 @@ export default function InsightsPage() {
                   <h2>{businessName} 表現總覽</h2>
                   <p>
                     {summary.hasInstagram
-                      ? `已連接 ${normalizePlatformName(instagramConnection?.account_name)}。SOON 會在 Meta 開通 insights 權限後，把真實觸及、互動及貼文表現同步到這裡。`
+                      ? instagramInsights
+                        ? `已連接 ${normalizePlatformName(instagramConnection?.account_name)}，正在使用 ${instagramInsights.account?.login_type || 'instagram_login'} 同步真實 Instagram 洞察。`
+                        : `已連接 ${normalizePlatformName(instagramConnection?.account_name)}。SOON 會在 Meta 開通 insights 權限後，把真實觸及、互動及貼文表現同步到這裡。`
                       : '尚未連接 Instagram。連接後，這裡會顯示帳戶及內容表現。'}
                   </p>
                 </div>
@@ -247,24 +284,24 @@ export default function InsightsPage() {
 
               <section className="metric-grid" aria-label="Instagram 表現">
                 <article>
-                  <span>觸及估算</span>
-                  <strong>{summary.impressions.toLocaleString('en-US')}</strong>
-                  <em>等待 Meta 真實數據同步</em>
+                  <span>{instagramInsights ? 'Instagram Reach' : '觸及估算'}</span>
+                  <strong>{displayReach.toLocaleString('en-US')}</strong>
+                  <em>{instagramInsights ? 'Meta Graph API' : '等待 Meta 真實數據同步'}</em>
                 </article>
                 <article>
-                  <span>互動率</span>
-                  <strong>{summary.engagement}%</strong>
-                  <em>Likes、留言、收藏綜合</em>
+                  <span>{instagramInsights ? 'Profile Views' : '互動率'}</span>
+                  <strong>{instagramInsights ? displayProfileViews.toLocaleString('en-US') : `${summary.engagement}%`}</strong>
+                  <em>{instagramInsights ? '最近同步數據' : 'Likes、留言、收藏綜合'}</em>
                 </article>
                 <article>
-                  <span>已發布內容</span>
-                  <strong>{summary.publishedPosts}</strong>
-                  <em>{summary.approvedPosts} 條已確認或排程</em>
+                  <span>{instagramInsights ? 'Followers' : '已發布內容'}</span>
+                  <strong>{displayFollowers.toLocaleString('en-US')}</strong>
+                  <em>{instagramInsights ? 'Instagram profile' : `${summary.approvedPosts} 條已確認或排程`}</em>
                 </article>
                 <article>
-                  <span>內容庫</span>
-                  <strong>{summary.totalPosts}</strong>
-                  <em>目前工作台內容總數</em>
+                  <span>{instagramInsights ? 'Media Count' : '內容庫'}</span>
+                  <strong>{displayMediaCount.toLocaleString('en-US')}</strong>
+                  <em>{instagramInsights ? 'Instagram profile' : '目前工作台內容總數'}</em>
                 </article>
               </section>
 

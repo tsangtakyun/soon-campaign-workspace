@@ -2281,6 +2281,20 @@ function ScheduledPostsPageContent() {
                   <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
                   <div className="post-time-actions">
                     <strong>{post.time}</strong>
+                    <button
+                      type="button"
+                      className="quick-publish-button"
+                      disabled={publishing || !hasPublishConnection || post.status === '已發布'}
+                      onClick={() => void publishPost(post, undefined, true)}
+                    >
+                      {publishingPlatform === 'all'
+                        ? '發布中...'
+                        : post.status === '已發布'
+                          ? '已發布'
+                          : hasPublishConnection
+                            ? '立即發布'
+                            : '未連接'}
+                    </button>
                     <button type="button" onClick={() => openScheduleModal(post)}>
                       改時間
                     </button>
@@ -2752,6 +2766,25 @@ const styles = `${dashboardSidebarStyles}
   .post-time-actions button:hover {
     border-color: #c7c9cf;
     background: #f7f7f8;
+  }
+
+  .post-time-actions .quick-publish-button {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+    min-width: 72px;
+  }
+
+  .post-time-actions .quick-publish-button:hover {
+    background: #202126;
+    border-color: #202126;
+  }
+
+  .post-time-actions .quick-publish-button:disabled {
+    background: #d8d9dd;
+    border-color: #d8d9dd;
+    color: #777b84;
+    cursor: not-allowed;
   }
 
   .post-image-wrap {
