@@ -361,6 +361,9 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   const [slides, setSlides] = useState(() => week.posts.map(() => 0))
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
+  const [captionDrafts, setCaptionDrafts] = useState<Record<string, string>>({})
+  const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
+  const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
   const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null)
   const [toast, setToast] = useState('')
   const visiblePosts = week.posts.filter(
@@ -428,6 +431,46 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
       showToast(error instanceof Error ? error.message : '未能刪除排程')
     } finally {
       setDeletingPostId(null)
+    }
+  }
+
+  function captionKey(post: ApprovalPost, index: number) {
+    return post.id || post.no || String(index)
+  }
+
+  function startCaptionEdit(post: ApprovalPost, index: number) {
+    const key = captionKey(post, index)
+    setCaptionDrafts((current) => ({ ...current, [key]: current[key] ?? post.caption }))
+    setEditingCaptionPostId(key)
+  }
+
+  async function saveCaptionEdit(post: ApprovalPost, index: number) {
+    const key = captionKey(post, index)
+    if (savingCaptionPostId || !post.id) return
+
+    const nextCaption = (captionDrafts[key] ?? post.caption).trim()
+    if (!nextCaption) {
+      showToast('Caption 不可以留空')
+      return
+    }
+
+    setSavingCaptionPostId(key)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('campaign_posts')
+        .update({ body: nextCaption, updated_at: new Date().toISOString() })
+        .eq('id', post.id)
+
+      if (error) throw error
+
+      post.caption = nextCaption
+      setEditingCaptionPostId(null)
+      showToast('Caption 已更新')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Caption 儲存失敗')
+    } finally {
+      setSavingCaptionPostId(null)
     }
   }
 
@@ -552,6 +595,9 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
           const isPublished = post.status === 'published'
           const isConfirmed = post.status === 'confirmed'
           const needsNote = decision === 'edit' || decision === 'no'
+          const captionEditKey = captionKey(post, postIndex)
+          const isEditingCaption = editingCaptionPostId === captionEditKey
+          const captionDraft = captionDrafts[captionEditKey] ?? post.caption
 
           if (isPublished || (post.id && hiddenPostIds.includes(post.id))) return null
 
@@ -629,7 +675,36 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
 
               <div className="approval-post-body">
                 <p className="approval-label">CAPTION</p>
-                <div className="approval-caption">{post.caption}</div>
+                {isEditingCaption ? (
+                  <div className="approval-caption-editor">
+                    <textarea
+                      value={captionDraft}
+                      onChange={(event) =>
+                        setCaptionDrafts((current) => ({ ...current, [captionEditKey]: event.target.value }))
+                      }
+                      aria-label={`${post.title} caption`}
+                    />
+                    <div className="approval-caption-editor-actions">
+                      <button type="button" onClick={() => setEditingCaptionPostId(null)}>
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingCaptionPostId === captionEditKey || !post.id}
+                        onClick={() => void saveCaptionEdit(post, postIndex)}
+                      >
+                        {savingCaptionPostId === captionEditKey ? '儲存中...' : '儲存'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="approval-caption-block">
+                    <div className="approval-caption">{captionDraft}</div>
+                    <button type="button" className="approval-caption-edit-btn" onClick={() => startCaptionEdit(post, postIndex)}>
+                      編輯 caption
+                    </button>
+                  </div>
+                )}
                 <p className="approval-label">備註</p>
                 <p className="approval-note">{post.note}</p>
               </div>
@@ -717,7 +792,7 @@ function ImportedApprovalBoard({
         status: persistedStatus,
         media: post.media?.length ? post.media : post.image ? [post.image] : [],
         caption: post.body,
-        note: '由 SOON import 流程加入，等待 Renee 檢查內容、圖片及 caption。',
+        note: '由 SOON import 流程加入，等待檢查內容、圖片及 caption。',
       }
     })
     .filter((post) => post.media.length > 0)
@@ -726,9 +801,9 @@ function ImportedApprovalBoard({
     <ApprovalBoard
       week={{
         brandLine: `${brandName || 'Egg.soon'} × SOON ・ 內容審批`,
-        completedText: '內容已匯入 SOON，等待 Renee 檢查及確認。',
+        completedText: '內容已匯入 SOON，等待檢查及確認。',
         deadline: approvalPosts[0]?.meta || '等待確認排程時間',
-        label: '待 Renee 檢查及審批',
+        label: '待檢查及審批',
         remark: '完成後可以複製審批文字或傳送到 WhatsApp 工作小組。',
         summary: `${approvalPosts.length} 條內容已匯入`,
         posts: approvalPosts,
@@ -1793,15 +1868,15 @@ const homeStyles = `
     top: 13px;
     right: 15px;
     border: 1px solid #ffd6d6;
-    border-radius: 8px;
+    border-radius: 12px;
     background: #fff7f7;
     color: #b42318;
     cursor: pointer;
     font: inherit;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 750;
-    min-height: 30px;
-    padding: 6px 9px;
+    min-height: 42px;
+    padding: 0 16px;
     white-space: nowrap;
   }
 
@@ -1815,7 +1890,7 @@ const homeStyles = `
   }
 
   .approval-tagrow {
-    padding-right: 88px;
+    padding-right: 120px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1823,16 +1898,20 @@ const homeStyles = `
   }
 
   .approval-num {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: #202126;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    background: linear-gradient(145deg, #2b2d33 0%, #15161a 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 18px rgba(32, 33, 38, 0.12);
     color: #ffffff;
     display: grid;
     place-items: center;
     flex: none;
-    font-size: 12px;
-    font-weight: 800;
+    font-size: 18px;
+    font-weight: 850;
+    letter-spacing: 0;
+    line-height: 1;
   }
 
   .approval-tagrow strong {
@@ -1843,12 +1922,17 @@ const homeStyles = `
   .approval-tagrow strong em {
     margin-left: 7px;
     border: 1px solid #e2e3e7;
-    border-radius: 999px;
+    border-radius: 12px;
     background: #f7f7f8;
     color: #6f737d;
-    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 0 16px;
+    font-size: 13px;
     font-style: normal;
-    padding: 2px 7px;
+    font-weight: 750;
+    vertical-align: middle;
   }
 
   .approval-tagrow strong em.confirmed {
@@ -1985,6 +2069,71 @@ const homeStyles = `
     line-height: 1.7;
     padding: 11px 13px;
     white-space: pre-wrap;
+  }
+
+  .approval-caption-block {
+    display: grid;
+    gap: 8px;
+  }
+
+  .approval-caption-edit-btn,
+  .approval-caption-editor-actions button {
+    justify-self: flex-start;
+    border: 1px solid #e0e2e7;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #333842;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .approval-caption-edit-btn:hover,
+  .approval-caption-editor-actions button:hover {
+    background: #f7f8fa;
+  }
+
+  .approval-caption-editor {
+    display: grid;
+    gap: 8px;
+  }
+
+  .approval-caption-editor textarea {
+    width: 100%;
+    min-height: 160px;
+    resize: vertical;
+    border: 1.5px solid var(--approval-line);
+    border-radius: 10px;
+    outline: 0;
+    color: var(--approval-ink);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 11px 13px;
+  }
+
+  .approval-caption-editor textarea:focus {
+    border-color: #111111;
+  }
+
+  .approval-caption-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  .approval-caption-editor-actions button:last-child {
+    border-color: #111111;
+    background: #111111;
+    color: #ffffff;
+  }
+
+  .approval-caption-editor-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
   }
 
   .approval-note {
