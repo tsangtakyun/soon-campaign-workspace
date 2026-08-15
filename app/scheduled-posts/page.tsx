@@ -42,9 +42,9 @@ const DesignCanvas = dynamic(
 )
 
 const PUBLISH_PLATFORMS = [
-  { channel: 'Instagram' as PreviewChannel, id: 'instagram', label: 'Instagram' },
-  { channel: 'Facebook' as PreviewChannel, id: 'facebook', label: 'Facebook' },
-  { channel: 'Threads' as PreviewChannel, id: 'threads', label: 'Threads' },
+  { channel: 'Instagram' as PreviewChannel, icon: 'ig', id: 'instagram', label: 'Instagram' },
+  { channel: 'Facebook' as PreviewChannel, icon: 'f', id: 'facebook', label: 'Facebook' },
+  { channel: 'Threads' as PreviewChannel, icon: '@', id: 'threads', label: 'Threads' },
 ]
 
 type PlatformConnection = {
@@ -709,6 +709,10 @@ function ScheduledPostsPageContent() {
   const [toolbarMessage, setToolbarMessage] = useState('')
   const [toolbarBusy, setToolbarBusy] = useState(false)
   const [postSlides, setPostSlides] = useState<Record<string, number>>({})
+  const [expandedCaptions, setExpandedCaptions] = useState<Record<string, boolean>>({})
+  const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
+  const [cardCaptionDrafts, setCardCaptionDrafts] = useState<Record<string, string>>({})
+  const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
   const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
   const connectedPublishPlatforms = PUBLISH_PLATFORMS.filter((platform) => platformConnections[platform.id])
   const hasPublishConnection = connectedPublishPlatforms.length > 0
@@ -783,6 +787,45 @@ function ScheduledPostsPageContent() {
   }
 
   const refreshCalendar = () => setRefreshKey((value) => value + 1)
+
+  const startCardCaptionEdit = (post: ScheduledPost) => {
+    setCardCaptionDrafts((current) => ({ ...current, [post.id]: current[post.id] ?? post.body }))
+    setEditingCaptionPostId(post.id)
+    setExpandedCaptions((current) => ({ ...current, [post.id]: true }))
+  }
+
+  async function saveCardCaption(post: ScheduledPost) {
+    if (savingCaptionPostId) return
+
+    const nextBody = (cardCaptionDrafts[post.id] ?? post.body).trim()
+    if (!nextBody) {
+      setToolbarMessage('Caption 不可以留空。')
+      return
+    }
+
+    setSavingCaptionPostId(post.id)
+    setToolbarMessage('')
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('campaign_posts')
+        .update({ body: nextBody, updated_at: new Date().toISOString() })
+        .eq('id', post.id)
+
+      if (error) throw error
+
+      setPersistedScheduledPosts((current) =>
+        current.map((item) => (item.id === post.id ? { ...item, body: nextBody } : item))
+      )
+      setEditingCaptionPostId(null)
+      setToolbarMessage('Caption 已更新。')
+    } catch (error) {
+      setToolbarMessage(error instanceof Error ? error.message : 'Caption 儲存失敗，請再試一次。')
+    } finally {
+      setSavingCaptionPostId(null)
+    }
+  }
 
   async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -2278,6 +2321,9 @@ function ScheduledPostsPageContent() {
           ) : scheduledPosts.length ? scheduledPosts.map((post) => {
             const media = post.media?.length ? post.media : [post.image]
             const activeSlide = Math.min(postSlides[post.id] ?? 0, media.length - 1)
+            const captionExpanded = Boolean(expandedCaptions[post.id])
+            const isEditingCaption = editingCaptionPostId === post.id
+            const cardCaptionDraft = cardCaptionDrafts[post.id] ?? post.body
 
             return (
               <article className="post-card" key={post.id}>
@@ -2344,7 +2390,46 @@ function ScheduledPostsPageContent() {
                 </div>
                 <div className="post-copy">
                   <h2>{post.title}</h2>
-                  <p>{post.body}</p>
+                  {isEditingCaption ? (
+                    <div className="post-caption-editor">
+                      <textarea
+                        value={cardCaptionDraft}
+                        onChange={(event) =>
+                          setCardCaptionDrafts((current) => ({ ...current, [post.id]: event.target.value }))
+                        }
+                        aria-label={`${post.title} caption`}
+                      />
+                      <div className="post-caption-editor-actions">
+                        <button type="button" onClick={() => setEditingCaptionPostId(null)}>
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveCardCaption(post)}
+                          disabled={savingCaptionPostId === post.id}
+                        >
+                          {savingCaptionPostId === post.id ? '儲存中...' : '儲存'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className={captionExpanded ? 'is-expanded' : ''}>{post.body}</p>
+                      <div className="post-caption-actions">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedCaptions((current) => ({ ...current, [post.id]: !captionExpanded }))
+                          }
+                        >
+                          {captionExpanded ? '收起' : '展開'}
+                        </button>
+                        <button type="button" onClick={() => startCardCaptionEdit(post)}>
+                          編輯 caption
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="post-card-actions">
                   {PUBLISH_PLATFORMS.map((platform) => {
@@ -2361,6 +2446,8 @@ function ScheduledPostsPageContent() {
                         onClick={() => void publishPost(post, platform.id, true)}
                         title={failedMessage || undefined}
                       >
+                        <span className={`publish-platform-icon ${platform.id}`}>{platform.icon}</span>
+                        <span className="publish-platform-label">
                         {status === 'published'
                           ? `已發布到 ${platform.label}`
                           : isPublishingThis
@@ -2368,6 +2455,7 @@ function ScheduledPostsPageContent() {
                             : connection
                               ? `發布到 ${platform.label}`
                               : `未連接 ${platform.label}`}
+                        </span>
                       </button>
                     )
                   })}
@@ -2714,21 +2802,24 @@ const styles = `${dashboardSidebarStyles}
   }
 
   .post-card-head {
-    min-height: 34px;
+    min-height: 38px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 0 10px;
+    gap: 10px;
+    padding: 0 8px;
     border-bottom: 1px solid #ececef;
   }
 
   .post-type {
+    flex: 0 0 auto;
     color: #202126;
-    font-size: 13px;
+    font-size: 12px;
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    line-height: 1;
+    white-space: nowrap;
   }
 
   .post-type::before {
@@ -2742,15 +2833,18 @@ const styles = `${dashboardSidebarStyles}
   }
 
   .post-card-head strong {
-    font-size: 13px;
-    font-weight: 550;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.05;
+    white-space: nowrap;
   }
 
   .post-time-actions {
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 6px;
+    gap: 5px;
+    flex: 1;
     min-width: 0;
   }
 
@@ -2763,7 +2857,8 @@ const styles = `${dashboardSidebarStyles}
     font: inherit;
     font-size: 11px;
     font-weight: 650;
-    padding: 4px 6px;
+    min-height: 28px;
+    padding: 4px 7px;
     white-space: nowrap;
   }
 
@@ -2776,7 +2871,7 @@ const styles = `${dashboardSidebarStyles}
     background: #111111;
     border-color: #111111;
     color: #ffffff;
-    min-width: 72px;
+    min-width: 78px;
   }
 
   .post-time-actions .quick-publish-button:hover {
@@ -2898,27 +2993,108 @@ const styles = `${dashboardSidebarStyles}
     color: #555861;
     font-size: 12px;
     line-height: 1.42;
+    display: -webkit-box;
+    overflow: hidden;
     white-space: pre-wrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .post-copy p.is-expanded {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+
+  .post-caption-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+  }
+
+  .post-caption-actions button,
+  .post-caption-editor-actions button {
+    border: 1px solid #e0e2e7;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #333842;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 8px;
+  }
+
+  .post-caption-actions button:hover,
+  .post-caption-editor-actions button:hover {
+    background: #f7f8fa;
+  }
+
+  .post-caption-editor {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .post-caption-editor textarea {
+    border: 1px solid #dfe2e8;
+    border-radius: 8px;
+    color: #202126;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.42;
+    min-height: 142px;
+    padding: 9px;
+    resize: vertical;
+    width: 100%;
+  }
+
+  .post-caption-editor textarea:focus {
+    border-color: #202126;
+    outline: 0;
+  }
+
+  .post-caption-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .post-caption-editor-actions button:last-child {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+  }
+
+  .post-caption-editor-actions button:disabled {
+    opacity: 0.55;
+    cursor: wait;
   }
 
   .post-card-actions {
     border-top: 1px solid #ececef;
     display: grid;
-    gap: 6px;
+    gap: 7px;
     padding: 10px 12px 12px;
   }
 
   .post-publish-now-button {
+    align-items: center;
     border: 0;
     border-radius: 8px;
     background: #111111;
     color: #ffffff;
     cursor: pointer;
+    display: flex;
+    gap: 8px;
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 750;
-    min-height: 38px;
-    padding: 9px 12px;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 10px;
+    white-space: nowrap;
   }
 
   .post-publish-now-button:disabled {
@@ -2932,7 +3108,44 @@ const styles = `${dashboardSidebarStyles}
     color: #146c36;
   }
 
-  .post-card-actions span {
+  .publish-platform-icon {
+    align-items: center;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 850;
+    height: 18px;
+    justify-content: center;
+    line-height: 1;
+    text-align: center;
+    width: 18px;
+  }
+
+  .publish-platform-icon.instagram {
+    background: linear-gradient(135deg, #f58529, #dd2a7b 52%, #515bd4);
+  }
+
+  .publish-platform-icon.facebook {
+    background: #1877f2;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+
+  .publish-platform-icon.threads {
+    background: #111111;
+    font-size: 12px;
+  }
+
+  .publish-platform-label {
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    min-width: 0;
+  }
+
+  .post-card-actions > span {
     color: #858994;
     font-size: 11px;
     line-height: 1.4;
