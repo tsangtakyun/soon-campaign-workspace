@@ -65,7 +65,10 @@ function followMetricValue(row: Record<string, unknown>) {
       if (!item || typeof item !== 'object') return false
       const dimensionValues = (item as { dimension_values?: unknown }).dimension_values
       return Array.isArray(dimensionValues)
-        ? dimensionValues.some((value) => String(value).toLowerCase().includes('follow'))
+        ? dimensionValues.some((value) => {
+            const normalizedValue = String(value).toLowerCase()
+            return normalizedValue === 'follow' || normalizedValue === 'follower'
+          })
         : false
     })
 
@@ -79,6 +82,20 @@ function followMetricValue(row: Record<string, unknown>) {
 
 function numericField(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function completedThirtyDayWindow() {
+  const until = new Date()
+  until.setUTCHours(0, 0, 0, 0)
+
+  const since = new Date(until)
+  since.setUTCDate(since.getUTCDate() - 30)
+
+  return {
+    label: `${since.toISOString().slice(0, 10)} to ${new Date(until.getTime() - 1).toISOString().slice(0, 10)}`,
+    since,
+    until,
+  }
 }
 
 async function graphGet(connection: SocialConnection, path: string, token: string, params: Record<string, string>) {
@@ -118,14 +135,11 @@ async function withToken(connection: SocialConnection, callback: (token: string,
 }
 
 async function fetchAccountInsightMetrics(connection: SocialConnection) {
-  const now = new Date()
-  const since = new Date(now)
-  since.setDate(since.getDate() - 29)
-  since.setHours(0, 0, 0, 0)
+  const window = completedThirtyDayWindow()
 
   const baseParams = {
-    since: String(Math.floor(since.getTime() / 1000)),
-    until: String(Math.floor(now.getTime() / 1000)),
+    since: String(Math.floor(window.since.getTime() / 1000)),
+    until: String(Math.floor(window.until.getTime() / 1000)),
   }
   const metrics: Record<string, number> = {}
   const tokenSources: string[] = []
@@ -173,6 +187,11 @@ async function fetchAccountInsightMetrics(connection: SocialConnection) {
   return {
     metrics,
     tokenSource: tokenSources[0] || null,
+    window: {
+      label: window.label,
+      since: window.since.toISOString(),
+      until: window.until.toISOString(),
+    },
   }
 }
 
@@ -304,6 +323,7 @@ export async function GET(req: Request) {
       metrics,
       ok: true,
       token_source: insightResult.tokenSource,
+      window: insightResult.window,
       updated_at: new Date().toISOString(),
     })
   } catch (error) {
