@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, type FormEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 
-import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { DesignToolbar } from '@/components/editor/DesignToolbar'
 import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
 import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
@@ -18,6 +18,7 @@ import {
 import type { FabricControls } from '@/components/editor/DesignCanvas'
 import { createClient } from '@/lib/supabase'
 import {
+  isBechillWorkspace,
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
 } from '@/lib/workspace-client'
@@ -225,11 +226,73 @@ function buildScheduledPosts(images: string[]): ScheduledPost[] {
   ]
 }
 
+const approvalAsset = (fileName: string) => `https://soon-approval.vercel.app/a/${fileName}`
+
+const bechillConfirmedSchedulePosts: ScheduledPost[] = [
+  {
+    id: 'bechill-week1-02',
+    type: '靜態圖片',
+    time: '8月13日（四）18:00',
+    title: '《乖乖等你》',
+    body: '你諗起邊個？\n\n有些人會陪你一段路。\n有些人會在某個時間明白你。\n有些關係很好，只是未必能一直留在原地。\n但笨chill 不太懂講大道理。\n牠一直在你回來之前，乖乖等你。\n-\n你同你屋企寵物之間，有冇一件好窩心嘅小事？\n留言講俾我哋聽',
+    image: approvalAsset('02_wait_1.webp'),
+    media: Array.from({ length: 7 }, (_, index) => approvalAsset(`02_wait_${index + 1}.webp`)),
+    scheduledAt: '2026-08-13T10:00:00.000Z',
+    status: '已確認',
+  },
+  {
+    id: 'bechill-week1-03',
+    type: '靜態圖片',
+    time: '8月14日（五）18:00',
+    title: '《有你嘅世界》',
+    body: 'Tag 一個成日好忙嘅朋友\n你開心，世界照樣轉。\n你唔開心，世界一樣照樣轉。\n唔係你唔重要，\n係唔使咩都攬上身。\n舒服啲啦 —— 世界唔會因為你抖五分鐘而停。',
+    image: approvalAsset('03_world_1.webp'),
+    media: Array.from({ length: 4 }, (_, index) => approvalAsset(`03_world_${index + 1}.webp`)),
+    scheduledAt: '2026-08-14T10:00:00.000Z',
+    status: '已確認',
+  },
+  {
+    id: 'bechill-week1-04',
+    type: '靜態圖片',
+    time: '8月15日（六）18:00',
+    title: '《休息不是懶惰》',
+    body: 'Tag 一個最近需要休息嘅朋友\n\n「休息並不是懶惰。在夏日某天躺在樹下草地上，聽水聲潺潺，或看雲在天上飄過，絕不是浪費時間。」\n\nJohn Lubbock',
+    image: approvalAsset('04_rest_1.webp'),
+    media: Array.from({ length: 7 }, (_, index) => approvalAsset(`04_rest_${index + 1}.webp`)),
+    scheduledAt: '2026-08-15T10:00:00.000Z',
+    status: '已確認',
+  },
+  {
+    id: 'bechill-week1-05',
+    type: '靜態圖片',
+    time: '8月16日（日）18:00',
+    title: '《沖完涼的髮型》',
+    body: '你喜歡笨chill沖完涼的髮型嗎？',
+    image: approvalAsset('05_hair_1.webp'),
+    media: Array.from({ length: 4 }, (_, index) => approvalAsset(`05_hair_${index + 1}.webp`)),
+    scheduledAt: '2026-08-16T10:00:00.000Z',
+    status: '已確認',
+  },
+]
+
 function formatPostTime(value: unknown, fallback: string) {
   if (typeof value !== 'string') return fallback
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleTimeString('zh-HK', { hour: '2-digit', hour12: false, minute: '2-digit' })
+  return date.toLocaleTimeString('zh-HK', {
+    hour: '2-digit',
+    hour12: false,
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+function currentTimeZoneLabel() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '你的本地時區'
+  } catch {
+    return '你的本地時區'
+  }
 }
 
 function mapPersistedPostType(value: unknown): ScheduledPost['type'] {
@@ -239,7 +302,7 @@ function mapPersistedPostType(value: unknown): ScheduledPost['type'] {
 }
 
 function mapPersistedPostStatus(value: unknown): ScheduledPost['status'] {
-  if (value === 'approved') return '已批准'
+  if (value === 'approved') return '已確認'
   if (value === 'scheduled') return '已排程'
   if (value === 'published' || value === 'posted') return '已發布'
   return value === 'draft' ? '草稿' : '新內容'
@@ -248,11 +311,23 @@ function mapPersistedPostStatus(value: unknown): ScheduledPost['status'] {
 function mapPersistedScheduledPost(row: Record<string, unknown>, index: number, fallbackPosts: ScheduledPost[]): ScheduledPost {
   const fallback = fallbackPosts[index % fallbackPosts.length]
   const postType = typeof row.post_type === 'string' ? row.post_type : undefined
+  const captions = row.captions && typeof row.captions === 'object' ? row.captions as Record<string, unknown> : {}
+  const publishStatus =
+    captions.publish_status && typeof captions.publish_status === 'object' && !Array.isArray(captions.publish_status)
+      ? (captions.publish_status as ScheduledPost['publishStatus'])
+      : undefined
+  const assets = Array.isArray(captions.assets) ? captions.assets : []
+  const media = assets
+    .map((asset) => asset && typeof asset === 'object' ? (asset as Record<string, unknown>).url : null)
+    .filter((url): url is string => typeof url === 'string' && url.length > 0)
+  const image = typeof row.image_url === 'string' && row.image_url ? row.image_url : media[0] || fallback.image
   return {
     body: typeof row.body === 'string' && row.body ? row.body : fallback.body,
     id: typeof row.id === 'string' ? row.id : fallback.id,
-    image: typeof row.image_url === 'string' && row.image_url ? row.image_url : fallback.image,
+    image,
+    media: media.length ? media : undefined,
     postType,
+    publishStatus,
     scheduledAt: typeof row.scheduled_at === 'string' ? row.scheduled_at : null,
     status: mapPersistedPostStatus(row.status),
     time: formatPostTime(row.scheduled_at, fallback.time),
@@ -264,8 +339,19 @@ function mapPersistedScheduledPost(row: Record<string, unknown>, index: number, 
 function localDateTimeValue(offsetHours = 1) {
   const date = new Date()
   date.setHours(date.getHours() + offsetHours, 0, 0, 0)
+  return dateToLocalDateTimeValue(date)
+}
+
+function dateToLocalDateTimeValue(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function scheduledPostDateTimeValue(value: string | null | undefined) {
+  if (!value) return localDateTimeValue()
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return localDateTimeValue()
+  return dateToLocalDateTimeValue(date)
 }
 
 function isInCurrentWeek(post: ScheduledPost) {
@@ -577,7 +663,13 @@ function ScheduledPostsPageContent() {
   const [compact, setCompact] = useState(false)
   const fallbackScheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
   const [persistedScheduledPosts, setPersistedScheduledPosts] = useState<ScheduledPost[]>([])
-  const scheduledPosts = persistedScheduledPosts.length > 0 ? persistedScheduledPosts : fallbackScheduledPosts
+  const [postsLoading, setPostsLoading] = useState(true)
+  const [postsLoadError, setPostsLoadError] = useState('')
+  const clientReadyPosts = persistedScheduledPosts.filter((post) =>
+    ['已批准', '已確認', '已排程', '已發布'].includes(post.status)
+  )
+  const [isBechillActive, setIsBechillActive] = useState(false)
+  const scheduledPosts = clientReadyPosts.length > 0 ? clientReadyPosts : isBechillActive ? bechillConfirmedSchedulePosts : []
   const currentWeekPosts = useMemo(() => scheduledPosts.filter(isInCurrentWeek), [scheduledPosts])
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
   const [postStatuses, setPostStatuses] = useState<Record<string, 'draft' | 'approved' | 'scheduled' | 'published' | 'rejected'>>({})
@@ -587,6 +679,7 @@ function ScheduledPostsPageContent() {
   const [publishMessage, setPublishMessage] = useState('')
   const [publishedPlatforms, setPublishedPlatforms] = useState<Record<string, boolean>>({})
   const [platformConnections, setPlatformConnections] = useState<Record<string, PlatformConnection>>({})
+  const [platformConnectionsLoading, setPlatformConnectionsLoading] = useState(true)
   const [previewChannel, setPreviewChannel] = useState<PreviewChannel>('Instagram')
   const [captions, setCaptions] = useState<Record<string, Partial<Record<PreviewChannel, string>>>>({})
   const [draftCaptions, setDraftCaptions] = useState<Partial<Record<PreviewChannel, string>>>({})
@@ -610,9 +703,15 @@ function ScheduledPostsPageContent() {
   const [createPostType, setCreatePostType] = useState('still-images')
   const [createTitle, setCreateTitle] = useState('')
   const [createScheduledAt, setCreateScheduledAt] = useState(localDateTimeValue())
+  const [scheduleModalPost, setScheduleModalPost] = useState<ScheduledPost | null>(null)
+  const [scheduleDraftAt, setScheduleDraftAt] = useState(localDateTimeValue())
+  const [localTimeZoneLabel, setLocalTimeZoneLabel] = useState('你的本地時區')
   const [toolbarMessage, setToolbarMessage] = useState('')
   const [toolbarBusy, setToolbarBusy] = useState(false)
+  const [postSlides, setPostSlides] = useState<Record<string, number>>({})
   const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
+  const connectedPublishPlatforms = PUBLISH_PLATFORMS.filter((platform) => platformConnections[platform.id])
+  const hasPublishConnection = connectedPublishPlatforms.length > 0
   const [regenerateProgress, setRegenerateProgress] = useState({ current: 0, total: 0 })
   const [improvePanelOpen, setImprovePanelOpen] = useState(false)
   const [improveMode, setImproveMode] = useState<'copy' | 'image-prompt'>('copy')
@@ -626,13 +725,19 @@ function ScheduledPostsPageContent() {
   const isRestoringDesignHistoryRef = useRef(false)
 
   useEffect(() => {
-    if (!autoPostId || scheduledPosts.length === 0) return
-    const target = scheduledPosts.find((post) => post.id === autoPostId)
-    if (target) {
-      setSelectedPost(target)
-      router.replace('/scheduled-posts', { scroll: false })
-    }
-  }, [autoPostId, router, scheduledPosts])
+    setLocalTimeZoneLabel(currentTimeZoneLabel())
+  }, [])
+
+  useEffect(() => {
+    if (!autoPostId) return
+    router.replace('/onboarding/scheduled-posts', { scroll: false })
+  }, [autoPostId, router])
+
+  useEffect(() => {
+    if (!autoPostId || selectedPost) return
+    const targetPost = scheduledPosts.find((post) => post.id === autoPostId)
+    if (targetPost) setSelectedPost(targetPost)
+  }, [autoPostId, scheduledPosts, selectedPost])
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
@@ -656,6 +761,13 @@ function ScheduledPostsPageContent() {
       }, {})
     )
     setCaptionModalOpen(true)
+  }
+
+  const platformPublishStatus = (post: ScheduledPost, platformId: string) => {
+    const localKey = `${post.id}:${platformId}`
+    if (publishedPlatforms[localKey]) return 'published'
+    const persisted = post.publishStatus?.[platformId]
+    return persisted?.status || ''
   }
 
   const saveCaptionDrafts = () => {
@@ -718,6 +830,62 @@ function ScheduledPostsPageContent() {
       refreshCalendar()
     } catch (error) {
       setToolbarMessage(error instanceof Error ? error.message : '建立貼文失敗，請再試一次。')
+    } finally {
+      setToolbarBusy(false)
+    }
+  }
+
+  function openScheduleModal(post: ScheduledPost) {
+    setScheduleModalPost(post)
+    setScheduleDraftAt(scheduledPostDateTimeValue(post.scheduledAt))
+    setToolbarMessage('')
+  }
+
+  async function handleUpdateSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!scheduleModalPost || toolbarBusy) return
+
+    setToolbarBusy(true)
+    setToolbarMessage('')
+
+    try {
+      const { workspaceId } = await resolveActiveWorkspace()
+      if (!workspaceId) throw new Error('找不到目前工作台。')
+
+      const nextScheduledAt = new Date(scheduleDraftAt)
+      if (Number.isNaN(nextScheduledAt.getTime())) throw new Error('請選擇有效的發布時間。')
+
+      const response = await fetch('/api/posts/update-schedule', {
+        body: JSON.stringify({
+          postId: scheduleModalPost.id,
+          scheduledAt: nextScheduledAt.toISOString(),
+          workspaceId,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.detail || result?.error || '更新發布時間失敗。')
+      }
+
+      setPersistedScheduledPosts((current) =>
+        current.map((post) =>
+          post.id === scheduleModalPost.id
+            ? {
+                ...post,
+                scheduledAt: result.scheduled_at,
+                status: post.status === '已發布' ? post.status : '已確認',
+                time: formatPostTime(result.scheduled_at, post.time),
+              }
+            : post
+        )
+      )
+      setScheduleModalPost(null)
+      setToolbarMessage('發布時間已更新。')
+      refreshCalendar()
+    } catch (error) {
+      setToolbarMessage(error instanceof Error ? error.message : '更新發布時間失敗，請再試一次。')
     } finally {
       setToolbarBusy(false)
     }
@@ -822,7 +990,7 @@ function ScheduledPostsPageContent() {
     await publishPost(post)
   }
 
-  const publishPost = async (post: ScheduledPost, platform?: string) => {
+  const publishPost = async (post: ScheduledPost, platform?: string, publishNow = false) => {
     if (publishing) return
 
     setPublishing(true)
@@ -835,14 +1003,15 @@ function ScheduledPostsPageContent() {
       if (!workspaceId) throw new Error('找不到目前工作台。')
 
       const response = await fetch('/api/posts/publish', {
-        body: JSON.stringify({ platform, postId: post.id, workspaceId }),
+        body: JSON.stringify({ platform, postId: post.id, publishNow, workspaceId }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       })
       const result = await response.json().catch(() => ({}))
       const errors = Array.isArray(result?.errors) ? result.errors : []
+      const platformsPublished = Array.isArray(result?.platforms_published) ? result.platforms_published : []
 
-      if (!result?.success || errors.length) {
+      if (!result?.success && !platformsPublished.length) {
         const message =
           errors
             .map((item: { message?: string; platform?: string }) =>
@@ -862,6 +1031,8 @@ function ScheduledPostsPageContent() {
       const status =
         result?.status === 'published'
           ? 'published'
+          : result?.status === 'partial_published'
+            ? 'approved'
           : result?.status === 'scheduled'
             ? 'scheduled'
             : 'approved'
@@ -871,15 +1042,22 @@ function ScheduledPostsPageContent() {
             timeStyle: 'short',
           })
         : '預定時間'
-      const platformText = Array.isArray(result?.platforms_published) && result.platforms_published.length
-        ? `已發布到 ${result.platforms_published.join(', ')}。`
+      const platformText = platformsPublished.length
+        ? `已發布到 ${platformsPublished.join(', ')}。`
+        : ''
+      const warningText = errors.length
+        ? ` 未能發布到：${errors
+            .map((item: { message?: string; platform?: string }) =>
+              item.platform ? `${item.platform}（${item.message || '發布失敗'}）` : item.message || '發布失敗'
+            )
+            .join('；')}`
         : ''
 
       setPostStatuses((current) => ({ ...current, [post.id]: status }))
-      if (Array.isArray(result?.platforms_published)) {
+      if (platformsPublished.length) {
         setPublishedPlatforms((current) => {
           const next = { ...current }
-          result.platforms_published.forEach((item: string) => {
+          platformsPublished.forEach((item: string) => {
             next[`${post.id}:${item}`] = true
           })
           return next
@@ -887,8 +1065,8 @@ function ScheduledPostsPageContent() {
       }
       setPublishResult('success')
       setPublishMessage(
-        status === 'published'
-          ? `✓ 已發布。${platformText}`
+        result?.status === 'published' || result?.status === 'partial_published'
+          ? `✓ ${platformText || '已發布。'}${warningText}`
           : `貼文已批准，將於 ${scheduledAt} 自動發布。`
       )
       refreshCalendar()
@@ -948,6 +1126,18 @@ function ScheduledPostsPageContent() {
   const hasPrevPost = selectedPostIndex > 0
   const hasNextPost = selectedPostIndex >= 0 && selectedPostIndex < scheduledPosts.length - 1
 
+  function setPostSlide(postId: string, totalSlides: number, nextSlide: number) {
+    setPostSlides((current) => ({
+      ...current,
+      [postId]: Math.max(0, Math.min(totalSlides - 1, nextSlide)),
+    }))
+  }
+
+  function movePostSlide(postId: string, totalSlides: number, direction: number) {
+    const currentSlide = postSlides[postId] ?? 0
+    setPostSlide(postId, totalSlides, currentSlide + direction)
+  }
+
   const getToolForElement = (element: DesignElement): DesignTool => {
     if (element.kind === 'text') return '文字'
     if (element.kind === 'image') return '媒體'
@@ -1001,32 +1191,33 @@ function ScheduledPostsPageContent() {
     let cancelled = false
 
     async function loadPlatformConnections() {
+      if (!cancelled) setPlatformConnectionsLoading(true)
       try {
-        const supabase = createClient()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (!user?.id) return
-
         const { workspaceId } = await resolveActiveWorkspace()
-        if (!workspaceId) return
+        if (!workspaceId) {
+          if (!cancelled) setPlatformConnections({})
+          return
+        }
 
-        const { data, error } = await supabase
-          .from('social_connections')
-          .select('platform,account_name,account_id')
-          .eq('workspace_id', workspaceId)
-          .in('platform', PUBLISH_PLATFORMS.map((platform) => platform.id))
+        const dashboardResponse = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
+          cache: 'no-store',
+        })
+        const dashboardPayload = await dashboardResponse.json().catch(() => null)
+        if (!dashboardResponse.ok) {
+          throw new Error(dashboardPayload?.error || 'Failed to load platform connections')
+        }
 
-        if (error) throw error
         if (cancelled) return
 
         const nextConnections: Record<string, PlatformConnection> = {}
-        ;((data || []) as PlatformConnection[]).forEach((connection) => {
+        ;((dashboardPayload?.connections || []) as PlatformConnection[]).forEach((connection) => {
           nextConnections[connection.platform] = connection
         })
         setPlatformConnections(nextConnections)
       } catch (error) {
         console.warn('[scheduled-posts] failed to load social connections:', error)
+      } finally {
+        if (!cancelled) setPlatformConnectionsLoading(false)
       }
     }
 
@@ -1047,6 +1238,8 @@ function ScheduledPostsPageContent() {
     let cancelled = false
 
     async function loadPersistedPostsAndCredits() {
+      if (!cancelled) setPostsLoading(true)
+      if (!cancelled) setPostsLoadError('')
       try {
         const supabase = createClient()
         const {
@@ -1055,48 +1248,73 @@ function ScheduledPostsPageContent() {
         const sessionId = getStoredOnboardingSessionId()
         let workspaceId: string | null = null
 
-        let query = supabase
-          .from('campaign_posts')
-          .select('id,title,body,post_type,scheduled_at,image_url,status,marketing_campaigns(name,strategy_emoji)')
-          .order('scheduled_at', { ascending: true })
+        let postsData: Record<string, unknown>[] | null = null
 
         if (user?.id) {
-          ;({ workspaceId } = await resolveActiveWorkspace())
+          const resolvedWorkspace = await resolveActiveWorkspace()
+          workspaceId = resolvedWorkspace.workspaceId
           if (!workspaceId) {
             if (!cancelled) {
               setActiveWorkspaceIdState(null)
               setPersistedScheduledPosts([])
+              setIsBechillActive(false)
+              setPostsLoading(false)
             }
             return
           }
 
-          if (!cancelled) setActiveWorkspaceIdState(workspaceId)
-          query = query.eq('workspace_id', workspaceId)
-          const { data: creditsData } = await supabase
-            .from('user_credits')
-            .select('balance')
-            .eq('user_id', user.id)
-            .maybeSingle()
-          if (!cancelled && typeof creditsData?.balance === 'number') {
-            setCreditBalance(creditsData.balance)
+          if (!cancelled) {
+            setActiveWorkspaceIdState(workspaceId)
+            setIsBechillActive(isBechillWorkspace(resolvedWorkspace.activeWorkspace))
+          }
+          const dashboardResponse = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
+            cache: 'no-store',
+          })
+          const dashboardPayload = await dashboardResponse.json().catch(() => null)
+          if (!dashboardResponse.ok) {
+            throw new Error(dashboardPayload?.error || 'Failed to load scheduled posts')
+          }
+
+          postsData = dashboardPayload?.posts || []
+          if (!cancelled && typeof dashboardPayload?.credits?.balance === 'number') {
+            setCreditBalance(dashboardPayload.credits.balance)
+          }
+          if (!cancelled && Array.isArray(dashboardPayload?.connections)) {
+            const nextConnections: Record<string, PlatformConnection> = {}
+            ;(dashboardPayload.connections as PlatformConnection[]).forEach((connection) => {
+              nextConnections[connection.platform] = connection
+            })
+            setPlatformConnections(nextConnections)
+            setPlatformConnectionsLoading(false)
           }
         } else if (sessionId) {
-          query = query.eq('onboarding_session_id', sessionId)
+          const { data, error } = await supabase
+            .from('campaign_posts')
+            .select('id,title,body,post_type,scheduled_at,image_url,status,captions,marketing_campaigns(name,strategy_emoji)')
+            .eq('onboarding_session_id', sessionId)
+            .order('scheduled_at', { ascending: true })
+          if (error) throw error
+          postsData = data || []
         } else {
+          if (!cancelled) setPostsLoading(false)
           return
         }
 
-        const { data, error } = await query
-
-        if (!cancelled && !error) {
+        if (!cancelled) {
           setPersistedScheduledPosts(
-            ((data || []) as Record<string, unknown>[]).map((post, index) =>
+            ((postsData || []) as Record<string, unknown>[]).map((post, index) =>
               mapPersistedScheduledPost(post, index, fallbackScheduledPosts)
             )
           )
         }
-      } catch {
-        // Keep the static calendar fallback when Supabase has no rows or the user is not signed in.
+      } catch (error) {
+        console.warn('[scheduled-posts] failed to load posts:', error)
+        if (!cancelled) {
+          setPersistedScheduledPosts([])
+          setPostsLoadError(error instanceof Error ? error.message : '未能載入已排程內容')
+        }
+      } finally {
+        if (!cancelled) setPostsLoading(false)
       }
     }
 
@@ -2001,57 +2219,150 @@ function ScheduledPostsPageContent() {
   return (
     <main className="dashboard-page">
       <ClaimOnboardingSession />
-      <DashboardSidebar activeItem="日曆" />
+      <DashboardSidebar activeItem="已排程內容" />
 
       <section className="calendar-shell">
         <header className="calendar-topbar">
           <div className="calendar-title">
-            <h1>日曆</h1>
-            <button type="button" aria-label="上一日">‹</button>
-            <button type="button">今天</button>
-            <button type="button" aria-label="下一日">›</button>
-            <strong>5月8日</strong>
+            <h1>已排程內容</h1>
+            <span>{isBechillActive ? '客戶已確認的 Week 1 貼文' : '目前工作台已確認的貼文'}</span>
           </div>
 
           <div className="calendar-actions">
-            <button type="button" onClick={() => setCreateModalOpen(true)}>＋ 建立</button>
-            <button type="button" onClick={() => setRegenerateConfirmOpen(true)}>↻ 重新生成</button>
-            <button type="button" onClick={() => setImprovePanelOpen(true)}>⌁ 改善</button>
-            <button type="button" onClick={() => setCompact((value) => !value)}>
-              {compact ? '展開' : '緊湊'} ⌄
-            </button>
             <span>✦ {creditBalance ?? "—"} credits 剩餘</span>
             <button type="button" className="upgrade-button">升級</button>
           </div>
         </header>
 
-        <div className="connect-banner">
-          <span>⚡ 你的貼文尚未自動發布。連接帳戶後，SOON 可以按排程自動發布。</span>
-          <button type="button" onClick={() => router.push('/onboarding/integrations')}>
-            連接
-          </button>
-        </div>
+        {platformConnectionsLoading ? (
+          <div className="connect-banner loading" aria-label="正在載入帳戶連接狀態" />
+        ) : hasPublishConnection ? (
+          <div className="connect-banner connected">
+            <span>
+              ✓ 已連接 {connectedPublishPlatforms.map((platform) => platform.label).join('、')}。SOON 可以在發布權限開通後按排程自動發布。
+            </span>
+            <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+              管理連接
+            </button>
+          </div>
+        ) : (
+          <div className="connect-banner">
+            <span>⚡ 你的貼文尚未自動發布。連接帳戶後，SOON 可以按排程自動發布。</span>
+            <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+              連接
+            </button>
+          </div>
+        )}
 
-        <div className="calendar-date-pill">5月8日 星期五</div>
+        {!postsLoading && scheduledPosts.length ? (
+          <div className="calendar-date-pill">
+            {isBechillActive ? '8月13日 - 8月16日 已確認排程' : '已確認排程'}
+          </div>
+        ) : null}
 
-        <section className={compact ? 'schedule-column compact' : 'schedule-column'} aria-label="今日排程">
-          {scheduledPosts.map((post) => (
-            <article className="post-card" key={post.id} onClick={() => setSelectedPost(post)}>
-              <div className="post-card-head">
-                <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
-                <strong>{post.time}</strong>
-              </div>
-              <p className="post-preview">{post.body}</p>
-              <div className="post-image-wrap">
-                <img src={post.image} alt="" />
-                <span>{post.status}</span>
-              </div>
-              <div className="post-copy">
-                <h2>{post.title}</h2>
-                <p>{post.body}</p>
-              </div>
-            </article>
-          ))}
+        <section className="schedule-column" aria-label="已排程內容">
+          {postsLoading ? (
+            <div className="schedule-empty-panel is-loading">
+              <strong>正在載入已排程內容</strong>
+              <span>SOON 正在同步目前工作台的貼文、審批狀態及圖片。</span>
+            </div>
+          ) : postsLoadError ? (
+            <div className="schedule-empty-panel">
+              <strong>未能載入已排程內容</strong>
+              <span>請重新整理頁面；如果仍然見到這個畫面，SOON 會用工作台紀錄追查載入問題。</span>
+            </div>
+          ) : scheduledPosts.length ? scheduledPosts.map((post) => {
+            const media = post.media?.length ? post.media : [post.image]
+            const activeSlide = Math.min(postSlides[post.id] ?? 0, media.length - 1)
+
+            return (
+              <article className="post-card" key={post.id}>
+                <div className="post-card-head">
+                  <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
+                  <div className="post-time-actions">
+                    <strong>{post.time}</strong>
+                    <button type="button" onClick={() => openScheduleModal(post)}>
+                      改時間
+                    </button>
+                  </div>
+                </div>
+                <div className="post-image-wrap">
+                  <img src={media[activeSlide]} alt={`${post.title} 第 ${activeSlide + 1} 張`} />
+                  <span className="post-status-badge">{post.status}</span>
+                  {media.length > 1 ? (
+                    <>
+                      <span className="post-carousel-count">{activeSlide + 1} / {media.length}</span>
+                      <button
+                        type="button"
+                        className="post-carousel-button previous"
+                        aria-label="上一張圖"
+                        disabled={activeSlide === 0}
+                        onClick={() => movePostSlide(post.id, media.length, -1)}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        className="post-carousel-button next"
+                        aria-label="下一張圖"
+                        disabled={activeSlide === media.length - 1}
+                        onClick={() => movePostSlide(post.id, media.length, 1)}
+                      >
+                        ›
+                      </button>
+                      <div className="post-carousel-dots" aria-label={`${post.title} 圖片頁數`}>
+                        {media.map((imageUrl, index) => (
+                          <button
+                            type="button"
+                            key={imageUrl}
+                            className={index === activeSlide ? 'active' : ''}
+                            aria-label={`第 ${index + 1} 張圖`}
+                            onClick={() => setPostSlide(post.id, media.length, index)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+                <div className="post-copy">
+                  <h2>{post.title}</h2>
+                  <p>{post.body}</p>
+                </div>
+                <div className="post-card-actions">
+                  {PUBLISH_PLATFORMS.map((platform) => {
+                    const connection = platformConnections[platform.id]
+                    const status = platformPublishStatus(post, platform.id)
+                    const isPublishingThis = publishingPlatform === platform.id
+                    const failedMessage = post.publishStatus?.[platform.id]?.message
+                    return (
+                      <button
+                        type="button"
+                        key={platform.id}
+                        className={`post-publish-now-button ${status === 'published' ? 'is-published' : ''}`}
+                        disabled={publishing || !connection || status === 'published'}
+                        onClick={() => void publishPost(post, platform.id, true)}
+                        title={failedMessage || undefined}
+                      >
+                        {status === 'published'
+                          ? `已發布到 ${platform.label}`
+                          : isPublishingThis
+                            ? `${platform.label} 發布中...`
+                            : connection
+                              ? `發布到 ${platform.label}`
+                              : `未連接 ${platform.label}`}
+                      </button>
+                    )
+                  })}
+                  {!hasPublishConnection ? <span>請先連接發布帳戶</span> : null}
+                </div>
+              </article>
+            )
+          }) : (
+            <div className="schedule-empty-panel">
+              <strong>暫時未有已確認排程內容</strong>
+              <span>這裡只會顯示目前工作台已獲客戶確認的貼文；有新內容確認後會自動出現在這裡。</span>
+            </div>
+          )}
         </section>
         {toolbarMessage ? <div className="toolbar-message">{toolbarMessage}</div> : null}
       </section>
@@ -2078,12 +2389,37 @@ function ScheduledPostsPageContent() {
                 <input value={createTitle} onChange={(event) => setCreateTitle(event.target.value)} placeholder="輸入貼文主題" />
               </label>
               <label>
-                <span>發布日期與時間</span>
+                <span>發布日期與時間（{localTimeZoneLabel}）</span>
                 <input type="datetime-local" value={createScheduledAt} onChange={(event) => setCreateScheduledAt(event.target.value)} />
               </label>
               <footer>
                 <button type="button" onClick={() => setCreateModalOpen(false)}>取消</button>
                 <button type="submit" disabled={toolbarBusy}>{toolbarBusy ? '建立中...' : '建立貼文'}</button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {scheduleModalPost ? (
+        <div className="toolbar-modal-backdrop" role="presentation" onMouseDown={() => setScheduleModalPost(null)}>
+          <section className="toolbar-modal" role="dialog" aria-modal="true" aria-labelledby="edit-schedule-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="edit-schedule-title">修改發布時間</h2>
+              <button type="button" onClick={() => setScheduleModalPost(null)} aria-label="關閉">×</button>
+            </header>
+            <form onSubmit={handleUpdateSchedule} className="toolbar-form">
+              <label>
+                <span>貼文</span>
+                <input value={scheduleModalPost.title} readOnly />
+              </label>
+              <label>
+                <span>發布日期與時間（{localTimeZoneLabel}）</span>
+                <input type="datetime-local" value={scheduleDraftAt} onChange={(event) => setScheduleDraftAt(event.target.value)} />
+              </label>
+              <footer>
+                <button type="button" onClick={() => setScheduleModalPost(null)}>取消</button>
+                <button type="submit" disabled={toolbarBusy}>{toolbarBusy ? '儲存中...' : '儲存時間'}</button>
               </footer>
             </form>
           </section>
@@ -2161,7 +2497,7 @@ export default function ScheduledPostsPage() {
   )
 }
 
-const styles = `
+const styles = `${dashboardSidebarStyles}
   .site-nav {
     display: none;
   }
@@ -2172,104 +2508,6 @@ const styles = `
     color: #202126;
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
-  }
-
-  .sidebar {
-    min-height: 100vh;
-    border-right: 1px solid #e6e7ea;
-    background: #f2f3f5;
-    padding: 16px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    position: relative;
-    z-index: 30;
-    pointer-events: auto;
-  }
-
-  .workspace-switcher {
-    display: grid;
-    grid-template-columns: 28px 1fr auto;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 6px 18px;
-    border-bottom: 1px solid #e2e3e6;
-  }
-
-  .workspace-mark {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    background: #ffd946;
-    color: #111111;
-    display: grid;
-    place-items: center;
-    font-weight: 800;
-    font-size: 13px;
-  }
-
-  .workspace-switcher strong {
-    font-size: 14px;
-    font-weight: 550;
-  }
-
-  .workspace-switcher span {
-    color: #9a9da4;
-  }
-
-  .sidebar-nav,
-  .sidebar-group,
-  .sidebar-footer {
-    display: grid;
-    gap: 5px;
-  }
-
-  .sidebar-nav a,
-  .sidebar-group a,
-  .sidebar-footer a {
-    min-height: 34px;
-    border-radius: 9px;
-    color: #6f7278;
-    display: grid;
-    grid-template-columns: 24px 1fr auto;
-    align-items: center;
-    gap: 8px;
-    padding: 0 10px;
-    text-decoration: none;
-    font-size: 14px;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .sidebar-group a,
-  .sidebar-footer a {
-    display: flex;
-  }
-
-  .sidebar-nav a.active {
-    background: #e5e7eb;
-    color: #202126;
-  }
-
-  .sidebar-nav strong {
-    font-weight: 500;
-  }
-
-  .sidebar-nav em {
-    color: #9b9ea6;
-    font-style: normal;
-  }
-
-  .sidebar-group p {
-    margin: 8px 10px 4px;
-    color: #9a9da4;
-    font-size: 12px;
-  }
-
-  .sidebar-footer {
-    margin-top: auto;
-    border-top: 1px solid #e2e3e6;
-    padding-top: 12px;
   }
 
   .calendar-shell {
@@ -2299,6 +2537,11 @@ const styles = `
     margin: 0 8px 0 0;
     font-size: 18px;
     font-weight: 650;
+  }
+
+  .calendar-title > span {
+    color: #6f737d;
+    font-size: 13px;
   }
 
   .calendar-title button,
@@ -2354,6 +2597,23 @@ const styles = `
     font-size: 14px;
   }
 
+  .connect-banner.connected {
+    background: #edfff5;
+    border-bottom-color: #c7f3d8;
+    color: #14532d;
+  }
+
+  .connect-banner.loading {
+    background: linear-gradient(90deg, #f7f7f8 25%, #eceef1 50%, #f7f7f8 75%);
+    background-size: 200% 100%;
+    animation: scheduled-banner-shimmer 1.2s infinite;
+  }
+
+  @keyframes scheduled-banner-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   .connect-banner button {
     border: 0;
     border-radius: 8px;
@@ -2383,6 +2643,39 @@ const styles = `
     gap: 10px;
   }
 
+  .schedule-empty-panel {
+    width: min(100%, 520px);
+    min-height: 220px;
+    border: 1px dashed #d9dbe1;
+    border-radius: 12px;
+    background: #fbfbfc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: #6f737d;
+  }
+
+  .schedule-empty-panel strong {
+    color: #202126;
+    font-size: 16px;
+  }
+
+  .schedule-empty-panel span {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .schedule-empty-panel.is-loading {
+    border-style: solid;
+    background:
+      linear-gradient(90deg, rgba(247, 247, 248, 0.7) 25%, rgba(235, 236, 239, 0.9) 50%, rgba(247, 247, 248, 0.7) 75%),
+      #ffffff;
+    background-size: 220% 100%;
+    animation: scheduled-banner-shimmer 1.2s infinite;
+  }
+
   .schedule-column.compact {
     width: min(100%, 280px);
   }
@@ -2392,14 +2685,14 @@ const styles = `
     border-radius: 10px;
     background: #ffffff;
     overflow: hidden;
-    cursor: pointer;
+    cursor: default;
     transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
 
   .post-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(32, 33, 38, 0.09);
-    border-color: #c8c9ce;
+    transform: none;
+    box-shadow: none;
+    border-color: #e8e9ec;
   }
 
   .post-card-head {
@@ -2407,6 +2700,7 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     padding: 0 10px;
     border-bottom: 1px solid #ececef;
   }
@@ -2434,29 +2728,48 @@ const styles = `
     font-weight: 550;
   }
 
-  .post-preview {
-    margin: 0;
-    padding: 10px;
-    color: #45474e;
-    font-size: 13px;
-    line-height: 1.35;
+  .post-time-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .post-time-actions button {
+    border: 1px solid #e2e3e7;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #202126;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 650;
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+
+  .post-time-actions button:hover {
+    border-color: #c7c9cf;
+    background: #f7f7f8;
   }
 
   .post-image-wrap {
     position: relative;
-    aspect-ratio: 1 / 1;
-    background: #f1f1f1;
+    aspect-ratio: 4 / 5;
+    background: #fbfaf7;
     overflow: hidden;
   }
 
   .post-image-wrap img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
   }
 
-  .post-image-wrap span {
+  .post-status-badge,
+  .post-carousel-count {
     position: absolute;
     left: 8px;
     bottom: 8px;
@@ -2465,6 +2778,70 @@ const styles = `
     color: #ffffff;
     padding: 3px 7px;
     font-size: 12px;
+  }
+
+  .post-carousel-count {
+    top: 8px;
+    bottom: auto;
+    background: rgba(17, 17, 17, 0.68);
+  }
+
+  .post-carousel-button {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(17, 17, 17, 0.74);
+    color: #ffffff;
+    font-size: 26px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+
+  .post-carousel-button.previous {
+    left: 8px;
+  }
+
+  .post-carousel-button.next {
+    right: 8px;
+  }
+
+  .post-carousel-button:disabled {
+    opacity: 0.28;
+    cursor: default;
+  }
+
+  .post-carousel-dots {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.46);
+    padding: 5px 7px;
+  }
+
+  .post-carousel-dots button {
+    width: 6px;
+    height: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.54);
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .post-carousel-dots button.active {
+    width: 16px;
+    background: #ffffff;
   }
 
   .post-copy {
@@ -2484,9 +2861,47 @@ const styles = `
     color: #555861;
     font-size: 12px;
     line-height: 1.42;
+    white-space: pre-wrap;
   }
 
-  .schedule-column.compact .post-preview,
+  .post-card-actions {
+    border-top: 1px solid #ececef;
+    display: grid;
+    gap: 6px;
+    padding: 10px 12px 12px;
+  }
+
+  .post-publish-now-button {
+    border: 0;
+    border-radius: 8px;
+    background: #111111;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    min-height: 38px;
+    padding: 9px 12px;
+  }
+
+  .post-publish-now-button:disabled {
+    background: #d8d9dd;
+    color: #777b84;
+    cursor: not-allowed;
+  }
+
+  .post-publish-now-button.is-published {
+    background: #e8fff1;
+    color: #146c36;
+  }
+
+  .post-card-actions span {
+    color: #858994;
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: center;
+  }
+
   .schedule-column.compact .post-copy p {
     display: none;
   }

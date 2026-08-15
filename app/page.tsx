@@ -94,9 +94,14 @@ export default function HomePage() {
               <br />
               不需要再請人打理社交媒體——每月只需 HK$588 起
             </p>
-            <Link href="/signup" className="hero__cta">
-              立即免費試用
-            </Link>
+            <div className="hero__actions">
+              <Link href="/signup" className="hero__cta hero__cta--primary">
+                立即免費試用
+              </Link>
+              <Link href="/login" className="hero__cta hero__cta--login">
+                客戶登入
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -310,6 +315,14 @@ export default function HomePage() {
               letter-spacing: 0;
             }
 
+            .hero__actions {
+              display: flex;
+              align-items: center;
+              justify-content: flex-end;
+              gap: 14px;
+              flex-wrap: wrap;
+            }
+
             .hero__cta {
               min-height: 54px;
               display: inline-flex;
@@ -317,12 +330,26 @@ export default function HomePage() {
               justify-content: center;
               padding: 0 24px;
               border-radius: 8px;
-              background: #ef4444;
-              color: #ffffff;
               text-decoration: none;
               font-size: 16px;
               font-weight: 800;
+              transition: transform 160ms ease, box-shadow 160ms ease;
+            }
+
+            .hero__cta:hover {
+              transform: translateY(-1px);
+            }
+
+            .hero__cta--primary {
+              background: #ef4444;
+              color: #ffffff;
               box-shadow: 0 16px 34px rgba(239, 68, 68, 0.34);
+            }
+
+            .hero__cta--login {
+              background: #ffd337;
+              color: #1f1600;
+              box-shadow: 0 16px 34px rgba(255, 211, 55, 0.28);
             }
 
             .platform-bar {
@@ -861,6 +888,10 @@ export default function HomePage() {
                 width: min(100%, 620px);
               }
 
+              .hero__actions {
+                justify-content: flex-start;
+              }
+
               .proof-grid,
               .pricing-grid {
                 grid-template-columns: 1fr;
@@ -907,6 +938,14 @@ export default function HomePage() {
 
               h1 {
                 font-size: clamp(3.25rem, 16vw, 5rem);
+              }
+
+              .hero__actions {
+                width: 100%;
+              }
+
+              .hero__cta {
+                flex: 1 1 180px;
               }
 
               .platform-bar__inner {

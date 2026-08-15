@@ -1,3 +1,4 @@
+import { CursorReset } from '@/components/CursorReset'
 import SiteNav from '@/components/SiteNav'
 import type { Metadata } from 'next'
 
@@ -10,6 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <CursorReset />
         <SiteNav />
         {children}
         <style
@@ -30,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               body {
                 margin: 0;
                 min-height: 100vh;
+                cursor: auto;
                 font-family:
                   "SF Pro Rounded", "SF Pro Display", "Avenir Next", ui-rounded,
                   "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont,
@@ -55,6 +58,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
               a {
                 color: inherit;
+              }
+
+              iframe[src*="vercel.live/_next-live"],
+              iframe[src*="vercel.live"][title*="Vercel"],
+              iframe[src*="vercel.live"][aria-label*="Vercel"] {
+                display: none !important;
+                pointer-events: none !important;
               }
             `,
           }}

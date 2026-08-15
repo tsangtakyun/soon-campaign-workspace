@@ -11,9 +11,10 @@ import { createClient } from '@/lib/supabase'
 function SignupContent() {
   const searchParams = useSearchParams()
   const selectedPlan = searchParams.get('plan')
-  const next = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
+  const requestedNext = normalizeAuthNext(searchParams.get('next'))
+  const next = requestedNext || (selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine')
   const contentEngineBase = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
-  const onboardingNext = selectedPlan ? `/signup?onboarding=1&plan=${selectedPlan}` : '/signup?onboarding=1'
+  const onboardingNext = requestedNext || (selectedPlan ? `/signup?onboarding=1&plan=${selectedPlan}` : '/signup?onboarding=1')
   const nextWithOnboarding = (name: string, budget: string, category: string) => {
     const url = new URL(contentEngineBase, getAppUrl())
     url.searchParams.set('name', name)
@@ -60,8 +61,12 @@ function SignupContent() {
 
       if (error) throw error
 
-      setMessage('已建立帳戶。請檢查電郵確認帳戶；你亦可以先完成以下設定。')
-      setStep('onboarding')
+      if (requestedNext) {
+        setMessage('已建立帳戶。請檢查電郵確認帳戶，之後回到邀請連結接受邀請。')
+      } else {
+        setMessage('已建立帳戶。請檢查電郵確認帳戶；你亦可以先完成以下設定。')
+        setStep('onboarding')
+      }
     } catch (error: any) {
       setMessage(error.message || '暫時未能建立帳戶，請稍後再試。')
     } finally {
@@ -474,4 +479,10 @@ export default function SignupPage() {
 function getAppUrl() {
   if (typeof window !== 'undefined') return window.location.origin
   return process.env.NEXT_PUBLIC_APP_URL || 'https://sooncreator.network'
+}
+
+function normalizeAuthNext(value: string | null) {
+  if (!value || !value.startsWith('/')) return ''
+  if (value.startsWith('//')) return ''
+  return value
 }

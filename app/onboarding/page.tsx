@@ -9,6 +9,7 @@ import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
 import { createClient } from '@/lib/supabase'
 import {
   getActiveWorkspaceId,
+  isBechillWorkspace,
   setActiveWorkspaceId,
   type WorkspaceSummary,
   WORKSPACE_CHANGED_EVENT,
@@ -23,6 +24,7 @@ type HomePost = {
   body: string
   time: string
   image: string | null
+  media?: string[]
   status: string
 }
 
@@ -126,7 +128,19 @@ function mapPostType(type: unknown): Pick<HomePost, 'type' | 'typeKind'> {
 }
 
 function mapPostStatus(status: unknown) {
+  if (status === 'ready' || status === 'pending_approval') return '待審批'
+  if (status === 'approved') return '已確認'
+  if (status === 'scheduled') return '已排程'
+  if (status === 'published' || status === 'posted') return '已發布'
+  if (status === 'rejected') return '要修改'
   return status === 'draft' ? '草稿' : '新內容'
+}
+
+function readPostMedia(post: any) {
+  const assets = Array.isArray(post?.captions?.assets) ? post.captions.assets : []
+  return assets
+    .map((asset: any) => asset?.url)
+    .filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
 }
 
 function mapCampaignStatus(status: unknown): Pick<HomeCampaign, 'status' | 'statusKind'> {
@@ -139,29 +153,514 @@ function isPlaceholderImage(value: string | null) {
   return !value || value.startsWith('data:image/svg+xml') || value.includes('placeholder')
 }
 
-const upNext = [
+const clientChangeRecords = [
   {
-    icon: '↯',
-    title: '連接你的帳戶',
-    desc: '連接後 SOON 可以自動按排程發布你的內容',
-    cta: '立即連接',
-    href: '/onboarding/integrations',
+    date: '2026年8月7日（五）',
+    title: '客戶提出修改',
+    desc: '04《休息不是懶惰》需要改表情，其餘內容維持原狀。',
   },
   {
-    icon: '◎',
-    title: '設定 SEO 計劃',
-    desc: '選擇關鍵詞，自動生成 SEO 內容集群',
-    cta: '開始設定',
-    href: '/onboarding/seo',
+    date: '2026年8月12日（三）',
+    title: '客戶確認 Week 1',
+    desc: '本週 5 條 IG Post 已確認，01 已發布，其餘 4 條準備按排程發布。',
   },
   {
-    icon: '▻',
-    title: '試試短影片',
-    desc: '上傳素材，SOON 自動剪輯成短片',
-    cta: '了解更多',
-    href: '/onboarding/content-preferences?type=short-form-video',
+    date: '2026年8月12日（三）',
+    title: '排程時間更新',
+    desc: '02-05 已更新為 8月13日至8月16日每日 18:00 發布。',
   },
 ]
+
+type ApprovalDecision = 'ok' | 'edit' | 'no'
+
+type ApprovalPost = {
+  id?: string
+  no: string
+  kind: string
+  meta: string
+  goal: string
+  title: string
+  badge?: string
+  status?: 'published' | 'confirmed'
+  publishedAt?: string
+  media: string[]
+  caption: string
+  note: string
+}
+
+type ApprovalWeek = {
+  brandLine: string
+  completedText: string
+  deadline: string
+  label: string
+  remark: string
+  summary: string
+  posts: ApprovalPost[]
+  whatsappPrefix: string
+  workspaceId?: string | null
+}
+
+const approvalLabels: Record<ApprovalDecision, string> = {
+  ok: '可以出',
+  edit: '要修改',
+  no: '換過',
+}
+
+const approvalQuickNotes = [
+  '文案太長',
+  '語氣不符',
+  '想換金句',
+  '配色想調整',
+  '文字太小',
+  '想加 CTA',
+  '修改 hashtag',
+  '想看多個版本',
+]
+
+const bechillApprovalWeek: ApprovalWeek = {
+  brandLine: '笨chill × SOON ・ 內容審批',
+  completedText: '01 已發布，其餘內容會留在這裡準備按排程發布。',
+  label: 'Week 1（2026年8月10-16日）',
+  deadline: '客人已確認本週全部內容',
+  summary: '2026年8月 Week 1 ・ 第四版 ・ 5 條 IG Post',
+  remark: '01 已發布，其餘 4 條準備按排程發布',
+  whatsappPrefix: '【笨chill × SOON】內容審批',
+  posts: [
+    {
+      no: '01',
+      kind: '金句 Carousel',
+      meta: '3 格輪播 ・ 已發布：2026年8月12日（三）18:00 HKT',
+      goal: '主打 Save · 共鳴',
+      title: '《煩惱可以分兩種》',
+      badge: '已發布',
+      status: 'published',
+      publishedAt: '2026年8月12日（三）18:00 HKT',
+      media: ['a/01_worries_1.webp', 'a/01_worries_2.webp', 'a/01_worries_3.webp'],
+      caption:
+        'Tag 一個很多煩惱的朋友\n-\n煩惱可以分兩種：\n解決到嘅，慢慢做。\n解決唔到嘅，坐低先。\n可以舒服，點解要辛苦。',
+      note: '中英對照排版，三格遞進：有煩惱 → 解決到 → 解決唔到。',
+    },
+    {
+      no: '02',
+      kind: '金句 Carousel',
+      meta: '7 格輪播 ・ 建議出帖：8月13日（四）18:00',
+      goal: '主打 Save · 共鳴',
+      title: '《乖乖等你》',
+      badge: '已確認',
+      status: 'confirmed',
+      media: [
+        'a/02_wait_1.webp',
+        'a/02_wait_2.webp',
+        'a/02_wait_3.webp',
+        'a/02_wait_4.webp',
+        'a/02_wait_5.webp',
+        'a/02_wait_6.webp',
+        'a/02_wait_7.webp',
+      ],
+      caption:
+        '你諗起邊個？\n\n有些人會陪你一段路。\n有些人會在某個時間明白你。\n有些關係很好，只是未必能一直留在原地。\n但笨chill 不太懂講大道理。\n牠一直在你回來之前，乖乖等你。\n-\n你同你屋企寵物之間，有冇一件好窩心嘅小事？\n留言講俾我哋聽',
+      note: '六格鋪陳（情人／朋友／同事／親人／難過／OT），第七格改成笨chill 開心迎接主人，收「或許我不能陪你一輩子，但我會用我的一輩子陪你」。',
+    },
+    {
+      no: '03',
+      kind: '金句 Carousel',
+      meta: '4 格輪播 ・ 建議出帖：8月14日（五）18:00',
+      goal: '主打 Save · 共鳴',
+      title: '《有你嘅世界》',
+      badge: '已確認',
+      status: 'confirmed',
+      media: ['a/03_world_1.webp', 'a/03_world_2.webp', 'a/03_world_3.webp', 'a/03_world_4.webp'],
+      caption:
+        'Tag 一個成日好忙嘅朋友\n你開心，世界照樣轉。\n你唔開心，世界一樣照樣轉。\n唔係你唔重要，\n係唔使咩都攬上身。\n舒服啲啦 —— 世界唔會因為你抖五分鐘而停。',
+      note: '四格遞進：開心／唔開心 → 其實一樣 → 做咩俾咁大壓力自己。',
+    },
+    {
+      no: '04',
+      kind: '金句 Carousel',
+      meta: '7 格輪播 ・ 建議出帖：8月15日（六）18:00',
+      goal: '主打 Save · 共鳴',
+      title: '《休息不是懶惰》',
+      badge: '已確認',
+      status: 'confirmed',
+      media: [
+        'a/04_rest_1.webp',
+        'a/04_rest_2.webp',
+        'a/04_rest_3.webp',
+        'a/04_rest_4.webp',
+        'a/04_rest_5.webp',
+        'a/04_rest_6.webp',
+        'a/04_rest_7.webp',
+      ],
+      caption:
+        'Tag 一個最近需要休息嘅朋友\n\n「休息並不是懶惰。在夏日某天躺在樹下草地上，聽水聲潺潺，或看雲在天上飄過，絕不是浪費時間。」\n\n“Rest is not idleness, and to lie sometimes on the grass under trees on a summer’s day, listening to the murmur of the water, or watching the clouds float across the sky, is by no means a waste of time.”\n\nJohn Lubbock',
+      note: '中英對照，七格：由「最累的不是忙」鋪到「休息不是懶惰」，尾格以 John Lubbock 收。',
+    },
+    {
+      no: '05',
+      kind: '金句 Carousel',
+      meta: '4 格輪播 ・ 建議出帖：8月16日（日）18:00',
+      goal: '主打 Share · 吸新粉',
+      title: '《沖完涼的髮型》',
+      badge: '已確認',
+      status: 'confirmed',
+      media: ['a/05_hair_1.webp', 'a/05_hair_2.webp', 'a/05_hair_3.webp', 'a/05_hair_4.webp'],
+      caption: '你喜歡笨chill沖完涼的髮型嗎？',
+      note: '第 4 格為笨chill 真實相片，用真人真狗畫面吸引新粉絲。',
+    },
+  ],
+}
+
+function approvalImageSrc(path: string) {
+  if (/^https?:\/\//i.test(path)) return path
+  return `https://soon-approval.vercel.app/${path}`
+}
+
+function ApprovalBoard({ week }: { week: ApprovalWeek }) {
+  const [decisions, setDecisions] = useState<(ApprovalDecision | null)[]>(
+    () => week.posts.map(() => null)
+  )
+  const [notes, setNotes] = useState(() => week.posts.map(() => ''))
+  const [slides, setSlides] = useState(() => week.posts.map(() => 0))
+  const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null)
+  const [toast, setToast] = useState('')
+
+  const completed = week.posts.filter((post, index) => {
+    if (post.status === 'published' || post.status === 'confirmed') return true
+    const decision = decisions[index]
+    return decision === 'ok' || (decision && notes[index].trim())
+  }).length
+  const progressPercent = week.posts.length ? (completed / week.posts.length) * 100 : 0
+
+  function showToast(message: string) {
+    setToast(message)
+    window.setTimeout(() => setToast(''), 2400)
+  }
+
+  function setDecision(index: number, decision: ApprovalDecision) {
+    setDecisions((current) => current.map((item, itemIndex) => (itemIndex === index ? decision : item)))
+  }
+
+  async function persistDecision(index: number, decision: ApprovalDecision) {
+    const post = week.posts[index]
+    if (!post?.id || !week.workspaceId) return
+
+    try {
+      const response = await fetch(decision === 'ok' ? '/api/posts/approve' : '/api/posts/reject', {
+        body: JSON.stringify({ postId: post.id, workspaceId: week.workspaceId }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '儲存失敗')
+      showToast(decision === 'ok' ? '已儲存：可以出' : '已儲存：需要跟進')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '未能儲存審批狀態')
+    }
+  }
+
+  function handleDecision(index: number, decision: ApprovalDecision) {
+    setDecision(index, decision)
+    void persistDecision(index, decision)
+  }
+
+  function setNote(index: number, value: string) {
+    setNotes((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)))
+  }
+
+  function addQuickNote(index: number, value: string) {
+    setNotes((current) =>
+      current.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        return item.trim() ? `${item.trim().replace(/[、,]$/, '')}、${value}` : value
+      })
+    )
+  }
+
+  function moveSlide(postIndex: number, direction: number) {
+    const total = week.posts[postIndex].media.length
+    setSlides((current) =>
+      current.map((slide, itemIndex) => {
+        if (itemIndex !== postIndex) return slide
+        return Math.max(0, Math.min(total - 1, slide + direction))
+      })
+    )
+  }
+
+  function goToSlide(postIndex: number, slideIndex: number) {
+    setSlides((current) => current.map((slide, itemIndex) => (itemIndex === postIndex ? slideIndex : slide)))
+  }
+
+  function buildApprovalText() {
+    const date = new Date()
+    const time = date.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const workspaceId = getActiveWorkspaceId()
+    const approvalUrl =
+      typeof window !== 'undefined' && workspaceId
+        ? `${window.location.origin}/workspace/${workspaceId}`
+        : 'https://sooncreator.network/onboarding'
+    const lines = [
+      week.whatsappPrefix,
+      week.label,
+      `提交時間：${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${time}`,
+      `審批連結：${approvalUrl}`,
+      '',
+    ]
+
+    week.posts.forEach((post, index) => {
+      const decision = decisions[index]
+      lines.push(`${post.no}. ${post.kind}${post.title}`)
+      lines.push(
+        post.status === 'published'
+          ? `已發布：${post.publishedAt}`
+          : post.status === 'confirmed'
+            ? '已確認：可以出'
+            : decision
+              ? approvalLabels[decision]
+              : '（未決定）'
+      )
+      if (decision && decision !== 'ok' && notes[index].trim()) lines.push(`→ ${notes[index].trim()}`)
+      lines.push('')
+    })
+
+    const ok = week.posts.filter(
+      (post, index) => post.status === 'published' || post.status === 'confirmed' || decisions[index] === 'ok'
+    ).length
+    lines.push(`小結：${ok}/${week.posts.length} 條可以出，${week.posts.length - ok} 條要跟進。`)
+    lines.push('—— 由 SOON 審批頁自動產生')
+    return lines.join('\n')
+  }
+
+  async function copyApprovalText() {
+    try {
+      await navigator.clipboard.writeText(buildApprovalText())
+      showToast('已複製，可貼上 WhatsApp')
+    } catch {
+      showToast('未能複製，請再試一次')
+    }
+  }
+
+  function sendToWhatsApp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildApprovalText())}`, '_blank', 'noopener')
+  }
+
+  return (
+    <section className="approval-board" aria-label={`${week.label} SOON Approval`}>
+      <header className="approval-board-hero">
+        <div>
+          <p>{week.brandLine}</p>
+          <h2>{week.label}</h2>
+        </div>
+        <div className="approval-board-meta">
+          <span>{week.summary}</span>
+          <strong>{week.deadline}</strong>
+          <small>{week.remark}</small>
+        </div>
+      </header>
+
+      <div className="approval-progress-card">
+        <div>
+          <strong>
+            本週確認 {completed}/{week.posts.length} 條
+          </strong>
+          <span>{week.completedText}</span>
+        </div>
+        <div className="approval-progress-track">
+          <span style={{ width: `${progressPercent}%` }} />
+        </div>
+        <div className="approval-progress-actions">
+          <button type="button" onClick={copyApprovalText}>
+            複製文字
+          </button>
+          <button type="button" className="send" onClick={sendToWhatsApp}>
+            傳送到 WhatsApp 工作小組
+          </button>
+        </div>
+      </div>
+
+      <div className="approval-posts">
+        {week.posts.map((post, postIndex) => {
+          const slide = slides[postIndex]
+          const decision = decisions[postIndex]
+          const currentImage = approvalImageSrc(post.media[slide])
+          const isPublished = post.status === 'published'
+          const isConfirmed = post.status === 'confirmed'
+          const needsNote = decision === 'edit' || decision === 'no'
+
+          if (isPublished) return null
+
+          return (
+            <article key={post.no} className={`approval-post ${decision ? `is-${decision}` : ''} ${isConfirmed ? 'is-confirmed' : ''}`}>
+              <div className="approval-post-head">
+                <div className="approval-tagrow">
+                  <span className="approval-num">{post.no}</span>
+                  <div>
+                    <strong>
+                      {post.kind}
+                      {post.badge ? <em className={isConfirmed ? 'confirmed' : ''}>{post.badge}</em> : null}
+                    </strong>
+                    <span>{post.meta}</span>
+                  </div>
+                  <small>{post.goal}</small>
+                </div>
+                <h3>{post.title}</h3>
+              </div>
+
+              <div className="approval-gallery">
+                <button
+                  type="button"
+                  className="approval-nav prev"
+                  aria-label="上一格"
+                  disabled={slide === 0}
+                  onClick={() => moveSlide(postIndex, -1)}
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="approval-nav next"
+                  aria-label="下一格"
+                  disabled={slide === post.media.length - 1}
+                  onClick={() => moveSlide(postIndex, 1)}
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  className="approval-image-button"
+                  onClick={() =>
+                    setPreview({
+                      src: currentImage,
+                      caption: `${post.title} ・ 第 ${slide + 1} / ${post.media.length} 格`,
+                    })
+                  }
+                >
+                  <img src={currentImage} alt={`${post.title} 第 ${slide + 1} 格`} loading="lazy" />
+                  <span>{`${slide + 1} / ${post.media.length}`}</span>
+                </button>
+                <div className="approval-dots">
+                  {post.media.map((_, slideIndex) => (
+                    <button
+                      key={slideIndex}
+                      type="button"
+                      className={slideIndex === slide ? 'on' : ''}
+                      aria-label={`第 ${slideIndex + 1} 格`}
+                      onClick={() => goToSlide(postIndex, slideIndex)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="approval-post-body">
+                <p className="approval-label">CAPTION</p>
+                <div className="approval-caption">{post.caption}</div>
+                <p className="approval-label">備註</p>
+                <p className="approval-note">{post.note}</p>
+              </div>
+
+              <div className="approval-decide">
+                {isConfirmed ? (
+                  <div className="approval-confirmed-note">
+                    客人已確認，準備按排程發布。
+                  </div>
+                ) : (
+                  <div className="approval-segment">
+                    {(Object.keys(approvalLabels) as ApprovalDecision[]).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        data-value={value}
+                        aria-pressed={decision === value}
+                        onClick={() => handleDecision(postIndex, value)}
+                      >
+                        {approvalLabels[value]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!isConfirmed && needsNote ? (
+                  <div className="approval-note-box">
+                    <textarea
+                      value={notes[postIndex]}
+                      onChange={(event) => setNote(postIndex, event.target.value)}
+                      placeholder="請說明修改方向，例：第 3 格文字太小、最後一格想換一句 caption。"
+                    />
+                    <div className="approval-quick">
+                      {approvalQuickNotes.map((quickNote) => (
+                        <button key={quickNote} type="button" onClick={() => addQuickNote(postIndex, quickNote)}>
+                          {quickNote}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {preview ? (
+        <button type="button" className="approval-lightbox" onClick={() => setPreview(null)}>
+          <img src={preview.src} alt={preview.caption} />
+          <span>{preview.caption}</span>
+        </button>
+      ) : null}
+
+      {toast ? <div className="approval-toast">{toast}</div> : null}
+    </section>
+  )
+}
+
+function BechillApprovalBoard() {
+  return <ApprovalBoard week={bechillApprovalWeek} />
+}
+
+function ImportedApprovalBoard({
+  brandName,
+  posts,
+  workspaceId,
+}: {
+  brandName: string
+  posts: HomePost[]
+  workspaceId: string | null
+}) {
+  const approvalPosts: ApprovalPost[] = posts
+    .map((post, index) => {
+      const persistedStatus: ApprovalPost['status'] =
+        post.status === '已確認' || post.status === '已排程' ? 'confirmed' : undefined
+
+      return {
+        id: post.id,
+        no: String(index + 1).padStart(2, '0'),
+        kind: post.type,
+        meta: `${post.media?.length || 1} 格輪播 ・ 建議出帖：${post.time}`,
+        goal: post.status,
+        title: post.title,
+        badge: post.status,
+        status: persistedStatus,
+        media: post.media?.length ? post.media : post.image ? [post.image] : [],
+        caption: post.body,
+        note: '由 SOON import 流程加入，等待 Renee 檢查內容、圖片及 caption。',
+      }
+    })
+    .filter((post) => post.media.length > 0)
+
+  return (
+    <ApprovalBoard
+      week={{
+        brandLine: `${brandName || 'Egg.soon'} × SOON ・ 內容審批`,
+        completedText: '內容已匯入 SOON，等待 Renee 檢查及確認。',
+        deadline: approvalPosts[0]?.meta || '等待確認排程時間',
+        label: '待 Renee 檢查及審批',
+        remark: '完成後可以複製審批文字或傳送到 WhatsApp 工作小組。',
+        summary: `${approvalPosts.length} 條內容已匯入`,
+        posts: approvalPosts,
+        whatsappPrefix: `【${brandName || 'Egg.soon'} × SOON】內容審批`,
+        workspaceId,
+      }}
+    />
+  )
+}
 
 export default function OnboardingHomePage() {
   const router = useRouter()
@@ -170,6 +669,8 @@ export default function OnboardingHomePage() {
   const [dashboardCampaigns, setDashboardCampaigns] = useState<HomeCampaign[]>([])
   const [connectedSocialAccount, setConnectedSocialAccount] = useState<string | null>(null)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
+  const [isBechillActive, setIsBechillActive] = useState(false)
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const hasGeneratingImagesRef = useRef(false)
   const generatingPostIdsRef = useRef<Set<string>>(new Set())
@@ -193,6 +694,8 @@ export default function OnboardingHomePage() {
             setDashboardPosts([])
             setDashboardCampaigns([])
             setCreditBalance(TRIAL_CREDITS)
+            setActiveWorkspaceIdState(null)
+            setIsBechillActive(false)
             setDashboardLoading(false)
           }
           return
@@ -213,6 +716,10 @@ export default function OnboardingHomePage() {
 
           workspaceId = activeWorkspace?.id || null
           activeWorkspaceName = activeWorkspace?.brandName || activeWorkspace?.name || null
+          if (!cancelled) {
+            setActiveWorkspaceIdState(workspaceId)
+            setIsBechillActive(isBechillWorkspace(activeWorkspace))
+          }
 
           console.log('[dashboard] active workspace debug', {
             userId: user.id,
@@ -228,64 +735,84 @@ export default function OnboardingHomePage() {
 
         }
 
-        let postsQuery = supabase
-          .from('campaign_posts')
-          .select('id,campaign_id,title,body,post_type,scheduled_at,image_url,status,source_key,marketing_campaigns(name,strategy_emoji)')
-          .order('scheduled_at', { ascending: true })
-          .limit(30)
+        let postsData: any[] | null = null
+        let campaignsData: any[] | null = null
+        let brandKitData: any = null
+        let connectionsData: any[] | null = null
+        let creditsData: any = null
+        let postsError: any = null
+        let campaignsError: any = null
 
-        let campaignsQuery = supabase
-          .from('marketing_campaigns')
-          .select('id,name,strategy_title,strategy_emoji,starts_on,status')
-          .order('created_at', { ascending: false })
-          .limit(5)
+        if (user?.id && workspaceId) {
+          const dashboardResponse = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
+            cache: 'no-store',
+          })
+          const dashboardPayload = await dashboardResponse.json().catch(() => null)
 
-        let brandKitQuery = supabase.from('brand_kits').select('business_name,logo_url')
-        let connectionsQuery = supabase
-          .from('social_connections')
-          .select('platform,account_name')
-          .order('connected_at', { ascending: false })
-          .limit(1)
-        let creditsQuery = supabase.from('user_credits').select('balance')
+          if (!dashboardResponse.ok) {
+            throw new Error(dashboardPayload?.error || 'Failed to load dashboard data')
+          }
 
-        if (user?.id) {
-          if (workspaceId) {
-            postsQuery = postsQuery.eq('workspace_id', workspaceId)
-            campaignsQuery = campaignsQuery.eq('workspace_id', workspaceId)
-            brandKitQuery = brandKitQuery.eq('workspace_id', workspaceId)
-            connectionsQuery = connectionsQuery.eq('workspace_id', workspaceId)
-          } else {
+          postsData = dashboardPayload?.posts || []
+          campaignsData = dashboardPayload?.campaigns || []
+          brandKitData = dashboardPayload?.brandKit || null
+          connectionsData = dashboardPayload?.connections || []
+          creditsData = dashboardPayload?.credits || null
+        } else {
+          let postsQuery = supabase
+            .from('campaign_posts')
+            .select('id,campaign_id,title,body,post_type,scheduled_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
+            .order('scheduled_at', { ascending: true })
+            .limit(30)
+
+          let campaignsQuery = supabase
+            .from('marketing_campaigns')
+            .select('id,name,strategy_title,strategy_emoji,starts_on,status')
+            .order('created_at', { ascending: false })
+            .limit(5)
+
+          let brandKitQuery = supabase.from('brand_kits').select('business_name,logo_url')
+          let connectionsQuery = supabase
+            .from('social_connections')
+            .select('platform,account_name')
+            .order('connected_at', { ascending: false })
+            .limit(1)
+          let creditsQuery = supabase.from('user_credits').select('balance')
+
+          if (user?.id) {
             postsQuery = postsQuery.eq('user_id', user.id)
             campaignsQuery = campaignsQuery.eq('user_id', user.id)
             brandKitQuery = brandKitQuery.eq('user_id', user.id)
             connectionsQuery = connectionsQuery.eq('user_id', user.id)
+            creditsQuery = creditsQuery.eq('user_id', user.id)
+          } else if (sessionId) {
+            postsQuery = postsQuery.eq('onboarding_session_id', sessionId)
+            campaignsQuery = campaignsQuery.eq('onboarding_session_id', sessionId)
+            brandKitQuery = brandKitQuery.eq('onboarding_session_id', sessionId)
+            connectionsQuery = connectionsQuery.eq('onboarding_session_id', sessionId)
           }
-          creditsQuery = creditsQuery.eq('user_id', user.id)
-        } else if (sessionId) {
-          postsQuery = postsQuery.eq('onboarding_session_id', sessionId)
-          campaignsQuery = campaignsQuery.eq('onboarding_session_id', sessionId)
-          brandKitQuery = brandKitQuery.eq('onboarding_session_id', sessionId)
-          connectionsQuery = connectionsQuery.eq('onboarding_session_id', sessionId)
-        }
 
-        const [
-          { data: postsData, error: postsError },
-          { data: campaignsData, error: campaignsError },
-          { data: brandKitData },
-          { data: connectionsData },
-          { data: creditsData },
-        ] =
-          await Promise.all([
-            postsQuery,
-            campaignsQuery,
-            brandKitQuery.maybeSingle(),
-            connectionsQuery,
-            user?.id ? creditsQuery.maybeSingle() : Promise.resolve({ data: null }),
-          ])
+          const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult] =
+            await Promise.all([
+              postsQuery,
+              campaignsQuery,
+              brandKitQuery.maybeSingle(),
+              connectionsQuery,
+              user?.id ? creditsQuery.maybeSingle() : Promise.resolve({ data: null }),
+            ])
+
+          postsData = postsResult.data
+          campaignsData = campaignsResult.data
+          brandKitData = brandKitResult.data
+          connectionsData = connectionsResult.data
+          creditsData = creditsResult.data
+          postsError = postsResult.error
+          campaignsError = campaignsResult.error
+        }
 
         if (cancelled) return
 
-        setBrandName(brandKitData?.business_name || activeWorkspaceName || '')
+          setBrandName(brandKitData?.business_name || activeWorkspaceName || '')
 
         if (connectionsData?.length) {
           const connection = connectionsData[0]
@@ -312,7 +839,11 @@ export default function OnboardingHomePage() {
           const displayPosts = postsData
             .filter((post: any) => {
               const sourceKey = String(post.source_key || '')
-              return sourceKey.startsWith('campaign-1-') || !isPlaceholderImage(post.image_url || null)
+              return (
+                sourceKey.startsWith('campaign-1-') ||
+                !isPlaceholderImage(post.image_url || null) ||
+                readPostMedia(post).length > 0
+              )
             })
             .slice(0, 10)
 
@@ -320,6 +851,10 @@ export default function OnboardingHomePage() {
           setDashboardPosts(
             displayPosts.map((post: any, index: number) => {
               const type = mapPostType(post.post_type)
+              const media = readPostMedia(post)
+              const image = isPlaceholderImage(post.image_url || null)
+                ? media[0] || null
+                : post.image_url
               return {
                 id: post.id,
                 sourceKey: post.source_key,
@@ -327,7 +862,8 @@ export default function OnboardingHomePage() {
                 title: post.title || fallbackUpcomingPosts[index % fallbackUpcomingPosts.length].title,
                 body: post.body || fallbackUpcomingPosts[index % fallbackUpcomingPosts.length].body,
                 time: formatDashboardTime(post.scheduled_at),
-                image: isPlaceholderImage(post.image_url || null) ? null : post.image_url,
+                image,
+                media,
                 status: mapPostStatus(post.status),
               }
             })
@@ -410,6 +946,8 @@ export default function OnboardingHomePage() {
           hasGeneratingImagesRef.current = false
           setDashboardPosts([])
           setDashboardCampaigns([])
+          setActiveWorkspaceIdState(null)
+          setIsBechillActive(false)
         }
       } finally {
         if (!cancelled) setDashboardLoading(false)
@@ -485,140 +1023,17 @@ export default function OnboardingHomePage() {
 
         <div className="home-body">
           <section className="home-main">
-            <section className="home-section">
-              <div className="home-section-head">
-                <h2>即將發布</h2>
-                <div className="home-section-actions">
-                  <button type="button" onClick={() => router.push('/onboarding/scheduled-posts')}>
-                    查看全部內容
-                  </button>
-                  <button type="button" className="home-create-btn">
-                    ＋ 建立
-                  </button>
-                </div>
-              </div>
-
-              <div className="upcoming-posts-list">
-                {dashboardLoading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <article key={`post-skeleton-${index}`} className="upcoming-post-card upcoming-post-card-skeleton">
-                      <div className="skeleton-line short" />
-                      <div className="skeleton-line tiny" />
-                      <div className="skeleton-line title" />
-                      <div className="skeleton-line body" />
-                      <div className="upcoming-post-img generating">
-                        <span aria-hidden="true" />
-                      </div>
-                    </article>
-                  ))
-                ) : dashboardPosts.length ? (
-                  dashboardPosts.map((post) => (
-                  <article
-                    key={post.id}
-                    className="upcoming-post-card"
-                    onClick={() => router.push('/onboarding/scheduled-posts')}
-                  >
-                    <div className="upcoming-post-card-top">
-                      <span className={`post-type-badge ${post.typeKind}`}>{post.type}</span>
-                      <button
-                        className="upcoming-post-edit-btn"
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          router.push('/onboarding/scheduled-posts')
-                        }}
-                      >
-                        編輯
-                      </button>
-                    </div>
-                    <span className="upcoming-post-time">{post.time}</span>
-                    <div className="upcoming-post-content">
-                      <h3>{post.title}</h3>
-                      <p>{post.body}</p>
-                    </div>
-                    <div className={`upcoming-post-img ${post.image ? 'ready' : 'generating'}`}>
-                      {post.image ? <img src={post.image} alt="" /> : <span aria-label="圖片生成中" />}
-                    </div>
-                  </article>
-                  ))
-                ) : (
-                  <div className="dashboard-empty-state">
-                    <strong>暫時未有即將發布的內容</strong>
-                    <span>完成 onboarding 後，這裡會顯示每一篇準備發布的內容。</span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="home-section">
-              <div className="home-section-head">
-                <h2>宣傳活動</h2>
-                <button type="button" onClick={() => router.push('/onboarding/scheduled-posts')}>
-                  查看全部活動
-                </button>
-              </div>
-              <div className="campaigns-table">
-                <div className="campaigns-table-head">
-                  <span>活動</span>
-                  <span>時間</span>
-                  <span>狀態</span>
-                  <span />
-                </div>
-                {dashboardLoading ? (
-                  Array.from({ length: 2 }).map((_, index) => (
-                    <div key={`campaign-skeleton-${index}`} className="campaign-row campaign-row-skeleton">
-                      <div className="campaign-info">
-                        <span className="campaign-thumb skeleton-block" />
-                        <div>
-                          <span className="skeleton-line title" />
-                          <span className="skeleton-line tiny" />
-                        </div>
-                      </div>
-                      <span className="skeleton-line tiny" />
-                      <span className="skeleton-pill" />
-                      <span />
-                    </div>
-                  ))
-                ) : dashboardCampaigns.length ? (
-                  dashboardCampaigns.map((campaign) => (
-                  <div
-                    key={campaign.id}
-                    className="campaign-row"
-                    onClick={() => router.push('/onboarding/scheduled-posts')}
-                  >
-                    <div className="campaign-info">
-                      {campaign.image ? (
-                        <img src={campaign.image} alt="" className="campaign-thumb" />
-                      ) : (
-                        <span className="campaign-thumb campaign-thumb-placeholder" aria-hidden="true" />
-                      )}
-                      <div>
-                        <strong>{campaign.name}</strong>
-                        <span>🎯 {campaign.type}</span>
-                      </div>
-                    </div>
-                    <span className="campaign-timing">{campaign.timing}</span>
-                    <span className={`campaign-status ${campaign.statusKind}`}>{campaign.status}</span>
-                    <button
-                      type="button"
-                      className="campaign-arrow"
-                      aria-label="查看活動"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        router.push('/onboarding/scheduled-posts')
-                      }}
-                    >
-                      ›
-                    </button>
-                  </div>
-                  ))
-                ) : (
-                  <div className="campaign-empty-row">
-                    完成 onboarding 後，這裡會顯示你的宣傳活動。
-                  </div>
-                )}
-              </div>
-            </section>
+            {isBechillActive ? (
+              <BechillApprovalBoard />
+            ) : dashboardPosts.length ? (
+              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} />
+            ) : (
+              <section className="workspace-empty-panel">
+                <span>SOON WORKSPACE</span>
+                <h2>{brandName || '這個工作台'} 內容準備中</h2>
+                <p>這裡只會顯示目前工作台的內容。Egg.soon 尚未加入內容審批、已發布貼文或修改紀錄。</p>
+              </section>
+            )}
           </section>
 
           <aside className="home-aside">
@@ -626,26 +1041,36 @@ export default function OnboardingHomePage() {
               <h3>過去 7 天</h3>
               <div className="stats-grid">
                 <div className="stat-card">
-                  <span className="stat-number">0</span>
+                  <span className="stat-number">{isBechillActive ? '1' : '0'}</span>
                   <span className="stat-label">已發布貼文</span>
                 </div>
               </div>
-              <p className="stats-hint">連接帳戶後即可查看數據分析</p>
+              {isBechillActive ? (
+                <div className="published-post-mini">
+                  <strong>《煩惱可以分兩種》</strong>
+                  <span>2026年8月12日 18:00 HKT</span>
+                </div>
+              ) : null}
+              <p className="stats-hint">連接帳戶後即可查看更完整數據分析</p>
             </section>
 
             <section className="home-aside-section">
-              <h3>下一步</h3>
-              <div className="up-next-list">
-                {upNext.map((item) => (
-                  <div key={item.title} className="up-next-item">
-                    <div className="up-next-icon">{item.icon}</div>
-                    <div className="up-next-content">
-                      <strong>{item.title}</strong>
-                      <p>{item.desc}</p>
-                      <a href={item.href}>{item.cta} →</a>
+              <h3>客戶修改紀錄</h3>
+              <div className="client-record-list">
+                {isBechillActive ? (
+                  clientChangeRecords.map((item) => (
+                    <div key={`${item.date}-${item.title}`} className="client-record-item">
+                      <span className="client-record-dot" aria-hidden="true" />
+                      <div className="client-record-content">
+                        <span>{item.date}</span>
+                        <strong>{item.title}</strong>
+                        <p>{item.desc}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="stats-hint">暫時未有 Egg.soon 客戶修改紀錄。</p>
+                )}
               </div>
             </section>
           </aside>
@@ -774,6 +1199,40 @@ const homeStyles = `
     gap: 36px;
   }
 
+  .workspace-empty-panel {
+    min-height: 260px;
+    border: 1px dashed #d9dbe1;
+    border-radius: 12px;
+    background: #fbfbfc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    padding: 28px;
+  }
+
+  .workspace-empty-panel span {
+    color: #8b8f99;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .workspace-empty-panel h2 {
+    margin: 0;
+    color: #202126;
+    font-size: 22px;
+    font-weight: 750;
+  }
+
+  .workspace-empty-panel p {
+    max-width: 540px;
+    margin: 0;
+    color: #6f737d;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
   .home-section {
     display: flex;
     flex-direction: column;
@@ -791,6 +1250,13 @@ const homeStyles = `
     margin: 0;
     font-size: 17px;
     font-weight: 650;
+  }
+
+  .home-section-head span {
+    display: block;
+    margin-top: 4px;
+    color: #777b84;
+    font-size: 13px;
   }
 
   .home-section-actions {
@@ -821,6 +1287,122 @@ const homeStyles = `
     background: #111111 !important;
     color: #ffffff !important;
     border-color: #111111 !important;
+  }
+
+  .imported-approval-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .imported-approval-card {
+    border: 1px solid #e7e8eb;
+    border-radius: 12px;
+    background: #ffffff;
+    display: grid;
+    grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .imported-approval-card:hover {
+    border-color: #c8c9ce;
+    box-shadow: 0 12px 28px rgba(32, 33, 38, 0.08);
+  }
+
+  .imported-approval-image {
+    position: relative;
+    min-height: 280px;
+    background: #f3f4f6;
+    display: grid;
+    place-items: center;
+    color: #8b8f99;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .imported-approval-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: #f5f5f6;
+  }
+
+  .imported-approval-image em {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.72);
+    color: #ffffff;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 750;
+    padding: 5px 8px;
+  }
+
+  .imported-approval-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .imported-approval-copy span {
+    color: #787c85;
+    font-size: 13px;
+  }
+
+  .imported-approval-copy strong {
+    display: block;
+    margin-top: 8px;
+    color: #202126;
+    font-size: 24px;
+    line-height: 1.18;
+    font-weight: 820;
+  }
+
+  .imported-approval-copy p {
+    margin: 0;
+    color: #555861;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 8;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .imported-approval-copy footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .imported-approval-copy footer span {
+    border-radius: 999px;
+    background: #fff7e6;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 750;
+    padding: 6px 9px;
+  }
+
+  .imported-approval-copy footer button {
+    border: 0;
+    border-radius: 8px;
+    background: #111111;
+    color: #ffffff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    padding: 8px 12px;
   }
 
   .upcoming-posts-list {
@@ -944,6 +1526,482 @@ const homeStyles = `
   .dashboard-empty-state span {
     font-size: 13px;
     line-height: 1.5;
+  }
+
+  .approval-board {
+    --approval-ink: #202126;
+    --approval-muted: #6f737d;
+    --approval-soft: #f7f7f8;
+    --approval-line: #e8e9ec;
+    --approval-strong: #111111;
+    --approval-accent: #7c3aed;
+    color: var(--approval-ink);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .approval-board-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.55fr);
+    gap: 18px;
+    align-items: end;
+    border: 1px solid var(--approval-line);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--approval-ink);
+    padding: 18px;
+  }
+
+  .approval-board-hero p {
+    margin: 0 0 6px;
+    color: var(--approval-muted);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .approval-board-hero h2 {
+    max-width: 620px;
+    margin: 0;
+    font-size: 23px;
+    line-height: 1.24;
+    letter-spacing: 0;
+  }
+
+  .approval-board-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    color: var(--approval-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .approval-board-meta strong {
+    color: var(--approval-ink);
+    font-weight: 750;
+  }
+
+  .approval-board-meta small {
+    color: var(--approval-muted);
+    font-size: 12px;
+  }
+
+  .approval-progress-card,
+  .approval-post {
+    border: 1px solid var(--approval-line);
+    border-radius: 8px;
+    background: #ffffff;
+  }
+
+  .approval-progress-card {
+    position: sticky;
+    top: 74px;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 0.35fr) auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 16px;
+    box-shadow: 0 10px 28px rgba(32, 33, 38, 0.06);
+  }
+
+  .approval-progress-card strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .approval-progress-card span {
+    color: var(--approval-muted);
+    font-size: 12px;
+  }
+
+  .approval-progress-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #f1f2f4;
+  }
+
+  .approval-progress-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--approval-strong);
+    transition: width 180ms ease;
+  }
+
+  .approval-progress-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .approval-progress-actions button {
+    min-height: 38px;
+    border: 1px solid var(--approval-line);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--approval-ink);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    padding: 0 13px;
+    cursor: pointer;
+  }
+
+  .approval-progress-actions .send {
+    border-color: #111111;
+    background: #111111;
+    color: #ffffff;
+  }
+
+  .approval-progress-actions .send:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  .approval-posts {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .approval-post {
+    overflow: hidden;
+    transition: border-color 160ms ease;
+  }
+
+  .approval-post.is-ok {
+    border-color: #b7dfc8;
+  }
+
+  .approval-post.is-edit {
+    border-color: #f5d37b;
+  }
+
+  .approval-post.is-no {
+    border-color: #f2b7b3;
+  }
+
+  .approval-post.is-confirmed {
+    border-color: #d9dbe1;
+    background: #fbfbfc;
+  }
+
+  .approval-post-head {
+    padding: 15px 17px 13px;
+  }
+
+  .approval-tagrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .approval-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #202126;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    flex: none;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .approval-tagrow strong {
+    display: block;
+    font-size: 13px;
+  }
+
+  .approval-tagrow strong em {
+    margin-left: 7px;
+    border: 1px solid #e2e3e7;
+    border-radius: 999px;
+    background: #f7f7f8;
+    color: #6f737d;
+    font-size: 10px;
+    font-style: normal;
+    padding: 2px 7px;
+  }
+
+  .approval-tagrow strong em.confirmed {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #15803d;
+  }
+
+  .approval-tagrow span {
+    display: block;
+    color: var(--approval-muted);
+    font-size: 12px;
+  }
+
+  .approval-tagrow small {
+    margin-left: auto;
+    border-radius: 999px;
+    background: #f1f2f4;
+    color: #202126;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 750;
+    padding: 4px 10px;
+  }
+
+  .approval-post h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .approval-gallery {
+    position: relative;
+    background: #f3f4f6;
+  }
+
+  .approval-image-button {
+    width: 100%;
+    display: block;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: zoom-in;
+    position: relative;
+  }
+
+  .approval-image-button img {
+    width: 100%;
+    max-height: 620px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .approval-image-button span {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    border-radius: 8px;
+    background: rgba(46, 36, 34, 0.72);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 750;
+    padding: 4px 9px;
+  }
+
+  .approval-nav {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 38px;
+    height: 38px;
+    transform: translateY(-50%);
+    border: 0;
+    border-radius: 8px;
+    background: rgba(46, 36, 34, 0.62);
+    color: #ffffff;
+    font: inherit;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .approval-nav.prev {
+    left: 10px;
+  }
+
+  .approval-nav.next {
+    right: 10px;
+  }
+
+  .approval-nav:disabled {
+    opacity: 0.24;
+    cursor: default;
+  }
+
+  .approval-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 0 12px;
+  }
+
+  .approval-dots button {
+    width: 7px;
+    height: 7px;
+    border: 0;
+    border-radius: 999px;
+    background: #d9c9c5;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .approval-dots button.on {
+    width: 20px;
+    background: var(--approval-strong);
+  }
+
+  .approval-post-body {
+    padding: 14px 17px 2px;
+  }
+
+  .approval-label {
+    margin: 11px 0 6px;
+    color: var(--approval-muted);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .approval-caption {
+    border-radius: 11px;
+    background: #f7f7f8;
+    color: #4b5563;
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 11px 13px;
+    white-space: pre-wrap;
+  }
+
+  .approval-note {
+    margin: 0 0 10px;
+    color: var(--approval-muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .approval-decide {
+    margin-top: 13px;
+    border-top: 1px solid var(--approval-line);
+    background: #fafafa;
+    padding: 14px 17px 17px;
+  }
+
+  .approval-segment {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+  }
+
+  .approval-segment button {
+    min-height: 42px;
+    border: 1.5px solid var(--approval-line);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #4a3b37;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .approval-segment button[aria-pressed='true'][data-value='ok'] {
+    border-color: #3e8e6e;
+    background: #e8f4ee;
+    color: #3e8e6e;
+  }
+
+  .approval-segment button[aria-pressed='true'][data-value='edit'] {
+    border-color: #b77a2b;
+    background: #faf0df;
+    color: #b77a2b;
+  }
+
+  .approval-segment button[aria-pressed='true'][data-value='no'] {
+    border-color: #b2544f;
+    background: #f9e8e7;
+    color: #b2544f;
+  }
+
+  .approval-confirmed-note {
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    background: #f0fdf4;
+    color: #15803d;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.5;
+    padding: 10px 12px;
+  }
+
+  .approval-note-box {
+    margin-top: 11px;
+  }
+
+  .approval-note-box textarea {
+    width: 100%;
+    min-height: 78px;
+    resize: vertical;
+    border: 1.5px solid var(--approval-line);
+    border-radius: 8px;
+    outline: 0;
+    color: var(--approval-ink);
+    font: inherit;
+    font-size: 14px;
+    padding: 11px 13px;
+  }
+
+  .approval-note-box textarea:focus {
+    border-color: #111111;
+  }
+
+  .approval-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .approval-quick button {
+    border: 1px dashed var(--approval-line);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--approval-muted);
+    font: inherit;
+    font-size: 12px;
+    padding: 5px 11px;
+    cursor: pointer;
+  }
+
+  .approval-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    border: 0;
+    background: rgba(23, 17, 15, 0.96);
+    padding: 28px;
+    cursor: zoom-out;
+  }
+
+  .approval-lightbox img {
+    width: min(100%, 820px);
+    max-height: 82vh;
+    object-fit: contain;
+  }
+
+  .approval-lightbox span {
+    color: #e2d2ce;
+    font-size: 12px;
+  }
+
+  .approval-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 95;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: #1c1413;
+    color: #ffffff;
+    font-size: 13px;
+    padding: 11px 18px;
   }
 
   .upcoming-post-card-top {
@@ -1273,62 +2331,75 @@ const homeStyles = `
     line-height: 1.4;
   }
 
-  .up-next-list {
+  .published-post-mini {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 4px;
+    border: 1px solid #e8e9ec;
+    border-radius: 8px;
+    background: #fafafa;
+    padding: 10px 12px;
   }
 
-  .up-next-item {
+  .published-post-mini strong {
+    color: #202126;
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+
+  .published-post-mini span {
+    color: #6f737d;
+    font-size: 12px;
+  }
+
+  .client-record-list {
     display: flex;
+    flex-direction: column;
     gap: 12px;
+  }
+
+  .client-record-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 10px;
     align-items: flex-start;
   }
 
-  .up-next-icon {
-    font-size: 18px;
+  .client-record-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: #111111;
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f4f5f7;
-    border-radius: 8px;
   }
 
-  .up-next-content {
+  .client-record-content {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
     flex: 1;
     min-width: 0;
   }
 
-  .up-next-content strong {
+  .client-record-content span {
+    color: #9a9da4;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .client-record-content strong {
     font-size: 13px;
     font-weight: 650;
   }
 
-  .up-next-content p {
+  .client-record-content p {
     margin: 0;
     font-size: 12px;
     color: #6f737d;
     line-height: 1.4;
-  }
-
-  .up-next-content a {
-    width: fit-content;
-    border: 0;
-    background: transparent;
-    color: #7c3aed;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 0;
-    cursor: pointer;
-    margin-top: 2px;
-    text-decoration: none;
   }
 
   @media (max-width: 980px) {
@@ -1342,6 +2413,52 @@ const homeStyles = `
 
     .home-body {
       grid-template-columns: 1fr;
+      padding: 18px 12px 42px;
+      gap: 18px;
+    }
+
+    .approval-board-hero {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .approval-board-hero h2 {
+      font-size: 22px;
+    }
+
+    .approval-progress-card {
+      position: static;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .approval-progress-card strong,
+    .approval-progress-card span {
+      word-break: keep-all;
+      overflow-wrap: normal;
+    }
+
+    .approval-progress-track {
+      width: 100%;
+    }
+
+    .approval-progress-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+      gap: 8px;
+    }
+
+    .approval-progress-actions button {
+      width: 100%;
+      min-width: 0;
+      min-height: 46px;
+      padding: 0 10px;
+      white-space: normal;
+      line-height: 1.25;
     }
 
     .campaigns-table-head,

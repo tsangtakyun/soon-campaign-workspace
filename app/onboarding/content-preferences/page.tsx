@@ -1,387 +1,155 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
-import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
-import { createClient } from '@/lib/supabase'
-import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
+import {
+  isBechillWorkspace,
+  isEggWorkspace,
+  resolveActiveWorkspace,
+  WORKSPACE_CHANGED_EVENT,
+} from '@/lib/workspace-client'
 
-const PLATFORMS = [
-  { id: 'instagram', icon: '📷', label: 'Instagram', desc: '對話式、表達豐富，使用 emoji 和短句' },
-  { id: 'facebook', icon: '📘', label: 'Facebook', desc: '個人與資訊並重，鼓勵留言互動' },
-  { id: 'linkedin', icon: '💼', label: 'LinkedIn', desc: '正式但有溫度，聚焦專業價值' },
-  { id: 'twitter', icon: '𝕏', label: 'X/Twitter', desc: '簡短有力，常用幽默或趨勢語言' },
-  { id: 'youtube', icon: '▶️', label: 'YouTube', desc: '描述詳盡且關鍵字豐富，利於搜尋' },
-  { id: 'tiktok', icon: '🎵', label: 'TikTok', desc: '潮流輕鬆，善用 hashtag 和 hook' },
-]
-
-type IconProps = {
-  size?: number
-  strokeWidth?: number
-}
-
-function IconSvg({ children, size = 18, strokeWidth = 2 }: IconProps & { children: ReactNode }) {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height={size}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={strokeWidth}
-      viewBox="0 0 24 24"
-      width={size}
-    >
-      {children}
-    </svg>
-  )
-}
-
-function Sparkles({ size, strokeWidth }: IconProps) {
-  return (
-    <IconSvg size={size} strokeWidth={strokeWidth}>
-      <path d="M12 3l1.7 4.4L18 9l-4.3 1.6L12 15l-1.7-4.4L6 9l4.3-1.6L12 3z" />
-      <path d="M5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14z" />
-      <path d="M19 14l.7 1.8L21.5 16.5l-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7L19 14z" />
-    </IconSvg>
-  )
-}
-
-function Sliders({ size, strokeWidth }: IconProps) {
-  return (
-    <IconSvg size={size} strokeWidth={strokeWidth}>
-      <path d="M4 6h7" />
-      <path d="M15 6h5" />
-      <path d="M13 4v4" />
-      <path d="M4 12h4" />
-      <path d="M12 12h8" />
-      <path d="M10 10v4" />
-      <path d="M4 18h10" />
-      <path d="M18 18h2" />
-      <path d="M16 16v4" />
-    </IconSvg>
-  )
-}
-
-function Tag({ size, strokeWidth }: IconProps) {
-  return (
-    <IconSvg size={size} strokeWidth={strokeWidth}>
-      <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
-      <path d="M7.5 7.5h.01" />
-    </IconSvg>
-  )
-}
-
-function Lock({ size, strokeWidth }: IconProps) {
-  return (
-    <IconSvg size={size} strokeWidth={strokeWidth}>
-      <rect height="11" rx="2" width="16" x="4" y="11" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-    </IconSvg>
-  )
-}
-
-const MARKET_LOCATION_OPTIONS = ['香港', '台灣', '新加坡', '澳門', '中國大陸', '馬來西亞', '英國', '美國']
-const AUDIENCE_GENDER_OPTIONS = ['全部性別', '女性為主', '男性為主', '非二元性別']
-const CONTENT_LANGUAGE_OPTIONS = ['繁體中文', '簡體中文', 'English', '日本語', '한국어', 'Bahasa Melayu', 'Bahasa Indonesia']
-const PERSONA_AGE_OPTIONS = ['不限', '18-24', '25-34', '35-44', '45-54', '55+']
-const PERSONA_GENDER_OPTIONS = ['不限', '女性', '男性', '多元性別']
-const PERSONA_ETHNICITY_OPTIONS = ['不限', '亞裔', '東亞', '東南亞', '南亞', '多元文化']
-
-const CONTENT_MODIFICATION_OPTIONS = [
+const bunchillLearnedPreferences = [
   {
-    Icon: Sparkles,
-    id: 'growth',
-    label: '增長導向',
-    desc: '透過 AI 強化和智能替換，最大化效果',
+    title: '內容方向',
+    items: [
+      '主力圍繞人與寵物之間的陪伴、等待、日常誤解與溫柔互動。',
+      'Bunchill 不是單純搞笑角色，而是用「舒服一點」的邏輯回應生活壓力。',
+      '內容感覺應輕鬆、可愛、生活化，帶少少自嘲，但不嘲笑真實人物或外貌。',
+    ],
   },
   {
-    Icon: Sliders,
-    id: 'balanced',
-    label: '平衡',
-    desc: '改善風格與構圖，同時保留更多原創內容',
+    title: '語氣偏好',
+    items: [
+      '自然香港廣東話、短句、輕輕幽默，不過分可愛。',
+      '不使用說教、心靈導師、企業雞湯或硬煽情語氣。',
+      'Bunchill 可以陪伴觀眾，但不是心理治療師，不把嚴重情緒問題簡化成一句安慰。',
+    ],
   },
   {
-    Icon: Tag,
-    id: 'brand-first',
-    label: '品牌優先',
-    desc: '應用光線改善，保留原有外觀和感覺',
+    title: '視覺偏好',
+    items: [
+      '2D 圖像優先跟 20260809/02_F.jpg：暖白底、大量留白、幼細手繪線、柔淡上色。',
+      '畫面需要生活化道具和具體場景，例如門口、鞋、書包、床邊、杯、風扇、毛巾等。',
+      '避免粗啡色漫畫框、厚重 3D、公仔寫實質感、過度上色、複雜背景或海報式插畫。',
+      'AI 插畫素材不放後製文字、對白框、IG 介面、額外 Logo 或 watermark，保留空間供 Photoshop 加字。',
+    ],
   },
   {
-    Icon: Lock,
-    id: 'strict',
-    label: '嚴格品牌控制',
-    desc: '只使用品牌素材庫資源，不使用庫存內容',
+    title: '角色一致性',
+    items: [
+      'Bunchill 通常一隻眼被長瀏海遮住，不加眼眉或眉毛。',
+      '同一組圖要保持眼睛大小、眼睛位置、鼻、嘴巴和臉部比例穩定。',
+      '藍白直間睡衣胸前口袋的 chill 布章必須清楚保留，不可被道具、手、桌面或裁切遮住。',
+      'Carousel 需要表情和姿勢節奏，不可每張都完全同一個合眼淡定樣。',
+    ],
+  },
+  {
+    title: '製作流程',
+    items: [
+      'Meme 通常做 1-3 張主圖，可加第 4 張 soft landing，不拖成長篇故事。',
+      '金句故事卡可做 4-8 格，每格只講一個瞬間，最後安靜收結。',
+      '如用 Elkie 與 Bunchill 真實照片作收結，必須由客戶提供或確認；AI 不偽造真實照片。',
+      '每次製作內容時，都會沿用已確認的偏好，確保角色、語氣與畫面方向保持一致。',
+    ],
   },
 ]
 
-type ContentPreferenceRow = {
-  raw_content_mix: Record<string, unknown> | null
-}
+const eggSoonLearnedPreferences = [
+  {
+    title: '內容方向',
+    items: [
+      '主力製作新聞、城市熱話、文化現象、品牌空間、影視娛樂、動物趣聞及生活觀察類 Carousel。',
+      '每個題材都要有清楚反差或驗證問題，例如「這不是雪」、「35 歲不是人生結算」、「為甚麼 H&M 門口有巨大頭像」。',
+      '內容不是純轉載新聞，而是拆開事件背後的視覺錯覺、社會情緒、文化背景或消費行為。',
+    ],
+  },
+  {
+    title: '資料核查',
+    items: [
+      '每次先分清已確認事實、官方資料、當事人自述、媒體報道、網上轉載及未確認說法。',
+      '優先使用官方來源、原始影片、當事人公開資料、可信媒體及專家資料；社交留言只作線索。',
+      '涉及健康、法律、犯罪、未成年人、死亡、人物關係或醫學風險時，要用保守語氣，不可將推測寫成定論。',
+    ],
+  },
+  {
+    title: '寫作語氣',
+    items: [
+      'Carousel 用繁體中文書面語，語氣可以好奇、有少少幽默，但要克制、準確，不製造恐慌或道德審判。',
+      'Reel 用自然香港廣東話口語，短句、有節奏、保留主持人真實反應和主觀判斷，不硬 sell。',
+      '避免空泛形容，例如「好正」、「好好食」、「爆紅到全世界都知」；要講具體感官、背景或判斷原因。',
+    ],
+  },
+  {
+    title: 'Carousel 結構',
+    items: [
+      '預設 8-10 頁，通常以 9 頁處理；每頁只講一個重點。',
+      'P.1 用強 hook 或反差問題；中段交代背景、第一次反轉、核心知識、數字或證據；最後用安靜收結或互動問題。',
+      '未得到確認前，只做資料核查與 P.1-P.N 故事結構；正式生成圖片前要逐頁確認素材和視覺方向。',
+    ],
+  },
+  {
+    title: '視覺偏好',
+    items: [
+      '整體走 editorial news carousel：4:5 直向、手機上快速讀到大標題、留白清楚、資訊層次明確。',
+      '封面根據題材選擇黑底緊急新聞、白底情緒人物、米白權威新聞或黃色好奇知識型，不同題材不可套同一個模板。',
+      '如未有授權真實圖片，要用示意圖、資料圖、剪影、地圖感或概念視覺，不可把 AI 圖包裝成真實新聞照片。',
+    ],
+  },
+  {
+    title: 'Eggy 角色使用',
+    items: [
+      'Eggy 是固定品牌角色，只作情緒輔助或觀眾視角，不需要每頁出現。',
+      '使用 Eggy 時要跟角色設定與表情庫，保持蛋白輪廓、蛋黃五官、手腳比例和整體質感一致。',
+      '寧可不用 Eggy，也不可使用走樣角色；不可讓 Eggy 遮擋新聞主體、人物面部、重要文字或證據相片。',
+    ],
+  },
+  {
+    title: '不可誇大',
+    items: [
+      '不可把打卡、爆紅、全城熱話、最高排名、最多人去等說法寫成定論，除非有可靠數據。',
+      '不可直接使用未授權媒體圖、社交平台截圖或真實人物圖片作最終素材；需要先確認來源和使用限制。',
+      '不可用 AI 生成真人演員、真實新聞現場、動物園事件或品牌合作現場，令觀眾誤以為是真實照片。',
+    ],
+  },
+]
 
-type WorkspaceSettings = {
-  avoided_keywords?: unknown
-  market_locations?: unknown
-  audience_gender?: string | null
-  content_persona_age?: string | null
-  content_persona_gender?: string | null
-  content_persona_ethnicity?: string | null
-}
-
-function normalizeStringArray(value: unknown) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) return normalizeStringArray(parsed)
-    } catch {
-      return value.split(',').map((item) => item.trim()).filter(Boolean)
-    }
-  }
-  return []
-}
-
-function addUniqueTag(current: string[], value: string) {
-  const trimmed = value.trim()
-  if (!trimmed || current.includes(trimmed)) return current
-  return [...current, trimmed]
-}
-
-function normalizeContentLanguage(value: unknown) {
-  if (value === 'zh-HK' || value === 'zh-TW' || value === '繁體中文（香港）' || value === '繁體中文（台灣）') return '繁體中文'
-  if (value === 'zh-CN') return '簡體中文'
-  if (value === 'en-US' || value === 'en') return 'English'
-  if (value === 'ja') return '日本語'
-  if (value === 'ko') return '한국어'
-  if (typeof value === 'string' && CONTENT_LANGUAGE_OPTIONS.includes(value)) return value
-  return '繁體中文'
-}
-
-function normalizeAudienceGender(value: unknown) {
-  return typeof value === 'string' && AUDIENCE_GENDER_OPTIONS.includes(value) ? value : '全部性別'
-}
-
-function normalizePersonaGender(value: unknown) {
-  if (value === '全部性別') return '不限'
-  return typeof value === 'string' && PERSONA_GENDER_OPTIONS.includes(value) ? value : '不限'
-}
+type WorkspacePreferenceMode = 'loading' | 'bechill' | 'egg' | 'empty'
 
 export default function ContentPreferencesPage() {
-  const [prefs, setPrefs] = useState<ContentPreferenceRow | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [contentLang, setContentLang] = useState('繁體中文')
-  const [smartCaptions, setSmartCaptions] = useState(false)
-  const [includeMusic, setIncludeMusic] = useState(true)
-  const [contentModification, setContentModification] = useState('growth')
-  const [defaultCta, setDefaultCta] = useState('')
-  const [defaultUrl, setDefaultUrl] = useState('')
-  const [ageMin, setAgeMin] = useState(18)
-  const [ageMax, setAgeMax] = useState(34)
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [avoidedKeywords, setAvoidedKeywords] = useState<string[]>([])
-  const [avoidedKeywordDraft, setAvoidedKeywordDraft] = useState('')
-  const [marketLocations, setMarketLocations] = useState<string[]>([])
-  const [marketLocationDraft, setMarketLocationDraft] = useState('')
-  const [audienceGender, setAudienceGender] = useState('全部性別')
-  const [contentPersonaAge, setContentPersonaAge] = useState('不限')
-  const [contentPersonaGender, setContentPersonaGender] = useState('不限')
-  const [contentPersonaEthnicity, setContentPersonaEthnicity] = useState('不限')
-  const [personaDetailsOpen, setPersonaDetailsOpen] = useState(false)
+  const [preferenceMode, setPreferenceMode] = useState<WorkspacePreferenceMode>('loading')
 
   useEffect(() => {
     let cancelled = false
 
-    async function loadPreferences() {
+    async function loadWorkspace() {
+      if (!cancelled) setPreferenceMode('loading')
       try {
-        const supabase = createClient()
-        const sessionId = getStoredOnboardingSessionId()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        let query = supabase.from('content_preferences').select('raw_content_mix')
-        if (user?.id) {
-          query = query.eq('user_id', user.id)
-        } else if (sessionId) {
-          query = query.eq('onboarding_session_id', sessionId)
-        } else {
-          return
-        }
-
-        const { data } = await query.maybeSingle()
-        if (cancelled || !data) return
-
-        const row = data as ContentPreferenceRow
-        const raw = row.raw_content_mix || {}
-        setPrefs(row)
-        if (typeof raw.smart_captions === 'boolean') setSmartCaptions(raw.smart_captions)
-        if (typeof raw.include_music === 'boolean') setIncludeMusic(raw.include_music)
-        if (typeof raw.content_modification === 'string') setContentModification(raw.content_modification)
-        if (typeof raw.content_language === 'string') setContentLang(normalizeContentLanguage(raw.content_language))
-        if (typeof raw.default_cta === 'string') setDefaultCta(raw.default_cta)
-        if (typeof raw.default_url === 'string') setDefaultUrl(raw.default_url)
-        if (typeof raw.audience_gender === 'string') setAudienceGender(normalizeAudienceGender(raw.audience_gender))
-        if (typeof raw.content_persona_age === 'string') setContentPersonaAge(raw.content_persona_age)
-        if (typeof raw.content_persona_gender === 'string') setContentPersonaGender(normalizePersonaGender(raw.content_persona_gender))
-        if (typeof raw.content_persona_ethnicity === 'string') setContentPersonaEthnicity(raw.content_persona_ethnicity)
-        setAvoidedKeywords(normalizeStringArray(raw.avoided_keywords))
-        setMarketLocations(normalizeStringArray(raw.market_locations))
-        if (
-          raw.audience_age &&
-          typeof raw.audience_age === 'object' &&
-          'min' in raw.audience_age &&
-          'max' in raw.audience_age
-        ) {
-          const age = raw.audience_age as { min?: unknown; max?: unknown }
-          if (typeof age.min === 'number') setAgeMin(age.min)
-          if (typeof age.max === 'number') setAgeMax(age.max)
+        const { activeWorkspace } = await resolveActiveWorkspace()
+        if (!cancelled) {
+          setPreferenceMode(
+            isBechillWorkspace(activeWorkspace) ? 'bechill' : isEggWorkspace(activeWorkspace) ? 'egg' : 'empty'
+          )
         }
       } catch {
-        // Keep local defaults when the data foundation is not ready yet.
-      } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setPreferenceMode('empty')
       }
     }
 
-    void loadPreferences()
+    void loadWorkspace()
 
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function resolveWorkspace() {
-      const { workspaceId: resolvedWorkspaceId } = await resolveActiveWorkspace()
-      if (!cancelled) setWorkspaceId(resolvedWorkspaceId)
+    function handleWorkspaceChanged() {
+      void loadWorkspace()
     }
 
-    function handleWorkspaceChanged(event: Event) {
-      const nextWorkspaceId = (event as CustomEvent<{ workspaceId?: string | null }>).detail?.workspaceId || null
-      setWorkspaceId(nextWorkspaceId)
-    }
-
-    void resolveWorkspace()
     window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
-
     return () => {
       cancelled = true
       window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
     }
   }, [])
-
-  useEffect(() => {
-    if (!workspaceId) return
-
-    async function loadWorkspaceSettings() {
-      try {
-        const response = await fetch(`/api/workspace-settings?workspace_id=${encodeURIComponent(workspaceId)}`, {
-          cache: 'no-store',
-        })
-        if (!response.ok) return
-        const payload = await response.json()
-        const settings = (payload.workspace || payload || {}) as WorkspaceSettings
-        setAvoidedKeywords(normalizeStringArray(settings.avoided_keywords))
-        setMarketLocations(normalizeStringArray(settings.market_locations))
-        setAudienceGender(normalizeAudienceGender(settings.audience_gender))
-        setContentPersonaAge(settings.content_persona_age || '不限')
-        setContentPersonaGender(normalizePersonaGender(settings.content_persona_gender))
-        setContentPersonaEthnicity(settings.content_persona_ethnicity || '不限')
-      } catch (error) {
-        console.error('Failed to load workspace content settings:', error)
-      }
-    }
-
-    void loadWorkspaceSettings()
-  }, [workspaceId])
-
-  function addAvoidedKeyword() {
-    setAvoidedKeywords((current) => addUniqueTag(current, avoidedKeywordDraft))
-    setAvoidedKeywordDraft('')
-  }
-
-  function addMarketLocation(value = marketLocationDraft) {
-    setMarketLocations((current) => addUniqueTag(current, value))
-    setMarketLocationDraft('')
-  }
-
-  async function handleSave(overrides: Partial<Record<string, unknown>> = {}) {
-    setSaving(true)
-    setSaved(false)
-
-    try {
-      const supabase = createClient()
-      const sessionId = getStoredOnboardingSessionId()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      const updates = {
-        raw_content_mix: {
-          ...(prefs?.raw_content_mix || {}),
-          audience_age: { max: ageMax, min: ageMin },
-          audience_gender: audienceGender,
-          content_language: contentLang,
-          content_modification: contentModification,
-          content_persona_age: contentPersonaAge,
-          content_persona_ethnicity: contentPersonaEthnicity,
-          content_persona_gender: contentPersonaGender,
-          default_cta: defaultCta,
-          default_url: defaultUrl,
-          avoided_keywords: avoidedKeywords,
-          include_music: includeMusic,
-          market_locations: marketLocations,
-          smart_captions: smartCaptions,
-          ...overrides,
-        },
-        updated_at: new Date().toISOString(),
-      }
-
-      if (user?.id) {
-        await supabase.from('content_preferences').update(updates).eq('user_id', user.id)
-      } else if (sessionId) {
-        await supabase.from('content_preferences').update(updates).eq('onboarding_session_id', sessionId)
-      }
-
-      if (workspaceId) {
-        await fetch('/api/workspace-settings', {
-          body: JSON.stringify({
-            updates: {
-              audience_gender: audienceGender,
-              avoided_keywords: avoidedKeywords,
-              content_persona_age: contentPersonaAge,
-              content_persona_ethnicity: contentPersonaEthnicity,
-              content_persona_gender: contentPersonaGender,
-              market_locations: marketLocations,
-            },
-            workspace_id: workspaceId,
-          }),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PATCH',
-        })
-      }
-
-      setPrefs({ raw_content_mix: updates.raw_content_mix })
-      setSaved(true)
-    } catch (error) {
-      console.error('Failed to save content preferences:', error)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function handleContentLanguageChange(value: string) {
-    const nextLanguage = normalizeContentLanguage(value)
-    setContentLang(nextLanguage)
-    void handleSave({ content_language: nextLanguage })
-  }
 
   return (
     <main className="dashboard-page">
@@ -392,289 +160,47 @@ export default function ContentPreferencesPage() {
         <header className="home-topbar">
           <div>
             <h1>內容偏好</h1>
-            {loading ? <span className="cp-save-note">載入設定中...</span> : null}
-            {saved ? <span className="cp-save-note">已儲存</span> : null}
-          </div>
-          <div className="home-topbar-right">
-            <button className="home-create-btn" disabled={saving} onClick={() => void handleSave()} type="button">
-              {saving ? '儲存中...' : '儲存設定'}
-            </button>
           </div>
         </header>
 
         <div className="content-prefs-body">
           <section className="cp-section">
-            <h2>內容指引</h2>
-
-            <div className="cp-field">
-              <label>內容語言</label>
-              <select className="cp-select" onChange={(event) => handleContentLanguageChange(event.target.value)} value={contentLang}>
-                {CONTENT_LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+            <div className="cp-learned-head">
+              <div>
+                <h2>SOON 已記住的內容偏好</h2>
+              </div>
+              {preferenceMode !== 'empty' && preferenceMode !== 'loading' ? <span>更新：2026年8月13日</span> : null}
             </div>
-
-            <div className="cp-field">
-              <label>避免詞彙與概念</label>
-              <div className="cp-tag-input-row">
-                <input
-                  className="cp-input"
-                  onChange={(event) => setAvoidedKeywordDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addAvoidedKeyword()
-                    }
-                  }}
-                  placeholder="輸入要避免的詞彙或概念"
-                  type="text"
-                  value={avoidedKeywordDraft}
-                />
-                <button className="cp-secondary-btn" onClick={addAvoidedKeyword} type="button">+ 新增</button>
-              </div>
-              <div className="cp-tags">
-                {avoidedKeywords.map((keyword) => (
-                  <span key={keyword}>
-                    {keyword}
-                    <button
-                      aria-label={`移除 ${keyword}`}
-                      onClick={() => setAvoidedKeywords((current) => current.filter((item) => item !== keyword))}
-                      type="button"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="cp-field">
-              <label>主要市場地區</label>
-              <div className="cp-tag-input-row">
-                <input
-                  className="cp-input"
-                  list="market-location-options"
-                  onChange={(event) => setMarketLocationDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addMarketLocation()
-                    }
-                  }}
-                  placeholder="搜尋或輸入地區"
-                  type="text"
-                  value={marketLocationDraft}
-                />
-                <datalist id="market-location-options">
-                  {MARKET_LOCATION_OPTIONS.map((location) => (
-                    <option key={location} value={location} />
-                  ))}
-                </datalist>
-                <button className="cp-secondary-btn" onClick={() => addMarketLocation()} type="button">+ 新增</button>
-              </div>
-              <div className="cp-location-options">
-                {MARKET_LOCATION_OPTIONS.filter((location) => !marketLocations.includes(location)).map((location) => (
-                  <button key={location} onClick={() => addMarketLocation(location)} type="button">
-                    {location}
-                  </button>
-                ))}
-              </div>
-              <div className="cp-tags">
-                {marketLocations.map((location) => (
-                  <span key={location}>
-                    {location}
-                    <button
-                      aria-label={`移除 ${location}`}
-                      onClick={() => setMarketLocations((current) => current.filter((item) => item !== location))}
-                      type="button"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="cp-field">
-              <label>目標受眾年齡</label>
-              <div className="cp-age-row">
-                <input
-                  className="cp-age-input"
-                  max={65}
-                  min={13}
-                  onChange={(event) => setAgeMin(Number(event.target.value))}
-                  type="number"
-                  value={ageMin}
-                />
-                <span>至</span>
-                <input
-                  className="cp-age-input"
-                  max={65}
-                  min={13}
-                  onChange={(event) => setAgeMax(Number(event.target.value))}
-                  type="number"
-                  value={ageMax}
-                />
-                <span>歲</span>
-                <div className="cp-inline-select-field">
-                  <label>性別</label>
-                  <select className="cp-select compact" onChange={(event) => setAudienceGender(event.target.value)} value={audienceGender}>
-                    {AUDIENCE_GENDER_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
+            {preferenceMode === 'loading' ? (
+              <div className="cp-loading-panel" aria-busy="true">
+                <strong>正在載入工作台內容偏好</strong>
+                <span>SOON 正在讀取目前工作台的設定。</span>
+                <div className="cp-skeleton-grid">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
                 </div>
               </div>
-            </div>
-          </section>
-
-          <section className="cp-section">
-            <h2>內容修改程度</h2>
-            <p className="cp-desc">選擇 AI 在生成內容時，如何平衡你的品牌素材與優化目標。</p>
-            <div className="cp-radio-list">
-              {CONTENT_MODIFICATION_OPTIONS.map((option) => (
-                <label
-                  className={contentModification === option.id ? 'cp-radio-card active' : 'cp-radio-card'}
-                  key={option.id}
-                >
-                  <input
-                    checked={contentModification === option.id}
-                    name="content-modification"
-                    onChange={() => setContentModification(option.id)}
-                    type="radio"
-                    value={option.id}
-                  />
-                  <span className="cp-radio-icon" aria-hidden="true">
-                    <option.Icon size={18} strokeWidth={2} />
-                  </span>
-                  <div>
-                    <strong>{option.label}</strong>
-                    <p>{option.desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section className="cp-section">
-            <h2>內容呈現人物</h2>
-            <p className="cp-desc">設定在你的內容中出現的人物形象</p>
-            <div className="cp-persona-grid">
-              <div className="cp-field">
-                <label>年齡層</label>
-                <select className="cp-select" onChange={(event) => setContentPersonaAge(event.target.value)} value={contentPersonaAge}>
-                  <option disabled value="">選擇年齡層</option>
-                  {PERSONA_AGE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="cp-field">
-                <label>性別</label>
-                <select className="cp-select" onChange={(event) => setContentPersonaGender(event.target.value)} value={contentPersonaGender}>
-                  <option disabled value="">選擇性別</option>
-                  {PERSONA_GENDER_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="cp-field">
-                <label>族裔背景</label>
-                <select className="cp-select" onChange={(event) => setContentPersonaEthnicity(event.target.value)} value={contentPersonaEthnicity}>
-                  <option disabled value="">選擇族裔</option>
-                  {PERSONA_ETHNICITY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <button className="cp-collapse-toggle" onClick={() => setPersonaDetailsOpen((value) => !value)} type="button">
-              新增形象細節（選填）{personaDetailsOpen ? '⌄' : '›'}
-            </button>
-            {personaDetailsOpen ? <div className="cp-empty-expansion" /> : null}
-          </section>
-
-          <section className="cp-section">
-            <h2>影片偏好</h2>
-            <div className="cp-toggle-row">
-              <div>
-                <strong>加入背景音樂</strong>
-                <p>為影片加入背景音軌</p>
-              </div>
-              <button
-                aria-label="加入背景音樂"
-                className={includeMusic ? 'cp-toggle on' : 'cp-toggle'}
-                onClick={() => setIncludeMusic((value) => !value)}
-                type="button"
-              >
-                <span />
-              </button>
-            </div>
-            <div className="cp-toggle-row disabled">
-              <div>
-                <strong>
-                  加入旁白 <span className="cp-coming-soon">即將推出</span>
-                </strong>
-                <p>為影片自動生成旁白</p>
-              </div>
-              <button aria-label="加入旁白" className="cp-toggle" disabled type="button">
-                <span />
-              </button>
-            </div>
-          </section>
-
-          <section className="cp-section">
-            <h2>預設行動呼籲</h2>
-            <p className="cp-desc">設定預設 CTA 文字和 URL，SOON 會在每個 campaign 中使用，並可按需調整。</p>
-            <div className="cp-cta-row">
-              <input
-                className="cp-input"
-                onChange={(event) => setDefaultCta(event.target.value)}
-                placeholder="行動呼籲文字"
-                type="text"
-                value={defaultCta}
-              />
-              <input
-                className="cp-input"
-                onChange={(event) => setDefaultUrl(event.target.value)}
-                placeholder="預設 URL（如 https://sooncreator.network）"
-                type="url"
-                value={defaultUrl}
-              />
-            </div>
-          </section>
-
-          <section className="cp-section">
-            <h2>智能 Caption</h2>
-            <div className="cp-toggle-row">
-              <div>
-                <strong>智能 Caption {smartCaptions ? '已開啟' : '已關閉'}</strong>
-                <p>每個社交平台獲得符合其獨特風格和受眾期望的優化 caption。</p>
-              </div>
-              <button
-                aria-label="智能 Caption"
-                className={smartCaptions ? 'cp-toggle on' : 'cp-toggle'}
-                onClick={() => setSmartCaptions((value) => !value)}
-                type="button"
-              >
-                <span />
-              </button>
-            </div>
-
-            {smartCaptions ? (
-              <div className="cp-platform-list">
-                {PLATFORMS.map((platform) => (
-                  <div className="cp-platform-row" key={platform.id}>
-                    <span className="cp-platform-icon">{platform.icon}</span>
-                    <div>
-                      <strong>{platform.label}</strong>
-                    <p>{platform.desc}</p>
-                    </div>
-                  </div>
+            ) : preferenceMode !== 'empty' ? (
+              <div className="cp-preference-grid">
+                {(preferenceMode === 'egg' ? eggSoonLearnedPreferences : bunchillLearnedPreferences).map((group) => (
+                  <article className="cp-preference-card" key={group.title}>
+                    <h3>{group.title}</h3>
+                    <ul>
+                      {group.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </article>
                 ))}
               </div>
-            ) : null}
+            ) : (
+              <div className="cp-empty-panel">
+                <strong>內容偏好尚未整理</strong>
+                <span>之後完成第一輪 prompt、製圖或客戶 feedback 後，這裡會只顯示目前工作台的偏好。</span>
+              </div>
+            )}
           </section>
         </div>
       </section>
@@ -717,43 +243,9 @@ const styles = `
     font-weight: 650;
   }
 
-  .home-topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .home-create-btn {
-    border: 1px solid #111111;
-    border-radius: 8px;
-    background: #111111;
-    color: #ffffff;
-    font: inherit;
-    font-size: 13px;
-    padding: 8px 13px;
-    cursor: pointer;
-    transition: opacity 150ms ease;
-  }
-
-  .home-create-btn:hover {
-    opacity: 0.86;
-  }
-
-  .home-create-btn:disabled {
-    cursor: wait;
-    opacity: 0.6;
-  }
-
-  .cp-save-note {
-    display: block;
-    margin-top: 2px;
-    font-size: 12px;
-    color: #6f737d;
-  }
-
   .content-prefs-body {
     padding: 28px 20px;
-    max-width: 680px;
+    max-width: 920px;
     display: flex;
     flex-direction: column;
     gap: 36px;
@@ -763,6 +255,69 @@ const styles = `
     display: flex;
     flex-direction: column;
     gap: 14px;
+  }
+
+  .cp-empty-panel {
+    min-height: 180px;
+    border: 1px dashed #d9dbe1;
+    border-radius: 12px;
+    background: #fbfbfc;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+  }
+
+  .cp-empty-panel strong {
+    color: #202126;
+    font-size: 16px;
+  }
+
+  .cp-empty-panel span {
+    color: #6f737d;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .cp-loading-panel {
+    border: 1px solid #e4e5e9;
+    border-radius: 12px;
+    background: #ffffff;
+    display: grid;
+    gap: 8px;
+    padding: 24px;
+    min-height: 220px;
+  }
+
+  .cp-loading-panel strong {
+    color: #202126;
+    font-size: 16px;
+  }
+
+  .cp-loading-panel span {
+    color: #6f737d;
+    font-size: 14px;
+  }
+
+  .cp-skeleton-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 14px;
+  }
+
+  .cp-skeleton-grid i {
+    min-height: 78px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #f3f4f6 0%, #fafafa 45%, #f3f4f6 100%);
+    background-size: 220% 100%;
+    animation: cpSkeleton 1.2s ease-in-out infinite;
+  }
+
+  @keyframes cpSkeleton {
+    0% { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
   }
 
   .cp-section h2 {
@@ -780,360 +335,68 @@ const styles = `
     line-height: 1.5;
   }
 
-  .cp-field {
+  .cp-learned-head {
+    align-items: flex-start;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    gap: 16px;
+    justify-content: space-between;
   }
 
-  .cp-field label {
-    font-size: 13px;
-    font-weight: 500;
-    color: #202126;
+  .cp-learned-head h2 {
+    margin-bottom: 6px;
   }
 
-  .cp-select {
-    width: 240px;
-    padding: 8px 12px;
-    border: 1px solid #d1d5db !important;
-    border-radius: 8px;
-    font-size: 14px;
-    background: #ffffff !important;
-    color: #111827 !important;
-    font-family: inherit;
-  }
-
-  .cp-select option {
-    background: #ffffff;
-    color: #111827;
-  }
-
-  .cp-select.compact {
-    width: 150px;
-  }
-
-  .cp-age-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #6f737d;
-    flex-wrap: wrap;
-  }
-
-  .cp-age-input {
-    width: 70px;
-    padding: 7px 10px;
-    border: 1px solid #d1d5db !important;
-    border-radius: 8px;
-    font-size: 14px;
-    text-align: center;
-    background: #ffffff !important;
-    color: #111827 !important;
-  }
-
-  .cp-inline-select-field {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: 8px;
-  }
-
-  .cp-inline-select-field label {
-    color: #202126;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  .cp-tag-input-row {
-    display: flex;
-    gap: 8px;
-  }
-
-  .cp-secondary-btn {
-    border: 1px solid #d8d9de;
-    border-radius: 8px;
-    background: #ffffff;
-    color: #202126;
-    cursor: pointer;
-    flex-shrink: 0;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 0 12px;
-  }
-
-  .cp-secondary-btn:hover {
-    border-color: #b9bbc3;
-  }
-
-  .cp-tags,
-  .cp-location-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .cp-tags span {
-    align-items: center;
+  .cp-learned-head > span {
     background: #f4f4f5;
     border: 1px solid #e2e3e7;
     border-radius: 999px;
-    color: #202126;
-    display: inline-flex;
-    font-size: 13px;
-    gap: 6px;
-    padding: 5px 9px;
-  }
-
-  .cp-tags button {
-    background: transparent;
-    border: 0;
     color: #6f737d;
-    cursor: pointer;
-    font: inherit;
-    padding: 0;
-  }
-
-  .cp-location-options button {
-    background: #ffffff;
-    border: 1px solid #e2e3e7;
-    border-radius: 999px;
-    color: #6f737d;
-    cursor: pointer;
-    font: inherit;
+    flex-shrink: 0;
     font-size: 12px;
+    font-weight: 600;
     padding: 5px 9px;
   }
 
-  .cp-location-options button:hover {
-    border-color: #b9bbc3;
-    color: #202126;
-  }
-
-  .cp-persona-grid {
+  .cp-preference-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .cp-persona-grid .cp-select {
-    width: 100%;
-  }
-
-  .cp-collapse-toggle {
-    align-self: flex-start;
-    border: 0;
-    background: transparent;
-    color: #4b5563;
-    cursor: pointer;
-    font: inherit;
-    font-size: 13px;
-    padding: 0;
-  }
-
-  .cp-empty-expansion {
-    min-height: 8px;
-  }
-
-  .cp-radio-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .cp-radio-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
+  .cp-preference-card {
+    background: #ffffff;
+    border: 1px solid #e4e5e9;
+    border-radius: 12px;
     padding: 14px 16px;
-    border: 1px solid #e2e3e7;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: border-color 150ms, background 150ms;
   }
 
-  .cp-radio-card.active {
-    border-color: #202126;
-    background: #f8f8f9;
-  }
-
-  .cp-radio-card input {
-    margin-top: 2px;
-    flex-shrink: 0;
-  }
-
-  .cp-radio-icon {
-    align-items: center;
-    background: #f3f4f6;
-    border-radius: 10px;
-    color: #4b5563;
-    display: inline-flex;
-    flex-shrink: 0;
-    height: 40px;
-    justify-content: center;
-    width: 40px;
-  }
-
-  .cp-radio-card.active .cp-radio-icon {
-    background: #eff6ff;
-    color: #1d4ed8;
-  }
-
-  .cp-radio-card strong {
-    display: block;
+  .cp-preference-card h3 {
+    color: #202126;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
+    margin: 0 0 10px;
   }
 
-  .cp-radio-card p {
-    margin: 2px 0 0;
+  .cp-preference-card ul {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .cp-preference-card li {
+    color: #5f636b;
     font-size: 13px;
-    color: #6f737d;
-  }
-
-  .cp-toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 12px 0;
-    border-bottom: 1px solid #f0f1f3;
-  }
-
-  .cp-toggle-row.disabled {
-    opacity: 0.5;
-  }
-
-  .cp-toggle-row strong {
-    font-size: 14px;
-    font-weight: 600;
-    display: block;
-  }
-
-  .cp-toggle-row p {
-    margin: 2px 0 0;
-    font-size: 13px;
-    color: #6f737d;
-  }
-
-  .cp-coming-soon {
-    font-size: 11px;
-    padding: 2px 7px;
-    border-radius: 6px;
-    background: #f0f0f0;
-    color: #6f737d;
-    font-weight: 400;
-  }
-
-  .cp-toggle {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    border-radius: 99px;
-    background: #d0d0d0;
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 200ms;
-  }
-
-  .cp-toggle.on {
-    background: #202126;
-  }
-
-  .cp-toggle span {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #ffffff;
-    transition: left 200ms;
-  }
-
-  .cp-toggle.on span {
-    left: 23px;
-  }
-
-  .cp-toggle:disabled {
-    cursor: not-allowed;
-  }
-
-  .cp-cta-row {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .cp-input {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #d1d5db !important;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    background: #ffffff !important;
-    color: #111827 !important;
-  }
-
-  .cp-input::placeholder {
-    color: #9ca3af !important;
-  }
-
-  .cp-platform-list {
-    border: 1px solid #e8e9ec;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #ffffff;
-  }
-
-  .cp-platform-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 16px;
-    border-bottom: 1px solid #f0f1f3;
-  }
-
-  .cp-platform-row:last-child {
-    border-bottom: none;
-  }
-
-  .cp-platform-row strong {
-    font-size: 14px;
-    display: block;
-  }
-
-  .cp-platform-icon {
-    align-items: center;
-    background: #f7f7f8;
-    border-radius: 8px;
-    display: inline-flex;
-    flex-shrink: 0;
-    height: 32px;
-    justify-content: center;
-    width: 32px;
-  }
-
-  .cp-platform-row p {
-    margin: 2px 0 0;
-    font-size: 13px;
-    color: #6f737d;
+    line-height: 1.5;
   }
 
   @media (max-width: 760px) {
-    .cp-persona-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .cp-tag-input-row {
+    .cp-learned-head {
       flex-direction: column;
     }
 
-    .cp-secondary-btn {
-      min-height: 38px;
+    .cp-preference-grid {
+      grid-template-columns: 1fr;
     }
   }
 `

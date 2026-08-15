@@ -10,6 +10,19 @@ type PrimaryLanguage = '繁體中文' | 'English' | '中英雙語' | ''
 type MarketPositioning = '平價親民' | '中價優質' | '高端奢華' | ''
 
 const progressMessages = ['正在讀取網站', '識別品牌核心', '整理受眾輪廓', '抽取內容方向', '建立品牌資料']
+const DOWNSTREAM_ONBOARDING_KEYS = [
+  'soon-content-strategy-v1',
+  'soon-campaign-details-v1',
+  'soon-distribution-preferences-v1',
+  'soon-content-mix-v1',
+  'soon-content-mood-v1',
+  'soon-content-modification-v1',
+  'soon-visual-style-v1',
+  'soon-typeface-v1',
+  'soon-photo-control-v2',
+  'soon-topic-review-v1',
+  'soon-campaign-themes-v1',
+]
 const businessTypeOptions: Array<{ label: string; value: Exclude<ManualBusinessType, ''> }> = [
   { label: '服務業', value: 'services' },
   { label: '實體店', value: 'local' },
@@ -114,6 +127,12 @@ function ContentEngineContent() {
     return `/api/website-image?url=${encodeURIComponent(value)}`
   }
 
+  function clearDownstreamOnboardingDraft() {
+    DOWNSTREAM_ONBOARDING_KEYS.forEach((key) => {
+      window.sessionStorage.removeItem(key)
+    })
+  }
+
   function analysisBusinessTypeLabel(value: unknown) {
     if (value === 'local') return '實體店'
     if (value === 'products') return '產品品牌'
@@ -194,6 +213,7 @@ function ContentEngineContent() {
   }
 
   function continueToNext() {
+    clearDownstreamOnboardingDraft()
     const profile = buildBusinessProfile()
     sessionStorage.setItem('soon-business-profile-v1', JSON.stringify(profile))
     sessionStorage.setItem('soon-brand-profile-v1', JSON.stringify({
@@ -258,6 +278,7 @@ function ContentEngineContent() {
       }))
 
       await revealAnalysis(data)
+      clearDownstreamOnboardingDraft()
       setManualProfile(mapAnalysisToManual(data))
       setMode('manual')
       setLoading(false)

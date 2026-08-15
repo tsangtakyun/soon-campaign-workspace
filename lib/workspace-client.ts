@@ -10,6 +10,24 @@ export type WorkspaceSummary = {
   description?: string | null
 }
 
+export function isBechillWorkspaceLabel(label?: string | null) {
+  const normalized = label?.toLowerCase().replace(/\s+/g, '') || ''
+  return normalized.includes('bechilltogether') || normalized.includes('bunchill')
+}
+
+export function isBechillWorkspace(workspace?: WorkspaceSummary | null) {
+  return isBechillWorkspaceLabel(workspace?.brandName || workspace?.name || '')
+}
+
+export function isEggWorkspaceLabel(label?: string | null) {
+  const normalized = label?.toLowerCase().replace(/\s+/g, '') || ''
+  return normalized.includes('egg.soon') || normalized.includes('eggsoon')
+}
+
+export function isEggWorkspace(workspace?: WorkspaceSummary | null) {
+  return isEggWorkspaceLabel(workspace?.brandName || workspace?.name || '')
+}
+
 export function getActiveWorkspaceId() {
   if (typeof window === 'undefined') return null
   return window.localStorage.getItem(ACTIVE_WORKSPACE_STORAGE_KEY)

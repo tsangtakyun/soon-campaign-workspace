@@ -260,7 +260,7 @@ export default function CampaignDetailPage() {
           className={`campaign-detail-hero ${campaign.cover_image_url ? 'has-image' : categoryGradient(campaign)}`}
           style={heroStyle}
         >
-          <button type="button" className="campaign-detail-back" onClick={() => router.push('/onboarding/campaigns')}>
+          <button type="button" className="campaign-detail-back" onClick={() => router.push('/onboarding/topic-library')}>
             ← 返回
           </button>
           <div className="campaign-hero-actions">

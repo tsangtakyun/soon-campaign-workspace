@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase'
 import {
   clearActiveWorkspaceId,
   getActiveWorkspaceId,
+  isBechillWorkspaceLabel,
+  isEggWorkspaceLabel,
   setActiveWorkspaceId,
   workspaceInitial,
   type WorkspaceSummary,
@@ -21,14 +23,11 @@ type SidebarItem = {
 
 const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
-  { icon: '▣', label: '日曆', href: '/onboarding/scheduled-posts' },
-  { icon: '▱', label: '宣傳活動', href: '/onboarding/campaigns' },
-  { icon: '↯', label: '整合', href: '/onboarding/integrations', meta: '0/4' },
+  { icon: '▣', label: '已排程內容', href: '/onboarding/scheduled-posts' },
+  { icon: '▱', label: '題材庫', href: '/onboarding/topic-library' },
+  { icon: '↯', label: '整合', href: '/onboarding/integrations' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
   { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
-  { icon: '◐', label: '視覺風格', href: '/onboarding/settings/visual-style' },
-  { icon: 'Aa', label: '字型風格', href: '/onboarding/settings/typeface' },
-  { icon: '✓', label: '審批', href: '/onboarding/approvals' },
   { icon: '▥', label: '洞察', href: '/onboarding/insights' },
 ]
 
@@ -37,6 +36,8 @@ type DashboardSidebarProps = {
 }
 
 const TRIAL_CREDITS = 200
+const BECHILL_LOGO_URL = '/brand-assets/bechilltogether/bunchill-logo.png'
+const EGG_SOON_LOGO_URL = '/brand-assets/eggsoon/soon-egg.png'
 
 export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const router = useRouter()
@@ -49,6 +50,11 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) || workspaces[0] || null
   const activeWorkspaceLabel = activeWorkspace?.brandName || activeWorkspace?.name || '你的工作台'
+  const activeWorkspaceLogoUrl = isBechillWorkspaceLabel(activeWorkspaceLabel)
+    ? BECHILL_LOGO_URL
+    : isEggWorkspaceLabel(activeWorkspaceLabel)
+      ? EGG_SOON_LOGO_URL
+      : ''
 
   useEffect(() => {
     let cancelled = false
@@ -154,7 +160,9 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           onClick={() => setWorkspaceMenuOpen((open) => !open)}
           type="button"
         >
-          <div className="workspace-mark">{workspaceInitial(activeWorkspaceLabel)}</div>
+          <div className={activeWorkspaceLogoUrl ? 'workspace-mark logo' : 'workspace-mark'}>
+            {activeWorkspaceLogoUrl ? <img src={activeWorkspaceLogoUrl} alt="" /> : workspaceInitial(activeWorkspaceLabel)}
+          </div>
           <strong
             style={{
               display: 'block',
@@ -238,13 +246,8 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       <div className="sidebar-group">
         <p>觸及</p>
         <Link href="/onboarding/meta-ads">Ⓜ Meta Ads</Link>
-        <Link href="/onboarding/seo">SEO</Link>
-      </div>
-
-      <div className="sidebar-footer">
-        <Link href="/onboarding/campaigns">＋ 建立新項目</Link>
         <Link href="/onboarding/team">邀請團隊成員</Link>
-        <Link href="/onboarding/help">幫助與學習</Link>
+        <Link href="/onboarding/settings">設定</Link>
       </div>
     </aside>
   )
@@ -294,6 +297,18 @@ export const dashboardSidebarStyles = `
     place-items: center;
     font-weight: 800;
     font-size: 13px;
+    overflow: hidden;
+  }
+
+  .workspace-mark.logo {
+    background: #f7f1ec;
+    border: 1px solid #e7ddd4;
+  }
+
+  .workspace-mark.logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .workspace-switcher strong {

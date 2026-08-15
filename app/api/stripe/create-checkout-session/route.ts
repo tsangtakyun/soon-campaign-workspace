@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'https://soon-campaign-workspace.vercel.app'
     const safeCancelPath =
-      typeof body.cancelPath === 'string' && body.cancelPath.startsWith('/') ? body.cancelPath : '/onboarding/review'
+      typeof body.cancelPath === 'string' && body.cancelPath.startsWith('/') ? body.cancelPath : '/onboarding'
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

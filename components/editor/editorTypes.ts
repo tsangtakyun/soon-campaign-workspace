@@ -9,7 +9,9 @@ export type ScheduledPost = {
   title: string
   body: string
   image: string
-  status: '新內容' | '草稿' | '已批准' | '已排程' | '已發布'
+  media?: string[]
+  publishStatus?: Record<string, { at?: string; message?: string; status?: string }>
+  status: '新內容' | '草稿' | '已批准' | '已確認' | '已排程' | '已發布'
 }
 
 export type TopicReference = {

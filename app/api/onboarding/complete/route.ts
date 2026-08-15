@@ -240,6 +240,20 @@ async function saveScopedCampaigns(
   )
 }
 
+async function clearScopedGeneratedPosts(
+  supabase: ReturnType<typeof createAdminSupabase>,
+  scopeColumn: string,
+  scopeValue: string
+) {
+  const { error } = await supabase
+    .from('campaign_posts')
+    .delete()
+    .eq(scopeColumn, scopeValue)
+    .like('source_key', 'campaign-%')
+
+  if (error) throw error
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as JsonRecord
@@ -490,6 +504,8 @@ export async function POST(req: Request) {
         ownerScope.value
       )
     }
+
+    await clearScopedGeneratedPosts(supabase, ownerScope.column, ownerScope.value)
 
     const fallbackCampaignName =
       firstString(campaignDetails.campaignName, campaignDetails.name, contentStrategy.titleZh, contentStrategy.title) ||

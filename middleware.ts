@@ -8,6 +8,10 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
 
+  if (pathname === '/onboarding/campaigns') {
+    return NextResponse.redirect(new URL('/onboarding/topic-library', request.url))
+  }
+
   if (pathname === '/my-workspace' || pathname.startsWith('/my-workspace/')) {
     return NextResponse.redirect(new URL('/onboarding', request.url))
   }
@@ -27,6 +31,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/delivery-confirmation') ||
     pathname.startsWith('/delivery-tracking') ||
     pathname === '/login' ||
+    pathname.startsWith('/invite') ||
+    pathname.startsWith('/workspace') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/stripe') ||
     pathname.startsWith('/api/paid-analysis') ||

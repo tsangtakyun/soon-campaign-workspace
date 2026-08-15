@@ -1,11 +1,781 @@
-import { DashboardPlaceholderPage } from '@/components/dashboard/DashboardPlaceholderPage'
+'use client'
 
-export default function MetaAdsPage() {
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+
+import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
+import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
+
+type DashboardPost = {
+  id: string
+  post_type?: string | null
+  scheduled_at?: string | null
+  status?: string | null
+  title?: string | null
+}
+
+type SocialConnection = {
+  account_name?: string | null
+  platform: string
+}
+
+type MetaAdsPayload = {
+  brandKit?: {
+    business_name?: string | null
+  } | null
+  connections?: SocialConnection[]
+  posts?: DashboardPost[]
+}
+
+type CampaignRow = {
+  budget: string
+  costPerResult: string
+  name: string
+  results: string
+  spent: string
+  status: '準備中' | '等待 Meta 權限' | '可建立'
+}
+
+function normalizeAccountName(value?: string | null) {
+  if (!value) return '尚未連接'
+  return value.startsWith('@') ? value : value.includes('.') ? `@${value}` : value
+}
+
+function MetaIcon() {
   return (
-    <DashboardPlaceholderPage
-      activeItem="Meta Ads"
-      description="之後會喺呢度建立同管理 Meta Ads 推廣。"
-      title="Meta Ads"
-    />
+    <span className="meta-icon" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none">
+        <path
+          d="M6.3 20.6c0-5.8 2.8-10.2 6.2-10.2 2 0 3.6 1.2 5.4 3.7 1.6-2.3 3.2-3.7 5.1-3.7 3.4 0 5.7 4.1 5.7 9.1 0 3.2-1.3 5.2-3.5 5.2-1.7 0-3-1-5-3.8l-1.9-2.7-.9 1.5c-2.2 3.6-3.6 5-5.7 5-3.2 0-5.4-1.7-5.4-4.1Zm7.6-7.3c-2 0-3.9 3.5-3.9 7.1 0 1.3.7 2 1.8 2 1.2 0 2.1-.9 4.1-4.1l1-1.7c-1.1-1.8-2-3.3-3-3.3Zm10.8 9.1c1 0 1.5-.9 1.5-2.8 0-3.5-1.4-6.3-3.2-6.3-1.1 0-2 .9-3.6 3.3l2.2 3.1c1.4 1.9 2.2 2.7 3.1 2.7Z"
+          fill="#1877F2"
+        />
+      </svg>
+    </span>
   )
 }
+
+function buildCampaignRows(posts: DashboardPost[], businessName: string): CampaignRow[] {
+  const readyPosts = posts.filter((post) => post.status === 'approved' || post.status === 'scheduled' || post.status === 'ready')
+  const publishedPosts = posts.filter((post) => post.status === 'published' || post.status === 'posted')
+
+  return [
+    {
+      budget: 'HK$80 / day',
+      costPerResult: '待同步',
+      name: `${businessName} 內容互動推廣`,
+      results: `${readyPosts.length || 1} 條內容可測試`,
+      spent: 'HK$0',
+      status: '等待 Meta 權限',
+    },
+    {
+      budget: 'HK$120 / day',
+      costPerResult: '待同步',
+      name: `${businessName} 新受眾測試`,
+      results: '3 組受眾草稿',
+      spent: 'HK$0',
+      status: '準備中',
+    },
+    {
+      budget: 'HK$100 / day',
+      costPerResult: publishedPosts.length ? '待 Meta 回傳' : '未開始',
+      name: `${businessName} 已發布內容再行銷`,
+      results: `${publishedPosts.length} 條已發布內容`,
+      spent: 'HK$0',
+      status: publishedPosts.length ? '可建立' : '準備中',
+    },
+  ]
+}
+
+export default function MetaAdsPage() {
+  const router = useRouter()
+  const [payload, setPayload] = useState<MetaAdsPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadMetaAds() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const { workspaceId } = await resolveActiveWorkspace()
+        if (!workspaceId) {
+          if (!cancelled) setPayload({ connections: [], posts: [] })
+          return
+        }
+
+        const response = await fetch(`/api/dashboard-data?workspace_id=${workspaceId}`, { cache: 'no-store' })
+        const data = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(data?.error || '未能讀取 Meta Ads 資料')
+
+        if (!cancelled) setPayload(data)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : '未能讀取 Meta Ads 資料')
+          setPayload({ connections: [], posts: [] })
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadMetaAds()
+
+    function handleWorkspaceChanged() {
+      void loadMetaAds()
+    }
+
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
+    }
+  }, [])
+
+  const connections = payload?.connections || []
+  const posts = payload?.posts || []
+  const businessName = payload?.brandKit?.business_name || '目前工作台'
+  const facebookConnection = connections.find((connection) => connection.platform === 'facebook')
+  const instagramConnection = connections.find((connection) => connection.platform === 'instagram')
+  const hasMetaConnection = Boolean(facebookConnection || instagramConnection)
+  const campaignRows = useMemo(() => buildCampaignRows(posts, businessName), [businessName, posts])
+
+  return (
+    <main className="dashboard-page">
+      <ClaimOnboardingSession />
+      <DashboardSidebar activeItem="Meta Ads" />
+
+      <section className="meta-ads-shell">
+        <header className="meta-ads-topbar">
+          <div>
+            <h1>Meta Ads</h1>
+            <span>準備推廣內容、設定預算，之後接駁 Meta Ads API 後即可正式投放。</span>
+          </div>
+          <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+            管理連接
+          </button>
+        </header>
+
+        <div className="meta-ads-body">
+          {loading ? (
+            <section className="meta-loading" aria-busy="true">
+              <div />
+              <span />
+              <span />
+            </section>
+          ) : (
+            <>
+              {error ? <div className="meta-alert">{error}</div> : null}
+
+              <section className="meta-hero">
+                <div>
+                  <span className="eyebrow">PAID ADS WORKSPACE</span>
+                  <h2>{businessName} 廣告推廣準備中</h2>
+                  <p>
+                    {hasMetaConnection
+                      ? `已連接 ${facebookConnection ? 'Facebook' : 'Instagram'}：${normalizeAccountName(
+                          facebookConnection?.account_name || instagramConnection?.account_name,
+                        )}。Meta 廣告權限批核後，這裡會用來建立 campaign、設定預算及追蹤成效。`
+                      : '尚未連接 Meta 帳戶。先到整合頁連接 Facebook / Instagram，之後便可把已確認內容轉成廣告草稿。'}
+                  </p>
+                </div>
+                <div className={hasMetaConnection ? 'meta-status-card connected' : 'meta-status-card'}>
+                  <MetaIcon />
+                  <div>
+                    <strong>{hasMetaConnection ? 'Meta 已連接' : 'Meta 未連接'}</strong>
+                    <span>{hasMetaConnection ? '等待廣告投放權限' : '需要先連接帳戶'}</span>
+                  </div>
+                  <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+                    {hasMetaConnection ? '查看連接' : '立即連接'}
+                  </button>
+                </div>
+              </section>
+
+              <section className="meta-steps" aria-label="Meta Ads 流程">
+                <div className={hasMetaConnection ? 'done' : ''}>
+                  <span>1</span>
+                  <strong>連接 Meta</strong>
+                  <em>{hasMetaConnection ? '已連接帳戶' : 'Facebook / Instagram'}</em>
+                </div>
+                <div>
+                  <span>2</span>
+                  <strong>選擇內容</strong>
+                  <em>由已確認貼文建立廣告</em>
+                </div>
+                <div>
+                  <span>3</span>
+                  <strong>設定預算</strong>
+                  <em>每日預算、受眾、日期</em>
+                </div>
+                <div>
+                  <span>4</span>
+                  <strong>等待批核</strong>
+                  <em>Meta Ads API 權限</em>
+                </div>
+              </section>
+
+              <section className="meta-banner">
+                <div>
+                  <strong>自動測試廣告草稿</strong>
+                  <p>SOON 之後可以根據已確認內容建立 challenger ads，低表現素材會暫停，高表現素材會被保留作下一輪推廣。</p>
+                </div>
+                <span>暫未開放</span>
+              </section>
+
+              <section className="meta-panel">
+                <div className="panel-heading">
+                  <div>
+                    <span>CAMPAIGNS</span>
+                    <h3>廣告活動草稿</h3>
+                  </div>
+                  <button type="button" disabled>
+                    ＋ 建立廣告活動
+                  </button>
+                </div>
+
+                <div className="campaign-table-wrap">
+                  <table className="campaign-table">
+                    <thead>
+                      <tr>
+                        <th>狀態</th>
+                        <th>活動名稱</th>
+                        <th>預算</th>
+                        <th>已花費</th>
+                        <th>結果</th>
+                        <th>每個結果成本</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaignRows.map((campaign) => (
+                        <tr key={campaign.name}>
+                          <td>
+                            <span className={`status-pill ${campaign.status === '可建立' ? 'ready' : ''}`}>{campaign.status}</span>
+                          </td>
+                          <td>
+                            <div className="campaign-name">
+                              <MetaIcon />
+                              <strong>{campaign.name}</strong>
+                            </div>
+                          </td>
+                          <td>{campaign.budget}</td>
+                          <td>{campaign.spent}</td>
+                          <td>{campaign.results}</td>
+                          <td>{campaign.costPerResult}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="meta-grid">
+                <article className="meta-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span>AD STRATEGY</span>
+                      <h3>SOON 建議</h3>
+                    </div>
+                  </div>
+                  <div className="strategy-list">
+                    <div>
+                      <strong>先推已確認內容</strong>
+                      <p>用已經通過客戶審批的貼文作測試，避免廣告素材同 organic 內容方向分裂。</p>
+                    </div>
+                    <div>
+                      <strong>小額測試 72 小時</strong>
+                      <p>先用低每日預算測試互動、收藏及 profile visit，再決定是否加大投放。</p>
+                    </div>
+                    <div>
+                      <strong>分開受眾與素材</strong>
+                      <p>同一素材測不同受眾，同一受眾測不同 hook，數據會更容易判斷下一步。</p>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="meta-panel connection-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <span>CONNECTED META</span>
+                      <h3>已連接帳戶</h3>
+                    </div>
+                  </div>
+                  <div className="connection-list">
+                    <div>
+                      <MetaIcon />
+                      <div>
+                        <strong>Facebook</strong>
+                        <span>{normalizeAccountName(facebookConnection?.account_name)}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <MetaIcon />
+                      <div>
+                        <strong>Instagram</strong>
+                        <span>{normalizeAccountName(instagramConnection?.account_name)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </section>
+            </>
+          )}
+        </div>
+      </section>
+
+      <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${metaAdsStyles}` }} />
+    </main>
+  )
+}
+
+const metaAdsStyles = `
+  .dashboard-page {
+    min-height: 100vh;
+    background: #f7f7f8;
+    color: #202126;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .meta-ads-shell {
+    min-width: 0;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .meta-ads-topbar {
+    min-height: 58px;
+    border-bottom: 1px solid #ebecef;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 20px;
+  }
+
+  .meta-ads-topbar h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .meta-ads-topbar span {
+    color: #72757d;
+    font-size: 13px;
+  }
+
+  .meta-ads-topbar button,
+  .panel-heading button,
+  .meta-status-card button {
+    border: 1px solid #dfe1e6;
+    background: #ffffff;
+    border-radius: 8px;
+    color: #202126;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 650;
+    min-height: 38px;
+    padding: 0 14px;
+  }
+
+  .panel-heading button:disabled {
+    color: #777b84;
+    cursor: not-allowed;
+    background: #f5f5f6;
+  }
+
+  .meta-ads-body {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .meta-loading {
+    width: min(1040px, 100%);
+    border: 1px solid #ebecef;
+    border-radius: 8px;
+    padding: 28px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .meta-loading div,
+  .meta-loading span {
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f0f1f3, #fafafa, #f0f1f3);
+    min-height: 18px;
+  }
+
+  .meta-loading div {
+    width: 44%;
+    min-height: 34px;
+  }
+
+  .meta-loading span:nth-child(2) {
+    width: 70%;
+  }
+
+  .meta-loading span:nth-child(3) {
+    width: 54%;
+  }
+
+  .meta-alert {
+    width: min(1040px, 100%);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #fff7e8;
+    color: #8a5a12;
+    font-size: 14px;
+  }
+
+  .meta-hero,
+  .meta-steps,
+  .meta-banner,
+  .meta-panel,
+  .meta-grid {
+    width: min(1040px, 100%);
+  }
+
+  .meta-hero {
+    border: 1px solid #e4e6ea;
+    border-radius: 8px;
+    padding: 22px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .eyebrow,
+  .panel-heading span {
+    color: #7a7d85;
+    display: block;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .meta-hero h2 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .meta-hero p {
+    color: #696d76;
+    font-size: 15px;
+    line-height: 1.7;
+    margin: 0;
+    max-width: 720px;
+  }
+
+  .meta-status-card {
+    border: 1px solid #e4e6ea;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 136px;
+    text-align: center;
+  }
+
+  .meta-status-card.connected {
+    background: #ecfdf3;
+    border-color: #bcf2cf;
+  }
+
+  .meta-status-card strong,
+  .connection-list strong {
+    display: block;
+    font-size: 16px;
+    line-height: 1.3;
+  }
+
+  .meta-status-card span,
+  .connection-list span {
+    color: #70747d;
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .meta-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .meta-icon svg {
+    width: 28px;
+    height: 28px;
+    display: block;
+  }
+
+  .meta-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .meta-steps div {
+    border: 1px solid #e4e6ea;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 14px;
+  }
+
+  .meta-steps div.done {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .meta-steps span {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #202126;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .meta-steps strong,
+  .meta-steps em {
+    display: block;
+  }
+
+  .meta-steps strong {
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .meta-steps em {
+    color: #70747d;
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .meta-banner {
+    background: #ecfdf3;
+    border: 1px solid #bcf2cf;
+    border-radius: 8px;
+    padding: 16px 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .meta-banner strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .meta-banner p {
+    color: #5f656f;
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .meta-banner > span {
+    border-radius: 999px;
+    background: #ffffff;
+    color: #5f656f;
+    font-size: 12px;
+    font-weight: 750;
+    padding: 7px 10px;
+    white-space: nowrap;
+  }
+
+  .meta-panel {
+    border: 1px solid #e4e6ea;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 20px;
+  }
+
+  .panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .panel-heading h3 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .campaign-table-wrap {
+    overflow-x: auto;
+  }
+
+  .campaign-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 820px;
+  }
+
+  .campaign-table th,
+  .campaign-table td {
+    border-bottom: 1px solid #eef0f2;
+    padding: 14px 10px;
+    text-align: left;
+    vertical-align: middle;
+    font-size: 14px;
+  }
+
+  .campaign-table th {
+    color: #8a8d94;
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  .campaign-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .campaign-name strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-pill {
+    border-radius: 999px;
+    background: #fff7e6;
+    color: #8a5a12;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 750;
+    padding: 5px 9px;
+    white-space: nowrap;
+  }
+
+  .status-pill.ready {
+    background: #ecfdf3;
+    color: #13723c;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 18px;
+  }
+
+  .strategy-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .strategy-list div {
+    border-left: 3px solid #202126;
+    padding-left: 12px;
+  }
+
+  .strategy-list strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .strategy-list p {
+    color: #666b75;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .connection-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .connection-list > div {
+    border: 1px solid #eceef1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    min-width: 0;
+  }
+
+  .connection-list > div > div {
+    min-width: 0;
+  }
+
+  .connection-list span {
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 900px) {
+    .dashboard-page {
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      min-height: auto;
+    }
+
+    .meta-ads-topbar {
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 14px 16px;
+    }
+
+    .meta-ads-body {
+      padding: 16px;
+    }
+
+    .meta-hero,
+    .meta-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .meta-steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .meta-banner,
+    .panel-heading {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .meta-hero h2 {
+      font-size: 24px;
+    }
+
+    .meta-steps {
+      grid-template-columns: 1fr;
+    }
+  }
+`
