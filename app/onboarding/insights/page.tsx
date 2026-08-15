@@ -42,20 +42,37 @@ type InstagramInsightsPayload = {
       username?: string
     }
   }
+  media?: InstagramMediaInsight[]
   metrics?: Record<string, number>
   ok?: boolean
   token_source?: string
   updated_at?: string
 }
 
+type InstagramMediaInsight = {
+  caption?: string
+  comments?: number
+  id: string
+  image?: string
+  likes?: number
+  permalink?: string
+  saves?: number
+  shares?: number
+  timestamp?: string
+  views?: number
+}
+
 type TopPost = {
   comments: number
   engagement: string
   image: string
-  impressions: number
+  mediaId?: string
+  shares: number
+  synced: boolean
   likes: number
   saves: number
   title: string
+  views: number
 }
 
 const platformLabels: Record<string, string> = {
@@ -81,7 +98,52 @@ function normalizePlatformName(value?: string | null) {
   return value.startsWith('@') ? value : value.includes('.') ? `@${value}` : value
 }
 
-function createTopPosts(posts: DashboardPost[]): TopPost[] {
+function readPublishStatus(post: DashboardPost, platform: string) {
+  const publishStatus =
+    post.captions?.publish_status && typeof post.captions.publish_status === 'object' && !Array.isArray(post.captions.publish_status)
+      ? (post.captions.publish_status as Record<string, unknown>)
+      : {}
+  const platformStatus =
+    publishStatus[platform] && typeof publishStatus[platform] === 'object' && !Array.isArray(publishStatus[platform])
+      ? (publishStatus[platform] as Record<string, unknown>)
+      : {}
+  return platformStatus
+}
+
+function normalizeMatchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '')
+}
+
+function findMatchingMedia(post: DashboardPost, media: InstagramMediaInsight[]) {
+  const instagramStatus = readPublishStatus(post, 'instagram')
+  const mediaId = typeof instagramStatus.media_id === 'string' ? instagramStatus.media_id : ''
+  if (mediaId) {
+    const exact = media.find((item) => item.id === mediaId)
+    if (exact) return exact
+  }
+
+  const title = normalizeMatchText(post.title || '')
+  const body = normalizeMatchText((post.body || '').slice(0, 80))
+  const candidates = media.filter((item) => {
+    const caption = normalizeMatchText(item.caption || '')
+    return Boolean((title && caption.includes(title)) || (body && caption.includes(body.slice(0, 32))))
+  })
+
+  if (candidates.length) return candidates[0]
+
+  const postedAt = post.scheduled_at ? new Date(post.scheduled_at).getTime() : 0
+  if (!Number.isFinite(postedAt) || !postedAt) return null
+
+  return media.find((item) => {
+    const mediaAt = item.timestamp ? new Date(item.timestamp).getTime() : 0
+    return Number.isFinite(mediaAt) && Math.abs(mediaAt - postedAt) < 36 * 60 * 60 * 1000
+  }) || null
+}
+
+function createTopPosts(posts: DashboardPost[], media: InstagramMediaInsight[] = []): TopPost[] {
   const rankedPosts = posts
     .filter((post) => post.title || post.body || post.image_url || post.captions)
     .slice(0, 6)
@@ -92,46 +154,75 @@ function createTopPosts(posts: DashboardPost[]): TopPost[] {
         comments: 0,
         engagement: '待同步',
         image: '/brand-assets/eggsoon/soon-egg.png',
-        impressions: 0,
+        shares: 0,
+        synced: false,
         likes: 0,
         saves: 0,
         title: '等待第一批內容發布',
+        views: 0,
       },
     ]
   }
 
   return rankedPosts.map((post, index) => {
+    const matchedMedia = findMatchingMedia(post, media)
+    if (matchedMedia) {
+      const views = matchedMedia.views || 0
+      const likes = matchedMedia.likes || 0
+      const comments = matchedMedia.comments || 0
+      const shares = matchedMedia.shares || 0
+      const saves = matchedMedia.saves || 0
+      const engagementValue = ((likes + comments + shares + saves) / Math.max(views, 1)) * 100
+
+      return {
+        comments,
+        engagement: `${engagementValue.toFixed(1)}%`,
+        image: matchedMedia.image || readPostImage(post),
+        likes,
+        mediaId: matchedMedia.id,
+        saves,
+        shares,
+        synced: true,
+        title: post.title || '未命名內容',
+        views,
+      }
+    }
+
     const base = Math.max(1, rankedPosts.length - index)
     const isPublished = post.status === 'published' || post.status === 'posted'
     const isApproved = post.status === 'approved' || post.status === 'scheduled'
-    const impressions = isPublished ? 320 + base * 42 : isApproved ? 180 + base * 28 : 90 + base * 16
+    const views = isPublished ? 320 + base * 42 : isApproved ? 180 + base * 28 : 90 + base * 16
     const likes = isPublished ? 18 + base * 3 : isApproved ? 8 + base * 2 : 3 + base
     const comments = isPublished ? 3 + index : isApproved ? 1 + index : index
+    const shares = 0
     const saves = isPublished ? 10 + base : isApproved ? 4 + base : 2
-    const engagementValue = ((likes + comments + saves) / Math.max(impressions, 1)) * 100
+    const engagementValue = ((likes + comments + shares + saves) / Math.max(views, 1)) * 100
 
     return {
       comments,
       engagement: `${engagementValue.toFixed(1)}%`,
       image: readPostImage(post),
-      impressions,
       likes,
       saves,
+      shares,
+      synced: false,
       title: post.title || '未命名內容',
+      views,
     }
   })
 }
 
-function buildSummary(posts: DashboardPost[], hasInstagram: boolean) {
+function buildSummary(posts: DashboardPost[], hasInstagram: boolean, media: InstagramMediaInsight[] = []) {
   const publishedPosts = posts.filter((post) => post.status === 'published' || post.status === 'posted')
   const approvedPosts = posts.filter((post) => post.status === 'approved' || post.status === 'scheduled')
   const totalPosts = posts.length
-  const topPosts = createTopPosts(posts)
-  const impressions = topPosts.reduce((sum, post) => sum + post.impressions, 0)
+  const topPosts = createTopPosts(posts, media)
+  const impressions = topPosts.reduce((sum, post) => sum + post.views, 0)
   const likes = topPosts.reduce((sum, post) => sum + post.likes, 0)
   const comments = topPosts.reduce((sum, post) => sum + post.comments, 0)
+  const shares = topPosts.reduce((sum, post) => sum + post.shares, 0)
   const saves = topPosts.reduce((sum, post) => sum + post.saves, 0)
-  const engagement = impressions ? (((likes + comments + saves) / impressions) * 100).toFixed(1) : '0.0'
+  const engagement = impressions ? (((likes + comments + shares + saves) / impressions) * 100).toFixed(1) : '0.0'
 
   return {
     approvedPosts: approvedPosts.length,
@@ -142,6 +233,7 @@ function buildSummary(posts: DashboardPost[], hasInstagram: boolean) {
     likes,
     publishedPosts: publishedPosts.length,
     saves,
+    shares,
     topPosts,
     totalPosts,
   }
@@ -210,8 +302,12 @@ export default function InsightsPage() {
 
   const connections = payload?.connections || []
   const posts = payload?.posts || []
+  const instagramMedia = instagramInsights?.media || []
   const instagramConnection = connections.find((connection) => connection.platform === 'instagram')
-  const summary = useMemo(() => buildSummary(posts, Boolean(instagramConnection)), [instagramConnection, posts])
+  const summary = useMemo(
+    () => buildSummary(posts, Boolean(instagramConnection), instagramMedia),
+    [instagramConnection, instagramMedia, posts]
+  )
   const businessName = payload?.brandKit?.business_name || '目前工作台'
   const instagramMetrics = instagramInsights?.metrics || {}
   const profile = instagramInsights?.account?.profile || {}
@@ -385,8 +481,8 @@ export default function InsightsPage() {
                         <h4>{post.title}</h4>
                         <dl>
                           <div>
-                            <dt>Impressions</dt>
-                            <dd>{post.impressions.toLocaleString('en-US')}</dd>
+                            <dt>{post.synced ? 'Views' : 'Views est.'}</dt>
+                            <dd>{post.views.toLocaleString('en-US')}</dd>
                           </div>
                           <div>
                             <dt>Likes</dt>
@@ -395,6 +491,10 @@ export default function InsightsPage() {
                           <div>
                             <dt>Comments</dt>
                             <dd>{post.comments}</dd>
+                          </div>
+                          <div>
+                            <dt>Shares</dt>
+                            <dd>{post.shares}</dd>
                           </div>
                           <div>
                             <dt>Saves</dt>

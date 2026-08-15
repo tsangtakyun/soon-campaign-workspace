@@ -119,10 +119,36 @@ export async function POST(req: Request) {
     }
 
     if (postId) {
+      const publishedAt = new Date().toISOString()
+      const { data: existingPost } = await supabase
+        .from('campaign_posts')
+        .select('captions')
+        .eq('id', postId)
+        .maybeSingle()
+      const captions =
+        existingPost?.captions && typeof existingPost.captions === 'object' && !Array.isArray(existingPost.captions)
+          ? (existingPost.captions as Record<string, unknown>)
+          : {}
+      const publishStatus =
+        captions.publish_status && typeof captions.publish_status === 'object' && !Array.isArray(captions.publish_status)
+          ? (captions.publish_status as Record<string, unknown>)
+          : {}
+
       await supabase
         .from('campaign_posts')
         .update({
-          posted_at: new Date().toISOString(),
+          captions: {
+            ...captions,
+            publish_status: {
+              ...publishStatus,
+              instagram: {
+                at: publishedAt,
+                media_id: String(publishData.id),
+                status: 'published',
+              },
+            },
+          },
+          posted_at: publishedAt,
           status: 'posted',
         })
         .eq('id', postId)

@@ -119,7 +119,11 @@ export async function POST(req: Request) {
     const nextPublishStatus: Record<string, unknown> = { ...existingPublishStatus }
 
     publishResult.platforms_published.forEach((item) => {
-      nextPublishStatus[item] = { at: publishedAt, status: 'published' }
+      nextPublishStatus[item] = {
+        at: publishedAt,
+        ...(publishResult.platform_results[item] || {}),
+        status: 'published',
+      }
     })
     publishResult.errors.forEach((item) => {
       nextPublishStatus[item.platform] = {

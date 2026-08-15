@@ -8,6 +8,7 @@ export type PublishError = {
 
 export type PublishResult = {
   errors: PublishError[]
+  platform_results: Record<string, Record<string, unknown>>
   platforms_published: string[]
 }
 
@@ -290,7 +291,9 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
         })
       )
       if (!published.id) throw new Error('Instagram 發布失敗。')
-      return
+      return {
+        media_id: String(published.id),
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       errors.push(`${label}: ${message}`)
@@ -430,7 +433,10 @@ async function publishToFacebook(post: CampaignPost, connection: SocialConnectio
         throw new Error(message)
       }
       if (!retryData.id && !retryData.post_id) throw new Error('Facebook 發布失敗。')
-      return
+      return {
+        media_id: typeof retryData.id === 'string' ? retryData.id : null,
+        post_id: typeof retryData.post_id === 'string' ? retryData.post_id : null,
+      }
     }
 
     const message =
@@ -442,6 +448,10 @@ async function publishToFacebook(post: CampaignPost, connection: SocialConnectio
 
   const published = responseData as Record<string, unknown>
   if (!published.id && !published.post_id) throw new Error('Facebook 發布失敗。')
+  return {
+    media_id: typeof published.id === 'string' ? published.id : null,
+    post_id: typeof published.post_id === 'string' ? published.post_id : null,
+  }
 }
 
 export async function publishPostToConnectedPlatforms(input: {
@@ -478,7 +488,7 @@ export async function publishPostToConnectedPlatforms(input: {
     })
   }
 
-  const result: PublishResult = { errors: [], platforms_published: [] }
+  const result: PublishResult = { errors: [], platform_results: {}, platforms_published: [] }
   const connectionRows = (connections || []) as SocialConnection[]
   console.log('workspace social connections:', connectionRows.map(sanitizeConnection))
 
@@ -499,9 +509,9 @@ export async function publishPostToConnectedPlatforms(input: {
 
     try {
       if (connection.platform === 'instagram') {
-        await publishToInstagram(input.post, connection, input.baseUrl)
+        result.platform_results.instagram = await publishToInstagram(input.post, connection, input.baseUrl)
       } else if (connection.platform === 'facebook') {
-        await publishToFacebook(input.post, connection, input.baseUrl)
+        result.platform_results.facebook = await publishToFacebook(input.post, connection, input.baseUrl)
       } else if (connection.platform === 'threads') {
         throw new Error('Threads 自動發布尚未啟用，請先使用手動發布。')
       } else {

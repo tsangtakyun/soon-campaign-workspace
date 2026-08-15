@@ -13,6 +13,7 @@ type SocialConnection = {
 }
 
 const GRAPH_VERSION = 'v18.0'
+const MEDIA_FIELDS = 'id,caption,media_type,media_product_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count'
 
 function graphOrigin(connection: SocialConnection) {
   return connection.page_id ? 'https://graph.facebook.com' : 'https://graph.instagram.com'
@@ -34,6 +35,10 @@ function metricValue(value: unknown) {
     const candidate = (item as { value?: unknown }).value
     return sum + (typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : 0)
   }, 0)
+}
+
+function numericField(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 async function graphGet(connection: SocialConnection, path: string, token: string, params: Record<string, string>) {
@@ -70,6 +75,34 @@ async function withToken(connection: SocialConnection, callback: (token: string,
   }
 
   throw new Error(errors.join(' | ') || 'No usable Instagram token')
+}
+
+async function fetchMediaInsights(connection: SocialConnection, mediaId: string, token: string) {
+  const attempts = [
+    { metric: 'views,reach,saved,shares,total_interactions' },
+    { metric: 'impressions,reach,saved,engagement' },
+    { metric: 'saved' },
+  ]
+  const errors: string[] = []
+
+  for (const params of attempts) {
+    try {
+      const data = await graphGet(connection, `${mediaId}/insights`, token, params)
+      const rows = Array.isArray(data.data) ? data.data : []
+      return rows.reduce<Record<string, number>>((acc, row) => {
+        if (!row || typeof row !== 'object') return acc
+        const name = (row as { name?: unknown }).name
+        if (typeof name !== 'string') return acc
+        acc[name] = metricValue((row as { values?: unknown }).values)
+        return acc
+      }, {})
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  console.warn('[instagram/insights] media insight failed', { errors, mediaId })
+  return {}
 }
 
 export async function GET(req: Request) {
@@ -141,6 +174,51 @@ export async function GET(req: Request) {
       return acc
     }, {})
 
+    const mediaResult = await withToken(typedConnection, (token) =>
+      graphGet(typedConnection, `${typedConnection.account_id}/media`, token, {
+        fields: MEDIA_FIELDS,
+        limit: '25',
+      })
+    ).catch((error) => {
+      console.warn('[instagram/insights] media list failed', error)
+      return null
+    })
+    const mediaRows = mediaResult?.data && Array.isArray(mediaResult.data.data) ? mediaResult.data.data : []
+    const mediaToken = mediaResult?.tokenSource
+      ? connectionTokens(typedConnection).find((item) => item.label === mediaResult.tokenSource)?.token
+      : null
+    const media = await Promise.all(
+      mediaRows
+        .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object' && !Array.isArray(row)))
+        .map(async (row) => {
+          const id = typeof row.id === 'string' ? row.id : ''
+          const postMetrics = id && mediaToken ? await fetchMediaInsights(typedConnection, id, mediaToken) : {}
+          const views = postMetrics.views || postMetrics.impressions || postMetrics.reach || 0
+          const saves = postMetrics.saved || postMetrics.saves || 0
+          const shares = postMetrics.shares || 0
+
+          return {
+            caption: typeof row.caption === 'string' ? row.caption : '',
+            comments: numericField(row.comments_count),
+            id,
+            image: typeof row.thumbnail_url === 'string'
+              ? row.thumbnail_url
+              : typeof row.media_url === 'string'
+                ? row.media_url
+                : '',
+            likes: numericField(row.like_count),
+            media_product_type: typeof row.media_product_type === 'string' ? row.media_product_type : '',
+            media_type: typeof row.media_type === 'string' ? row.media_type : '',
+            metrics: postMetrics,
+            permalink: typeof row.permalink === 'string' ? row.permalink : '',
+            saves,
+            shares,
+            timestamp: typeof row.timestamp === 'string' ? row.timestamp : '',
+            views,
+          }
+        })
+    )
+
     return NextResponse.json({
       account: {
         id: typedConnection.account_id,
@@ -148,6 +226,7 @@ export async function GET(req: Request) {
         name: typedConnection.account_name,
         profile: profileResult.data,
       },
+      media,
       metrics,
       ok: true,
       token_source: insightResult.tokenSource,
