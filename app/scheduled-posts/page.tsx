@@ -1024,6 +1024,7 @@ function ScheduledPostsPageContent() {
         setPostStatuses((current) => ({ ...current, [post.id]: 'approved' }))
         setPublishResult('error')
         setPublishMessage(message)
+        setToolbarMessage(message)
         refreshCalendar()
         return
       }
@@ -1063,17 +1064,20 @@ function ScheduledPostsPageContent() {
           return next
         })
       }
-      setPublishResult('success')
-      setPublishMessage(
+      const nextPublishMessage =
         result?.status === 'published' || result?.status === 'partial_published'
           ? `✓ ${platformText || '已發布。'}${warningText}`
           : `貼文已批准，將於 ${scheduledAt} 自動發布。`
-      )
+      setPublishResult('success')
+      setPublishMessage(nextPublishMessage)
+      setToolbarMessage(nextPublishMessage)
       refreshCalendar()
     } catch (error) {
+      const message = error instanceof Error ? error.message : '發布失敗，貼文已保留為已批准。'
       setPostStatuses((current) => ({ ...current, [post.id]: 'approved' }))
       setPublishResult('error')
-      setPublishMessage(error instanceof Error ? error.message : '發布失敗，貼文已保留為已批准。')
+      setPublishMessage(message)
+      setToolbarMessage(message)
     } finally {
       setPublishing(false)
       setPublishingPlatform(null)
