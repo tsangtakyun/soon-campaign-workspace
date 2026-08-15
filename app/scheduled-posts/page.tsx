@@ -42,10 +42,38 @@ const DesignCanvas = dynamic(
 )
 
 const PUBLISH_PLATFORMS = [
-  { channel: 'Instagram' as PreviewChannel, icon: 'ig', id: 'instagram', label: 'Instagram' },
-  { channel: 'Facebook' as PreviewChannel, icon: 'f', id: 'facebook', label: 'Facebook' },
-  { channel: 'Threads' as PreviewChannel, icon: '@', id: 'threads', label: 'Threads' },
+  { channel: 'Instagram' as PreviewChannel, id: 'instagram', label: 'Instagram' },
+  { channel: 'Facebook' as PreviewChannel, id: 'facebook', label: 'Facebook' },
+  { channel: 'Threads' as PreviewChannel, id: 'threads', label: 'Threads' },
 ]
+
+function PublishPlatformIcon({ platform }: { platform: string }) {
+  if (platform === 'instagram') {
+    return (
+      <span className="publish-platform-icon instagram" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <rect x="5.25" y="5.25" width="13.5" height="13.5" rx="4.25" />
+          <circle cx="12" cy="12" r="3.25" />
+          <circle cx="16.15" cy="7.85" r="1" />
+        </svg>
+      </span>
+    )
+  }
+
+  if (platform === 'facebook') {
+    return (
+      <span className="publish-platform-icon facebook" aria-hidden="true">
+        f
+      </span>
+    )
+  }
+
+  return (
+    <span className="publish-platform-icon threads" aria-hidden="true">
+      @
+    </span>
+  )
+}
 
 type PlatformConnection = {
   account_id?: string | null
@@ -2446,7 +2474,7 @@ function ScheduledPostsPageContent() {
                         onClick={() => void publishPost(post, platform.id, true)}
                         title={failedMessage || undefined}
                       >
-                        <span className={`publish-platform-icon ${platform.id}`}>{platform.icon}</span>
+                        <PublishPlatformIcon platform={platform.id} />
                         <span className="publish-platform-label">
                         {status === 'published'
                           ? `已發布到 ${platform.label}`
@@ -3125,6 +3153,16 @@ const styles = `${dashboardSidebarStyles}
 
   .publish-platform-icon.instagram {
     background: linear-gradient(135deg, #f58529, #dd2a7b 52%, #515bd4);
+  }
+
+  .publish-platform-icon.instagram svg {
+    fill: none;
+    height: 14px;
+    stroke: #ffffff;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 14px;
   }
 
   .publish-platform-icon.facebook {
