@@ -36,11 +36,30 @@ function instagramRedirectUri(req: Request) {
   return new URL('/api/auth/callback/instagram', new URL(req.url).origin).toString()
 }
 
+function parseState(state: string) {
+  if (isUuid(state)) return { redirectUri: '', workspaceId: state }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as {
+      redirectUri?: unknown
+      workspaceId?: unknown
+    }
+
+    return {
+      redirectUri: typeof parsed.redirectUri === 'string' ? parsed.redirectUri : '',
+      workspaceId: typeof parsed.workspaceId === 'string' ? parsed.workspaceId : '',
+    }
+  } catch {
+    return { redirectUri: '', workspaceId: '' }
+  }
+}
+
 export async function GET(req: Request) {
   const requestUrl = new URL(req.url)
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')
-  const workspaceId = requestUrl.searchParams.get('state') || ''
+  const state = parseState(requestUrl.searchParams.get('state') || '')
+  const workspaceId = state.workspaceId
   const baseUrl = appUrl(req)
 
   if (error || !code) {
@@ -76,7 +95,7 @@ export async function GET(req: Request) {
       workspaceId,
     })
 
-    const redirectUri = instagramRedirectUri(req)
+    const redirectUri = state.redirectUri || instagramRedirectUri(req)
     const shortTokenData = (await readJson(
       await fetch('https://api.instagram.com/oauth/access_token', {
         body: new URLSearchParams({
