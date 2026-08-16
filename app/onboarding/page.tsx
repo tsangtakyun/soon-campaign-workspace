@@ -1859,24 +1859,29 @@ const homeStyles = `
   }
 
   .approval-post-head {
-    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px 16px;
     padding: 15px 17px 13px;
   }
 
   .approval-delete-btn {
-    position: absolute;
-    top: 13px;
-    right: 15px;
     border: 1px solid #ffd6d6;
-    border-radius: 12px;
+    border-radius: 14px;
     background: #fff7f7;
     color: #b42318;
     cursor: pointer;
     font: inherit;
     font-size: 13px;
     font-weight: 750;
-    min-height: 42px;
-    padding: 0 16px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    width: 112px;
+    padding: 0 14px;
     white-space: nowrap;
   }
 
@@ -1890,28 +1895,34 @@ const homeStyles = `
   }
 
   .approval-tagrow {
-    padding-right: 120px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 8px;
+    min-width: 0;
   }
 
   .approval-num {
-    width: 48px;
-    height: 48px;
+    width: 54px;
+    min-width: 54px;
+    height: 54px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
+    border-radius: 16px;
     background: linear-gradient(145deg, #2b2d33 0%, #15161a 100%);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 18px rgba(32, 33, 38, 0.12);
     color: #ffffff;
-    display: grid;
-    place-items: center;
-    flex: none;
-    font-size: 18px;
-    font-weight: 850;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 54px;
+    overflow: hidden;
+    font-size: 17px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
     letter-spacing: 0;
     line-height: 1;
+    text-align: center;
   }
 
   .approval-tagrow strong {
@@ -1922,13 +1933,16 @@ const homeStyles = `
   .approval-tagrow strong em {
     margin-left: 7px;
     border: 1px solid #e2e3e7;
-    border-radius: 12px;
+    border-radius: 14px;
     background: #f7f7f8;
     color: #6f737d;
     display: inline-flex;
     align-items: center;
-    min-height: 42px;
-    padding: 0 16px;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    width: 112px;
+    padding: 0 14px;
     font-size: 13px;
     font-style: normal;
     font-weight: 750;
@@ -1949,19 +1963,27 @@ const homeStyles = `
 
   .approval-tagrow small {
     margin-left: auto;
-    border-radius: 999px;
+    border-radius: 14px;
     background: #f1f2f4;
     color: #202126;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 750;
-    padding: 4px 10px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    width: 112px;
+    padding: 0 14px;
   }
 
   .approval-post h3 {
+    grid-column: 1 / -1;
     margin: 0;
     font-size: 18px;
     font-weight: 800;
+    line-height: 1.25;
   }
 
   .approval-gallery {
