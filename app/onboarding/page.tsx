@@ -376,6 +376,9 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   const [captionDrafts, setCaptionDrafts] = useState<Record<string, string>>({})
   const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
   const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
+  const [savingIndex, setSavingIndex] = useState<number | null>(null)
+  const [decisionErrors, setDecisionErrors] = useState<Record<number, string>>({})
+  const [failedDecisions, setFailedDecisions] = useState<Record<number, ApprovalDecision>>({})
   const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null)
   const [toast, setToast] = useState('')
   const visiblePosts = week.posts.filter(
@@ -403,6 +406,12 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     const post = week.posts[index]
     if (!post?.id || !week.workspaceId) return
 
+    setSavingIndex(index)
+    setDecisionErrors((current) => {
+      const next = { ...current }
+      delete next[index]
+      return next
+    })
     try {
       const isContentProject = post.recordType === 'content_project'
       const response = await fetch(isContentProject ? '/api/content-projects/approve' : decision === 'ok' ? '/api/posts/approve' : '/api/posts/reject', {
@@ -416,17 +425,26 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
         method: 'POST',
       })
       const result = await response.json().catch(() => ({}))
-      if (response.status === 403) {
-        setDecisions((current) => current.map((item, itemIndex) => itemIndex === index ? previousDecision : item))
-      }
       if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '儲存失敗')
+      setFailedDecisions((current) => {
+        const next = { ...current }
+        delete next[index]
+        return next
+      })
       showToast(decision === 'ok' ? '已儲存：可以出' : '已儲存：需要跟進')
     } catch (error) {
-      showToast(error instanceof Error ? error.message : '未能儲存審批狀態')
+      const message = error instanceof Error ? error.message : '未能儲存審批狀態'
+      setDecisions((current) => current.map((item, itemIndex) => itemIndex === index ? previousDecision : item))
+      setFailedDecisions((current) => ({ ...current, [index]: decision }))
+      setDecisionErrors((current) => ({ ...current, [index]: message }))
+      showToast(message)
+    } finally {
+      setSavingIndex((current) => current === index ? null : current)
     }
   }
 
   function handleDecision(index: number, decision: ApprovalDecision) {
+    if (savingIndex === index) return
     const previousDecision = decisions[index]
     setDecision(index, decision)
     void persistDecision(index, decision, previousDecision)
@@ -629,6 +647,8 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
         {week.posts.map((post, postIndex) => {
           const slide = slides[postIndex]
           const decision = decisions[postIndex]
+          const isSavingDecision = savingIndex === postIndex
+          const decisionError = decisionErrors[postIndex]
           const currentImage = approvalImageSrc(post.media[slide])
           const isPublished = post.status === 'published'
           const isConfirmed = post.status === 'confirmed'
@@ -767,15 +787,27 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                         type="button"
                         data-value={value}
                         aria-pressed={decision === value}
-                        disabled={week.permissions?.canApprove === false}
+                        disabled={week.permissions?.canApprove === false || isSavingDecision}
                         onClick={() => handleDecision(postIndex, value)}
                       >
-                        {approvalLabels[value]}
+                        {isSavingDecision && decision === value ? '儲存中…' : approvalLabels[value]}
                       </button>
                     ))}
                   </div>
                 )}
                 {!isConfirmed && week.permissions?.canApprove === false ? <p className="approval-permission-note">只有 Admin 或客戶審批人可以確認</p> : null}
+                {!isConfirmed && decisionError ? (
+                  <div className="approval-decision-error" role="alert">
+                    <span>{decisionError}</span>
+                    <button
+                      type="button"
+                      disabled={isSavingDecision}
+                      onClick={() => handleDecision(postIndex, failedDecisions[postIndex])}
+                    >
+                      重試
+                    </button>
+                  </div>
+                ) : null}
                 {!isConfirmed && needsNote ? (
                   <div className="approval-note-box">
                     <textarea
@@ -2340,6 +2372,33 @@ const homeStyles = `
     font-weight: 650;
     line-height: 1.5;
     padding: 10px 12px;
+  }
+
+  .approval-decision-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 9px 11px;
+  }
+
+  .approval-decision-error button {
+    flex: 0 0 auto;
+    border: 1px solid #fca5a5;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #991b1b;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    padding: 5px 10px;
   }
 
   .approval-note-box {
