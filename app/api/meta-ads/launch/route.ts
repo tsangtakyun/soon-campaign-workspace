@@ -95,6 +95,13 @@ export async function POST(req: Request) {
     if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const authorized = await withWorkspaceAuth({ email: user.email, userId: user.id, workspaceId }, { require: 'canManageAds' }, async () => 'authorized' as const)
     if (authorized !== 'authorized') return authorized
+    if (process.env.META_APP_LIVE !== 'true') {
+      return NextResponse.json({
+        code: 'META_APP_DEVELOPMENT_MODE',
+        error: 'Meta App 尚未公開，暫時無法建立廣告。',
+        requiresAppLive: true,
+      }, { status: 409 })
+    }
 
     const launchAttemptId = input.launchAttemptId || ''
     if (!isUuid(launchAttemptId)) return NextResponse.json({ error: '建立請求識別碼無效，請關閉 wizard 後再試。' }, { status: 400 })
