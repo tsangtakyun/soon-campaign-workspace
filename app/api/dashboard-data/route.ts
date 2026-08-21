@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
     const memberQuery = supabase
       .from('workspace_members')
-      .select('id')
+      .select('id,role')
       .eq('workspace_id', workspaceId)
       .eq('status', 'active')
       .limit(1)
@@ -51,6 +51,12 @@ export async function GET(req: Request) {
     if (membershipError) throw membershipError
     if (workspace.owner_id !== user.id && !membership?.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const role = workspace.owner_id === user.id ? 'owner' : membership?.role || 'viewer'
+    const permissions = {
+      canApprove: role === 'owner' || role === 'admin' || role === 'client_approver',
+      canEdit: role === 'owner' || role === 'admin' || role === 'member',
+      canPublish: role === 'owner' || role === 'admin',
     }
 
     const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult, contentProjectsResult, reviewNotesResult] = await Promise.all([
@@ -123,6 +129,7 @@ export async function GET(req: Request) {
       posts: postsResult.data || [],
       contentProjects: contentProjectsResult.data || [],
       reviewNotes: reviewNotesResult.data || [],
+      permissions,
     })
   } catch (error) {
     console.error('[api/dashboard-data] failed', error)

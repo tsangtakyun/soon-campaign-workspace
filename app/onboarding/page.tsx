@@ -243,7 +243,10 @@ type ApprovalWeek = {
   posts: ApprovalPost[]
   whatsappPrefix: string
   workspaceId?: string | null
+  permissions?: DashboardPermissions
 }
+
+type DashboardPermissions = { canApprove: boolean; canEdit: boolean; canPublish: boolean }
 
 const approvalLabels: Record<ApprovalDecision, string> = {
   ok: '可以出',
@@ -394,7 +397,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     setDecisions((current) => current.map((item, itemIndex) => (itemIndex === index ? decision : item)))
   }
 
-  async function persistDecision(index: number, decision: ApprovalDecision) {
+  async function persistDecision(index: number, decision: ApprovalDecision, previousDecision: ApprovalDecision | null) {
     const post = week.posts[index]
     if (!post?.id || !week.workspaceId) return
 
@@ -411,6 +414,9 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
         method: 'POST',
       })
       const result = await response.json().catch(() => ({}))
+      if (response.status === 403) {
+        setDecisions((current) => current.map((item, itemIndex) => itemIndex === index ? previousDecision : item))
+      }
       if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '儲存失敗')
       showToast(decision === 'ok' ? '已儲存：可以出' : '已儲存：需要跟進')
     } catch (error) {
@@ -419,8 +425,9 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   }
 
   function handleDecision(index: number, decision: ApprovalDecision) {
+    const previousDecision = decisions[index]
     setDecision(index, decision)
-    void persistDecision(index, decision)
+    void persistDecision(index, decision, previousDecision)
   }
 
   async function deleteApprovalPost(post: ApprovalPost) {
@@ -643,7 +650,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                   </div>
                   <div className="approval-head-actions">
                     <small>{post.goal}</small>
-                    {post.id && week.workspaceId ? (
+                    {post.id && week.workspaceId && week.permissions?.canApprove !== false ? (
                       <button
                         type="button"
                         className="approval-delete-btn"
@@ -736,7 +743,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                 ) : (
                   <div className="approval-caption-block">
                     <div className="approval-caption">{captionDraft}</div>
-                    <button type="button" className="approval-caption-edit-btn" onClick={() => startCaptionEdit(post, postIndex)}>
+                    <button type="button" className="approval-caption-edit-btn" disabled={week.permissions?.canEdit === false} onClick={() => startCaptionEdit(post, postIndex)}>
                       編輯 caption
                     </button>
                   </div>
@@ -758,6 +765,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                         type="button"
                         data-value={value}
                         aria-pressed={decision === value}
+                        disabled={week.permissions?.canApprove === false}
                         onClick={() => handleDecision(postIndex, value)}
                       >
                         {approvalLabels[value]}
@@ -765,6 +773,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
                     ))}
                   </div>
                 )}
+                {!isConfirmed && week.permissions?.canApprove === false ? <p className="approval-permission-note">只有 Admin 或客戶審批人可以確認</p> : null}
                 {!isConfirmed && needsNote ? (
                   <div className="approval-note-box">
                     <textarea
@@ -808,11 +817,13 @@ function ImportedApprovalBoard({
   posts,
   workspaceId,
   reviewNotes,
+  permissions,
 }: {
   brandName: string
   posts: HomePost[]
   workspaceId: string | null
   reviewNotes: ReviewNote[]
+  permissions: DashboardPermissions
 }) {
   const approvalPosts: ApprovalPost[] = posts
     .map((post, index) => {
@@ -850,6 +861,7 @@ function ImportedApprovalBoard({
         posts: approvalPosts,
         whatsappPrefix: `【${brandName || 'Egg.soon'} × SOON】內容審批`,
         workspaceId,
+        permissions,
       }}
     />
   )
@@ -861,6 +873,7 @@ export default function OnboardingHomePage() {
   const [dashboardPosts, setDashboardPosts] = useState<HomePost[]>([])
   const [dashboardCampaigns, setDashboardCampaigns] = useState<HomeCampaign[]>([])
   const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
+  const [dashboardPermissions, setDashboardPermissions] = useState<DashboardPermissions>({ canApprove: false, canEdit: false, canPublish: false })
   const [publishedPostSummary, setPublishedPostSummary] = useState<PublishedPostSummary>({
     count: 0,
     latestTime: '',
@@ -961,6 +974,7 @@ export default function OnboardingHomePage() {
           creditsData = dashboardPayload?.credits || null
           contentProjectsData = dashboardPayload?.contentProjects || []
           setReviewNotes(Array.isArray(dashboardPayload?.reviewNotes) ? dashboardPayload.reviewNotes : [])
+          setDashboardPermissions(dashboardPayload?.permissions || { canApprove: false, canEdit: false, canPublish: false })
         } else {
           let postsQuery = supabase
             .from('campaign_posts')
@@ -1259,7 +1273,7 @@ export default function OnboardingHomePage() {
             {isBechillActive ? (
               <BechillApprovalBoard />
             ) : dashboardPosts.length ? (
-              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} reviewNotes={reviewNotes} />
+              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} reviewNotes={reviewNotes} permissions={dashboardPermissions} />
             ) : (
               <section className="workspace-empty-panel">
                 <span>SOON WORKSPACE</span>
