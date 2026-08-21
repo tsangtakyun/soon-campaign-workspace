@@ -65,6 +65,18 @@ async function handlePublishDue(req: Request) {
       if (!workspaceId) continue
 
       try {
+        const { data: claimedPost, error: claimError } = await supabase
+          .from('campaign_posts')
+          .update({ status: 'publishing', updated_at: new Date().toISOString() })
+          .eq('id', post.id)
+          .eq('workspace_id', workspaceId)
+          .in('status', ['approved', 'scheduled'])
+          .is('posted_at', null)
+          .select('id')
+          .maybeSingle()
+        if (claimError) throw claimError
+        if (!claimedPost?.id) continue
+
         const publishResult = await publishPostToConnectedPlatforms({
           baseUrl: appUrl(req),
           platforms: ['instagram', 'facebook', 'threads'],
@@ -87,12 +99,14 @@ async function handlePublishDue(req: Request) {
           published += 1
           console.log('[cron] Published:', post.id, 'to', publishResult.platforms_published)
         } else {
+          await supabase.from('campaign_posts').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
           failed += 1
           const message = publishResult.errors.map((item) => item.message).join('; ') || 'No platforms published'
           errors.push({ error: message, postId: post.id })
           console.log('[cron] Failed:', post.id, message)
         }
       } catch (error) {
+        await supabase.from('campaign_posts').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
         failed += 1
         const message = error instanceof Error ? error.message : String(error)
         errors.push({ error: message, postId: post.id })
