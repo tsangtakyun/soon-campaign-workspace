@@ -2,7 +2,7 @@ import { createAdminSupabase } from '@/lib/server-supabase'
 import { NextResponse } from 'next/server'
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'client_approver' | 'viewer'
-export type WorkspaceCapability = 'canApprove' | 'canEdit' | 'canManagePrompt' | 'canManageWorkspace'
+export type WorkspaceCapability = 'canApprove' | 'canEdit' | 'canManageAds' | 'canManagePrompt' | 'canManageWorkspace' | 'canPublish'
 
 export async function getWorkspaceAccess(input: {
   email?: string | null
@@ -19,7 +19,7 @@ export async function getWorkspaceAccess(input: {
   if (!workspace?.id) return null
 
   if (workspace.owner_id === input.userId) {
-    return { admin, canApprove: true, canEdit: true, canManagePrompt: true, canManageWorkspace: true, role: 'owner' as const, workspace }
+    return { admin, canApprove: true, canEdit: true, canManageAds: true, canManagePrompt: true, canManageWorkspace: true, canPublish: true, role: 'owner' as const, workspace }
   }
 
   let query = admin
@@ -40,8 +40,10 @@ export async function getWorkspaceAccess(input: {
     admin,
     canApprove: role === 'admin' || role === 'client_approver',
     canEdit: role === 'admin' || role === 'member',
+    canManageAds: role === 'admin',
     canManagePrompt: false,
     canManageWorkspace: role === 'admin',
+    canPublish: role === 'admin',
     role,
     workspace,
   }

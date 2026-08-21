@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { appUrl, assertWorkspaceAccess, isUuid } from '@/lib/oauth-connections'
+import { appUrl, isUuid } from '@/lib/oauth-connections'
 import { publishPostToConnectedPlatforms, shouldPublishNow } from '@/lib/post-publishing'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { withWorkspaceAuth } from '@/lib/workspace-access'
 
 export const maxDuration = 300
 
@@ -36,7 +37,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    await assertWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
+    const authorized = await withWorkspaceAuth({ email: user.email, userId: user.id, workspaceId }, { require: 'canPublish' }, async () => 'authorized' as const)
+    if (authorized !== 'authorized') return authorized
 
     const supabase = createAdminSupabase()
     const { data: post, error: postError } = await supabase
