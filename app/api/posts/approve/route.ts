@@ -10,6 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
     const postId = typeof body.postId === 'string' ? body.postId : ''
     const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : ''
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 4000) : ''
 
     if (!isUuid(postId) || !isUuid(workspaceId)) {
       return NextResponse.json({ error: 'Missing postId or workspaceId' }, { status: 400 })
@@ -37,6 +38,10 @@ export async function POST(req: Request) {
       .eq('workspace_id', workspaceId)
 
     if (error) throw error
+    if (note) {
+      const { error: noteError } = await supabase.from('review_notes').insert({ workspace_id: workspaceId, post_id: postId, original_text: note, reviewer_id: user.id, reviewer: user.email || null })
+      if (noteError) throw noteError
+    }
 
     return NextResponse.json({ success: true, status: 'approved' })
   } catch (error) {

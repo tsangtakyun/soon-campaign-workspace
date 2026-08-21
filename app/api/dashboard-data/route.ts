@@ -53,7 +53,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult] = await Promise.all([
+    const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult, contentProjectsResult, reviewNotesResult] = await Promise.all([
       supabase
         .from('campaign_posts')
         .select('id,campaign_id,title,body,post_type,scheduled_at,posted_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
@@ -81,6 +81,14 @@ export async function GET(req: Request) {
         .select('balance')
         .eq('user_id', user.id)
         .maybeSingle(),
+      supabase
+        .from('content_projects')
+        .select('id,title,selected_format,production,updated_at')
+        .eq('workspace_id', workspaceId)
+        .eq('stage', 'approval')
+        .order('updated_at', { ascending: false })
+        .limit(20),
+      supabase.from('review_notes').select('id,project_id,post_id,page_number,original_text,reviewer,created_at,resolved').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(30),
     ])
 
     console.log('[api/dashboard-data] loaded', {
@@ -96,6 +104,7 @@ export async function GET(req: Request) {
         connections: connectionsResult.error?.message || null,
         credits: creditsResult.error?.message || null,
         posts: postsResult.error?.message || null,
+        contentProjects: contentProjectsResult.error?.message || null,
       },
     })
 
@@ -112,6 +121,8 @@ export async function GET(req: Request) {
         posts: postsResult.error?.message || null,
       },
       posts: postsResult.data || [],
+      contentProjects: contentProjectsResult.data || [],
+      reviewNotes: reviewNotesResult.data || [],
     })
   } catch (error) {
     console.error('[api/dashboard-data] failed', error)

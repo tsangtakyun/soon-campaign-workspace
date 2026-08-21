@@ -26,6 +26,8 @@ type HomePost = {
   image: string | null
   media?: string[]
   status: string
+  recordType?: 'campaign_post' | 'content_project'
+  production?: Record<string, unknown>
 }
 
 type HomeCampaign = {
@@ -224,7 +226,12 @@ type ApprovalPost = {
   media: string[]
   caption: string
   note: string
+  recordType?: 'campaign_post' | 'content_project'
+  production?: Record<string, unknown>
+  reviewNote?: string
 }
+
+type ReviewNote = { id: string; project_id?: string | null; post_id?: string | null; original_text: string; reviewer?: string | null; created_at: string; resolved?: boolean }
 
 type ApprovalWeek = {
   brandLine: string
@@ -357,7 +364,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   const [decisions, setDecisions] = useState<(ApprovalDecision | null)[]>(
     () => week.posts.map(() => null)
   )
-  const [notes, setNotes] = useState(() => week.posts.map(() => ''))
+  const [notes, setNotes] = useState(() => week.posts.map((post) => post.reviewNote || ''))
   const [slides, setSlides] = useState(() => week.posts.map(() => 0))
   const [hiddenPostIds, setHiddenPostIds] = useState<string[]>([])
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null)
@@ -392,8 +399,14 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     if (!post?.id || !week.workspaceId) return
 
     try {
-      const response = await fetch(decision === 'ok' ? '/api/posts/approve' : '/api/posts/reject', {
-        body: JSON.stringify({ postId: post.id, workspaceId: week.workspaceId }),
+      const isContentProject = post.recordType === 'content_project'
+      const response = await fetch(isContentProject ? '/api/content-projects/approve' : decision === 'ok' ? '/api/posts/approve' : '/api/posts/reject', {
+        body: JSON.stringify(isContentProject ? {
+          projectId: post.id,
+          workspaceId: week.workspaceId,
+          decision: decision === 'ok' ? 'approved' : 'changes_requested',
+          note: notes[index].trim(),
+        } : { postId: post.id, workspaceId: week.workspaceId, note: notes[index].trim() }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       })
@@ -410,25 +423,28 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     void persistDecision(index, decision)
   }
 
-  async function deleteScheduledPost(post: ApprovalPost) {
+  async function deleteApprovalPost(post: ApprovalPost) {
     if (!post.id || !week.workspaceId || deletingPostId) return
-    const confirmed = window.confirm('刪除這個排程？貼文會從首頁和已排程內容移除。')
+    const confirmed = window.confirm(`確定刪除「${post.title}」？\n\n內容會由首頁及審批頁移除。`)
     if (!confirmed) return
 
     setDeletingPostId(post.id)
     try {
-      const response = await fetch('/api/posts/reject', {
-        body: JSON.stringify({ postId: post.id, workspaceId: week.workspaceId }),
+      const isContentProject = post.recordType === 'content_project'
+      const response = await fetch(isContentProject ? '/api/content-projects' : '/api/posts/reject', {
+        body: JSON.stringify(isContentProject
+          ? { projectId: post.id, workspaceId: week.workspaceId, stage: 'archived' }
+          : { postId: post.id, workspaceId: week.workspaceId }),
         headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
+        method: isContentProject ? 'PATCH' : 'POST',
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '刪除失敗')
 
       setHiddenPostIds((current) => [...current, post.id as string])
-      showToast('排程已刪除')
+      showToast('內容已刪除')
     } catch (error) {
-      showToast(error instanceof Error ? error.message : '未能刪除排程')
+      showToast(error instanceof Error ? error.message : '未能刪除內容')
     } finally {
       setDeletingPostId(null)
     }
@@ -456,13 +472,26 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
 
     setSavingCaptionPostId(key)
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('campaign_posts')
-        .update({ body: nextCaption, updated_at: new Date().toISOString() })
-        .eq('id', post.id)
-
-      if (error) throw error
+      if (post.recordType === 'content_project' && week.workspaceId) {
+        const response = await fetch('/api/content-projects', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: post.id,
+            workspaceId: week.workspaceId,
+            production: { ...(post.production || {}), captionDraft: nextCaption },
+          }),
+        })
+        const result = await response.json().catch(() => ({}))
+        if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || 'Caption 儲存失敗')
+      } else {
+        const supabase = createClient()
+        const { error } = await supabase
+          .from('campaign_posts')
+          .update({ body: nextCaption, updated_at: new Date().toISOString() })
+          .eq('id', post.id)
+        if (error) throw error
+      }
 
       post.caption = nextCaption
       setEditingCaptionPostId(null)
@@ -605,27 +634,34 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
             <article key={post.no} className={`approval-post ${decision ? `is-${decision}` : ''} ${isConfirmed ? 'is-confirmed' : ''}`}>
               <div className="approval-post-head">
                 <div className="approval-tagrow">
-                  <span className="approval-num">{post.no}</span>
+                  <span className="approval-media-icon" aria-hidden="true">
+                    <span />
+                  </span>
                   <div>
-                    <strong>
-                      {post.kind}
-                      {post.badge ? <em className={isConfirmed ? 'confirmed' : ''}>{post.badge}</em> : null}
-                    </strong>
-                    <span>{post.meta}</span>
+                    <strong>{post.kind}</strong>
+                    <span className="approval-meta">{post.meta}</span>
                   </div>
-                  <small>{post.goal}</small>
+                  <div className="approval-head-actions">
+                    <small>{post.goal}</small>
+                    {post.id && week.workspaceId ? (
+                      <button
+                        type="button"
+                        className="approval-delete-btn"
+                        disabled={deletingPostId === post.id}
+                        onClick={() => void deleteApprovalPost(post)}
+                        aria-label={`刪除內容：${post.title}`}
+                        title="刪除內容"
+                      >
+                        {deletingPostId === post.id ? <span aria-hidden="true">…</span> : (
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" />
+                          </svg>
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <h3>{post.title}</h3>
-                {post.id && week.workspaceId ? (
-                  <button
-                    type="button"
-                    className="approval-delete-btn"
-                    disabled={deletingPostId === post.id}
-                    onClick={() => void deleteScheduledPost(post)}
-                  >
-                    {deletingPostId === post.id ? '刪除中...' : '刪除排程'}
-                  </button>
-                ) : null}
               </div>
 
               <div className="approval-gallery">
@@ -771,10 +807,12 @@ function ImportedApprovalBoard({
   brandName,
   posts,
   workspaceId,
+  reviewNotes,
 }: {
   brandName: string
   posts: HomePost[]
   workspaceId: string | null
+  reviewNotes: ReviewNote[]
 }) {
   const approvalPosts: ApprovalPost[] = posts
     .map((post, index) => {
@@ -793,6 +831,9 @@ function ImportedApprovalBoard({
         media: post.media?.length ? post.media : post.image ? [post.image] : [],
         caption: post.body,
         note: '由 SOON import 流程加入，等待檢查內容、圖片及 caption。',
+        recordType: post.recordType,
+        production: post.production,
+        reviewNote: reviewNotes.find((note) => note.project_id === post.id || note.post_id === post.id)?.original_text || '',
       }
     })
     .filter((post) => post.media.length > 0)
@@ -819,6 +860,7 @@ export default function OnboardingHomePage() {
   const [brandName, setBrandName] = useState('')
   const [dashboardPosts, setDashboardPosts] = useState<HomePost[]>([])
   const [dashboardCampaigns, setDashboardCampaigns] = useState<HomeCampaign[]>([])
+  const [reviewNotes, setReviewNotes] = useState<ReviewNote[]>([])
   const [publishedPostSummary, setPublishedPostSummary] = useState<PublishedPostSummary>({
     count: 0,
     latestTime: '',
@@ -898,6 +940,7 @@ export default function OnboardingHomePage() {
         let brandKitData: any = null
         let connectionsData: any[] | null = null
         let creditsData: any = null
+        let contentProjectsData: any[] = []
         let postsError: any = null
         let campaignsError: any = null
 
@@ -916,6 +959,8 @@ export default function OnboardingHomePage() {
           brandKitData = dashboardPayload?.brandKit || null
           connectionsData = dashboardPayload?.connections || []
           creditsData = dashboardPayload?.credits || null
+          contentProjectsData = dashboardPayload?.contentProjects || []
+          setReviewNotes(Array.isArray(dashboardPayload?.reviewNotes) ? dashboardPayload.reviewNotes : [])
         } else {
           let postsQuery = supabase
             .from('campaign_posts')
@@ -991,6 +1036,30 @@ export default function OnboardingHomePage() {
 
         setPublishedPostSummary(summarizePublishedPosts(postsData))
 
+        const contentProjectPosts: HomePost[] = contentProjectsData
+          .map((project: any) => {
+            const production = project?.production && typeof project.production === 'object' ? project.production : {}
+            const generatedPages = Array.isArray(production.generatedPages) ? production.generatedPages : []
+            const media = generatedPages
+              .map((page: any) => page?.url)
+              .filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+            return {
+              id: project.id,
+              recordType: 'content_project' as const,
+              production,
+              sourceKey: `content-project-${project.id}`,
+              type: '輪播貼文',
+              typeKind: 'image' as const,
+              title: project.title || '未命名 Carousel',
+              body: typeof production.captionDraft === 'string' ? production.captionDraft : '',
+              time: formatDashboardTime(production.submittedForApprovalAt || project.updated_at),
+              image: media[0] || null,
+              media,
+              status: production.approvalStatus === 'approved' ? '已確認' : production.approvalStatus === 'changes_requested' ? '要修改' : '待審批',
+            }
+          })
+          .filter((post: HomePost) => post.media?.length)
+
         if (!postsError && postsData?.length) {
           const postsMissingImages = postsData.filter((post: any) => isPlaceholderImage(post.image_url || null))
           const firstWeekMissingImages = postsMissingImages.filter((post: any) =>
@@ -1009,8 +1078,9 @@ export default function OnboardingHomePage() {
             .slice(0, 10)
 
           hasGeneratingImagesRef.current = firstWeekMissingImages.length > 0
-          setDashboardPosts(
-            displayPosts.map((post: any, index: number) => {
+          setDashboardPosts([
+            ...contentProjectPosts,
+            ...displayPosts.map((post: any, index: number) => {
               const type = mapPostType(post.post_type)
               const media = readPostMedia(post)
               const image = isPlaceholderImage(post.image_url || null)
@@ -1026,9 +1096,10 @@ export default function OnboardingHomePage() {
                 image,
                 media,
                 status: mapPostStatus(post.status),
+                recordType: 'campaign_post' as const,
               }
-            })
-          )
+            }),
+          ].slice(0, 10))
 
           if (firstWeekMissingImages.length) {
             void (async () => {
@@ -1069,7 +1140,7 @@ export default function OnboardingHomePage() {
           }
         } else {
           hasGeneratingImagesRef.current = false
-          setDashboardPosts([])
+          setDashboardPosts(contentProjectPosts.slice(0, 10))
         }
 
         if (!campaignsError && campaignsData?.length) {
@@ -1188,7 +1259,7 @@ export default function OnboardingHomePage() {
             {isBechillActive ? (
               <BechillApprovalBoard />
             ) : dashboardPosts.length ? (
-              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} />
+              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} reviewNotes={reviewNotes} />
             ) : (
               <section className="workspace-empty-panel">
                 <span>SOON WORKSPACE</span>
@@ -1226,14 +1297,14 @@ export default function OnboardingHomePage() {
             <section className="home-aside-section">
               <h3>客戶修改紀錄</h3>
               <div className="client-record-list">
-                {isBechillActive ? (
-                  clientChangeRecords.map((item) => (
-                    <div key={`${item.date}-${item.title}`} className="client-record-item">
+                {reviewNotes.length ? (
+                  reviewNotes.map((item) => (
+                    <div key={item.id} className="client-record-item">
                       <span className="client-record-dot" aria-hidden="true" />
                       <div className="client-record-content">
-                        <span>{item.date}</span>
-                        <strong>{item.title}</strong>
-                        <p>{item.desc}</p>
+                        <span>{new Date(item.created_at).toLocaleString('zh-HK')}</span>
+                        <strong>{item.resolved ? '已處理' : '待跟進'}</strong>
+                        <p>{item.original_text}</p>
                       </div>
                     </div>
                   ))
@@ -1859,34 +1930,42 @@ const homeStyles = `
   }
 
   .approval-post-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 12px 16px;
     padding: 15px 17px 13px;
   }
 
   .approval-delete-btn {
-    border: 1px solid #ffd6d6;
-    border-radius: 14px;
-    background: #fff7f7;
-    color: #b42318;
+    border: 1px solid #e0e2e7;
+    border-radius: 50%;
+    background: #fff;
+    color: #737780;
     cursor: pointer;
     font: inherit;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 750;
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
-    width: 112px;
-    padding: 0 14px;
+    height: 40px;
+    width: 40px;
+    padding: 0;
     white-space: nowrap;
   }
 
   .approval-delete-btn:hover {
     background: #ffefef;
+    border-color: #f1b7b7;
+    color: #b42318;
+  }
+
+  .approval-delete-btn svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
   }
 
   .approval-delete-btn:disabled {
@@ -1902,67 +1981,96 @@ const homeStyles = `
     min-width: 0;
   }
 
-  .approval-num {
+  .approval-head-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+
+  .approval-media-icon {
     width: 54px;
     min-width: 54px;
     height: 54px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid #d8dbe2;
     border-radius: 16px;
-    background: linear-gradient(145deg, #2b2d33 0%, #15161a 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 18px rgba(32, 33, 38, 0.12);
-    color: #ffffff;
+    background: linear-gradient(145deg, #ffffff 0%, #f3f5f8 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 8px 18px rgba(32, 33, 38, 0.1);
     box-sizing: border-box;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 54px;
     overflow: hidden;
-    font-size: 17px;
-    font-weight: 900;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
-    line-height: 1;
-    text-align: center;
+    position: relative;
+  }
+
+  .approval-media-icon::before {
+    content: '';
+    position: absolute;
+    width: 27px;
+    height: 22px;
+    border: 2px solid #202126;
+    border-radius: 7px;
+    opacity: 0.16;
+    transform: translate(5px, 5px);
+  }
+
+  .approval-media-icon::after {
+    content: '';
+    position: absolute;
+    width: 28px;
+    height: 23px;
+    border: 2px solid #202126;
+    border-radius: 7px;
+    background: #ffffff;
+    transform: translate(-2px, -2px);
+  }
+
+  .approval-media-icon span {
+    position: relative;
+    z-index: 1;
+    width: 28px;
+    height: 23px;
+    display: block;
+  }
+
+  .approval-media-icon span::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: #202126;
+  }
+
+  .approval-media-icon span::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    bottom: 5px;
+    width: 16px;
+    height: 8px;
+    background: #202126;
+    clip-path: polygon(0 100%, 38% 30%, 58% 58%, 76% 15%, 100% 100%);
   }
 
   .approval-tagrow strong {
     display: block;
     font-size: 13px;
+    line-height: 1.15;
   }
 
-  .approval-tagrow strong em {
-    margin-left: 7px;
-    border: 1px solid #e2e3e7;
-    border-radius: 14px;
-    background: #f7f7f8;
-    color: #6f737d;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    min-height: 44px;
-    width: 112px;
-    padding: 0 14px;
-    font-size: 13px;
-    font-style: normal;
-    font-weight: 750;
-    vertical-align: middle;
-  }
-
-  .approval-tagrow strong em.confirmed {
-    border-color: #bbf7d0;
-    background: #f0fdf4;
-    color: #15803d;
-  }
-
-  .approval-tagrow span {
+  .approval-meta {
     display: block;
     color: var(--approval-muted);
     font-size: 12px;
   }
 
   .approval-tagrow small {
-    margin-left: auto;
     border-radius: 14px;
     background: #f1f2f4;
     color: #202126;
@@ -1973,13 +2081,12 @@ const homeStyles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    height: 44px;
     width: 112px;
     padding: 0 14px;
   }
 
   .approval-post h3 {
-    grid-column: 1 / -1;
     margin: 0;
     font-size: 18px;
     font-weight: 800;
@@ -2698,10 +2805,6 @@ const homeStyles = `
   @media (max-width: 980px) {
     .dashboard-page {
       grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-      display: none;
     }
 
     .home-body {

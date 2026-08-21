@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : ''
     const projectId = typeof body.projectId === 'string' ? body.projectId : ''
     const decision = body.decision === 'changes_requested' ? 'changes_requested' : 'approved'
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 4000) : ''
 
     if (!isUuid(workspaceId) || !isUuid(projectId)) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
@@ -103,6 +104,13 @@ export async function POST(req: Request) {
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
     if (updateError) throw updateError
+    if (note) {
+      const { error: noteError } = await access.admin.from('review_notes').insert({
+        workspace_id: workspaceId, project_id: projectId, original_text: note,
+        reviewer_id: user.id, reviewer: user.email || null,
+      })
+      if (noteError) throw noteError
+    }
 
     return NextResponse.json({ success: true, status: decision })
   } catch (error) {
