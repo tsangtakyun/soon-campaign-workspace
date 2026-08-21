@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { createServerSupabase } from '@/lib/server-supabase'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -25,38 +26,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createAdminSupabase()
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .select('id,owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle()
-
-    if (workspaceError) throw workspaceError
-    if (!workspace?.id) {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-    }
-
-    const memberQuery = supabase
-      .from('workspace_members')
-      .select('id,role')
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'active')
-      .limit(1)
-
-    const { data: membership, error: membershipError } = user.email
-      ? await memberQuery.or(`user_id.eq.${user.id},email.ilike.${user.email.toLowerCase()}`).maybeSingle()
-      : await memberQuery.eq('user_id', user.id).maybeSingle()
-
-    if (membershipError) throw membershipError
-    if (workspace.owner_id !== user.id && !membership?.id) {
+    const access = await getWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
+    if (!access) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    const role = workspace.owner_id === user.id ? 'owner' : membership?.role || 'viewer'
+    const supabase = access.admin
     const permissions = {
-      canApprove: role === 'owner' || role === 'admin' || role === 'client_approver',
-      canEdit: role === 'owner' || role === 'admin' || role === 'member',
-      canPublish: role === 'owner' || role === 'admin',
+      canApprove: access.canApprove,
+      canEdit: access.canEdit,
+      canPublish: access.canPublish,
     }
 
     const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult, contentProjectsResult, reviewNotesResult] = await Promise.all([
