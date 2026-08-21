@@ -29,6 +29,19 @@ async function handlePublishDue(req: Request) {
   const now = new Date().toISOString()
 
   try {
+    const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    const { data: recoveredPosts, error: recoveryError } = await supabase
+      .from('campaign_posts')
+      .update({ status: 'approved', publishing_started_at: null, updated_at: new Date().toISOString() })
+      .eq('status', 'publishing')
+      .lt('publishing_started_at', staleBefore)
+      .is('posted_at', null)
+      .select('id')
+    if (recoveryError) throw recoveryError
+    for (const recovered of recoveredPosts || []) {
+      console.warn('[posts/publish-due] recovered stale publishing lease', { postId: recovered.id })
+    }
+
     const { data: connectionWorkspaces, error: connectionWorkspaceError } = await supabase
       .from('social_connections')
       .select('workspace_id')
@@ -74,7 +87,7 @@ async function handlePublishDue(req: Request) {
       try {
         const { data: claimedPost, error: claimError } = await supabase
           .from('campaign_posts')
-          .update({ status: 'publishing', updated_at: new Date().toISOString() })
+          .update({ status: 'publishing', publishing_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('id', post.id)
           .eq('workspace_id', workspaceId)
           .in('status', ['approved', 'scheduled'])
@@ -98,6 +111,7 @@ async function handlePublishDue(req: Request) {
             .update({
               posted_at: new Date().toISOString(),
               status: 'published',
+              publishing_started_at: null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', post.id)
@@ -106,14 +120,14 @@ async function handlePublishDue(req: Request) {
           published += 1
           console.log('[cron] Published:', post.id, 'to', publishResult.platforms_published)
         } else {
-          await supabase.from('campaign_posts').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
+          await supabase.from('campaign_posts').update({ status: 'approved', publishing_started_at: null, updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
           failed += 1
           const message = publishResult.errors.map((item) => item.message).join('; ') || 'No platforms published'
           errors.push({ error: message, postId: post.id })
           console.log('[cron] Failed:', post.id, message)
         }
       } catch (error) {
-        await supabase.from('campaign_posts').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
+        await supabase.from('campaign_posts').update({ status: 'approved', publishing_started_at: null, updated_at: new Date().toISOString() }).eq('id', post.id).eq('status', 'publishing')
         failed += 1
         const message = error instanceof Error ? error.message : String(error)
         errors.push({ error: message, postId: post.id })
