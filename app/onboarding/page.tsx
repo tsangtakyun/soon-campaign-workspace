@@ -173,6 +173,8 @@ function mapPostStatus(status: unknown) {
   if (status === 'scheduled') return '已排程'
   if (status === 'published' || status === 'posted') return '已發布'
   if (status === 'rejected') return '要修改'
+  if (status === 'withdrawn') return '已撤回'
+  if (status === 'publishing') return '發布中'
   return status === 'draft' ? '草稿' : '新內容'
 }
 
@@ -1082,7 +1084,7 @@ export default function OnboardingHomePage() {
           const displayPosts = postsData
             .filter((post: any) => {
               const sourceKey = String(post.source_key || '')
-              if (post.status === 'published' || post.status === 'posted' || post.status === 'rejected') return false
+              if (['published', 'posted', 'rejected', 'withdrawn', 'publishing'].includes(post.status)) return false
               return (
                 sourceKey.startsWith('campaign-1-') ||
                 !isPlaceholderImage(post.image_url || null) ||

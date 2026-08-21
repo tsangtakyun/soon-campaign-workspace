@@ -92,9 +92,11 @@ export async function POST(req: Request) {
     } else {
       const { error: withdrawError } = await access.admin
         .from('campaign_posts')
-        .update({ approved_at: null, scheduled_at: null, status: 'draft', updated_at: now })
+        .update({ approved_at: null, scheduled_at: null, status: 'withdrawn', updated_at: now })
         .eq('workspace_id', workspaceId)
         .eq('source_key', `content-project-${projectId}`)
+        .is('posted_at', null)
+        .in('status', ['approved', 'scheduled', 'draft', 'ready', 'pending_approval', 'rejected', 'publishing'])
       if (withdrawError) throw withdrawError
     }
 
