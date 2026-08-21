@@ -10,7 +10,11 @@ export const maxDuration = 300
 function isAuthorizedCronRequest(req: Request) {
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization')
-  if (!secret || !authorization?.startsWith('Bearer ')) return false
+  if (!secret) {
+    console.error('[posts/publish-due] CRON_SECRET is not configured; scheduled publishing is disabled')
+    return false
+  }
+  if (!authorization?.startsWith('Bearer ')) return false
   const supplied = Buffer.from(authorization.slice(7))
   const expected = Buffer.from(secret)
   return supplied.length === expected.length && timingSafeEqual(supplied, expected)
