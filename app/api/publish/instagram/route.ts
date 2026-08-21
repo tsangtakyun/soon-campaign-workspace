@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { assertWorkspaceAccess, isUuid } from '@/lib/oauth-connections'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 function readGraphError(value: unknown) {
@@ -13,15 +14,16 @@ function readGraphError(value: unknown) {
 
 export async function POST(req: Request) {
   try {
-    const { caption, imageUrl, postId, sessionId } = (await req.json()) as {
+    const { caption, imageUrl, postId, sessionId, workspaceId } = (await req.json()) as {
       caption?: string
       imageUrl?: string
       postId?: string
       sessionId?: string
+      workspaceId?: string
     }
 
-    if (!imageUrl || !caption) {
-      return NextResponse.json({ error: 'Missing imageUrl or caption' }, { status: 400 })
+    if (!imageUrl || !caption || (sessionId ? !isUuid(sessionId) || !isUuid(postId || '') : !isUuid(workspaceId || ''))) {
+      return NextResponse.json({ error: 'Missing imageUrl, caption or workspaceId' }, { status: 400 })
     }
 
     const supabase = createAdminSupabase()
@@ -35,9 +37,35 @@ export async function POST(req: Request) {
       .eq('platform', 'instagram')
 
     if (sessionId) {
-      connectionQuery = connectionQuery.eq('onboarding_session_id', sessionId)
-    } else if (user?.id) {
-      connectionQuery = connectionQuery.eq('user_id', user.id)
+      const { data: anonymousConnection } = await supabase
+        .from('social_connections')
+        .select('id,user_id,connected_at')
+        .eq('platform', 'instagram')
+        .eq('onboarding_session_id', sessionId)
+        .is('user_id', null)
+        .maybeSingle()
+      const connectedAt = anonymousConnection?.connected_at ? new Date(anonymousConnection.connected_at).getTime() : 0
+      if (!anonymousConnection?.id || !connectedAt || Date.now() - connectedAt > 24 * 60 * 60 * 1000) {
+        return NextResponse.json({ error: 'Invalid or expired onboarding session' }, { status: 401 })
+      }
+      const { data: sessionPost } = await supabase
+        .from('campaign_posts')
+        .select('id')
+        .eq('id', postId)
+        .eq('onboarding_session_id', sessionId)
+        .is('user_id', null)
+        .maybeSingle()
+      if (!sessionPost?.id) return NextResponse.json({ error: 'Post does not belong to onboarding session' }, { status: 401 })
+      const { count: publishCount } = await supabase
+        .from('campaign_posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('onboarding_session_id', sessionId)
+        .in('status', ['posted', 'published'])
+      if ((publishCount || 0) >= 3) return NextResponse.json({ error: 'Onboarding publish limit reached' }, { status: 429 })
+      connectionQuery = connectionQuery.eq('onboarding_session_id', sessionId).is('user_id', null)
+    } else if (user?.id && workspaceId) {
+      await assertWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
+      connectionQuery = connectionQuery.eq('workspace_id', workspaceId)
     } else {
       return NextResponse.json({ error: 'Missing onboarding session' }, { status: 400 })
     }
@@ -124,6 +152,7 @@ export async function POST(req: Request) {
         .from('campaign_posts')
         .select('captions')
         .eq('id', postId)
+        .eq('workspace_id', workspaceId)
         .maybeSingle()
       const captions =
         existingPost?.captions && typeof existingPost.captions === 'object' && !Array.isArray(existingPost.captions)
@@ -152,6 +181,7 @@ export async function POST(req: Request) {
           status: 'posted',
         })
         .eq('id', postId)
+        .eq('workspace_id', workspaceId)
     }
 
     return NextResponse.json({
