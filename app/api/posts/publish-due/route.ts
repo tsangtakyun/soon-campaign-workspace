@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 
 import { appUrl } from '@/lib/oauth-connections'
 import { publishPostToConnectedPlatforms } from '@/lib/post-publishing'
@@ -9,8 +10,10 @@ export const maxDuration = 300
 function isAuthorizedCronRequest(req: Request) {
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization')
-  const isVercelCron = req.headers.get('x-vercel-cron') === '1'
-  return Boolean((secret && authorization === `Bearer ${secret}`) || isVercelCron)
+  if (!secret || !authorization?.startsWith('Bearer ')) return false
+  const supplied = Buffer.from(authorization.slice(7))
+  const expected = Buffer.from(secret)
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected)
 }
 
 async function handlePublishDue(req: Request) {
