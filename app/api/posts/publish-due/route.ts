@@ -34,7 +34,7 @@ async function handlePublishDue(req: Request) {
       .from('campaign_posts')
       .update({ status: 'approved', publishing_started_at: null, updated_at: new Date().toISOString() })
       .eq('status', 'publishing')
-      .lt('publishing_started_at', staleBefore)
+      .or(`publishing_started_at.is.null,publishing_started_at.lt.${staleBefore}`)
       .is('posted_at', null)
       .select('id')
     if (recoveryError) throw recoveryError
@@ -85,16 +85,26 @@ async function handlePublishDue(req: Request) {
       if (!workspaceId) continue
 
       try {
-        const { data: claimedPost, error: claimError } = await supabase
-          .from('campaign_posts')
-          .update({ status: 'publishing', publishing_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-          .eq('id', post.id)
-          .eq('workspace_id', workspaceId)
-          .in('status', ['approved', 'scheduled'])
-          .is('posted_at', null)
-          .select('id')
-          .maybeSingle()
-        if (claimError) throw claimError
+        let claimedPost: { id: string } | null = null
+        try {
+          const { data, error: claimError } = await supabase
+            .from('campaign_posts')
+            .update({ status: 'publishing', publishing_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', post.id)
+            .eq('workspace_id', workspaceId)
+            .in('status', ['approved', 'scheduled'])
+            .is('posted_at', null)
+            .select('id')
+            .maybeSingle()
+          if (claimError) throw claimError
+          claimedPost = data
+        } catch (claimError) {
+          console.error('[posts/publish-due] failed to claim post; verify publishing lease migration was applied before deployment', {
+            error: claimError instanceof Error ? claimError.message : String(claimError),
+            postId: post.id,
+          })
+          throw claimError
+        }
         if (!claimedPost?.id) continue
 
         const publishResult = await publishPostToConnectedPlatforms({
