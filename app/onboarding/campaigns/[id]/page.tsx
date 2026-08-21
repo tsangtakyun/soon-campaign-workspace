@@ -900,10 +900,6 @@ const campaignDetailStyles = `
       grid-template-columns: 1fr;
     }
 
-    .sidebar {
-      display: none;
-    }
-
     .campaign-post-row {
       grid-template-columns: 1fr;
     }

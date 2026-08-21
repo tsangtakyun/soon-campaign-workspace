@@ -67,19 +67,37 @@ export async function GET() {
     })
 
     const workspaceIds = Array.from(workspaceMap.keys())
+    const roleByWorkspace = new Map<string, string>()
+    ;[...(userMemberships ?? []), ...(emailMemberships ?? [])].forEach((membership: any) => {
+      if (membership.workspace_id && membership.role) roleByWorkspace.set(membership.workspace_id, membership.role)
+    })
+    ;(ownedWorkspaces ?? []).forEach((workspace: any) => {
+      if (workspace?.id) roleByWorkspace.set(workspace.id, 'owner')
+    })
     const { data: brandKits, error: brandKitsError } = workspaceIds.length
       ? await supabase
           .from('brand_kits')
-          .select('workspace_id,business_name')
+          .select('workspace_id,business_name,logo_url')
           .in('workspace_id', workspaceIds)
       : { data: [], error: null }
 
     const brandByWorkspace = new Map<string, string>()
+    const brandLogoByWorkspace = new Map<string, string>()
     brandKits?.forEach((kit: any) => {
       if (kit.workspace_id && kit.business_name) {
         brandByWorkspace.set(kit.workspace_id, kit.business_name)
       }
+      if (kit.workspace_id && kit.logo_url) brandLogoByWorkspace.set(kit.workspace_id, kit.logo_url)
     })
+
+    const { data: workspaceProfiles } = workspaceIds.length
+      ? await supabase
+          .from('workspace_profiles')
+          .select('workspace_id,logo_url,prompt_profile_key')
+          .in('workspace_id', workspaceIds)
+      : { data: [] }
+    const profileByWorkspace = new Map<string, any>()
+    workspaceProfiles?.forEach((profile: any) => profileByWorkspace.set(profile.workspace_id, profile))
 
     const workspaces = Array.from(workspaceMap.values())
       .sort((a, b) => {
@@ -92,6 +110,9 @@ export async function GET() {
         name: workspace.name || '未命名工作台',
         brandName: brandByWorkspace.get(workspace.id) || workspace.name || null,
         description: workspace.description || null,
+        logoUrl: profileByWorkspace.get(workspace.id)?.logo_url || brandLogoByWorkspace.get(workspace.id) || null,
+        promptProfileKey: profileByWorkspace.get(workspace.id)?.prompt_profile_key || null,
+        role: roleByWorkspace.get(workspace.id) || null,
       }))
 
     console.log('[api/workspaces] debug', {

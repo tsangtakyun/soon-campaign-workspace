@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
+import { MetaAdsWizard } from '@/components/meta-ads/MetaAdsWizard'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
 import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
 
@@ -28,15 +29,6 @@ type MetaAdsPayload = {
   posts?: DashboardPost[]
 }
 
-type CampaignRow = {
-  budget: string
-  costPerResult: string
-  name: string
-  results: string
-  spent: string
-  status: '準備中' | '等待 Meta 權限' | '可建立'
-}
-
 function normalizeAccountName(value?: string | null) {
   if (!value) return '尚未連接'
   return value.startsWith('@') ? value : value.includes('.') ? `@${value}` : value
@@ -55,43 +47,33 @@ function MetaIcon() {
   )
 }
 
-function buildCampaignRows(posts: DashboardPost[], businessName: string): CampaignRow[] {
-  const readyPosts = posts.filter((post) => post.status === 'approved' || post.status === 'scheduled' || post.status === 'ready')
-  const publishedPosts = posts.filter((post) => post.status === 'published' || post.status === 'posted')
-
-  return [
-    {
-      budget: 'HK$80 / day',
-      costPerResult: '待同步',
-      name: `${businessName} 內容互動推廣`,
-      results: `${readyPosts.length || 1} 條內容可測試`,
-      spent: 'HK$0',
-      status: '等待 Meta 權限',
-    },
-    {
-      budget: 'HK$120 / day',
-      costPerResult: '待同步',
-      name: `${businessName} 新受眾測試`,
-      results: '3 組受眾草稿',
-      spent: 'HK$0',
-      status: '準備中',
-    },
-    {
-      budget: 'HK$100 / day',
-      costPerResult: publishedPosts.length ? '待 Meta 回傳' : '未開始',
-      name: `${businessName} 已發布內容再行銷`,
-      results: `${publishedPosts.length} 條已發布內容`,
-      spent: 'HK$0',
-      status: publishedPosts.length ? '可建立' : '準備中',
-    },
-  ]
-}
-
 export default function MetaAdsPage() {
   const router = useRouter()
   const [payload, setPayload] = useState<MetaAdsPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [workspaceId, setWorkspaceId] = useState('')
+  const [showWizard, setShowWizard] = useState(false)
+
+  async function openWizard() {
+    setError(null)
+    if (workspaceId) {
+      setShowWizard(true)
+      return
+    }
+
+    // The onboarding claim and this page can finish loading in either order.
+    // Resolve once more at click time instead of leaving a permanently disabled
+    // button when the workspace becomes available a moment later.
+    const resolved = await resolveActiveWorkspace().catch(() => null)
+    if (resolved?.workspaceId) {
+      setWorkspaceId(resolved.workspaceId)
+      setShowWizard(true)
+      return
+    }
+
+    setError('未能找到可用工作台。請先返回首頁完成工作台設定，然後再建立廣告活動。')
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +84,7 @@ export default function MetaAdsPage() {
 
       try {
         const { workspaceId } = await resolveActiveWorkspace()
+        if (!cancelled) setWorkspaceId(workspaceId || '')
         if (!workspaceId) {
           if (!cancelled) setPayload({ connections: [], posts: [] })
           return
@@ -137,12 +120,10 @@ export default function MetaAdsPage() {
   }, [])
 
   const connections = payload?.connections || []
-  const posts = payload?.posts || []
   const businessName = payload?.brandKit?.business_name || '目前工作台'
   const facebookConnection = connections.find((connection) => connection.platform === 'facebook')
   const instagramConnection = connections.find((connection) => connection.platform === 'instagram')
   const hasMetaConnection = Boolean(facebookConnection || instagramConnection)
-  const campaignRows = useMemo(() => buildCampaignRows(posts, businessName), [businessName, posts])
 
   return (
     <main className="dashboard-page">
@@ -153,7 +134,7 @@ export default function MetaAdsPage() {
         <header className="meta-ads-topbar">
           <div>
             <h1>Meta Ads</h1>
-            <span>準備推廣內容、設定預算，之後接駁 Meta Ads API 後即可正式投放。</span>
+            <span>連接真實 Meta Ad Account、建立 Campaign、素材及受眾設定。</span>
           </div>
           <button type="button" onClick={() => router.push('/onboarding/integrations')}>
             管理連接
@@ -174,20 +155,20 @@ export default function MetaAdsPage() {
               <section className="meta-hero">
                 <div>
                   <span className="eyebrow">PAID ADS WORKSPACE</span>
-                  <h2>{businessName} 廣告推廣準備中</h2>
+                  <h2>{businessName} Meta Ads</h2>
                   <p>
                     {hasMetaConnection
                       ? `已連接 ${facebookConnection ? 'Facebook' : 'Instagram'}：${normalizeAccountName(
                           facebookConnection?.account_name || instagramConnection?.account_name,
-                        )}。Meta 廣告權限批核後，這裡會用來建立 campaign、設定預算及追蹤成效。`
-                      : '尚未連接 Meta 帳戶。先到整合頁連接 Facebook / Instagram，之後便可把已確認內容轉成廣告草稿。'}
+                        )}。建立流程會即時檢查 Ad Account、Page、Instagram 及 ads_management 權限。`
+                      : '尚未連接 Meta 帳戶。開始建立流程後會引導你完成 Meta Ads 授權。'}
                   </p>
                 </div>
                 <div className={hasMetaConnection ? 'meta-status-card connected' : 'meta-status-card'}>
                   <MetaIcon />
                   <div>
                     <strong>{hasMetaConnection ? 'Meta 已連接' : 'Meta 未連接'}</strong>
-                    <span>{hasMetaConnection ? '等待廣告投放權限' : '需要先連接帳戶'}</span>
+                    <span>{hasMetaConnection ? '建立時會驗證 Ads 權限' : '需要先連接帳戶'}</span>
                   </div>
                   <button type="button" onClick={() => router.push('/onboarding/integrations')}>
                     {hasMetaConnection ? '查看連接' : '立即連接'}
@@ -203,27 +184,27 @@ export default function MetaAdsPage() {
                 </div>
                 <div>
                   <span>2</span>
-                  <strong>選擇內容</strong>
-                  <em>由已確認貼文建立廣告</em>
+                  <strong>目的與主題</strong>
+                  <em>目標、網址、Campaign Topic</em>
                 </div>
                 <div>
                   <span>3</span>
-                  <strong>設定預算</strong>
-                  <em>每日預算、受眾、日期</em>
+                  <strong>選擇素材</strong>
+                  <em>最多 5 個已審批內容</em>
                 </div>
                 <div>
                   <span>4</span>
-                  <strong>等待批核</strong>
-                  <em>Meta Ads API 權限</em>
+                  <strong>建立到 Meta</strong>
+                  <em>Campaign、Ad Set、Creative、Ad</em>
                 </div>
               </section>
 
               <section className="meta-banner">
                 <div>
-                  <strong>自動測試廣告草稿</strong>
-                  <p>SOON 之後可以根據已確認內容建立 challenger ads，低表現素材會暫停，高表現素材會被保留作下一輪推廣。</p>
+                  <strong>真實 Meta Marketing API</strong>
+                  <p>SOON 會將選定素材真正建立到 Meta；新 Campaign 預設為 PAUSED，確認後才開始投放及扣款。</p>
                 </div>
-                <span>暫未開放</span>
+                <span>安全模式</span>
               </section>
 
               <section className="meta-panel">
@@ -232,7 +213,7 @@ export default function MetaAdsPage() {
                     <span>CAMPAIGNS</span>
                     <h3>廣告活動草稿</h3>
                   </div>
-                  <button type="button" disabled>
+                  <button type="button" onClick={() => void openWizard()}>
                     ＋ 建立廣告活動
                   </button>
                 </div>
@@ -250,23 +231,11 @@ export default function MetaAdsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {campaignRows.map((campaign) => (
-                        <tr key={campaign.name}>
-                          <td>
-                            <span className={`status-pill ${campaign.status === '可建立' ? 'ready' : ''}`}>{campaign.status}</span>
-                          </td>
-                          <td>
-                            <div className="campaign-name">
-                              <MetaIcon />
-                              <strong>{campaign.name}</strong>
-                            </div>
-                          </td>
-                          <td>{campaign.budget}</td>
-                          <td>{campaign.spent}</td>
-                          <td>{campaign.results}</td>
-                          <td>{campaign.costPerResult}</td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', color: '#7b7f88', padding: '42px 20px' }}>
+                          暫未有已同步 Campaign。按「建立廣告活動」開始真實 Meta 建立流程。
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -325,6 +294,7 @@ export default function MetaAdsPage() {
           )}
         </div>
       </section>
+      {showWizard && workspaceId ? <MetaAdsWizard workspaceId={workspaceId} onClose={() => setShowWizard(false)} /> : null}
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${metaAdsStyles}` }} />
     </main>

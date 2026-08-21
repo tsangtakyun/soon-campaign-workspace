@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
@@ -17,6 +18,7 @@ type ReferenceIdea = {
   id: string
   title: string
   source: string
+  url?: string
   image: string
   height: 'short' | 'medium' | 'tall'
   category: string
@@ -112,74 +114,114 @@ const bechillReferenceIdeas: ReferenceIdea[] = [
 
 const eggReferenceIdeas: ReferenceIdea[] = [
   {
-    id: 'egg-trending-city',
-    title: '城市熱話用 Egg.soon 角度拆解',
-    source: 'Egg.soon brainstorm',
-    image: '/assets/content-strategies/photos/trend-hijacking.jpg',
+    id: 'aday-police-cat-amsterdam',
+    title: '阿姆斯特丹「社區警貓」有新搭檔',
+    source: 'A Day Magazine · 2026.08.07',
+    url: 'https://www.adaymag.com/2026/08/07/police-cat-amsterdam.html',
+    image: '/topic-library/police-cat-amsterdam.jpg',
+    height: 'tall',
+    category: 'Trending 最新資訊',
+    tags: ['動物趣聞', '阿姆斯特丹', '社群熱話'],
+    note: '住在船屋的黑貓 Nimis 因穿上黃色 POLICE 救生衣巡邏而爆紅，現在更迎來黑貓妹妹 Boef，一起延續可愛的社區警貓故事。',
+  },
+  {
+    id: 'aday-il-sonno-stone-supermarket',
+    title: '米蘭期間限定「大理石超市」',
+    source: 'A Day Magazine · 2026.06.19',
+    url: 'https://www.adaymag.com/2026/06/19/il-sonno-stone-supermarket.html',
+    image: '/topic-library/il-sonno-stone-supermarket.jpg',
     height: 'medium',
     category: 'Trending 最新資訊',
-    tags: ['hot topic', '快訊', '懶人包'],
-    note: '將近期網絡熱話變成易讀重點，先講事件，再加一個 SOON 式觀察角度。',
+    tags: ['設計藝術', '米蘭設計週', '永續'],
+    note: 'Solid Nature 與 AMO 把剩餘天然石材雕成香蕉、三明治等超市商品，以 Il Sonno Supermarket 反思快速消費與物件價值。',
   },
   {
-    id: 'egg-entertainment-watchlist',
-    title: '一週娛樂 watchlist',
-    source: 'Entertainment scan',
-    image: '/assets/content-strategies/photos/community-content.jpg',
-    height: 'tall',
-    category: 'Entertainment 娛樂資訊',
-    tags: ['劇集', '電影', '社交話題'],
-    note: '整理近期值得留意的劇集、電影、節目或平台內容，適合做 carousel。',
+    id: 'instagram-sleep-wind-down',
+    title: '睡不着不是不夠累：睡前先讓身體慢慢關機',
+    source: 'Instagram · @lilia0730000 · 2026.08.12',
+    url: 'https://www.instagram.com/p/Db8Zw0qE0ay/?img_index=6',
+    image: '/topic-library/sleep-wind-down.jpg',
+    height: 'medium',
+    category: 'Trending 最新資訊',
+    tags: ['睡眠', '生活健康', '互動貼文'],
+    note: '很累但仍然睡不着時，越逼自己入睡反而越清醒；可用「睡前關機」切入，再以留言關鍵字提供舒眠飲食清單。',
   },
   {
-    id: 'egg-celebrity-profile',
-    title: '人物介紹：由一個細節認識名人',
-    source: 'Profile angle',
-    image: '/assets/content-strategies/photos/lifestyle-content.jpg',
+    id: 'instagram-buton-blue-eyes',
+    title: '印尼布頓族罕見的藍色眼睛',
+    source: 'Instagram · @moo.magazine · 2026.08.12',
+    url: 'https://www.instagram.com/p/Db7ypoaj85V/?img_index=5',
+    image: '/topic-library/buton-blue-eyes.jpg',
     height: 'short',
-    category: 'Celebrity 人物介紹',
-    tags: ['人物故事', '背景資料', 'timeline'],
-    note: '不是單純報導，而是用一個行為、造型或訪問片段切入，建立人物記憶點。',
+    category: 'Trending 最新資訊',
+    tags: ['印尼文化', '罕見基因', '人物攝影'],
+    note: '印尼布頓族部分族人因 Waardenburg Syndrome 擁有亮藍色眼睛，攝影師 Korchnoi Pasaribu 透過肖像記錄這種罕見特徵與族群故事。',
   },
   {
-    id: 'egg-travel-pocket-guide',
-    title: '旅遊資訊做成收藏型 mini guide',
-    source: 'Travel reference',
-    image: '/assets/content-strategies/photos/series-content.jpg',
+    id: 'instagram-spiderman-lizard',
+    title: '大自然設計的「蜘蛛人蜥蜴」',
+    source: 'Instagram · @moo.magazine · 2026.08.04',
+    url: 'https://www.instagram.com/p/DbpxE6FD64e/',
+    image: '/topic-library/spiderman-lizard.jpg',
+    height: 'medium',
+    category: 'Trending 最新資訊',
+    tags: ['動物趣聞', '東非', '自然科普'],
+    note: '東非的平頭岩蜥在繁殖季會呈現鮮紅與電光藍配色，外形酷似蜘蛛俠；雄性亦會以亮色吸引伴侶及震懾對手。',
+  },
+  {
+    id: 'instagram-sweden-icehotel',
+    title: '每年春天都會消失的瑞典 ICEHOTEL',
+    source: 'Instagram · @junpin_design · 2026.07.23',
+    url: 'https://www.instagram.com/p/DbvA-XZkXLX/',
+    image: '/topic-library/sweden-icehotel.jpg',
     height: 'tall',
     category: 'Travel 旅遊資訊',
-    tags: ['目的地', '打卡', 'save'],
-    note: '用地點、交通、預算、適合人群做快速整理，重點係令人想 save 起。',
+    tags: ['瑞典', '冰旅館', '建築設計'],
+    note: '瑞典 Jukkasjärvi 的 ICEHOTEL 每年冬天以托爾訥河冰塊重建，春天再融回河流；不同藝術家每年打造全新的限定房間。',
   },
   {
-    id: 'egg-relationship-question',
-    title: 'Relationship 討論題：一句問題帶出留言',
-    source: 'Relationship prompt',
-    image: '/assets/content-strategies/photos/problem-solution.jpg',
-    height: 'medium',
-    category: '兩性關係 relationship',
-    tags: ['互動', '留言', '情感觀察'],
-    note: '用「你會唔會...」或「你點睇...」切入，保持輕鬆但有討論空間。',
-  },
-  {
-    id: 'egg-entertainment-moment',
-    title: '娛樂事件的三個看點',
-    source: 'Newsroom format',
-    image: '/assets/content-strategies/photos/behind-the-scenes.jpg',
+    id: 'instagram-masayuki-oki-cats',
+    title: '專拍貓咪失態瞬間的攝影師沖昌之',
+    source: 'Instagram · @moom.cat · 2026.08.03',
+    url: 'https://www.instagram.com/p/Dbk8HF7DHYn/',
+    image: '/topic-library/masayuki-oki-cats.jpg',
     height: 'short',
-    category: 'Entertainment 娛樂資訊',
-    tags: ['3 points', '快讀', 'IG post'],
-    note: '適合快速追蹤新歌、活動、紅毯、節目片段，用三點式降低閱讀成本。',
+    category: 'Celebrity 人物介紹',
+    tags: ['貓咪攝影', '沖昌之', '街頭文化'],
+    note: '日本攝影師沖昌之以貓的視線高度拍攝街貓，捕捉打呵欠、扭動和突發失態的真實瞬間，靠耐心建立信任後才按下快門。',
+  },
+  {
+    id: 'instagram-three-second-rule',
+    title: '食物跌落地，三秒內執起真的可以吃嗎？',
+    source: 'Instagram · @wisdomkingdom_hk · 2026.06.23',
+    url: 'https://www.instagram.com/p/DZ7UdWggTjd/',
+    image: '/topic-library/three-second-rule.jpg',
+    height: 'medium',
+    category: 'Trending 最新資訊',
+    tags: ['冷知識', '食物科學', '三秒定律'],
+    note: '研究以不同食物、地面及接觸時間進行超過 2,500 次測試，發現細菌幾乎即時轉移；食物水分與地面材質往往比「三秒」更關鍵。',
   },
 ]
 
 export default function CampaignsPage() {
+  const router = useRouter()
   const [activeFilter, setActiveFilter] = useState('全部')
   const [query, setQuery] = useState('')
   const [reactions, setReactions] = useState<Record<string, Reaction | undefined>>({})
   const [isBechillActive, setIsBechillActive] = useState(false)
   const [isEggActive, setIsEggActive] = useState(false)
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
+  const [canStartContent, setCanStartContent] = useState(false)
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
+  const [masonryColumnCount, setMasonryColumnCount] = useState(4)
+  const [userIdeas, setUserIdeas] = useState<ReferenceIdea[]>([])
+  const [ideaUrl, setIdeaUrl] = useState('')
+  const [importingIdea, setImportingIdea] = useState(false)
+  const [importMessage, setImportMessage] = useState('')
+  const [dismissedIdeaIds, setDismissedIdeaIds] = useState<string[]>([])
+  const [pendingDelete, setPendingDelete] = useState<ReferenceIdea | null>(null)
+  const [deletingIdea, setDeletingIdea] = useState(false)
+  const [creatingProjectId, setCreatingProjectId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -187,15 +229,67 @@ export default function CampaignsPage() {
     async function loadWorkspace() {
       if (!cancelled) setWorkspaceLoading(true)
       try {
-        const { activeWorkspace } = await resolveActiveWorkspace()
+        const { activeWorkspace, workspaceId } = await resolveActiveWorkspace()
         if (!cancelled) {
           setIsBechillActive(isBechillWorkspace(activeWorkspace))
           setIsEggActive(isEggWorkspace(activeWorkspace))
+          setActiveWorkspaceId(workspaceId)
+          setCanStartContent(activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin')
+          if (workspaceId) {
+            const legacyKey = `soon-topic-library-user-ideas:${workspaceId}`
+            const globalLegacyKey = 'soon-topic-library-user-ideas'
+            let legacyIdeas: ReferenceIdea[] = []
+            let migrationSucceeded = false
+            try {
+              const scoped = JSON.parse(window.localStorage.getItem(legacyKey) || '[]')
+              const global = JSON.parse(window.localStorage.getItem(globalLegacyKey) || '[]')
+              legacyIdeas = [...(Array.isArray(scoped) ? scoped : []), ...(Array.isArray(global) ? global : [])]
+                .filter((idea, index, items) => idea?.url && items.findIndex((item) => item.url === idea.url) === index)
+              if (legacyIdeas.length > 0) {
+                const migrationResponses = await Promise.all(
+                  legacyIdeas.map((idea) =>
+                    fetch('/api/workspace-topic-ideas', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ workspaceId, idea }),
+                    })
+                  )
+                )
+                migrationSucceeded = migrationResponses.every((response) => response.ok)
+                if (migrationSucceeded) {
+                  window.localStorage.removeItem(legacyKey)
+                  window.localStorage.removeItem(globalLegacyKey)
+                }
+              }
+            } catch {
+              migrationSucceeded = false
+            }
+            const ideasResponse = await fetch(
+              `/api/workspace-topic-ideas?workspaceId=${encodeURIComponent(workspaceId)}`,
+              { cache: 'no-store' }
+            )
+            const ideasPayload = await ideasResponse.json().catch(() => null)
+            if (!ideasResponse.ok) throw new Error(ideasPayload?.error || '未能載入 workspace 題材')
+            if (!cancelled) {
+              const sharedIdeas = Array.isArray(ideasPayload?.ideas) ? ideasPayload.ideas : []
+              setDismissedIdeaIds(
+                Array.isArray(ideasPayload?.dismissedIdeaIds) ? ideasPayload.dismissedIdeaIds : []
+              )
+              setUserIdeas(
+                migrationSucceeded
+                  ? sharedIdeas
+                  : [...sharedIdeas, ...legacyIdeas.filter((idea) => !sharedIdeas.some((shared: ReferenceIdea) => shared.url === idea.url))]
+              )
+            }
+          } else {
+            setUserIdeas([])
+          }
         }
       } catch {
         if (!cancelled) {
           setIsBechillActive(false)
           setIsEggActive(false)
+          setCanStartContent(false)
         }
       } finally {
         if (!cancelled) setWorkspaceLoading(false)
@@ -215,14 +309,27 @@ export default function CampaignsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    function updateColumnCount() {
+      const width = window.innerWidth
+      setMasonryColumnCount(width <= 520 ? 1 : width <= 860 ? 2 : width <= 1180 ? 3 : 4)
+    }
+
+    updateColumnCount()
+    window.addEventListener('resize', updateColumnCount)
+    return () => window.removeEventListener('resize', updateColumnCount)
+  }, [])
+
   const filters = workspaceLoading ? ['全部'] : isEggActive ? eggFilters : bechillFilters
-  const referenceIdeas = workspaceLoading
+  const baseReferenceIdeas = workspaceLoading
     ? []
     : isEggActive
       ? eggReferenceIdeas
       : isBechillActive
         ? bechillReferenceIdeas
         : []
+  const referenceIdeas = [...userIdeas, ...baseReferenceIdeas]
+    .filter((idea) => !dismissedIdeaIds.includes(idea.id))
 
   useEffect(() => {
     if (!filters.includes(activeFilter as never)) {
@@ -246,7 +353,92 @@ export default function CampaignsPage() {
     }))
   }
 
-  const likedCount = Object.values(reactions).filter(Boolean).length
+  async function startContentProject(idea: ReferenceIdea) {
+    if (!activeWorkspaceId || creatingProjectId) return
+    setCreatingProjectId(idea.id)
+    setImportMessage('正在建立 Content Project…')
+    try {
+      const response = await fetch('/api/content-projects', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sourceName: idea.source,
+          sourceNote: idea.note,
+          sourceUrl: idea.url || null,
+          title: idea.title,
+          topicIdeaId: idea.id,
+          workspaceId: activeWorkspaceId,
+        }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.project?.id) throw new Error(payload?.detail || payload?.error || '未能建立內容')
+      setReaction(idea.id, 'like')
+      router.push(`/onboarding/content-studio?project=${encodeURIComponent(payload.project.id)}`)
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : '未能建立內容')
+      setCreatingProjectId(null)
+    }
+  }
+
+  async function importIdea(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmedUrl = ideaUrl.trim()
+    if (!trimmedUrl || !activeWorkspaceId || importingIdea) return
+    setImportingIdea(true)
+    setImportMessage('正在讀取連結…')
+    try {
+      const response = await fetch('/api/topic-import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: trimmedUrl }),
+      })
+      const extractedIdea = await response.json()
+      if (!response.ok) throw new Error(extractedIdea.error || '未能加入題材')
+      const saveResponse = await fetch('/api/workspace-topic-ideas', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, idea: extractedIdea }),
+      })
+      const savedPayload = await saveResponse.json()
+      if (!saveResponse.ok) throw new Error(savedPayload.error || '未能儲存到 workspace')
+      setUserIdeas((current) => [
+        savedPayload.idea as ReferenceIdea,
+        ...current.filter((idea) => idea.url !== savedPayload.idea.url),
+      ])
+      setIdeaUrl('')
+      setActiveFilter('全部')
+      setImportMessage('已加入題材庫')
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : '未能加入題材')
+    } finally {
+      setImportingIdea(false)
+    }
+  }
+
+  async function confirmDeleteIdea() {
+    if (!pendingDelete || !activeWorkspaceId || deletingIdea) return
+    setDeletingIdea(true)
+    try {
+      const response = await fetch('/api/workspace-topic-ideas', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, ideaId: pendingDelete.id }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || '未能刪除題材')
+      setUserIdeas((current) => current.filter((idea) => idea.id !== pendingDelete.id))
+      setDismissedIdeaIds((current) => [...current, pendingDelete.id])
+      setPendingDelete(null)
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : '未能刪除題材')
+    } finally {
+      setDeletingIdea(false)
+    }
+  }
+
+  const masonryColumns = Array.from({ length: masonryColumnCount }, (_, columnIndex) =>
+    visibleIdeas.filter((_, ideaIndex) => ideaIndex % masonryColumnCount === columnIndex)
+  )
 
   return (
     <main className="dashboard-page">
@@ -266,10 +458,24 @@ export default function CampaignsPage() {
                   : '這裡會按目前工作台整理 reference、題材方向和 brainstorm'}
             </span>
           </div>
-          <div className="library-summary">
-            <strong>{likedCount}</strong>
-            <span>個客戶反應</span>
-          </div>
+          <form className="idea-importer" onSubmit={importIdea}>
+            <label htmlFor="idea-url">加入新題材</label>
+            <div>
+              <input
+                id="idea-url"
+                type="url"
+                inputMode="url"
+                value={ideaUrl}
+                onChange={(event) => setIdeaUrl(event.target.value)}
+                placeholder="貼上 Instagram 或文章連結"
+                required
+              />
+              <button type="submit" disabled={importingIdea}>
+                {importingIdea ? '讀取中…' : '加入'}
+              </button>
+            </div>
+            {importMessage ? <span className="idea-import-message">{importMessage}</span> : null}
+          </form>
         </header>
 
         <section className="library-body">
@@ -316,51 +522,78 @@ export default function CampaignsPage() {
                 </div>
               </div>
 
-              <div className="idea-masonry" aria-label="題材 reference">
-                {visibleIdeas.map((idea) => {
-                  const reaction = reactions[idea.id]
-                  return (
-                    <article className={`idea-card ${idea.height}`} key={idea.id}>
-                      <div className="idea-image-wrap">
-                        <img src={idea.image} alt="" />
-                        <span>{idea.category}</span>
-                      </div>
+              <div
+                className="idea-masonry"
+                style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }}
+                aria-label="題材 reference"
+              >
+                {masonryColumns.map((column, columnIndex) => (
+                  <div className="idea-column" key={`column-${columnIndex}`}>
+                    {column.map((idea) => {
+                      const reaction = reactions[idea.id]
+                      return (
+                        <article className={`idea-card ${idea.height}`} key={idea.id}>
+                      {idea.url ? (
+                        <a
+                          className="idea-image-wrap"
+                          href={idea.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`查看原文：${idea.title}`}
+                        >
+                          <img src={idea.image} alt="" />
+                          <span>{idea.category}</span>
+                        </a>
+                      ) : (
+                        <div className="idea-image-wrap">
+                          <img src={idea.image} alt="" />
+                          <span>{idea.category}</span>
+                        </div>
+                      )}
                       <div className="idea-copy">
                         <p>{idea.source}</p>
-                        <h2>{idea.title}</h2>
+                        <h2>
+                          {idea.url ? (
+                            <a href={idea.url} target="_blank" rel="noopener noreferrer">
+                              {idea.title}
+                            </a>
+                          ) : idea.title}
+                        </h2>
                         <span>{idea.note}</span>
                         <div className="idea-tags">
                           {idea.tags.map((tag) => (
                             <em key={tag}>{tag}</em>
                           ))}
                         </div>
+                        {idea.url ? (
+                          <a className="idea-source-link" href={idea.url} target="_blank" rel="noopener noreferrer">
+                            查看原文 ↗
+                          </a>
+                        ) : null}
                         <div className="idea-reactions" aria-label={`${idea.title} 客戶反應`}>
                           <button
                             type="button"
                             className={reaction === 'like' ? 'active' : ''}
-                            onClick={() => setReaction(idea.id, 'like')}
+                            disabled={creatingProjectId === idea.id || !canStartContent}
+                            onClick={() => void startContentProject(idea)}
+                            title={canStartContent ? '建立 Content Project' : '只限 Workspace Owner 或 Admin'}
                           >
-                            喜歡
+                            {creatingProjectId === idea.id ? '建立中…' : canStartContent ? '喜歡' : '只限管理員'}
                           </button>
                           <button
                             type="button"
-                            className={reaction === 'try' ? 'active' : ''}
-                            onClick={() => setReaction(idea.id, 'try')}
-                          >
-                            想試
-                          </button>
-                          <button
-                            type="button"
-                            className={reaction === 'pass' ? 'muted active' : 'muted'}
-                            onClick={() => setReaction(idea.id, 'pass')}
+                            className="muted"
+                            onClick={() => setPendingDelete(idea)}
                           >
                             不合適
                           </button>
                         </div>
                       </div>
-                    </article>
-                  )
-                })}
+                        </article>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
 
               {visibleIdeas.length === 0 ? (
@@ -378,6 +611,28 @@ export default function CampaignsPage() {
           )}
         </section>
       </section>
+
+      {pendingDelete ? (
+        <div className="delete-dialog-backdrop" role="presentation" onMouseDown={() => !deletingIdea && setPendingDelete(null)}>
+          <section
+            className="delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="delete-dialog-icon">!</div>
+            <h2 id="delete-dialog-title">刪除這個題材？</h2>
+            <p>「{pendingDelete.title}」會從目前 workspace 刪除，其他成員亦會看不到。</p>
+            <div>
+              <button type="button" onClick={() => setPendingDelete(null)} disabled={deletingIdea}>取消</button>
+              <button type="button" className="danger" onClick={confirmDeleteIdea} disabled={deletingIdea}>
+                {deletingIdea ? '正在刪除…' : '確認刪除'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${libraryStyles}` }} />
     </main>
@@ -424,24 +679,68 @@ const libraryStyles = `
     font-size: 13px;
   }
 
-  .library-summary {
-    min-width: 116px;
-    border: 1px solid #e6e7ea;
-    border-radius: 10px;
-    padding: 8px 12px;
-    text-align: right;
+  .idea-importer {
+    position: relative;
+    width: min(460px, 46vw);
   }
 
-  .library-summary strong {
+  .idea-importer > label {
     display: block;
-    font-size: 20px;
-    line-height: 1;
-  }
-
-  .library-summary span {
-    display: block;
-    margin-top: 4px;
+    color: #555961;
     font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+
+  .idea-importer > div {
+    display: grid;
+    grid-template-columns: minmax(210px, 1fr) auto;
+    gap: 6px;
+  }
+
+  .idea-importer input {
+    min-width: 0;
+    height: 36px;
+    border: 1px solid #dfe1e5;
+    border-radius: 9px;
+    background: #f7f7f8;
+    color: #202126;
+    font: inherit;
+    font-size: 13px;
+    outline: 0;
+    padding: 0 11px;
+  }
+
+  .idea-importer input:focus {
+    border-color: #202126;
+    background: #ffffff;
+  }
+
+  .idea-importer button {
+    height: 36px;
+    border: 0;
+    border-radius: 9px;
+    background: #111111;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 16px;
+  }
+
+  .idea-importer button:disabled {
+    cursor: wait;
+    opacity: 0.58;
+  }
+
+  .idea-import-message {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    color: #555961 !important;
+    font-size: 11px !important;
+    white-space: nowrap;
   }
 
   .library-body {
@@ -567,18 +866,25 @@ const libraryStyles = `
   }
 
   .idea-masonry {
-    column-count: 4;
-    column-gap: 18px;
+    display: grid;
+    align-items: start;
+    gap: 18px;
+  }
+
+  .idea-column {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
   }
 
   .idea-card {
-    display: inline-block;
+    display: block;
     width: 100%;
-    break-inside: avoid;
     border: 1px solid #e7e8eb;
     border-radius: 12px;
     background: #ffffff;
-    margin: 0 0 18px;
+    margin: 0;
     overflow: hidden;
     transition: transform 150ms ease, box-shadow 150ms ease;
   }
@@ -589,27 +895,15 @@ const libraryStyles = `
   }
 
   .idea-image-wrap {
+    display: block;
     position: relative;
     background: #f2f1ee;
     overflow: hidden;
   }
 
-  .idea-card.short .idea-image-wrap {
-    aspect-ratio: 4 / 3;
-  }
-
-  .idea-card.medium .idea-image-wrap {
-    aspect-ratio: 4 / 5;
-  }
-
-  .idea-card.tall .idea-image-wrap {
-    aspect-ratio: 3 / 4;
-  }
-
   .idea-image-wrap img {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
     display: block;
   }
 
@@ -645,6 +939,16 @@ const libraryStyles = `
     font-weight: 800;
   }
 
+  .idea-copy h2 a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .idea-copy h2 a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .idea-copy > span {
     display: block;
     margin-top: 8px;
@@ -669,9 +973,23 @@ const libraryStyles = `
     padding: 4px 7px;
   }
 
+  .idea-source-link {
+    display: inline-block;
+    margin-top: 12px;
+    color: #34373e;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .idea-source-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
   .idea-reactions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     margin-top: 12px;
   }
@@ -694,10 +1012,84 @@ const libraryStyles = `
     color: #ffffff;
   }
 
-  .idea-reactions button.muted.active {
-    border-color: #d5d7dc;
-    background: #f1f2f4;
-    color: #5f636b;
+  .idea-reactions button.muted:hover {
+    border-color: #d92d20;
+    color: #b42318;
+  }
+
+  .delete-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(17, 17, 17, 0.48);
+    backdrop-filter: blur(5px);
+  }
+
+  .delete-dialog {
+    width: min(100%, 420px);
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+    color: #202126;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .delete-dialog-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 14px;
+    background: #fff1f0;
+    color: #b42318;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .delete-dialog h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  .delete-dialog p {
+    margin: 10px 0 22px;
+    color: #686c74;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .delete-dialog > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .delete-dialog button {
+    min-height: 42px;
+    border: 1px solid #dfe1e5;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #34373e;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .delete-dialog button.danger {
+    border-color: #d92d20;
+    background: #d92d20;
+    color: #ffffff;
+  }
+
+  .delete-dialog button:disabled {
+    cursor: wait;
+    opacity: 0.6;
   }
 
   .library-empty {
@@ -732,19 +1124,9 @@ const libraryStyles = `
     padding: 8px 12px;
   }
 
-  @media (max-width: 1180px) {
-    .idea-masonry {
-      column-count: 3;
-    }
-  }
-
   @media (max-width: 860px) {
     .dashboard-page {
       grid-template-columns: 1fr;
-    }
-
-    .sidebar {
-      display: none;
     }
 
     .library-topbar {
@@ -753,21 +1135,24 @@ const libraryStyles = `
       padding: 16px 18px;
     }
 
-    .library-summary {
-      text-align: left;
+    .idea-importer {
+      width: 100%;
+    }
+
+    .idea-importer > div {
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .library-body {
       padding: 16px 14px 32px;
     }
 
-    .idea-masonry {
-      column-count: 2;
-      column-gap: 12px;
+    .idea-masonry,
+    .idea-column {
+      gap: 12px;
     }
 
     .idea-card {
-      margin-bottom: 12px;
       border-radius: 10px;
     }
 
@@ -780,9 +1165,4 @@ const libraryStyles = `
     }
   }
 
-  @media (max-width: 520px) {
-    .idea-masonry {
-      column-count: 1;
-    }
-  }
 `

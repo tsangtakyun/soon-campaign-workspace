@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
+  cacheActiveWorkspace,
   clearActiveWorkspaceId,
   getActiveWorkspaceId,
+  getCachedActiveWorkspace,
   isBechillWorkspaceLabel,
   isEggWorkspaceLabel,
   setActiveWorkspaceId,
@@ -25,6 +27,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
   { icon: '▣', label: '已排程內容', href: '/onboarding/scheduled-posts' },
   { icon: '▱', label: '題材庫', href: '/onboarding/topic-library' },
+  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio' },
   { icon: '↯', label: '整合', href: '/onboarding/integrations' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
   { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
@@ -47,14 +50,25 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
 
+  useLayoutEffect(() => {
+    const cachedWorkspace = getCachedActiveWorkspace()
+    if (!cachedWorkspace) return
+
+    setWorkspaces([cachedWorkspace])
+    setActiveWorkspaceIdState(getActiveWorkspaceId() || cachedWorkspace.id)
+  }, [])
+
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) || workspaces[0] || null
   const activeWorkspaceLabel = activeWorkspace?.brandName || activeWorkspace?.name || '你的工作台'
-  const activeWorkspaceLogoUrl = isBechillWorkspaceLabel(activeWorkspaceLabel)
+  const activeWorkspaceLogoUrl = activeWorkspace?.logoUrl || (isBechillWorkspaceLabel(activeWorkspaceLabel)
     ? BECHILL_LOGO_URL
     : isEggWorkspaceLabel(activeWorkspaceLabel)
       ? EGG_SOON_LOGO_URL
-      : ''
+      : '')
+  const visibleSidebarItems = sidebarItems.filter(
+    (item) => item.label !== '內容製作' || activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin'
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -105,6 +119,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
             mappedWorkspaces.find((workspace) => workspace.id === storedWorkspaceId) || mappedWorkspaces[0]
 
           setActiveWorkspaceIdState(nextActiveWorkspace.id)
+          cacheActiveWorkspace(nextActiveWorkspace)
           if (storedWorkspaceId !== nextActiveWorkspace.id) {
             setActiveWorkspaceId(nextActiveWorkspace.id)
           }
@@ -139,6 +154,8 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
 
   function switchWorkspace(workspaceId: string) {
     setActiveWorkspaceId(workspaceId)
+    const nextWorkspace = workspaces.find((workspace) => workspace.id === workspaceId)
+    if (nextWorkspace) cacheActiveWorkspace(nextWorkspace)
     setActiveWorkspaceIdState(workspaceId)
     setWorkspaceMenuOpen(false)
     router.refresh()
@@ -215,7 +232,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
-        {sidebarItems.map((item) => (
+        {visibleSidebarItems.map((item) => (
           <Link
             aria-current={item.label === activeItem ? 'page' : undefined}
             className={item.label === activeItem ? 'active' : ''}

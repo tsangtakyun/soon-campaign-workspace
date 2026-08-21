@@ -31,18 +31,21 @@ type TeamPayload = {
 const roleOptions = [
   { label: '管理員', value: 'admin' },
   { label: '成員', value: 'member' },
+  { label: '客戶審批', value: 'client_approver' },
   { label: '只讀', value: 'viewer' },
 ]
 
 const roleDescriptions = {
   admin: '可以邀請/移除成員及管理工作台設定。',
   member: '可以進入工作台，查看及處理內容。',
-  viewer: '適合只需要查看內容的人；更細權限會在下一版收緊。',
+  client_approver: '只處理內容批准、要求修改及留言，不會看到 Prompt。',
+  viewer: '只可以查看工作台內容。',
 }
 
 function roleLabel(value?: string | null) {
   if (value === 'owner') return '擁有人'
   if (value === 'admin') return '管理員'
+  if (value === 'client_approver') return '客戶審批'
   if (value === 'viewer') return '只讀'
   return '成員'
 }

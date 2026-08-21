@@ -14,8 +14,14 @@ export function DesignToolbar({ activeDesignTool, onRedo, onToolChange, onUndo }
   return (
     <nav className="design-toolbar" aria-label="設計工具">
       <div className="history-tools">
-        <button type="button" onClick={onUndo}>↶</button>
-        <button type="button" onClick={onRedo}>↷</button>
+        <button aria-label="復原" type="button" onClick={onUndo}>
+          <span aria-hidden="true">↶</span>
+          <strong>復原</strong>
+        </button>
+        <button aria-label="重做" type="button" onClick={onRedo}>
+          <span aria-hidden="true">↷</span>
+          <strong>重做</strong>
+        </button>
       </div>
       {DESIGN_TOOL_ITEMS.map(([icon, label]) => (
         <button

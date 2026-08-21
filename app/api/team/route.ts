@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { appUrl, isUuid } from '@/lib/oauth-connections'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
-type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
+type WorkspaceRole = 'owner' | 'admin' | 'member' | 'client_approver' | 'viewer'
 
 const EDITOR_ROLES = new Set(['owner', 'admin'])
 
@@ -13,7 +13,7 @@ function normalizeEmail(value: unknown) {
 }
 
 function normalizeRole(value: unknown): WorkspaceRole {
-  return value === 'admin' || value === 'viewer' || value === 'owner' ? value : 'member'
+  return value === 'admin' || value === 'viewer' || value === 'client_approver' || value === 'owner' ? value : 'member'
 }
 
 async function currentUser() {

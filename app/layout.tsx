@@ -17,6 +17,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <style
           dangerouslySetInnerHTML={{
             __html: `
+              @font-face {
+                font-family: "SweiGothicCJKtc-Regular";
+                src: url("/fonts/max32002/SweiGothicCJKtc-Regular.woff2") format("woff2");
+                font-style: normal;
+                font-weight: 400;
+                font-display: swap;
+              }
+
+              @font-face {
+                font-family: "SweiGothicCJKtc-Regular";
+                src: url("/fonts/max32002/SweiGothicCJKtc-Bold.woff2") format("woff2");
+                font-style: normal;
+                font-weight: 700;
+                font-display: swap;
+              }
+
+              /* Workspace「GenSenRounded2 / 系統圓體」使用的編輯器字型別名。 */
+              @font-face {
+                font-family: "GenSenRounded2";
+                src: url("/fonts/max32002/SweiGothicCJKtc-Regular.woff2") format("woff2");
+                font-style: normal;
+                font-weight: 400;
+                font-display: swap;
+              }
+
+              @font-face {
+                font-family: "GenSenRounded2";
+                src: url("/fonts/max32002/SweiGothicCJKtc-Bold.woff2") format("woff2");
+                font-style: normal;
+                font-weight: 700;
+                font-display: swap;
+              }
+
               :root {
                 color-scheme: dark;
               }

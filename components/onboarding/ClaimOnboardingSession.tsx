@@ -7,6 +7,7 @@ import {
   getStoredOnboardingSessionId,
   hasPersistedOnboardingSession,
 } from '@/lib/onboarding-session'
+import { WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
 
 export function ClaimOnboardingSession() {
   useEffect(() => {
@@ -23,6 +24,9 @@ export function ClaimOnboardingSession() {
 
         if (response.ok) {
           clearOnboardingSessionClaim()
+          // Pages that loaded before the anonymous onboarding data was claimed
+          // need to resolve the newly attached workspace again.
+          window.dispatchEvent(new CustomEvent(WORKSPACE_CHANGED_EVENT))
           console.log('[onboarding/claim] success')
         } else if (response.status === 409) {
           clearOnboardingSessionClaim()

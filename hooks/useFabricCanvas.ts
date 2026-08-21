@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Canvas, Circle, FabricImage, FabricObject, IText, Polygon, Rect, Triangle } from 'fabric'
+import { Canvas, Circle, FabricImage, FabricObject, IText, Polygon, Rect, Textbox, Triangle } from 'fabric'
 
 import type { CanvasSize, DesignElement } from '@/components/editor/editorTypes'
 import { createClient } from '@/lib/supabase'
@@ -24,6 +24,22 @@ type UseFabricCanvasOptions = {
 }
 
 const BASE_CANVAS = { width: 430, height: 538 }
+
+function resolveCanvasFontFamily(value?: string) {
+  if (!value || value === 'inherit') return 'SweiGothicCJKtc-Regular'
+  const normalized = value.toLowerCase()
+  if (normalized.includes('gensenrounded') || normalized.includes('系統圓體')) return 'GenSenRounded2'
+  return value
+}
+
+async function ensureCanvasFontLoaded(fontFamily: string, fontWeight: string | number = 'normal') {
+  if (typeof document === 'undefined' || !document.fonts) return
+  try {
+    await document.fonts.load(`${fontWeight} 32px "${fontFamily}"`, '繁體中文 ABC 123')
+  } catch {
+    // Fabric can still render with the browser fallback if a remote font is unavailable.
+  }
+}
 
 function toCanvasPosition(element: DesignElement, size: Pick<CanvasSize, 'h' | 'w'>) {
   return {
@@ -111,22 +127,31 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
       })
     } else {
       const targetWidth = (element.width || element.size || 300) * scale
-      image.scaleToWidth(targetWidth)
+      const targetHeight = element.height ? element.height * scale : 0
+      const containScale = targetHeight
+        ? Math.min(targetWidth / (image.width || 1), targetHeight / (image.height || 1))
+        : targetWidth / (image.width || 1)
+      image.set({ scaleX: containScale, scaleY: containScale })
       image.set(common)
     }
     return attachElementData(image as FabricElementObject, element)
   }
 
   if (element.kind === 'text') {
-    const text = new IText(element.textContent || element.label, {
+    const fontFamily = resolveCanvasFontFamily(element.fontFamily)
+    const fontWeight = element.fontWeight || 'normal'
+    await ensureCanvasFontLoaded(fontFamily, fontWeight)
+    const text = new Textbox(element.textContent || element.label, {
       ...common,
       fill: element.color,
-      fontFamily: element.fontFamily === 'inherit' ? 'Arial, sans-serif' : element.fontFamily,
+      fontFamily,
       fontSize: (element.fontSize || element.size || 24) * scale,
       fontStyle: element.fontStyle || 'normal',
-      fontWeight: element.fontWeight || 'normal',
+      fontWeight,
       lineHeight: element.lineHeight || 1.3,
+      splitByGrapheme: true,
       textAlign: element.textAlign || 'center',
+      underline: element.textDecoration === 'underline',
       width: (element.width || 300) * scale,
     })
     return attachElementData(text as FabricElementObject, element)
@@ -164,12 +189,14 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   } else if (element.item === 'star') {
     shape = new Polygon(buildStarPoints(objectSize / 2, objectSize / 4), defaults) as FabricElementObject
   } else {
+    const rectWidth = (element.width || element.size) * scale
+    const rectHeight = (element.height || element.size) * scale
     shape = new Rect({
       ...defaults,
-      height: objectSize,
+      height: rectHeight,
       rx: element.item === 'rounded' ? objectSize * 0.18 : 0,
       ry: element.item === 'rounded' ? objectSize * 0.18 : 0,
-      width: objectSize,
+      width: rectWidth,
     }) as FabricElementObject
   }
 
@@ -382,8 +409,15 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     if (changes.rotation !== undefined) nextProps.angle = changes.rotation
     if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
     if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
+    if (changes.fontFamily !== undefined || changes.fontWeight !== undefined) {
+      const fontFamily = resolveCanvasFontFamily(changes.fontFamily || String(object.get('fontFamily') || ''))
+      const fontWeight = changes.fontWeight || String(object.get('fontWeight') || 'normal')
+      await ensureCanvasFontLoaded(fontFamily, fontWeight)
+      nextProps.fontFamily = fontFamily
+    }
     if (changes.fontStyle !== undefined) nextProps.fontStyle = changes.fontStyle
     if (changes.fontWeight !== undefined) nextProps.fontWeight = changes.fontWeight
+    if (changes.textDecoration !== undefined) nextProps.underline = changes.textDecoration === 'underline'
     if (changes.lineHeight !== undefined) nextProps.lineHeight = changes.lineHeight
     if (changes.opacity !== undefined) nextProps.opacity = changes.opacity / 100
     if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
@@ -397,6 +431,9 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
 
     object.set(nextProps)
+    if (object instanceof IText && (changes.fontFamily !== undefined || changes.fontWeight !== undefined)) {
+      object.initDimensions()
+    }
     object.setCoords()
     canvas.requestRenderAll()
   }, [])

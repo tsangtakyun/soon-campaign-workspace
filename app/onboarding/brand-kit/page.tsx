@@ -2808,10 +2808,6 @@ const brandKitStyles = `
       grid-template-columns: 1fr;
     }
 
-    .sidebar {
-      display: none;
-    }
-
     .brand-kit-layout {
       grid-template-columns: 1fr;
     }

@@ -20,8 +20,12 @@ export async function GET(req: Request) {
     'pages_show_list',
     'pages_read_engagement',
     'pages_manage_posts',
+    'ads_read',
+    'ads_management',
+    'business_management',
   ].join(',')
-  const oauthUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth')
+  const graphVersion = process.env.META_GRAPH_VERSION || 'v23.0'
+  const oauthUrl = new URL(`https://www.facebook.com/${graphVersion}/dialog/oauth`)
 
   oauthUrl.searchParams.set('client_id', appId)
   oauthUrl.searchParams.set('redirect_uri', redirectUri)

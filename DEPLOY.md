@@ -1,5 +1,9 @@
 # Deployment checklist
 
+## Temporary production branch freeze
+
+`main` and the source snapshot currently serving production are not aligned. Do **not** push `main` or trigger a Git production deployment until T35 has been resolved and the approved production source has been committed in full. A push to `main` before that reconciliation can remove features that currently exist only in the production working-tree snapshot.
+
 ## Scheduled publishing
 
 Before deploying, set `CRON_SECRET` in all three Vercel environments: Development, Preview, and Production. Vercel Cron sends this value as `Authorization: Bearer <CRON_SECRET>` when invoking `/api/posts/publish-due`.
@@ -21,6 +25,10 @@ Do not deploy the code first. The scheduled publishing route writes `campaign_po
 
 `supabase/migrations/20260821155000_baseline_from_production.sql` mirrors all production table definitions with `CREATE TABLE IF NOT EXISTS`. Existing environments can apply it safely; a completely empty recovery environment should restore `schema_snapshot.sql` to recover the full schema rather than relying on the table-only baseline by itself.
 
+## Migration files
+
+The ten `supabase/migrations/2026052*_remote_history.sql` files are 82-byte empty placeholders created by migration-history reconciliation. They do not create any schema. The real baseline DDL is `supabase/migrations/20260821155000_baseline_from_production.sql`; rebuilding a new environment must use that baseline rather than the remote-history placeholders.
+
 ## New table standard
 
 Do not create production tables directly in the Supabase Dashboard. Every new table must be introduced by a committed migration that, in the same migration:
@@ -32,3 +40,14 @@ Do not create production tables directly in the Supabase Dashboard. Every new ta
 The production default privileges intentionally deny new tables and sequences to `anon` and `authenticated`. A new table is therefore private until its migration explicitly opens the required operations.
 
 The `supabase_admin` defaults are owned by Supabase's internal platform superuser and cannot be changed by the project migration role. Keep **Integrations → Data API → Default privileges for new entities** disabled in every Supabase environment; this is the platform-side half of the same deny-by-default control.
+
+New functions are also private by default. Any RPC intended for direct client use must receive an explicit, least-privilege `GRANT EXECUTE` in the same migration; otherwise `anon` and `authenticated` will receive `permission denied`.
+
+## Known debt
+
+- `origin/main` and `codex/recover-campaign-workspace-work` are divergent from merge base `4f12449`: main has 157 unique commits and the codex line has 47 including T29. They overlap on 13 paths and have at least six direct conflicts: `app/onboarding/campaigns/page.tsx`, `app/onboarding/seo/page.tsx`, `app/onboarding/team/page.tsx`, `app/page.tsx`, `app/scheduled-posts/page.tsx`, and `components/dashboard/DashboardSidebar.tsx`. Do not push `main` until this is reconciled.
+- The `supabase_admin` default ACL still mentions `anon` and `authenticated`. Both projects currently have zero tables owned by `supabase_admin`, so this is a theoretical residual rather than a current exposure.
+- `defacl_postgres_f` is `{postgres=X}`. Every new client-callable function must explicitly grant the minimum required `EXECUTE` privilege.
+- `withWorkspaceAuth()` is not mechanically enforced. Approximately 26 routes using `createAdminSupabase()` remain to be migrated.
+- `content_strategy_library`, `creator_usage_ledger`, and `strategy_library` have RLS enabled with no policies. Both repositories have been checked for client usage and have none, so remaining locked is intentional.
+- `META_APP_LIVE` is a Vercel Sensitive variable, so its stored value cannot be read back. Determining it requires deliberately overwriting it with an explicit value: keep it `false` while the Meta App is not Live, and change it to `true` only after App Review succeeds. Tommy must authorize that change; do not alter it as part of a routine deployment.

@@ -90,7 +90,8 @@ export async function GET(req: Request) {
     })
 
     const redirectUri = `${baseUrl}/api/auth/callback/facebook`
-    const tokenUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token')
+    const graphVersion = process.env.META_GRAPH_VERSION || 'v23.0'
+    const tokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`)
     tokenUrl.searchParams.set('client_id', appId)
     tokenUrl.searchParams.set('client_secret', appSecret)
     tokenUrl.searchParams.set('redirect_uri', redirectUri)
@@ -100,7 +101,7 @@ export async function GET(req: Request) {
     const shortToken = typeof tokenData.access_token === 'string' ? tokenData.access_token : ''
     if (!shortToken) throw new Error(`No Facebook access token: ${JSON.stringify(tokenData)}`)
 
-    const longTokenUrl = new URL('https://graph.facebook.com/v18.0/oauth/access_token')
+    const longTokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`)
     longTokenUrl.searchParams.set('grant_type', 'fb_exchange_token')
     longTokenUrl.searchParams.set('client_id', appId)
     longTokenUrl.searchParams.set('client_secret', appSecret)
@@ -111,7 +112,7 @@ export async function GET(req: Request) {
       typeof longTokenData.access_token === 'string' ? longTokenData.access_token : shortToken
     const expiresAt = expiresAtFromSeconds(longTokenData.expires_in)
 
-    const pagesUrl = new URL('https://graph.facebook.com/v18.0/me/accounts')
+    const pagesUrl = new URL(`https://graph.facebook.com/${graphVersion}/me/accounts`)
     pagesUrl.searchParams.set(
       'fields',
       'id,name,access_token,instagram_business_account{id,username,profile_picture_url}'

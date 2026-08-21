@@ -40,7 +40,6 @@ export function DesignCanvas({
   canvasSize,
   selectedPost,
   designElements,
-  onCloseDesignMode,
   onDeselectElement,
   onFabricReady,
   onSelectElement,
@@ -156,20 +155,6 @@ export function DesignCanvas({
         </div>
       ) : null}
 
-      <div className="canvas-side-actions">
-        <button type="button">▣</button>
-        <button type="button">＋</button>
-      </div>
-
-      <div className="design-result-bar">
-        <span>你喜歡這個結果嗎？</span>
-        <button type="button">不喜歡</button>
-        <button type="button">喜歡</button>
-        <button type="button" onClick={onCloseDesignMode}>關閉</button>
-      </div>
-
-      <div className="ask-soon-button">AI Ask SOON</div>
-      <div className="zoom-control">1 / 1 重新排序頁面　⌕ 100%</div>
     </section>
   )
 }

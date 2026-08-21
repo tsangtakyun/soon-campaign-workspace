@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let payload: { mode?: PhotoControlMode; originalImageUrl?: string; prompt?: string }
+  let payload: {
+    mode?: PhotoControlMode
+    originalImageUrl?: string
+    referenceImageUrls?: string[]
+    prompt?: string
+    requestedSize?: 'square' | 'landscape' | 'portrait'
+  }
   try {
     payload = await request.json()
   } catch {
@@ -69,12 +75,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const sourceImage = await loadImage(originalImageUrl, request)
+    const referenceImageUrls = Array.isArray(payload.referenceImageUrls)
+      ? payload.referenceImageUrls.filter((value): value is string => typeof value === 'string' && value.length > 0).slice(0, 4)
+      : []
+    const referenceImages = await Promise.all(
+      referenceImageUrls.map((source) => loadImage(source, request)),
+    )
     const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
+    const requestedSize = payload.requestedSize || 'portrait'
+    const outputSize = requestedSize === 'landscape'
+      ? '1536x1024'
+      : requestedSize === 'square'
+        ? '1024x1024'
+        : '1024x1536'
     const form = new FormData()
     form.append('model', imageModel)
-    form.append('image', sourceImage)
+    if (referenceImages.length) {
+      form.append('image[]', sourceImage)
+      referenceImages.forEach((image) => form.append('image[]', image))
+    } else {
+      form.append('image', sourceImage)
+    }
     form.append('prompt', prompt)
-    form.append('size', '1024x1536')
+    form.append('size', outputSize)
     form.append('quality', 'high')
     form.append('input_fidelity', mode === 'full' ? 'low' : 'high')
 

@@ -1,27 +1,43 @@
-'use client'
+"use client";
 
-import dynamic from 'next/dynamic'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, type FormEvent, type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from "next/dynamic";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Suspense,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
-import { DesignToolbar } from '@/components/editor/DesignToolbar'
-import { EditorSidePanel } from '@/components/editor/EditorSidePanel'
-import { CHANNELS, FALLBACK_IMAGES, PLACEHOLDER_IMAGE } from '@/components/editor/editorData'
-import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import {
+  DashboardSidebar,
+  dashboardSidebarStyles,
+} from "@/components/dashboard/DashboardSidebar";
+import { DesignToolbar } from "@/components/editor/DesignToolbar";
+import { EditorSidePanel } from "@/components/editor/EditorSidePanel";
+import {
+  CHANNELS,
+  FALLBACK_IMAGES,
+  PLACEHOLDER_IMAGE,
+} from "@/components/editor/editorData";
+import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
 import {
   getOrCreateOnboardingSessionId,
   getStoredOnboardingSessionId,
   hasPersistedOnboardingSession,
   markOnboardingPersisted,
-} from '@/lib/onboarding-session'
-import type { FabricControls } from '@/components/editor/DesignCanvas'
-import { createClient } from '@/lib/supabase'
+} from "@/lib/onboarding-session";
+import type { FabricControls } from "@/components/editor/DesignCanvas";
+import { createClient } from "@/lib/supabase";
 import {
   isBechillWorkspace,
+  isEggWorkspace,
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
-} from '@/lib/workspace-client'
+} from "@/lib/workspace-client";
 import type {
   CanvasSize,
   DesignElement,
@@ -30,25 +46,32 @@ import type {
   ElementSection,
   PreviewChannel,
   ScheduledPost,
-  TemplatePresetId,
   TextPreset,
-  TextStylePreset,
   TopicReference,
-} from '@/components/editor/editorTypes'
+} from "@/components/editor/editorTypes";
 
 const DesignCanvas = dynamic(
-  () => import('@/components/editor/DesignCanvas').then((module) => module.DesignCanvas),
-  { ssr: false }
-)
+  () =>
+    import("@/components/editor/DesignCanvas").then(
+      (module) => module.DesignCanvas,
+    ),
+  { ssr: false },
+);
 
 const PUBLISH_PLATFORMS = [
-  { channel: 'Instagram' as PreviewChannel, id: 'instagram', label: 'Instagram' },
-  { channel: 'Facebook' as PreviewChannel, id: 'facebook', label: 'Facebook' },
-  { channel: 'Threads' as PreviewChannel, id: 'threads', label: 'Threads' },
-]
+  {
+    channel: "Instagram" as PreviewChannel,
+    id: "instagram",
+    label: "Instagram",
+  },
+  { channel: "Facebook" as PreviewChannel, id: "facebook", label: "Facebook" },
+  { channel: "Threads" as PreviewChannel, id: "threads", label: "Threads" },
+];
+
+const AUTO_PUBLISH_PLATFORM_IDS = new Set(["instagram", "facebook", "threads"]);
 
 function PublishPlatformIcon({ platform }: { platform: string }) {
-  if (platform === 'instagram') {
+  if (platform === "instagram") {
     return (
       <span className="publish-platform-icon instagram" aria-hidden="true">
         <svg viewBox="0 0 24 24" focusable="false">
@@ -57,349 +80,392 @@ function PublishPlatformIcon({ platform }: { platform: string }) {
           <circle cx="16.15" cy="7.85" r="1" />
         </svg>
       </span>
-    )
+    );
   }
 
-  if (platform === 'facebook') {
+  if (platform === "facebook") {
     return (
       <span className="publish-platform-icon facebook" aria-hidden="true">
         f
       </span>
-    )
+    );
   }
 
   return (
     <span className="publish-platform-icon threads" aria-hidden="true">
       @
     </span>
-  )
+  );
 }
 
 type PlatformConnection = {
-  account_id?: string | null
-  account_name?: string | null
-  platform: string
-}
+  account_id?: string | null;
+  account_name?: string | null;
+  platform: string;
+};
 
 function readTopicImages() {
-  if (typeof window === 'undefined') return FALLBACK_IMAGES
+  if (typeof window === "undefined") return FALLBACK_IMAGES;
   try {
-    const raw = window.sessionStorage.getItem('soon-topic-review-v1')
-    const topics = raw ? (JSON.parse(raw) as TopicReference[]) : []
+    const raw = window.sessionStorage.getItem("soon-topic-review-v1");
+    const topics = raw ? (JSON.parse(raw) as TopicReference[]) : [];
     const images = topics
       .map((topic) => topic.image)
-      .filter((image) => image && image !== PLACEHOLDER_IMAGE)
-    return images.length ? images : FALLBACK_IMAGES
+      .filter((image) => image && image !== PLACEHOLDER_IMAGE);
+    return images.length ? images : FALLBACK_IMAGES;
   } catch {
-    return FALLBACK_IMAGES
+    return FALLBACK_IMAGES;
   }
 }
 
 function resolveLogoSrc(value: string) {
-  if (!value) return ''
-  if (value.startsWith('blob:') || value.startsWith('data:')) return value
-  return `/api/logo-image?url=${encodeURIComponent(value)}`
+  if (!value) return "";
+  if (
+    value.startsWith("/") ||
+    value.startsWith("blob:") ||
+    value.startsWith("data:")
+  )
+    return value;
+  return `/api/logo-image?url=${encodeURIComponent(value)}`;
 }
 
+function normalizeHexColorValue(value: unknown): string | null {
+  const raw = String(value || "").trim().replace(/^#/, "");
+  const expanded = /^[0-9a-f]{3}$/i.test(raw)
+    ? raw
+        .split("")
+        .map((char) => char + char)
+        .join("")
+    : raw;
+  return /^[0-9a-f]{6}$/i.test(expanded)
+    ? `#${expanded.toUpperCase()}`
+    : null;
+}
+
+function extractBrandColors(value: unknown): string[] {
+  let input = value;
+  if (typeof input === "string") {
+    const serialized = input;
+    try {
+      input = JSON.parse(serialized);
+    } catch {
+      input = serialized.split(",");
+    }
+  }
+  const items = Array.isArray(input) ? input : [];
+  const normalized = items
+    .map((item) => {
+      if (typeof item === "string") return normalizeHexColorValue(item);
+      if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        return normalizeHexColorValue(
+          record.hex ?? record.color ?? record.value,
+        );
+      }
+      return null;
+    })
+    .filter((color): color is string => Boolean(color));
+  return Array.from(new Set(normalized));
+}
+
+const BECHILL_BRAND_COLORS = [
+  "#F7F1EC",
+  "#CFE3F1",
+  "#F1B8C6",
+  "#EFE3D2",
+  "#171717",
+];
+
+const EGG_BRAND_COLORS = [
+  "#F4D547",
+  "#111111",
+  "#F6F1E7",
+  "#E24B35",
+  "#FFFFFF",
+];
+
 function readBrandKit() {
-  if (typeof window === 'undefined') return { businessName: '品牌', logoUrl: '' }
+  if (typeof window === "undefined")
+    return {
+      businessName: "品牌",
+      logoUrl: "",
+      fontFamily: "SweiGothicCJKtc-Regular",
+      brandColors: [] as string[],
+    };
 
   try {
-    const rawProfile = window.sessionStorage.getItem('soon-business-profile-v1')
+    const rawProfile = window.sessionStorage.getItem(
+      "soon-business-profile-v1",
+    );
     if (rawProfile) {
-      const profile = JSON.parse(rawProfile) as { businessName?: string; logoUrl?: string }
+      const profile = JSON.parse(rawProfile) as {
+        businessName?: string;
+        logoUrl?: string;
+      };
       return {
-        businessName: profile.businessName || '品牌',
-        logoUrl: resolveLogoSrc(profile.logoUrl || ''),
-      }
+        businessName: profile.businessName || "品牌",
+        logoUrl: resolveLogoSrc(profile.logoUrl || ""),
+        fontFamily: "SweiGothicCJKtc-Regular",
+        brandColors: extractBrandColors(
+          (profile as { brandColors?: unknown; brand_colors?: unknown }).brandColors ??
+            (profile as { brand_colors?: unknown }).brand_colors,
+        ),
+      };
     }
   } catch {
     // Fall through to website analysis fallback.
   }
 
   try {
-    const rawAnalysis = window.sessionStorage.getItem('soon-website-analysis-v1')
+    const rawAnalysis = window.sessionStorage.getItem(
+      "soon-website-analysis-v1",
+    );
     if (rawAnalysis) {
-      const parsed = JSON.parse(rawAnalysis) as { analysis?: { businessName?: string; logoUrl?: string } }
+      const parsed = JSON.parse(rawAnalysis) as {
+        analysis?: { businessName?: string; logoUrl?: string };
+      };
       return {
-        businessName: parsed.analysis?.businessName || '品牌',
-        logoUrl: resolveLogoSrc(parsed.analysis?.logoUrl || ''),
-      }
+        businessName: parsed.analysis?.businessName || "品牌",
+        logoUrl: resolveLogoSrc(parsed.analysis?.logoUrl || ""),
+        fontFamily: "SweiGothicCJKtc-Regular",
+        brandColors: extractBrandColors(
+          (parsed.analysis as { brandColors?: unknown; brand_colors?: unknown } | undefined)?.brandColors ??
+            (parsed.analysis as { brand_colors?: unknown } | undefined)?.brand_colors,
+        ),
+      };
     }
   } catch {
     // Ignore malformed session data.
   }
 
-  return { businessName: '品牌', logoUrl: '' }
+  return {
+    businessName: "品牌",
+    logoUrl: "",
+    fontFamily: "SweiGothicCJKtc-Regular",
+    brandColors: [] as string[],
+  };
 }
 
 function readSessionJson(key: string) {
-  if (typeof window === 'undefined') return null
+  if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(key)
-    return raw ? JSON.parse(raw) : null
+    const raw = window.sessionStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function buildOnboardingCompletePayload() {
   return {
     sessionId: getOrCreateOnboardingSessionId(),
-    websiteAnalysis: readSessionJson('soon-website-analysis-v1'),
-    businessProfile: readSessionJson('soon-business-profile-v1'),
-    contentStrategy: readSessionJson('soon-content-strategy-v1'),
-    campaignDetails: readSessionJson('soon-campaign-details-v1'),
-    distributionPrefs: readSessionJson('soon-distribution-preferences-v1'),
-    contentMix: readSessionJson('soon-content-mix-v1'),
-    contentMood: readSessionJson('soon-content-mood-v1'),
-    visualStyle: readSessionJson('soon-visual-style-v1'),
-    typeface: readSessionJson('soon-typeface-v1'),
-    photoControl: readSessionJson('soon-photo-control-v2'),
-    topicReview: readSessionJson('soon-topic-review-v1'),
-    campaignThemes: readSessionJson('soon-campaign-themes-v1'),
-  }
+    websiteAnalysis: readSessionJson("soon-website-analysis-v1"),
+    businessProfile: readSessionJson("soon-business-profile-v1"),
+    contentStrategy: readSessionJson("soon-content-strategy-v1"),
+    campaignDetails: readSessionJson("soon-campaign-details-v1"),
+    distributionPrefs: readSessionJson("soon-distribution-preferences-v1"),
+    contentMix: readSessionJson("soon-content-mix-v1"),
+    contentMood: readSessionJson("soon-content-mood-v1"),
+    visualStyle: readSessionJson("soon-visual-style-v1"),
+    typeface: readSessionJson("soon-typeface-v1"),
+    photoControl: readSessionJson("soon-photo-control-v2"),
+    topicReview: readSessionJson("soon-topic-review-v1"),
+    campaignThemes: readSessionJson("soon-campaign-themes-v1"),
+  };
 }
 
 async function completeOnboardingSnapshot() {
-  if (hasPersistedOnboardingSession()) return true
+  if (hasPersistedOnboardingSession()) return true;
 
-  const payload = buildOnboardingCompletePayload()
-  if (!payload.sessionId) return false
-  if (!payload.businessProfile && !payload.websiteAnalysis) return false
+  const payload = buildOnboardingCompletePayload();
+  if (!payload.sessionId) return false;
+  if (!payload.businessProfile && !payload.websiteAnalysis) return false;
 
   try {
-    const response = await fetch('/api/onboarding/complete', {
+    const response = await fetch("/api/onboarding/complete", {
       body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
 
     if (!response.ok) {
-      const message = await response.text().catch(() => '')
-      console.warn('Failed to persist onboarding snapshot:', response.status, message)
-      return false
+      const message = await response.text().catch(() => "");
+      console.warn(
+        "Failed to persist onboarding snapshot:",
+        response.status,
+        message,
+      );
+      return false;
     }
 
-    const result = await response.json().catch(() => ({}))
-    console.log('[onboarding/complete] success:', result)
-    markOnboardingPersisted()
-    return true
+    const result = await response.json().catch(() => ({}));
+    console.log("[onboarding/complete] success:", result);
+    markOnboardingPersisted();
+    return true;
   } catch (error) {
-    console.error('Failed to persist onboarding:', error)
-    return false
+    console.error("Failed to persist onboarding:", error);
+    return false;
   }
 }
 
-async function loadPersistedBrandKit(fallback: { businessName: string; logoUrl: string }) {
+async function loadPersistedBrandKit(fallback: {
+  businessName: string;
+  logoUrl: string;
+  fontFamily: string;
+  brandColors: string[];
+}) {
   try {
-    const supabase = createClient()
+    const supabase = createClient();
     const {
       data: { user },
-    } = await supabase.auth.getUser()
-    const sessionId = getStoredOnboardingSessionId()
+    } = await supabase.auth.getUser();
+    const sessionId = getStoredOnboardingSessionId();
 
-    let query = supabase.from('brand_kits').select('business_name,logo_url')
+    let query = supabase.from("brand_kits").select("business_name,logo_url");
     if (user?.id) {
-      const { workspaceId } = await resolveActiveWorkspace()
-      query = workspaceId ? query.eq('workspace_id', workspaceId) : query.eq('user_id', user.id)
+      const { activeWorkspace, workspaceId } = await resolveActiveWorkspace();
+      if (workspaceId) {
+        const [response, settingsResponse] = await Promise.all([
+          fetch(
+            `/api/brand-kit-data?workspace_id=${encodeURIComponent(workspaceId)}`,
+            { cache: "no-store" },
+          ),
+          fetch(
+            `/api/workspace-settings?workspace_id=${encodeURIComponent(workspaceId)}`,
+            { cache: "no-store" },
+          ),
+        ]);
+        const payload = await response.json().catch(() => null);
+        const settingsPayload = await settingsResponse.json().catch(() => null);
+        if (response.ok || settingsResponse.ok) {
+          const workspaceSettings =
+            settingsPayload?.workspace || settingsPayload || payload?.workspace || {};
+          const workspaceLogo = workspaceSettings?.logo_url || "";
+          const workspaceFallbackLogo = isEggWorkspace(activeWorkspace)
+            ? "/brand-assets/eggsoon/soon-egg.png"
+            : isBechillWorkspace(activeWorkspace)
+              ? "/brand-assets/bechilltogether/bunchill-logo.png"
+              : "";
+          const workspaceFont = resolveWorkspaceFontFamily(
+            workspaceSettings?.font_style,
+            fallback.fontFamily,
+          );
+          const persistedWorkspaceBrandColors = extractBrandColors(
+            workspaceSettings?.brand_colors,
+          );
+          const workspaceBrandColors = persistedWorkspaceBrandColors.length
+            ? persistedWorkspaceBrandColors
+            : isEggWorkspace(activeWorkspace)
+              ? EGG_BRAND_COLORS
+              : isBechillWorkspace(activeWorkspace)
+                ? BECHILL_BRAND_COLORS
+                : [];
+          if (!workspaceLogo) {
+            const { data: storedKit } = await supabase
+              .from("brand_kits")
+              .select("business_name,logo_url")
+              .eq("workspace_id", workspaceId)
+              .maybeSingle();
+            return {
+              businessName:
+                payload?.brandProfile?.business_name ||
+                storedKit?.business_name ||
+                fallback.businessName,
+              logoUrl: storedKit?.logo_url
+                ? resolveLogoSrc(storedKit.logo_url)
+                : workspaceFallbackLogo,
+              fontFamily: workspaceFont,
+              brandColors: workspaceBrandColors,
+            };
+          }
+          return {
+            businessName:
+              payload?.brandProfile?.business_name || fallback.businessName,
+            logoUrl: resolveLogoSrc(workspaceLogo),
+            fontFamily: workspaceFont,
+            brandColors: workspaceBrandColors,
+          };
+        }
+        query = query.eq("workspace_id", workspaceId);
+      } else {
+        query = query.eq("user_id", user.id);
+      }
     } else if (sessionId) {
-      query = query.eq('onboarding_session_id', sessionId)
+      query = query.eq("onboarding_session_id", sessionId);
     } else {
-      return fallback
+      return fallback;
     }
 
-    const { data, error } = await query.maybeSingle()
-    if (error || !data) return fallback
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) return fallback;
 
-    const nextLogo = data.logo_url ? resolveLogoSrc(data.logo_url) : fallback.logoUrl
+    const nextLogo = data.logo_url
+      ? resolveLogoSrc(data.logo_url)
+      : fallback.logoUrl;
     return {
       businessName: data.business_name || fallback.businessName,
       logoUrl: nextLogo,
-    }
+      fontFamily: fallback.fontFamily,
+      brandColors: fallback.brandColors,
+    };
   } catch {
-    return fallback
+    return fallback;
   }
 }
 
-function buildScheduledPosts(images: string[]): ScheduledPost[] {
-  return [
-    {
-      id: 'still-1000',
-      type: '靜態圖片',
-      time: '10:00',
-      title: '差點沒拍下來的片段',
-      body: '最細小的片段，往往承載最真實的感覺。把那個笑聲、眼神或普通一刻分享出去，就會變成朋友想再看一次的回憶。',
-      image: images[0] || FALLBACK_IMAGES[0],
-      status: '新內容',
-    },
-    {
-      id: 'blog-1400',
-      type: '文章',
-      time: '14:00',
-      title: '一個簡單房間，幾段短片，突然就值得重播',
-      body: '和朋友聚在一起，本來可以很平常。但當那些片段被剪成有節奏的日常故事，它就會變成你想再看、再分享的內容。',
-      image: images[1] || FALLBACK_IMAGES[1],
-      status: '新內容',
-    },
-    {
-      id: 'short-1800',
-      type: '短影片',
-      time: '18:00',
-      title: '今天值得留下的一秒',
-      body: '晚上的內容會用更輕鬆的節奏，提醒觀眾每日都有值得記錄的微小時刻。',
-      image: images[2] || FALLBACK_IMAGES[2],
-      status: '草稿',
-    },
-  ]
+function resolveWorkspaceFontFamily(value?: string | null, fallback = "SweiGothicCJKtc-Regular") {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("gensenrounded") || normalized.includes("系統圓體")) {
+    return "GenSenRounded2";
+  }
+  return value?.trim() || fallback;
 }
 
-const approvalAsset = (fileName: string) => `https://soon-approval.vercel.app/a/${fileName}`
+type CarouselEditorPayload = {
+  draft?: {
+    body?: string[];
+    headline?: string;
+    layout?: string;
+    subheadline?: string;
+  };
+  generatedImage?: string;
+  page?: string;
+  projectId?: string;
+  sourceImage?: string;
+  title?: string;
+  workspaceLogo?: string;
+  workspaceName?: string;
+  workspaceFont?: string;
+};
 
-const bechillConfirmedSchedulePosts: ScheduledPost[] = [
-  {
-    id: 'bechill-week1-02',
-    type: '靜態圖片',
-    time: '8月13日（四）18:00',
-    title: '《乖乖等你》',
-    body: '你諗起邊個？\n\n有些人會陪你一段路。\n有些人會在某個時間明白你。\n有些關係很好，只是未必能一直留在原地。\n但笨chill 不太懂講大道理。\n牠一直在你回來之前，乖乖等你。\n-\n你同你屋企寵物之間，有冇一件好窩心嘅小事？\n留言講俾我哋聽',
-    image: approvalAsset('02_wait_1.webp'),
-    media: Array.from({ length: 7 }, (_, index) => approvalAsset(`02_wait_${index + 1}.webp`)),
-    scheduledAt: '2026-08-13T10:00:00.000Z',
-    status: '已確認',
-  },
-  {
-    id: 'bechill-week1-03',
-    type: '靜態圖片',
-    time: '8月14日（五）18:00',
-    title: '《有你嘅世界》',
-    body: 'Tag 一個成日好忙嘅朋友\n你開心，世界照樣轉。\n你唔開心，世界一樣照樣轉。\n唔係你唔重要，\n係唔使咩都攬上身。\n舒服啲啦 —— 世界唔會因為你抖五分鐘而停。',
-    image: approvalAsset('03_world_1.webp'),
-    media: Array.from({ length: 4 }, (_, index) => approvalAsset(`03_world_${index + 1}.webp`)),
-    scheduledAt: '2026-08-14T10:00:00.000Z',
-    status: '已確認',
-  },
-  {
-    id: 'bechill-week1-04',
-    type: '靜態圖片',
-    time: '8月15日（六）18:00',
-    title: '《休息不是懶惰》',
-    body: 'Tag 一個最近需要休息嘅朋友\n\n「休息並不是懶惰。在夏日某天躺在樹下草地上，聽水聲潺潺，或看雲在天上飄過，絕不是浪費時間。」\n\nJohn Lubbock',
-    image: approvalAsset('04_rest_1.webp'),
-    media: Array.from({ length: 7 }, (_, index) => approvalAsset(`04_rest_${index + 1}.webp`)),
-    scheduledAt: '2026-08-15T10:00:00.000Z',
-    status: '已確認',
-  },
-  {
-    id: 'bechill-week1-05',
-    type: '靜態圖片',
-    time: '8月16日（日）18:00',
-    title: '《沖完涼的髮型》',
-    body: '你喜歡笨chill沖完涼的髮型嗎？',
-    image: approvalAsset('05_hair_1.webp'),
-    media: Array.from({ length: 4 }, (_, index) => approvalAsset(`05_hair_${index + 1}.webp`)),
-    scheduledAt: '2026-08-16T10:00:00.000Z',
-    status: '已確認',
-  },
-]
-
-function formatPostTime(value: unknown, fallback: string) {
-  if (typeof value !== 'string') return fallback
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleTimeString('zh-HK', {
-    hour: '2-digit',
-    hour12: false,
-    minute: '2-digit',
-    timeZoneName: 'short',
-  })
-}
-
-function currentTimeZoneLabel() {
+function readCarouselEditorPayload(): CarouselEditorPayload | null {
+  if (typeof window === "undefined") return null;
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || '你的本地時區'
+    const raw = window.sessionStorage.getItem(
+      "soon-carousel-editor-payload-v1",
+    );
+    return raw ? (JSON.parse(raw) as CarouselEditorPayload) : null;
   } catch {
-    return '你的本地時區'
+    return null;
   }
 }
 
-function mapPersistedPostType(value: unknown): ScheduledPost['type'] {
-  if (value === 'blog') return '文章'
-  if (value === 'video') return '短影片'
-  return '靜態圖片'
-}
-
-function mapPersistedPostStatus(value: unknown): ScheduledPost['status'] {
-  if (value === 'approved') return '已確認'
-  if (value === 'scheduled') return '已排程'
-  if (value === 'published' || value === 'posted') return '已發布'
-  return value === 'draft' ? '草稿' : '新內容'
-}
-
-function mapPersistedScheduledPost(row: Record<string, unknown>, index: number, fallbackPosts: ScheduledPost[]): ScheduledPost {
-  const fallback = fallbackPosts[index % fallbackPosts.length]
-  const postType = typeof row.post_type === 'string' ? row.post_type : undefined
-  const captions = row.captions && typeof row.captions === 'object' ? row.captions as Record<string, unknown> : {}
-  const publishStatus =
-    captions.publish_status && typeof captions.publish_status === 'object' && !Array.isArray(captions.publish_status)
-      ? (captions.publish_status as ScheduledPost['publishStatus'])
-      : undefined
-  const assets = Array.isArray(captions.assets) ? captions.assets : []
-  const media = assets
-    .map((asset) => asset && typeof asset === 'object' ? (asset as Record<string, unknown>).url : null)
-    .filter((url): url is string => typeof url === 'string' && url.length > 0)
-  const image = typeof row.image_url === 'string' && row.image_url ? row.image_url : media[0] || fallback.image
-  return {
-    body: typeof row.body === 'string' && row.body ? row.body : fallback.body,
-    id: typeof row.id === 'string' ? row.id : fallback.id,
-    image,
-    media: media.length ? media : undefined,
-    postType,
-    publishStatus,
-    scheduledAt: typeof row.scheduled_at === 'string' ? row.scheduled_at : null,
-    status: mapPersistedPostStatus(row.status),
-    time: formatPostTime(row.scheduled_at, fallback.time),
-    title: typeof row.title === 'string' && row.title ? row.title : fallback.title,
-    type: mapPersistedPostType(postType),
-  }
-}
-
-function localDateTimeValue(offsetHours = 1) {
-  const date = new Date()
-  date.setHours(date.getHours() + offsetHours, 0, 0, 0)
-  return dateToLocalDateTimeValue(date)
-}
-
-function dateToLocalDateTimeValue(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function scheduledPostDateTimeValue(value: string | null | undefined) {
-  if (!value) return localDateTimeValue()
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return localDateTimeValue()
-  return dateToLocalDateTimeValue(date)
-}
-
-function isInCurrentWeek(post: ScheduledPost) {
-  if (!post.scheduledAt) return false
-  const scheduled = new Date(post.scheduledAt)
-  if (Number.isNaN(scheduled.getTime())) return false
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 7)
-  return scheduled >= start && scheduled < end
-}
-
-function createPostDesignElements(post: ScheduledPost): DesignElement[] {
-  return [
+function createCarouselLayerElements(
+  payload: CarouselEditorPayload,
+  _fallbackImage: string,
+): DesignElement[] {
+  const cover = payload.draft?.layout === "cover" || payload.page === "P.1";
+  const textColor = cover ? "#ffffff" : "#171717";
+  const workspaceFont = resolveWorkspaceFontFamily(payload.workspaceFont);
+  const body = Array.isArray(payload.draft?.body)
+    ? payload.draft.body.slice(0, 3)
+    : [];
+  const elements: DesignElement[] = [
     {
-      id: `image-background-${post.id}`,
-      kind: 'image',
-      item: 'background',
-      label: '背景圖片',
+      id: "carousel-background",
+      kind: "shape",
+      item: "background",
+      label: "頁面背景",
       x: 50,
       y: 50,
       size: 430,
@@ -407,571 +473,995 @@ function createPostDesignElements(post: ScheduledPost): DesignElement[] {
       height: 538,
       rotation: 0,
       opacity: 100,
-      color: '#ffffff',
+      color: cover ? "#171717" : "#f8f6f0",
+      zIndex: 1,
+    },
+  ];
+  if (payload.sourceImage) {
+    if (!cover) {
+      elements.push({
+        id: "carousel-image-mat",
+        kind: "shape",
+        item: "rectangle",
+        label: "圖片底板",
+        x: 50,
+        y: 67,
+        size: 379,
+        width: 379,
+        height: 207,
+        rotation: 0,
+        opacity: 100,
+        color: "#f1f1ef",
+        zIndex: 2,
+      });
+    }
+    elements.push({
+      id: "carousel-source-image",
+      kind: "image",
+      item: cover ? "background" : "photo",
+      label: "原圖",
+      x: 50,
+      y: cover ? 50 : 67,
+      size: cover ? 430 : 379,
+      width: cover ? 430 : 379,
+      height: cover ? 538 : 207,
+      rotation: 0,
+      opacity: 100,
+      color: "#ffffff",
+      zIndex: cover ? 2 : 3,
+      imageUrl: payload.sourceImage,
+    });
+  }
+  if (cover) {
+    elements.push({
+      id: "carousel-overlay",
+      kind: "shape",
+      item: "rectangle",
+      label: "文字遮罩",
+      x: 50,
+      y: 79,
+      size: 430,
+      width: 430,
+      height: 225,
+      rotation: 0,
+      opacity: 58,
+      color: "#111111",
+      zIndex: 3,
+    });
+  }
+  elements.push(
+    {
+      id: "carousel-category",
+      kind: "text",
+      item: "caption",
+      label: "分類",
+      x: 50,
+      y: cover ? 72 : 5.5,
+      size: cover ? 13 : 9,
+      width: cover ? 378 : 379,
+      rotation: 0,
+      opacity: 82,
+      color: textColor,
+      zIndex: 10,
+      textContent: "生活常識 × 科學解說",
+      fontFamily: workspaceFont,
+      fontSize: cover ? 13 : 9,
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
+      lineHeight: 1.2,
+    },
+    {
+      id: "carousel-headline",
+      kind: "text",
+      item: "headline",
+      label: "主標題",
+      x: 50,
+      y: cover ? 81 : 12.5,
+      size: cover ? 29 : 23,
+      width: 379,
+      rotation: 0,
+      opacity: 100,
+      color: textColor,
+      zIndex: 11,
+      textContent: (payload.draft?.headline || payload.title || "")
+        .replace(/\s+/g, " ")
+        .trim(),
+      fontFamily: workspaceFont,
+      fontSize: cover ? 29 : 23,
+      fontWeight: "bold",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
+      lineHeight: 1.05,
+    },
+  );
+  if (!cover) {
+    elements.push({
+      id: "carousel-headline-rule",
+      kind: "shape",
+      item: "rectangle",
+      label: "標題分隔線",
+      x: 10,
+      y: 19.5,
+      size: 36,
+      width: 36,
+      height: 2,
+      rotation: 0,
+      opacity: 100,
+      color: "#111111",
+      zIndex: 11,
+    });
+  }
+  if (payload.draft?.subheadline) {
+    elements.push({
+      id: "carousel-subheadline",
+      kind: "text",
+      item: "subtitle",
+      label: "副標題",
+      x: 50,
+      y: cover ? 90 : 29,
+      size: 18,
+      width: 379,
+      rotation: 0,
+      opacity: 100,
+      color: textColor,
+      zIndex: 12,
+      textContent: payload.draft.subheadline,
+      fontFamily: workspaceFont,
+      fontSize: 18,
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
+      lineHeight: 1.15,
+    });
+  }
+  if (!cover && body.length) {
+    const bodyWidth = 379;
+    const bodyFontSize = 12;
+    const bodyLineHeight = 1.55;
+    const bodyGap = 8;
+    const approximateCharactersPerLine = Math.floor(bodyWidth / bodyFontSize);
+    let bodyTop = 129;
+    body.forEach((paragraph, index) => {
+      const visualLength = Array.from(paragraph).reduce(
+        (total, character) => total + (/\s/.test(character) ? 0.45 : 1),
+        0,
+      );
+      const lineCount = Math.max(
+        1,
+        Math.ceil(visualLength / approximateCharactersPerLine),
+      );
+      const paragraphHeight = lineCount * bodyFontSize * bodyLineHeight;
+      elements.push({
+        id: `carousel-body-${index + 1}`,
+        kind: "text",
+        item: "body",
+        label: `正文 ${index + 1}`,
+        x: 50,
+        y: ((bodyTop + paragraphHeight / 2) / 538) * 100,
+        size: bodyFontSize,
+        width: bodyWidth,
+        rotation: 0,
+        opacity: 100,
+        color: "#171717",
+        zIndex: 12,
+        textContent: paragraph,
+        fontFamily: workspaceFont,
+        fontSize: bodyFontSize,
+        fontWeight: "normal",
+        fontStyle: "normal",
+        textDecoration: "none",
+        textAlign: "left",
+        lineHeight: bodyLineHeight,
+      });
+      bodyTop += paragraphHeight + bodyGap;
+    });
+  }
+  if (payload.workspaceLogo) {
+    elements.push({
+      id: "carousel-logo",
+      kind: "image",
+      item: "logo",
+      label: "Workspace Logo",
+      x: 7.5,
+      y: 95.5,
+      size: 14,
+      width: 14,
+      height: 14,
+      rotation: 0,
+      opacity: 100,
+      color: "#ffffff",
+      zIndex: 20,
+      imageUrl: payload.workspaceLogo,
+    });
+  }
+  elements.push(
+    {
+      id: "carousel-brand-name",
+      kind: "text",
+      item: "caption",
+      label: "品牌名稱",
+      x: payload.workspaceLogo ? 22.5 : 17.5,
+      y: 95.5,
+      size: 10,
+      width: 100,
+      rotation: 0,
+      opacity: 100,
+      color: textColor,
+      zIndex: 21,
+      textContent: payload.workspaceName || "egg.soon",
+      fontFamily: workspaceFont,
+      fontSize: 10,
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
+      lineHeight: 1,
+    },
+    {
+      id: "carousel-page-number",
+      kind: "text",
+      item: "caption",
+      label: "頁碼",
+      x: 90,
+      y: 95.5,
+      size: 10,
+      width: 55,
+      rotation: 0,
+      opacity: 100,
+      color: textColor,
+      zIndex: 21,
+      textContent: payload.page || "P.1",
+      fontFamily: workspaceFont,
+      fontSize: 10,
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "right",
+      lineHeight: 1,
+    },
+  );
+  return elements;
+}
+
+function buildScheduledPosts(images: string[]): ScheduledPost[] {
+  return [
+    {
+      id: "still-1000",
+      type: "靜態圖片",
+      time: "10:00",
+      title: "差點沒拍下來的片段",
+      body: "最細小的片段，往往承載最真實的感覺。把那個笑聲、眼神或普通一刻分享出去，就會變成朋友想再看一次的回憶。",
+      image: images[0] || FALLBACK_IMAGES[0],
+      status: "新內容",
+    },
+    {
+      id: "blog-1400",
+      type: "文章",
+      time: "14:00",
+      title: "一個簡單房間，幾段短片，突然就值得重播",
+      body: "和朋友聚在一起，本來可以很平常。但當那些片段被剪成有節奏的日常故事，它就會變成你想再看、再分享的內容。",
+      image: images[1] || FALLBACK_IMAGES[1],
+      status: "新內容",
+    },
+    {
+      id: "short-1800",
+      type: "短影片",
+      time: "18:00",
+      title: "今天值得留下的一秒",
+      body: "晚上的內容會用更輕鬆的節奏，提醒觀眾每日都有值得記錄的微小時刻。",
+      image: images[2] || FALLBACK_IMAGES[2],
+      status: "草稿",
+    },
+  ];
+}
+
+const approvalAsset = (fileName: string) =>
+  `https://soon-approval.vercel.app/a/${fileName}`;
+
+const bechillConfirmedSchedulePosts: ScheduledPost[] = [
+  {
+    id: "bechill-week1-02",
+    type: "靜態圖片",
+    time: "8月13日（四）18:00",
+    title: "《乖乖等你》",
+    body: "你諗起邊個？\n\n有些人會陪你一段路。\n有些人會在某個時間明白你。\n有些關係很好，只是未必能一直留在原地。\n但笨chill 不太懂講大道理。\n牠一直在你回來之前，乖乖等你。\n-\n你同你屋企寵物之間，有冇一件好窩心嘅小事？\n留言講俾我哋聽",
+    image: approvalAsset("02_wait_1.webp"),
+    media: Array.from({ length: 7 }, (_, index) =>
+      approvalAsset(`02_wait_${index + 1}.webp`),
+    ),
+    scheduledAt: "2026-08-13T10:00:00.000Z",
+    status: "已確認",
+  },
+  {
+    id: "bechill-week1-03",
+    type: "靜態圖片",
+    time: "8月14日（五）18:00",
+    title: "《有你嘅世界》",
+    body: "Tag 一個成日好忙嘅朋友\n你開心，世界照樣轉。\n你唔開心，世界一樣照樣轉。\n唔係你唔重要，\n係唔使咩都攬上身。\n舒服啲啦 —— 世界唔會因為你抖五分鐘而停。",
+    image: approvalAsset("03_world_1.webp"),
+    media: Array.from({ length: 4 }, (_, index) =>
+      approvalAsset(`03_world_${index + 1}.webp`),
+    ),
+    scheduledAt: "2026-08-14T10:00:00.000Z",
+    status: "已確認",
+  },
+  {
+    id: "bechill-week1-04",
+    type: "靜態圖片",
+    time: "8月15日（六）18:00",
+    title: "《休息不是懶惰》",
+    body: "Tag 一個最近需要休息嘅朋友\n\n「休息並不是懶惰。在夏日某天躺在樹下草地上，聽水聲潺潺，或看雲在天上飄過，絕不是浪費時間。」\n\nJohn Lubbock",
+    image: approvalAsset("04_rest_1.webp"),
+    media: Array.from({ length: 7 }, (_, index) =>
+      approvalAsset(`04_rest_${index + 1}.webp`),
+    ),
+    scheduledAt: "2026-08-15T10:00:00.000Z",
+    status: "已確認",
+  },
+  {
+    id: "bechill-week1-05",
+    type: "靜態圖片",
+    time: "8月16日（日）18:00",
+    title: "《沖完涼的髮型》",
+    body: "你喜歡笨chill沖完涼的髮型嗎？",
+    image: approvalAsset("05_hair_1.webp"),
+    media: Array.from({ length: 4 }, (_, index) =>
+      approvalAsset(`05_hair_${index + 1}.webp`),
+    ),
+    scheduledAt: "2026-08-16T10:00:00.000Z",
+    status: "已確認",
+  },
+];
+
+function formatPostTime(value: unknown, fallback: string) {
+  if (typeof value !== "string") return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return date.toLocaleTimeString("zh-HK", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+function currentTimeZoneLabel() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "你的本地時區";
+  } catch {
+    return "你的本地時區";
+  }
+}
+
+function mapPersistedPostType(value: unknown): ScheduledPost["type"] {
+  if (value === "blog") return "文章";
+  if (value === "video") return "短影片";
+  return "靜態圖片";
+}
+
+function mapPersistedPostStatus(value: unknown): ScheduledPost["status"] {
+  if (value === "approved") return "已確認";
+  if (value === "scheduled") return "已排程";
+  if (value === "published" || value === "posted") return "已發布";
+  return value === "draft" ? "草稿" : "新內容";
+}
+
+function mapPersistedScheduledPost(
+  row: Record<string, unknown>,
+  index: number,
+  fallbackPosts: ScheduledPost[],
+): ScheduledPost {
+  const fallback = fallbackPosts[index % fallbackPosts.length];
+  const postType =
+    typeof row.post_type === "string" ? row.post_type : undefined;
+  const captions =
+    row.captions && typeof row.captions === "object"
+      ? (row.captions as Record<string, unknown>)
+      : {};
+  const publishStatus =
+    captions.publish_status &&
+    typeof captions.publish_status === "object" &&
+    !Array.isArray(captions.publish_status)
+      ? (captions.publish_status as ScheduledPost["publishStatus"])
+      : undefined;
+  const assets = Array.isArray(captions.assets) ? captions.assets : [];
+  const media = assets
+    .map((asset) =>
+      asset && typeof asset === "object"
+        ? (asset as Record<string, unknown>).url
+        : null,
+    )
+    .filter((url): url is string => typeof url === "string" && url.length > 0);
+  const image =
+    typeof row.image_url === "string" && row.image_url
+      ? row.image_url
+      : media[0] || fallback.image;
+  return {
+    body: typeof row.body === "string" && row.body ? row.body : fallback.body,
+    id: typeof row.id === "string" ? row.id : fallback.id,
+    image,
+    media: media.length ? media : undefined,
+    postType,
+    publishStatus,
+    scheduledAt: typeof row.scheduled_at === "string" ? row.scheduled_at : null,
+    status: mapPersistedPostStatus(row.status),
+    time: formatPostTime(row.scheduled_at, fallback.time),
+    title:
+      typeof row.title === "string" && row.title ? row.title : fallback.title,
+    type: mapPersistedPostType(postType),
+  };
+}
+
+function localDateTimeValue(offsetHours = 1) {
+  const date = new Date();
+  date.setHours(date.getHours() + offsetHours, 0, 0, 0);
+  return dateToLocalDateTimeValue(date);
+}
+
+function dateToLocalDateTimeValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function scheduledPostDateTimeValue(value: string | null | undefined) {
+  if (!value) return localDateTimeValue();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return localDateTimeValue();
+  return dateToLocalDateTimeValue(date);
+}
+
+function isInCurrentWeek(post: ScheduledPost) {
+  if (!post.scheduledAt) return false;
+  const scheduled = new Date(post.scheduledAt);
+  if (Number.isNaN(scheduled.getTime())) return false;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return scheduled >= start && scheduled < end;
+}
+
+function createPostDesignElements(post: ScheduledPost): DesignElement[] {
+  return [
+    {
+      id: `image-background-${post.id}`,
+      kind: "image",
+      item: "background",
+      label: "背景圖片",
+      x: 50,
+      y: 50,
+      size: 430,
+      width: 430,
+      height: 538,
+      rotation: 0,
+      opacity: 100,
+      color: "#ffffff",
       zIndex: 1,
       imageUrl: post.image,
     },
     {
       id: `text-title-${post.id}`,
-      kind: 'text',
-      item: 'headline',
-      label: '標題文字',
+      kind: "text",
+      item: "headline",
+      label: "標題文字",
       x: 34,
       y: 13,
       size: 36,
       rotation: 0,
       opacity: 100,
-      color: '#ffffff',
+      color: "#ffffff",
       zIndex: 10,
       textContent: post.title,
-      fontFamily: 'Georgia, serif',
+      fontFamily: "Georgia, serif",
       fontSize: 36,
-      fontWeight: 'bold',
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'left',
+      fontWeight: "bold",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
       width: 330,
       lineHeight: 0.96,
     },
     {
       id: `text-subtitle-${post.id}`,
-      kind: 'text',
-      item: 'subtitle',
-      label: '副標題文字',
+      kind: "text",
+      item: "subtitle",
+      label: "副標題文字",
       x: 33,
       y: 25,
       size: 21,
       rotation: 0,
       opacity: 100,
-      color: '#ffffff',
+      color: "#ffffff",
       zIndex: 11,
-      textContent: 'is the one friends replay most.',
-      fontFamily: 'inherit',
+      textContent: "is the one friends replay most.",
+      fontFamily: "inherit",
       fontSize: 21,
-      fontWeight: 'normal',
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'left',
+      fontWeight: "normal",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "left",
       width: 310,
       lineHeight: 1.08,
     },
     {
       id: `text-logo-${post.id}`,
-      kind: 'text',
-      item: 'logo',
-      label: '品牌 Logo',
+      kind: "text",
+      item: "logo",
+      label: "品牌 Logo",
       x: 18,
       y: 91,
       size: 21,
       rotation: -4,
       opacity: 100,
-      color: '#ffffff',
+      color: "#ffffff",
       zIndex: 12,
-      textContent: 'SOON\nLOG',
-      fontFamily: 'inherit',
+      textContent: "SOON\nLOG",
+      fontFamily: "inherit",
       fontSize: 21,
-      fontWeight: 'bold',
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'center',
+      fontWeight: "bold",
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "center",
       width: 86,
       lineHeight: 0.8,
     },
-  ]
-}
-
-function createTemplateDesignElements(post: ScheduledPost, templateId: TemplatePresetId, imageUrl: string): DesignElement[] {
-  if (templateId === 'bold-focus') {
-    return [
-      {
-        id: `image-background-${post.id}-${templateId}`,
-        kind: 'image',
-        item: 'background',
-        label: '背景圖片',
-        x: 50,
-        y: 50,
-        size: 430,
-        width: 430,
-        height: 538,
-        rotation: 0,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 1,
-        imageUrl,
-      },
-      {
-        id: `shape-focus-${post.id}-${templateId}`,
-        kind: 'shape',
-        item: 'rounded',
-        label: '焦點色塊',
-        x: 43,
-        y: 23,
-        size: 210,
-        rotation: -4,
-        opacity: 82,
-        color: '#111111',
-        zIndex: 6,
-      },
-      {
-        id: `text-title-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'headline',
-        label: '標題文字',
-        x: 42,
-        y: 20,
-        size: 42,
-        rotation: 0,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 12,
-        textContent: post.title,
-        fontFamily: 'inherit',
-        fontSize: 42,
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'left',
-        width: 330,
-        lineHeight: 0.98,
-      },
-      {
-        id: `text-subtitle-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'subtitle',
-        label: '副標題文字',
-        x: 44,
-        y: 36,
-        size: 18,
-        rotation: 0,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 13,
-        textContent: '平凡一刻，也可以變成朋友想重播的故事。',
-        fontFamily: 'inherit',
-        fontSize: 18,
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'left',
-        width: 300,
-        lineHeight: 1.2,
-      },
-      {
-        id: `text-logo-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'logo',
-        label: '品牌 Logo',
-        x: 18,
-        y: 91,
-        size: 21,
-        rotation: -4,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 14,
-        textContent: 'SOON\nLOG',
-        fontFamily: 'inherit',
-        fontSize: 21,
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'center',
-        width: 86,
-        lineHeight: 0.8,
-      },
-    ]
-  }
-
-  if (templateId === 'clean-brand') {
-    return [
-      {
-        id: `image-background-${post.id}-${templateId}`,
-        kind: 'image',
-        item: 'background',
-        label: '背景圖片',
-        x: 50,
-        y: 47,
-        size: 390,
-        width: 390,
-        height: 488,
-        rotation: 0,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 1,
-        imageUrl,
-      },
-      {
-        id: `shape-caption-${post.id}-${templateId}`,
-        kind: 'shape',
-        item: 'rounded',
-        label: '文字底板',
-        x: 50,
-        y: 79,
-        size: 250,
-        rotation: 0,
-        opacity: 88,
-        color: '#F5F0EB',
-        zIndex: 7,
-      },
-      {
-        id: `text-title-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'headline',
-        label: '標題文字',
-        x: 50,
-        y: 75,
-        size: 28,
-        rotation: 0,
-        opacity: 100,
-        color: '#1A1A1A',
-        zIndex: 12,
-        textContent: post.title,
-        fontFamily: 'inherit',
-        fontSize: 28,
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'center',
-        width: 340,
-        lineHeight: 1.05,
-      },
-      {
-        id: `text-subtitle-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'subtitle',
-        label: '副標題文字',
-        x: 50,
-        y: 86,
-        size: 15,
-        rotation: 0,
-        opacity: 100,
-        color: '#5f534e',
-        zIndex: 13,
-        textContent: '由 SOON LOG 幫你把日常整理成更有節奏的內容。',
-        fontFamily: 'inherit',
-        fontSize: 15,
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'center',
-        width: 310,
-        lineHeight: 1.28,
-      },
-      {
-        id: `text-logo-${post.id}-${templateId}`,
-        kind: 'text',
-        item: 'logo',
-        label: '品牌 Logo',
-        x: 18,
-        y: 11,
-        size: 19,
-        rotation: -4,
-        opacity: 100,
-        color: '#ffffff',
-        zIndex: 14,
-        textContent: 'SOON\nLOG',
-        fontFamily: 'inherit',
-        fontSize: 19,
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        textAlign: 'center',
-        width: 82,
-        lineHeight: 0.8,
-      },
-    ]
-  }
-
-  return createPostDesignElements({ ...post, image: imageUrl })
+  ];
 }
 
 function ScheduledPostsPageContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const autoPostId = searchParams.get('postId')
-  const [compact, setCompact] = useState(false)
-  const fallbackScheduledPosts = useMemo(() => buildScheduledPosts(readTopicImages()), [])
-  const [persistedScheduledPosts, setPersistedScheduledPosts] = useState<ScheduledPost[]>([])
-  const [postsLoading, setPostsLoading] = useState(true)
-  const [postsLoadError, setPostsLoadError] = useState('')
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const autoPostId = searchParams.get("postId");
+  const externalEditImage = searchParams.get("editImage");
+  const externalEditTitle = searchParams.get("editTitle") || "Carousel 圖片";
+  const externalEditPage = searchParams.get("editPage") || "P.1";
+  const carouselEditorPayload = useMemo(() => readCarouselEditorPayload(), []);
+  const externalEditorReturnUrl = carouselEditorPayload?.projectId
+    ? `/onboarding/content-studio?project=${encodeURIComponent(carouselEditorPayload.projectId)}`
+    : "/onboarding/content-studio";
+  const [compact, setCompact] = useState(false);
+  const fallbackScheduledPosts = useMemo(
+    () => buildScheduledPosts(readTopicImages()),
+    [],
+  );
+  const [persistedScheduledPosts, setPersistedScheduledPosts] = useState<
+    ScheduledPost[]
+  >([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsLoadError, setPostsLoadError] = useState("");
   const clientReadyPosts = persistedScheduledPosts.filter((post) =>
-    ['已批准', '已確認', '已排程'].includes(post.status)
-  )
-  const [isBechillActive, setIsBechillActive] = useState(false)
-  const scheduledPosts = clientReadyPosts.length > 0 ? clientReadyPosts : isBechillActive ? bechillConfirmedSchedulePosts : []
-  const currentWeekPosts = useMemo(() => scheduledPosts.filter(isInCurrentWeek), [scheduledPosts])
-  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null)
-  const [postStatuses, setPostStatuses] = useState<Record<string, 'draft' | 'approved' | 'scheduled' | 'published' | 'rejected'>>({})
-  const [publishing, setPublishing] = useState(false)
-  const [publishingPlatform, setPublishingPlatform] = useState<string | null>(null)
-  const [publishResult, setPublishResult] = useState<'success' | 'error' | null>(null)
-  const [publishMessage, setPublishMessage] = useState('')
-  const [publishedPlatforms, setPublishedPlatforms] = useState<Record<string, boolean>>({})
-  const [platformConnections, setPlatformConnections] = useState<Record<string, PlatformConnection>>({})
-  const [platformConnectionsLoading, setPlatformConnectionsLoading] = useState(true)
-  const [previewChannel, setPreviewChannel] = useState<PreviewChannel>('Instagram')
-  const [captions, setCaptions] = useState<Record<string, Partial<Record<PreviewChannel, string>>>>({})
-  const [draftCaptions, setDraftCaptions] = useState<Partial<Record<PreviewChannel, string>>>({})
-  const [captionModalOpen, setCaptionModalOpen] = useState(false)
-  const [designMode, setDesignMode] = useState(false)
-  const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>('品牌')
+    ["已批准", "已確認", "已排程"].includes(post.status),
+  );
+  const [isBechillActive, setIsBechillActive] = useState(false);
+  const scheduledPosts =
+    clientReadyPosts.length > 0
+      ? clientReadyPosts
+      : isBechillActive
+        ? bechillConfirmedSchedulePosts
+        : [];
+  const currentWeekPosts = useMemo(
+    () => scheduledPosts.filter(isInCurrentWeek),
+    [scheduledPosts],
+  );
+  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
+  const [postStatuses, setPostStatuses] = useState<
+    Record<
+      string,
+      "draft" | "approved" | "scheduled" | "published" | "rejected"
+    >
+  >({});
+  const [publishing, setPublishing] = useState(false);
+  const [publishingPlatform, setPublishingPlatform] = useState<string | null>(
+    null,
+  );
+  const [publishResult, setPublishResult] = useState<
+    "success" | "error" | null
+  >(null);
+  const [publishMessage, setPublishMessage] = useState("");
+  const [publishedPlatforms, setPublishedPlatforms] = useState<
+    Record<string, boolean>
+  >({});
+  const [platformConnections, setPlatformConnections] = useState<
+    Record<string, PlatformConnection>
+  >({});
+  const [platformConnectionsLoading, setPlatformConnectionsLoading] =
+    useState(true);
+  const [previewChannel, setPreviewChannel] =
+    useState<PreviewChannel>("Instagram");
+  const [captions, setCaptions] = useState<
+    Record<string, Partial<Record<PreviewChannel, string>>>
+  >({});
+  const [draftCaptions, setDraftCaptions] = useState<
+    Partial<Record<PreviewChannel, string>>
+  >({});
+  const [captionModalOpen, setCaptionModalOpen] = useState(false);
+  const [designMode, setDesignMode] = useState(false);
+  const [activeDesignTool, setActiveDesignTool] = useState<DesignTool>("品牌");
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({
-    label: 'Instagram 直向貼文',
+    label: "Instagram 直向貼文",
     w: 1080,
     h: 1350,
-  })
-  const [expandedElementSection, setExpandedElementSection] = useState<ElementSection | null>(null)
-  const [designElements, setDesignElements] = useState<DesignElement[]>([])
-  const [designElementsPostId, setDesignElementsPostId] = useState<string | null>(null)
-  const [uploadedImages, setUploadedImages] = useState<{ url: string; label: string }[]>([])
-  const [brandKit, setBrandKit] = useState({ businessName: '品牌', logoUrl: '' })
-  const [creditBalance, setCreditBalance] = useState<number | null>(null)
-  const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [createPostType, setCreatePostType] = useState('still-images')
-  const [createTitle, setCreateTitle] = useState('')
-  const [createScheduledAt, setCreateScheduledAt] = useState(localDateTimeValue())
-  const [scheduleModalPost, setScheduleModalPost] = useState<ScheduledPost | null>(null)
-  const [scheduleDraftAt, setScheduleDraftAt] = useState(localDateTimeValue())
-  const [localTimeZoneLabel, setLocalTimeZoneLabel] = useState('你的本地時區')
-  const [toolbarMessage, setToolbarMessage] = useState('')
-  const [toolbarBusy, setToolbarBusy] = useState(false)
-  const [postSlides, setPostSlides] = useState<Record<string, number>>({})
-  const [expandedCaptions, setExpandedCaptions] = useState<Record<string, boolean>>({})
-  const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
-  const [cardCaptionDrafts, setCardCaptionDrafts] = useState<Record<string, string>>({})
-  const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
-  const [cancellingPostId, setCancellingPostId] = useState<string | null>(null)
-  const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
-  const connectedPublishPlatforms = PUBLISH_PLATFORMS.filter((platform) => platformConnections[platform.id])
-  const hasPublishConnection = connectedPublishPlatforms.length > 0
-  const [regenerateProgress, setRegenerateProgress] = useState({ current: 0, total: 0 })
-  const [improvePanelOpen, setImprovePanelOpen] = useState(false)
-  const [improveMode, setImproveMode] = useState<'copy' | 'image-prompt'>('copy')
-  const [improveProgress, setImproveProgress] = useState({ current: 0, total: 0 })
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
-  const canvasRef = useRef<HTMLElement | null>(null)
-  const fabricControlsRef = useRef<FabricControls | null>(null)
-  const designHistoryIndexRef = useRef(-1)
-  const designHistoryRef = useRef<string[]>([])
-  const isRestoringDesignHistoryRef = useRef(false)
+  });
+  const [expandedElementSection, setExpandedElementSection] =
+    useState<ElementSection | null>(null);
+  const [designElements, setDesignElements] = useState<DesignElement[]>([]);
+  const [designElementsPostId, setDesignElementsPostId] = useState<
+    string | null
+  >(null);
+  const [uploadedImages, setUploadedImages] = useState<
+    { url: string; label: string }[]
+  >([]);
+  const [brandKit, setBrandKit] = useState({
+    businessName: "品牌",
+    logoUrl: "",
+    fontFamily: "SweiGothicCJKtc-Regular",
+    brandColors: [] as string[],
+  });
+  const [brandKitLoading, setBrandKitLoading] = useState(true);
+  const [isSavingDesign, setIsSavingDesign] = useState(false);
+  const [saveDesignMessage, setSaveDesignMessage] = useState("");
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<
+    string | null
+  >(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createPostType, setCreatePostType] = useState("still-images");
+  const [createTitle, setCreateTitle] = useState("");
+  const [createScheduledAt, setCreateScheduledAt] =
+    useState(localDateTimeValue());
+  const [scheduleModalPost, setScheduleModalPost] =
+    useState<ScheduledPost | null>(null);
+  const [scheduleDraftAt, setScheduleDraftAt] = useState(localDateTimeValue());
+  const [localTimeZoneLabel, setLocalTimeZoneLabel] = useState("你的本地時區");
+  const [toolbarMessage, setToolbarMessage] = useState("");
+  const [toolbarBusy, setToolbarBusy] = useState(false);
+  const [postSlides, setPostSlides] = useState<Record<string, number>>({});
+  const [expandedCaptions, setExpandedCaptions] = useState<
+    Record<string, boolean>
+  >({});
+  const [editingCaptionPostId, setEditingCaptionPostId] = useState<
+    string | null
+  >(null);
+  const [cardCaptionDrafts, setCardCaptionDrafts] = useState<
+    Record<string, string>
+  >({});
+  const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(
+    null,
+  );
+  const [cancellingPostId, setCancellingPostId] = useState<string | null>(null);
+  const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false);
+  const connectedPublishPlatforms = PUBLISH_PLATFORMS.filter(
+    (platform) => platformConnections[platform.id],
+  );
+  const connectedAutoPublishPlatforms = connectedPublishPlatforms.filter(
+    (platform) => AUTO_PUBLISH_PLATFORM_IDS.has(platform.id),
+  );
+  const hasPublishConnection = connectedAutoPublishPlatforms.length > 0;
+  const [regenerateProgress, setRegenerateProgress] = useState({
+    current: 0,
+    total: 0,
+  });
+  const [improvePanelOpen, setImprovePanelOpen] = useState(false);
+  const [improveMode, setImproveMode] = useState<"copy" | "image-prompt">(
+    "copy",
+  );
+  const [improveProgress, setImproveProgress] = useState({
+    current: 0,
+    total: 0,
+  });
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(
+    null,
+  );
+  const canvasRef = useRef<HTMLElement | null>(null);
+  const fabricControlsRef = useRef<FabricControls | null>(null);
+  const designHistoryIndexRef = useRef(-1);
+  const designHistoryRef = useRef<string[]>([]);
+  const isRestoringDesignHistoryRef = useRef(false);
 
   useEffect(() => {
-    setLocalTimeZoneLabel(currentTimeZoneLabel())
-  }, [])
+    setLocalTimeZoneLabel(currentTimeZoneLabel());
+  }, []);
 
   useEffect(() => {
-    if (!autoPostId) return
-    router.replace('/onboarding/scheduled-posts', { scroll: false })
-  }, [autoPostId, router])
+    if (!autoPostId) return;
+    router.replace("/onboarding/scheduled-posts", { scroll: false });
+  }, [autoPostId, router]);
 
   useEffect(() => {
-    if (!autoPostId || selectedPost) return
-    const targetPost = scheduledPosts.find((post) => post.id === autoPostId)
-    if (targetPost) setSelectedPost(targetPost)
-  }, [autoPostId, scheduledPosts, selectedPost])
+    if (!autoPostId || selectedPost) return;
+    const targetPost = scheduledPosts.find((post) => post.id === autoPostId);
+    if (targetPost) setSelectedPost(targetPost);
+  }, [autoPostId, scheduledPosts, selectedPost]);
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
-      const nextElements = createPostDesignElements(post)
-      designHistoryRef.current = [JSON.stringify(nextElements)]
-      designHistoryIndexRef.current = 0
-      setDesignElements(nextElements)
-      void fabricControlsRef.current?.loadDesignElements(nextElements)
-      setDesignElementsPostId(post.id)
-      setSelectedElementId(null)
+      const nextElements = createPostDesignElements(post);
+      designHistoryRef.current = [JSON.stringify(nextElements)];
+      designHistoryIndexRef.current = 0;
+      setDesignElements(nextElements);
+      void fabricControlsRef.current?.loadDesignElements(nextElements);
+      setDesignElementsPostId(post.id);
+      setSelectedElementId(null);
     }
-    setDesignMode(true)
-  }
+    setDesignMode(true);
+  };
+
+  useEffect(() => {
+    if (!externalEditImage || selectedPost) return;
+    const externalPost: ScheduledPost = {
+      id: `carousel-${externalEditPage}`,
+      type: "靜態圖片",
+      time: "",
+      title: `${externalEditPage} · ${externalEditTitle}`,
+      body: "",
+      image: externalEditImage,
+      status: "草稿",
+    };
+    setSelectedPost(externalPost);
+    const payload = carouselEditorPayload
+      ? {
+          ...carouselEditorPayload,
+          workspaceLogo:
+            carouselEditorPayload.workspaceLogo || brandKit.logoUrl,
+          workspaceName:
+            carouselEditorPayload.workspaceName || brandKit.businessName,
+          workspaceFont:
+            carouselEditorPayload.workspaceFont || brandKit.fontFamily,
+        }
+      : null;
+    const nextElements = payload
+      ? createCarouselLayerElements(payload, externalEditImage)
+      : createPostDesignElements(externalPost).filter(
+          (element) => element.kind === "image",
+        );
+    designHistoryRef.current = [JSON.stringify(nextElements)];
+    designHistoryIndexRef.current = 0;
+    setDesignElements(nextElements);
+    setDesignElementsPostId(externalPost.id);
+    setSelectedElementId(null);
+    setDesignMode(true);
+  }, [
+    brandKit.businessName,
+    brandKit.logoUrl,
+    brandKit.fontFamily,
+    carouselEditorPayload,
+    externalEditImage,
+    externalEditPage,
+    externalEditTitle,
+    selectedPost,
+  ]);
+
+  const closeDesignEditor = () => {
+    if (externalEditImage) {
+      router.push(externalEditorReturnUrl);
+      return;
+    }
+    setDesignMode(false);
+  };
 
   const openCaptionModal = (post: ScheduledPost) => {
-    const currentCaptions = captions[post.id] || {}
+    const currentCaptions = captions[post.id] || {};
     setDraftCaptions(
-      CHANNELS.reduce<Partial<Record<PreviewChannel, string>>>((draft, channel) => {
-        draft[channel.id] = currentCaptions[channel.id] || post.body
-        return draft
-      }, {})
-    )
-    setCaptionModalOpen(true)
-  }
+      CHANNELS.reduce<Partial<Record<PreviewChannel, string>>>(
+        (draft, channel) => {
+          draft[channel.id] = currentCaptions[channel.id] || post.body;
+          return draft;
+        },
+        {},
+      ),
+    );
+    setCaptionModalOpen(true);
+  };
 
   const platformPublishStatus = (post: ScheduledPost, platformId: string) => {
-    const localKey = `${post.id}:${platformId}`
-    if (publishedPlatforms[localKey]) return 'published'
-    const persisted = post.publishStatus?.[platformId]
-    return persisted?.status || ''
-  }
+    const localKey = `${post.id}:${platformId}`;
+    if (publishedPlatforms[localKey]) return "published";
+    const persisted = post.publishStatus?.[platformId];
+    return persisted?.status || "";
+  };
 
   const saveCaptionDrafts = () => {
-    if (!selectedPost) return
+    if (!selectedPost) return;
     setCaptions((current) => ({
       ...current,
       [selectedPost.id]: {
         ...current[selectedPost.id],
         ...draftCaptions,
       },
-    }))
-    setCaptionModalOpen(false)
-  }
+    }));
+    setCaptionModalOpen(false);
+  };
 
-  const refreshCalendar = () => setRefreshKey((value) => value + 1)
+  const refreshCalendar = () => setRefreshKey((value) => value + 1);
 
   const startCardCaptionEdit = (post: ScheduledPost) => {
-    setCardCaptionDrafts((current) => ({ ...current, [post.id]: current[post.id] ?? post.body }))
-    setEditingCaptionPostId(post.id)
-    setExpandedCaptions((current) => ({ ...current, [post.id]: true }))
-  }
+    setCardCaptionDrafts((current) => ({
+      ...current,
+      [post.id]: current[post.id] ?? post.body,
+    }));
+    setEditingCaptionPostId(post.id);
+    setExpandedCaptions((current) => ({ ...current, [post.id]: true }));
+  };
 
   async function saveCardCaption(post: ScheduledPost) {
-    if (savingCaptionPostId) return
+    if (savingCaptionPostId) return;
 
-    const nextBody = (cardCaptionDrafts[post.id] ?? post.body).trim()
+    const nextBody = (cardCaptionDrafts[post.id] ?? post.body).trim();
     if (!nextBody) {
-      setToolbarMessage('Caption 不可以留空。')
-      return
+      setToolbarMessage("Caption 不可以留空。");
+      return;
     }
 
-    setSavingCaptionPostId(post.id)
-    setToolbarMessage('')
+    setSavingCaptionPostId(post.id);
+    setToolbarMessage("");
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from('campaign_posts')
-        .update({ body: nextBody, updated_at: new Date().toISOString() })
-        .eq('id', post.id)
-
-      if (error) throw error
+      const { workspaceId } = await resolveActiveWorkspace();
+      if (!workspaceId) throw new Error("找不到目前工作台。");
+      const response = await fetch("/api/posts/update-caption", {
+        body: JSON.stringify({ body: nextBody, postId: post.id, workspaceId }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.detail || result?.error || "Caption 儲存失敗。",
+        );
+      }
 
       setPersistedScheduledPosts((current) =>
-        current.map((item) => (item.id === post.id ? { ...item, body: nextBody } : item))
-      )
-      setEditingCaptionPostId(null)
-      setToolbarMessage('Caption 已更新。')
+        current.map((item) =>
+          item.id === post.id ? { ...item, body: nextBody } : item,
+        ),
+      );
+      setEditingCaptionPostId(null);
+      setToolbarMessage("Caption 已更新。");
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : 'Caption 儲存失敗，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error
+          ? error.message
+          : "Caption 儲存失敗，請再試一次。",
+      );
     } finally {
-      setSavingCaptionPostId(null)
+      setSavingCaptionPostId(null);
     }
   }
 
   async function cancelScheduledPost(post: ScheduledPost) {
-    if (cancellingPostId) return
-    const confirmed = window.confirm('刪除這個排程？貼文會從已排程內容移除。')
-    if (!confirmed) return
+    if (cancellingPostId) return;
+    const confirmed = window.confirm("刪除這個排程？貼文會從已排程內容移除。");
+    if (!confirmed) return;
 
-    setCancellingPostId(post.id)
-    setToolbarMessage('')
+    setCancellingPostId(post.id);
+    setToolbarMessage("");
 
     try {
-      const { workspaceId } = await resolveActiveWorkspace()
-      if (!workspaceId) throw new Error('找不到目前工作台。')
+      const { workspaceId } = await resolveActiveWorkspace();
+      if (!workspaceId) throw new Error("找不到目前工作台。");
 
-      const response = await fetch('/api/posts/reject', {
+      const response = await fetch("/api/posts/reject", {
         body: JSON.stringify({ postId: post.id, workspaceId }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      })
-      const result = await response.json().catch(() => ({}))
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
-        throw new Error(result?.detail || result?.error || '未能刪除排程，請再試一次。')
+        throw new Error(
+          result?.detail || result?.error || "未能刪除排程，請再試一次。",
+        );
       }
 
-      setPersistedScheduledPosts((current) => current.filter((item) => item.id !== post.id))
-      setPostStatuses((current) => ({ ...current, [post.id]: 'rejected' }))
-      if (selectedPost?.id === post.id) setSelectedPost(null)
-      setToolbarMessage('排程已刪除。')
+      setPersistedScheduledPosts((current) =>
+        current.filter((item) => item.id !== post.id),
+      );
+      setPostStatuses((current) => ({ ...current, [post.id]: "rejected" }));
+      if (selectedPost?.id === post.id) setSelectedPost(null);
+      setToolbarMessage("排程已刪除。");
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : '未能刪除排程，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error ? error.message : "未能刪除排程，請再試一次。",
+      );
     } finally {
-      setCancellingPostId(null)
+      setCancellingPostId(null);
     }
   }
 
   async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (toolbarBusy) return
+    event.preventDefault();
+    if (toolbarBusy) return;
 
-    setToolbarBusy(true)
-    setToolbarMessage('')
+    setToolbarBusy(true);
+    setToolbarMessage("");
 
     try {
-      const supabase = createClient()
+      const supabase = createClient();
       const {
         data: { user },
-      } = await supabase.auth.getUser()
-      if (!user?.id) throw new Error('請先登入。')
+      } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("請先登入。");
 
-      const { workspaceId } = await resolveActiveWorkspace()
-      if (!workspaceId) throw new Error('找不到目前工作台。')
+      const { workspaceId } = await resolveActiveWorkspace();
+      if (!workspaceId) throw new Error("找不到目前工作台。");
 
-      const scheduledAt = new Date(createScheduledAt)
-      if (Number.isNaN(scheduledAt.getTime())) throw new Error('請選擇有效的發布時間。')
+      const scheduledAt = new Date(createScheduledAt);
+      if (Number.isNaN(scheduledAt.getTime()))
+        throw new Error("請選擇有效的發布時間。");
 
-      const title = createTitle.trim()
-      if (!title) throw new Error('請輸入標題。')
+      const title = createTitle.trim();
+      if (!title) throw new Error("請輸入標題。");
 
-      const { error } = await supabase.from('campaign_posts').insert({
-        user_id: user.id,
-        workspace_id: workspaceId,
-        source_key: `manual-${crypto.randomUUID()}`,
-        title,
-        body: 'SOON 會根據這個標題協助你完善內容。',
-        post_type: createPostType,
-        scheduled_at: scheduledAt.toISOString(),
-        image_url: null,
-        status: 'draft',
-        updated_at: new Date().toISOString(),
-      })
+      const response = await fetch("/api/posts/create", {
+        body: JSON.stringify({
+          postType: createPostType,
+          scheduledAt: scheduledAt.toISOString(),
+          title,
+          workspaceId,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.detail || result?.error || "建立貼文失敗。");
+      }
 
-      if (error) throw error
-
-      setActiveWorkspaceIdState(workspaceId)
-      setCreateModalOpen(false)
-      setCreateTitle('')
-      setCreateScheduledAt(localDateTimeValue())
-      setToolbarMessage('已建立新貼文。')
-      refreshCalendar()
+      setActiveWorkspaceIdState(workspaceId);
+      setCreateModalOpen(false);
+      setCreateTitle("");
+      setCreateScheduledAt(localDateTimeValue());
+      setToolbarMessage("已建立新貼文。");
+      refreshCalendar();
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : '建立貼文失敗，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error ? error.message : "建立貼文失敗，請再試一次。",
+      );
     } finally {
-      setToolbarBusy(false)
+      setToolbarBusy(false);
     }
   }
 
   function openScheduleModal(post: ScheduledPost) {
-    setScheduleModalPost(post)
-    setScheduleDraftAt(scheduledPostDateTimeValue(post.scheduledAt))
-    setToolbarMessage('')
+    setScheduleModalPost(post);
+    setScheduleDraftAt(scheduledPostDateTimeValue(post.scheduledAt));
+    setToolbarMessage("");
   }
 
   async function handleUpdateSchedule(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!scheduleModalPost || toolbarBusy) return
+    event.preventDefault();
+    if (!scheduleModalPost || toolbarBusy) return;
 
-    setToolbarBusy(true)
-    setToolbarMessage('')
+    setToolbarBusy(true);
+    setToolbarMessage("");
 
     try {
-      const { workspaceId } = await resolveActiveWorkspace()
-      if (!workspaceId) throw new Error('找不到目前工作台。')
+      const { workspaceId } = await resolveActiveWorkspace();
+      if (!workspaceId) throw new Error("找不到目前工作台。");
 
-      const nextScheduledAt = new Date(scheduleDraftAt)
-      if (Number.isNaN(nextScheduledAt.getTime())) throw new Error('請選擇有效的發布時間。')
+      const nextScheduledAt = new Date(scheduleDraftAt);
+      if (Number.isNaN(nextScheduledAt.getTime()))
+        throw new Error("請選擇有效的發布時間。");
 
-      const response = await fetch('/api/posts/update-schedule', {
+      const response = await fetch("/api/posts/update-schedule", {
         body: JSON.stringify({
           postId: scheduleModalPost.id,
           scheduledAt: nextScheduledAt.toISOString(),
           workspaceId,
         }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      })
-      const result = await response.json().catch(() => ({}))
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
       if (!response.ok || !result?.success) {
-        throw new Error(result?.detail || result?.error || '更新發布時間失敗。')
+        throw new Error(
+          result?.detail || result?.error || "更新發布時間失敗。",
+        );
       }
 
       setPersistedScheduledPosts((current) =>
@@ -980,662 +1470,777 @@ function ScheduledPostsPageContent() {
             ? {
                 ...post,
                 scheduledAt: result.scheduled_at,
-                status: post.status === '已發布' ? post.status : '已確認',
+                status: post.status === "已發布" ? post.status : "已確認",
                 time: formatPostTime(result.scheduled_at, post.time),
               }
-            : post
-        )
-      )
-      setScheduleModalPost(null)
-      setToolbarMessage('發布時間已更新。')
-      refreshCalendar()
+            : post,
+        ),
+      );
+      setScheduleModalPost(null);
+      setToolbarMessage("發布時間已更新。");
+      refreshCalendar();
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : '更新發布時間失敗，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error
+          ? error.message
+          : "更新發布時間失敗，請再試一次。",
+      );
     } finally {
-      setToolbarBusy(false)
+      setToolbarBusy(false);
     }
   }
 
   async function regenerateImagesForPosts(
     posts: ScheduledPost[],
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
   ) {
-    setRegenerateProgress({ current: 0, total: posts.length })
+    setRegenerateProgress({ current: 0, total: posts.length });
     for (let index = 0; index < posts.length; index += 1) {
-      const post = posts[index]
-      setRegenerateProgress({ current: index + 1, total: posts.length })
-      onProgress?.(index + 1, posts.length)
-      const response = await fetch('/api/generate-post-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const post = posts[index];
+      setRegenerateProgress({ current: index + 1, total: posts.length });
+      onProgress?.(index + 1, posts.length);
+      const response = await fetch("/api/generate-post-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId: post.id }),
-      })
+      });
       if (!response.ok) {
-        const message = await response.text().catch(() => '')
-        throw new Error(message || `圖片生成失敗：${post.title}`)
+        const message = await response.text().catch(() => "");
+        throw new Error(message || `圖片生成失敗：${post.title}`);
       }
     }
   }
 
   async function handleConfirmRegenerate() {
-    if (toolbarBusy) return
+    if (toolbarBusy) return;
 
-    const posts = currentWeekPosts
+    const posts = currentWeekPosts;
     if (!activeWorkspaceId || !posts.length) {
-      setToolbarMessage('本週沒有可重新生成的貼文。')
-      setRegenerateConfirmOpen(false)
-      return
+      setToolbarMessage("本週沒有可重新生成的貼文。");
+      setRegenerateConfirmOpen(false);
+      return;
     }
 
-    setToolbarBusy(true)
-    setToolbarMessage('')
+    setToolbarBusy(true);
+    setToolbarMessage("");
 
     try {
-      await regenerateImagesForPosts(posts)
-      setToolbarMessage('本週圖片已重新生成。')
-      setRegenerateConfirmOpen(false)
-      refreshCalendar()
+      await regenerateImagesForPosts(posts);
+      setToolbarMessage("本週圖片已重新生成。");
+      setRegenerateConfirmOpen(false);
+      refreshCalendar();
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : '重新生成失敗，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error ? error.message : "重新生成失敗，請再試一次。",
+      );
     } finally {
-      setToolbarBusy(false)
-      setRegenerateProgress({ current: 0, total: 0 })
+      setToolbarBusy(false);
+      setRegenerateProgress({ current: 0, total: 0 });
     }
   }
 
   async function handleImprovePosts() {
-    if (toolbarBusy) return
+    if (toolbarBusy) return;
 
-    const posts = currentWeekPosts
+    const posts = currentWeekPosts;
     if (!activeWorkspaceId || !posts.length) {
-      setToolbarMessage('本週沒有可改善的貼文。')
-      setImprovePanelOpen(false)
-      return
+      setToolbarMessage("本週沒有可改善的貼文。");
+      setImprovePanelOpen(false);
+      return;
     }
 
-    setToolbarBusy(true)
-    setToolbarMessage('')
-    setImproveProgress({ current: 1, total: improveMode === 'image-prompt' ? posts.length + 1 : 1 })
+    setToolbarBusy(true);
+    setToolbarMessage("");
+    setImproveProgress({
+      current: 1,
+      total: improveMode === "image-prompt" ? posts.length + 1 : 1,
+    });
 
     try {
-      const response = await fetch('/api/scheduled-posts/improve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/scheduled-posts/improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: improveMode,
           postIds: posts.map((post) => post.id),
           workspaceId: activeWorkspaceId,
         }),
-      })
-      const result = await response.json().catch(() => ({}))
+      });
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result?.detail || result?.error || '改善失敗，請再試一次。')
+        throw new Error(
+          result?.detail || result?.error || "改善失敗，請再試一次。",
+        );
       }
 
-      if (improveMode === 'image-prompt') {
-        const updatedIds = Array.isArray(result?.updated) ? result.updated : posts.map((post) => post.id)
-        const updatedPosts = posts.filter((post) => updatedIds.includes(post.id))
+      if (improveMode === "image-prompt") {
+        const updatedIds = Array.isArray(result?.updated)
+          ? result.updated
+          : posts.map((post) => post.id);
+        const updatedPosts = posts.filter((post) =>
+          updatedIds.includes(post.id),
+        );
         await regenerateImagesForPosts(updatedPosts, (current, total) => {
-          setImproveProgress({ current: current + 1, total: total + 1 })
-        })
+          setImproveProgress({ current: current + 1, total: total + 1 });
+        });
       }
 
-      setToolbarMessage(improveMode === 'copy' ? '本週文案已改善。' : '本週圖片 prompt 已改善並重新生成圖片。')
-      setImprovePanelOpen(false)
-      refreshCalendar()
+      setToolbarMessage(
+        improveMode === "copy"
+          ? "本週文案已改善。"
+          : "本週圖片 prompt 已改善並重新生成圖片。",
+      );
+      setImprovePanelOpen(false);
+      refreshCalendar();
     } catch (error) {
-      setToolbarMessage(error instanceof Error ? error.message : '改善失敗，請再試一次。')
+      setToolbarMessage(
+        error instanceof Error ? error.message : "改善失敗，請再試一次。",
+      );
     } finally {
-      setToolbarBusy(false)
-      setImproveProgress({ current: 0, total: 0 })
+      setToolbarBusy(false);
+      setImproveProgress({ current: 0, total: 0 });
     }
   }
 
   const approvePost = async (post: ScheduledPost) => {
-    await publishPost(post)
-  }
+    await publishPost(post);
+  };
 
-  const publishPost = async (post: ScheduledPost, platform?: string, publishNow = false) => {
-    if (publishing) return
+  const publishPost = async (
+    post: ScheduledPost,
+    platform?: string,
+    publishNow = false,
+  ) => {
+    if (publishing) return;
 
-    setPublishing(true)
-    setPublishingPlatform(platform || 'all')
-    setPublishResult(null)
-    setPublishMessage('')
+    setPublishing(true);
+    setPublishingPlatform(platform || "all");
+    setPublishResult(null);
+    setPublishMessage("");
 
     try {
-      const { workspaceId } = await resolveActiveWorkspace()
-      if (!workspaceId) throw new Error('找不到目前工作台。')
+      const { workspaceId } = await resolveActiveWorkspace();
+      if (!workspaceId) throw new Error("找不到目前工作台。");
 
-      const response = await fetch('/api/posts/publish', {
-        body: JSON.stringify({ platform, postId: post.id, publishNow, workspaceId }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      })
-      const result = await response.json().catch(() => ({}))
-      const errors = Array.isArray(result?.errors) ? result.errors : []
-      const platformsPublished = Array.isArray(result?.platforms_published) ? result.platforms_published : []
+      const response = await fetch("/api/posts/publish", {
+        body: JSON.stringify({
+          platform,
+          postId: post.id,
+          publishNow,
+          workspaceId,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = await response.json().catch(() => ({}));
+      const errors = Array.isArray(result?.errors) ? result.errors : [];
+      const platformsPublished = Array.isArray(result?.platforms_published)
+        ? result.platforms_published
+        : [];
 
       if (!result?.success && !platformsPublished.length) {
         const message =
           errors
             .map((item: { message?: string; platform?: string }) =>
-              item.platform ? `${item.platform}: ${item.message || '發布失敗'}` : item.message || '發布失敗'
+              item.platform
+                ? `${item.platform}: ${item.message || "發布失敗"}`
+                : item.message || "發布失敗",
             )
-            .join('；') ||
+            .join("；") ||
           result?.detail ||
           result?.error ||
-          '發布失敗，貼文已保留為已批准。'
-        setPostStatuses((current) => ({ ...current, [post.id]: 'approved' }))
-        setPublishResult('error')
-        setPublishMessage(message)
-        setToolbarMessage(message)
-        refreshCalendar()
-        return
+          "發布失敗，貼文已保留為已批准。";
+        setPostStatuses((current) => ({ ...current, [post.id]: "approved" }));
+        setPublishResult("error");
+        setPublishMessage(message);
+        setToolbarMessage(message);
+        refreshCalendar();
+        return;
       }
 
       const status =
-        result?.status === 'published'
-          ? 'published'
-          : result?.status === 'partial_published'
-            ? 'approved'
-          : result?.status === 'scheduled'
-            ? 'scheduled'
-            : 'approved'
+        result?.status === "published"
+          ? "published"
+          : result?.status === "partial_published"
+            ? "approved"
+            : result?.status === "scheduled"
+              ? "scheduled"
+              : "approved";
       const scheduledAt = post.scheduledAt
-        ? new Date(post.scheduledAt).toLocaleString('zh-HK', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
+        ? new Date(post.scheduledAt).toLocaleString("zh-HK", {
+            dateStyle: "medium",
+            timeStyle: "short",
           })
-        : '預定時間'
+        : "預定時間";
       const platformText = platformsPublished.length
-        ? `已發布到 ${platformsPublished.join(', ')}。`
-        : ''
+        ? `已發布到 ${platformsPublished.join(", ")}。`
+        : "";
       const warningText = errors.length
         ? ` 未能發布到：${errors
             .map((item: { message?: string; platform?: string }) =>
-              item.platform ? `${item.platform}（${item.message || '發布失敗'}）` : item.message || '發布失敗'
+              item.platform
+                ? `${item.platform}（${item.message || "發布失敗"}）`
+                : item.message || "發布失敗",
             )
-            .join('；')}`
-        : ''
+            .join("；")}`
+        : "";
 
-      setPostStatuses((current) => ({ ...current, [post.id]: status }))
-      if (status === 'published') {
-        setPersistedScheduledPosts((current) => current.filter((item) => item.id !== post.id))
-        if (selectedPost?.id === post.id) setSelectedPost(null)
+      setPostStatuses((current) => ({ ...current, [post.id]: status }));
+      if (status === "published") {
+        setPersistedScheduledPosts((current) =>
+          current.filter((item) => item.id !== post.id),
+        );
+        if (selectedPost?.id === post.id) setSelectedPost(null);
       }
       if (platformsPublished.length) {
         setPublishedPlatforms((current) => {
-          const next = { ...current }
+          const next = { ...current };
           platformsPublished.forEach((item: string) => {
-            next[`${post.id}:${item}`] = true
-          })
-          return next
-        })
+            next[`${post.id}:${item}`] = true;
+          });
+          return next;
+        });
       }
       const nextPublishMessage =
-        result?.status === 'published' || result?.status === 'partial_published'
-          ? `✓ ${platformText || '已發布。'}${warningText}`
-          : `貼文已批准，將於 ${scheduledAt} 自動發布。`
-      setPublishResult('success')
-      setPublishMessage(nextPublishMessage)
-      setToolbarMessage(nextPublishMessage)
-      refreshCalendar()
+        result?.status === "published" || result?.status === "partial_published"
+          ? `✓ ${platformText || "已發布。"}${warningText}`
+          : `貼文已批准，將於 ${scheduledAt} 自動發布。`;
+      setPublishResult("success");
+      setPublishMessage(nextPublishMessage);
+      setToolbarMessage(nextPublishMessage);
+      refreshCalendar();
     } catch (error) {
-      const message = error instanceof Error ? error.message : '發布失敗，貼文已保留為已批准。'
-      setPostStatuses((current) => ({ ...current, [post.id]: 'approved' }))
-      setPublishResult('error')
-      setPublishMessage(message)
-      setToolbarMessage(message)
+      const message =
+        error instanceof Error
+          ? error.message
+          : "發布失敗，貼文已保留為已批准。";
+      setPostStatuses((current) => ({ ...current, [post.id]: "approved" }));
+      setPublishResult("error");
+      setPublishMessage(message);
+      setToolbarMessage(message);
     } finally {
-      setPublishing(false)
-      setPublishingPlatform(null)
+      setPublishing(false);
+      setPublishingPlatform(null);
     }
-  }
+  };
 
   const platformAccountName = (platformId: string) => {
-    const connection = platformConnections[platformId]
-    const name = connection?.account_name || connection?.account_id || ''
-    if (!name) return ''
-    return platformId === 'instagram' || platformId === 'threads' ? `@${name}` : name
-  }
+    const connection = platformConnections[platformId];
+    const name = connection?.account_name || connection?.account_id || "";
+    if (!name) return "";
+    return platformId === "instagram" || platformId === "threads"
+      ? `@${name}`
+      : name;
+  };
 
   const rejectPost = (post: ScheduledPost) => {
-    setPostStatuses((current) => ({ ...current, [post.id]: 'rejected' }))
-  }
+    setPostStatuses((current) => ({ ...current, [post.id]: "rejected" }));
+  };
 
   const goToNextPost = () => {
-    if (!selectedPost) return
-    const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
-    const nextPost = scheduledPosts[index + 1]
-    if (nextPost) setSelectedPost(nextPost)
-  }
+    if (!selectedPost) return;
+    const index = scheduledPosts.findIndex(
+      (post) => post.id === selectedPost.id,
+    );
+    const nextPost = scheduledPosts[index + 1];
+    if (nextPost) setSelectedPost(nextPost);
+  };
 
   const goToPrevPost = () => {
-    if (!selectedPost) return
-    const index = scheduledPosts.findIndex((post) => post.id === selectedPost.id)
-    const prevPost = scheduledPosts[index - 1]
-    if (prevPost) setSelectedPost(prevPost)
-  }
+    if (!selectedPost) return;
+    const index = scheduledPosts.findIndex(
+      (post) => post.id === selectedPost.id,
+    );
+    const prevPost = scheduledPosts[index - 1];
+    if (prevPost) setSelectedPost(prevPost);
+  };
 
-  const selectedCaption =
-    selectedPost ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body : ''
-  const selectedElement = designElements.find((element) => element.id === selectedElementId) || null
+  const selectedCaption = selectedPost
+    ? captions[selectedPost.id]?.[previewChannel] || selectedPost.body
+    : "";
+  const selectedElement =
+    designElements.find((element) => element.id === selectedElementId) || null;
   const selectedPostIndex = selectedPost
     ? scheduledPosts.findIndex((post) => post.id === selectedPost.id)
-    : -1
+    : -1;
   const currentPostStatus = selectedPost
     ? postStatuses[selectedPost.id] ||
-      (selectedPost.status === '已發布'
-        ? 'published'
-        : selectedPost.status === '已排程'
-          ? 'scheduled'
-          : selectedPost.status === '已批准'
-            ? 'approved'
-            : selectedPost.status === '草稿'
-              ? 'draft'
-              : 'draft')
-    : 'draft'
-  const hasPrevPost = selectedPostIndex > 0
-  const hasNextPost = selectedPostIndex >= 0 && selectedPostIndex < scheduledPosts.length - 1
+      (selectedPost.status === "已發布"
+        ? "published"
+        : selectedPost.status === "已排程"
+          ? "scheduled"
+          : selectedPost.status === "已批准"
+            ? "approved"
+            : selectedPost.status === "草稿"
+              ? "draft"
+              : "draft")
+    : "draft";
+  const hasPrevPost = selectedPostIndex > 0;
+  const hasNextPost =
+    selectedPostIndex >= 0 && selectedPostIndex < scheduledPosts.length - 1;
 
-  function setPostSlide(postId: string, totalSlides: number, nextSlide: number) {
+  function setPostSlide(
+    postId: string,
+    totalSlides: number,
+    nextSlide: number,
+  ) {
     setPostSlides((current) => ({
       ...current,
       [postId]: Math.max(0, Math.min(totalSlides - 1, nextSlide)),
-    }))
+    }));
   }
 
-  function movePostSlide(postId: string, totalSlides: number, direction: number) {
-    const currentSlide = postSlides[postId] ?? 0
-    setPostSlide(postId, totalSlides, currentSlide + direction)
+  function movePostSlide(
+    postId: string,
+    totalSlides: number,
+    direction: number,
+  ) {
+    const currentSlide = postSlides[postId] ?? 0;
+    setPostSlide(postId, totalSlides, currentSlide + direction);
   }
 
   const getToolForElement = (element: DesignElement): DesignTool => {
-    if (element.kind === 'text') return '文字'
-    if (element.kind === 'image') return '媒體'
-    return '元素'
-  }
+    if (element.kind === "text") return "文字";
+    if (element.kind === "image") return "媒體";
+    return "元素";
+  };
 
   const clearFabricSelection = () => {
-    const canvas = fabricControlsRef.current?.fabricRef.current
-    if (!canvas) return
-    canvas.discardActiveObject()
-    canvas.renderAll()
-  }
+    const canvas = fabricControlsRef.current?.fabricRef.current;
+    if (!canvas) return;
+    canvas.discardActiveObject();
+    canvas.renderAll();
+  };
 
   const deselectDesignElement = () => {
-    clearFabricSelection()
-    setSelectedElementId(null)
-  }
+    clearFabricSelection();
+    setSelectedElementId(null);
+  };
 
   const selectDesignElement = (id: string) => {
-    setSelectedElementId(id)
-    const element = designElements.find((item) => item.id === id)
+    setSelectedElementId(id);
+    const element = designElements.find((item) => item.id === id);
     if (element) {
-      setActiveDesignTool(getToolForElement(element))
+      setActiveDesignTool(getToolForElement(element));
     }
-  }
+  };
 
   const switchDesignTool = (tool: DesignTool) => {
-    deselectDesignElement()
-    setActiveDesignTool(tool)
-  }
+    deselectDesignElement();
+    setActiveDesignTool(tool);
+  };
 
   useEffect(() => {
-    let cancelled = false
-    const fallback = readBrandKit()
-    setBrandKit(fallback)
+    let cancelled = false;
 
-    async function persistAndLoadBrandKit() {
-      await completeOnboardingSnapshot()
-      const persisted = await loadPersistedBrandKit(fallback)
-      if (!cancelled) setBrandKit(persisted)
-    }
-
-    void persistAndLoadBrandKit()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadPlatformConnections() {
-      if (!cancelled) setPlatformConnectionsLoading(true)
+    async function persistAndLoadBrandKit(includeOnboardingSnapshot = false) {
+      const fallback = readBrandKit();
+      if (!cancelled) {
+        setBrandKitLoading(true);
+        setBrandKit(fallback);
+      }
       try {
-        const { workspaceId } = await resolveActiveWorkspace()
-        if (!workspaceId) {
-          if (!cancelled) setPlatformConnections({})
-          return
-        }
-
-        const dashboardResponse = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
-          cache: 'no-store',
-        })
-        const dashboardPayload = await dashboardResponse.json().catch(() => null)
-        if (!dashboardResponse.ok) {
-          throw new Error(dashboardPayload?.error || 'Failed to load platform connections')
-        }
-
-        if (cancelled) return
-
-        const nextConnections: Record<string, PlatformConnection> = {}
-        ;((dashboardPayload?.connections || []) as PlatformConnection[]).forEach((connection) => {
-          nextConnections[connection.platform] = connection
-        })
-        setPlatformConnections(nextConnections)
-      } catch (error) {
-        console.warn('[scheduled-posts] failed to load social connections:', error)
+        if (includeOnboardingSnapshot) await completeOnboardingSnapshot();
+        const persisted = await loadPersistedBrandKit(fallback);
+        if (!cancelled) setBrandKit(persisted);
       } finally {
-        if (!cancelled) setPlatformConnectionsLoading(false)
+        if (!cancelled) setBrandKitLoading(false);
       }
     }
 
-    void loadPlatformConnections()
+    const handleWorkspaceBrandKitChanged = () => {
+      void persistAndLoadBrandKit();
+    };
 
-    function handleWorkspaceChanged() {
-      void loadPlatformConnections()
-    }
+    void persistAndLoadBrandKit(true);
+    window.addEventListener(
+      WORKSPACE_CHANGED_EVENT,
+      handleWorkspaceBrandKitChanged,
+    );
 
-    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
     return () => {
-      cancelled = true
-      window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
-    }
-  }, [refreshKey])
+      cancelled = true;
+      window.removeEventListener(
+        WORKSPACE_CHANGED_EVENT,
+        handleWorkspaceBrandKitChanged,
+      );
+    };
+  }, []);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
+
+    async function loadPlatformConnections() {
+      if (!cancelled) setPlatformConnectionsLoading(true);
+      try {
+        const { workspaceId } = await resolveActiveWorkspace();
+        if (!workspaceId) {
+          if (!cancelled) setPlatformConnections({});
+          return;
+        }
+
+        const dashboardResponse = await fetch(
+          `/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`,
+          {
+            cache: "no-store",
+          },
+        );
+        const dashboardPayload = await dashboardResponse
+          .json()
+          .catch(() => null);
+        if (!dashboardResponse.ok) {
+          throw new Error(
+            dashboardPayload?.error || "Failed to load platform connections",
+          );
+        }
+
+        if (cancelled) return;
+
+        const nextConnections: Record<string, PlatformConnection> = {};
+        ((dashboardPayload?.connections || []) as PlatformConnection[]).forEach(
+          (connection) => {
+            nextConnections[connection.platform] = connection;
+          },
+        );
+        setPlatformConnections(nextConnections);
+      } catch (error) {
+        console.warn(
+          "[scheduled-posts] failed to load social connections:",
+          error,
+        );
+      } finally {
+        if (!cancelled) setPlatformConnectionsLoading(false);
+      }
+    }
+
+    void loadPlatformConnections();
+
+    function handleWorkspaceChanged() {
+      void loadPlatformConnections();
+    }
+
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(
+        WORKSPACE_CHANGED_EVENT,
+        handleWorkspaceChanged,
+      );
+    };
+  }, [refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     async function loadPersistedPostsAndCredits() {
-      if (!cancelled) setPostsLoading(true)
-      if (!cancelled) setPostsLoadError('')
+      if (!cancelled) setPostsLoading(true);
+      if (!cancelled) setPostsLoadError("");
       try {
-        const supabase = createClient()
+        const supabase = createClient();
         const {
           data: { user },
-        } = await supabase.auth.getUser()
-        const sessionId = getStoredOnboardingSessionId()
-        let workspaceId: string | null = null
+        } = await supabase.auth.getUser();
+        const sessionId = getStoredOnboardingSessionId();
+        let workspaceId: string | null = null;
 
-        let postsData: Record<string, unknown>[] | null = null
+        let postsData: Record<string, unknown>[] | null = null;
 
         if (user?.id) {
-          const resolvedWorkspace = await resolveActiveWorkspace()
-          workspaceId = resolvedWorkspace.workspaceId
+          const resolvedWorkspace = await resolveActiveWorkspace();
+          workspaceId = resolvedWorkspace.workspaceId;
           if (!workspaceId) {
             if (!cancelled) {
-              setActiveWorkspaceIdState(null)
-              setPersistedScheduledPosts([])
-              setIsBechillActive(false)
-              setPostsLoading(false)
+              setActiveWorkspaceIdState(null);
+              setPersistedScheduledPosts([]);
+              setIsBechillActive(false);
+              setPostsLoading(false);
             }
-            return
+            return;
           }
 
           if (!cancelled) {
-            setActiveWorkspaceIdState(workspaceId)
-            setIsBechillActive(isBechillWorkspace(resolvedWorkspace.activeWorkspace))
+            setActiveWorkspaceIdState(workspaceId);
+            setIsBechillActive(
+              isBechillWorkspace(resolvedWorkspace.activeWorkspace),
+            );
           }
-          const dashboardResponse = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`, {
-            cache: 'no-store',
-          })
-          const dashboardPayload = await dashboardResponse.json().catch(() => null)
+          const syncResponse = await fetch("/api/content-projects/sync-approved", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ workspaceId }),
+          });
+          const syncPayload = await syncResponse.json().catch(() => null);
+          if (!syncResponse.ok) {
+            throw new Error(
+              syncPayload?.detail ||
+                syncPayload?.error ||
+                "Failed to sync approved content",
+            );
+          }
+          const dashboardResponse = await fetch(
+            `/api/dashboard-data?workspace_id=${encodeURIComponent(workspaceId)}`,
+            {
+              cache: "no-store",
+            },
+          );
+          const dashboardPayload = await dashboardResponse
+            .json()
+            .catch(() => null);
           if (!dashboardResponse.ok) {
-            throw new Error(dashboardPayload?.error || 'Failed to load scheduled posts')
+            throw new Error(
+              dashboardPayload?.error || "Failed to load scheduled posts",
+            );
           }
 
-          postsData = dashboardPayload?.posts || []
-          if (!cancelled && typeof dashboardPayload?.credits?.balance === 'number') {
-            setCreditBalance(dashboardPayload.credits.balance)
+          postsData = dashboardPayload?.posts || [];
+          if (
+            !cancelled &&
+            typeof dashboardPayload?.credits?.balance === "number"
+          ) {
+            setCreditBalance(dashboardPayload.credits.balance);
           }
           if (!cancelled && Array.isArray(dashboardPayload?.connections)) {
-            const nextConnections: Record<string, PlatformConnection> = {}
-            ;(dashboardPayload.connections as PlatformConnection[]).forEach((connection) => {
-              nextConnections[connection.platform] = connection
-            })
-            setPlatformConnections(nextConnections)
-            setPlatformConnectionsLoading(false)
+            const nextConnections: Record<string, PlatformConnection> = {};
+            (dashboardPayload.connections as PlatformConnection[]).forEach(
+              (connection) => {
+                nextConnections[connection.platform] = connection;
+              },
+            );
+            setPlatformConnections(nextConnections);
+            setPlatformConnectionsLoading(false);
           }
         } else if (sessionId) {
           const { data, error } = await supabase
-            .from('campaign_posts')
-            .select('id,title,body,post_type,scheduled_at,image_url,status,captions,marketing_campaigns(name,strategy_emoji)')
-            .eq('onboarding_session_id', sessionId)
-            .order('scheduled_at', { ascending: true })
-          if (error) throw error
-          postsData = data || []
+            .from("campaign_posts")
+            .select(
+              "id,title,body,post_type,scheduled_at,image_url,status,captions,marketing_campaigns(name,strategy_emoji)",
+            )
+            .eq("onboarding_session_id", sessionId)
+            .order("scheduled_at", { ascending: true });
+          if (error) throw error;
+          postsData = data || [];
         } else {
-          if (!cancelled) setPostsLoading(false)
-          return
+          if (!cancelled) setPostsLoading(false);
+          return;
         }
 
         if (!cancelled) {
           setPersistedScheduledPosts(
-            ((postsData || []) as Record<string, unknown>[]).map((post, index) =>
-              mapPersistedScheduledPost(post, index, fallbackScheduledPosts)
-            )
-          )
+            ((postsData || []) as Record<string, unknown>[]).map(
+              (post, index) =>
+                mapPersistedScheduledPost(post, index, fallbackScheduledPosts),
+            ),
+          );
         }
       } catch (error) {
-        console.warn('[scheduled-posts] failed to load posts:', error)
+        console.warn("[scheduled-posts] failed to load posts:", error);
         if (!cancelled) {
-          setPersistedScheduledPosts([])
-          setPostsLoadError(error instanceof Error ? error.message : '未能載入已排程內容')
+          setPersistedScheduledPosts([]);
+          setPostsLoadError(
+            error instanceof Error ? error.message : "未能載入已排程內容",
+          );
         }
       } finally {
-        if (!cancelled) setPostsLoading(false)
+        if (!cancelled) setPostsLoading(false);
       }
     }
 
-    void loadPersistedPostsAndCredits()
+    void loadPersistedPostsAndCredits();
 
     function handleWorkspaceChanged() {
-      setRefreshKey((value) => value + 1)
+      setRefreshKey((value) => value + 1);
     }
 
-    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
+    window.addEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged);
 
     return () => {
-      cancelled = true
-      window.removeEventListener(WORKSPACE_CHANGED_EVENT, handleWorkspaceChanged)
-    }
-  }, [fallbackScheduledPosts, refreshKey])
+      cancelled = true;
+      window.removeEventListener(
+        WORKSPACE_CHANGED_EVENT,
+        handleWorkspaceChanged,
+      );
+    };
+  }, [fallbackScheduledPosts, refreshKey]);
 
   useEffect(() => {
-    const snapshot = JSON.stringify(designElements)
+    const snapshot = JSON.stringify(designElements);
     if (isRestoringDesignHistoryRef.current) {
-      isRestoringDesignHistoryRef.current = false
-      return
+      isRestoringDesignHistoryRef.current = false;
+      return;
     }
 
-    const history = designHistoryRef.current
-    const currentIndex = designHistoryIndexRef.current
-    if (history[currentIndex] === snapshot) return
+    const history = designHistoryRef.current;
+    const currentIndex = designHistoryIndexRef.current;
+    if (history[currentIndex] === snapshot) return;
 
-    const nextHistory = history.slice(0, currentIndex + 1)
-    nextHistory.push(snapshot)
+    const nextHistory = history.slice(0, currentIndex + 1);
+    nextHistory.push(snapshot);
     if (nextHistory.length > 50) {
-      nextHistory.shift()
+      nextHistory.shift();
     }
 
-    designHistoryRef.current = nextHistory
-    designHistoryIndexRef.current = nextHistory.length - 1
-  }, [designElements])
+    designHistoryRef.current = nextHistory;
+    designHistoryIndexRef.current = nextHistory.length - 1;
+  }, [designElements]);
 
-  const restoreDesignHistory = (direction: 'undo' | 'redo') => {
+  const restoreDesignHistory = (direction: "undo" | "redo") => {
     if (fabricControlsRef.current) {
-      void (direction === 'undo' ? fabricControlsRef.current.undo() : fabricControlsRef.current.redo())
-      return
+      void (direction === "undo"
+        ? fabricControlsRef.current.undo()
+        : fabricControlsRef.current.redo());
+      return;
     }
 
-    const history = designHistoryRef.current
-    const currentIndex = designHistoryIndexRef.current
-    const nextIndex = direction === 'undo' ? currentIndex - 1 : currentIndex + 1
-    if (nextIndex < 0 || nextIndex >= history.length) return
+    const history = designHistoryRef.current;
+    const currentIndex = designHistoryIndexRef.current;
+    const nextIndex =
+      direction === "undo" ? currentIndex - 1 : currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= history.length) return;
 
-    const nextElements = JSON.parse(history[nextIndex]) as DesignElement[]
-    designHistoryIndexRef.current = nextIndex
-    isRestoringDesignHistoryRef.current = true
-    setDesignElements(nextElements)
+    const nextElements = JSON.parse(history[nextIndex]) as DesignElement[];
+    designHistoryIndexRef.current = nextIndex;
+    isRestoringDesignHistoryRef.current = true;
+    setDesignElements(nextElements);
     setSelectedElementId((current) =>
-      current && nextElements.some((element) => element.id === current) ? current : null
-    )
-  }
+      current && nextElements.some((element) => element.id === current)
+        ? current
+        : null,
+    );
+  };
 
   useEffect(() => {
-    if (!designMode) return
+    if (!designMode) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          'input, textarea, select, button, [contenteditable="true"]',
+        )
+      )
+        return;
 
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-        event.preventDefault()
-        restoreDesignHistory(event.shiftKey ? 'redo' : 'undo')
-        return
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        restoreDesignHistory(event.shiftKey ? "redo" : "undo");
+        return;
       }
 
-      if ((event.key === 'Backspace' || event.key === 'Delete') && selectedElementId) {
-        event.preventDefault()
-        deleteSelectedElement()
-        return
+      if (
+        (event.key === "Backspace" || event.key === "Delete") &&
+        selectedElementId
+      ) {
+        event.preventDefault();
+        deleteSelectedElement();
+        return;
       }
 
-      if (event.key === 'Enter' || event.key === 'Escape') {
-        event.preventDefault()
-        deselectDesignElement()
+      if (event.key === "Enter" || event.key === "Escape") {
+        event.preventDefault();
+        deselectDesignElement();
       }
-    }
+    };
 
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [designMode, selectedElementId])
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [designMode, selectedElementId]);
 
-  const addDesignElement = (kind: Exclude<DesignElementKind, 'text' | 'image'>, item: string) => {
-    const id = `${kind}-${item}-${Date.now()}`
+  const addDesignElement = (
+    kind: Exclude<DesignElementKind, "text" | "image">,
+    item: string,
+  ) => {
+    const id = `${kind}-${item}-${Date.now()}`;
     const nextElement: DesignElement = {
       id,
       kind,
       item,
-      label: kind === 'shape' ? '形狀' : kind === 'frame' ? '相框' : '圖示',
+      label: kind === "shape" ? "形狀" : kind === "frame" ? "相框" : "圖示",
       x: 50,
       y: 48,
-      size: kind === 'icon' ? 58 : 132,
+      size: kind === "icon" ? 58 : 132,
       rotation: 0,
       opacity: 100,
-      color: '#111111',
+      color: "#111111",
       zIndex: 15 + designElements.length,
-    }
-    void fabricControlsRef.current?.addDesignElement(nextElement)
-    setDesignElements((current) => [...current, nextElement])
-    setSelectedElementId(id)
-    setActiveDesignTool('元素')
-  }
+    };
+    void fabricControlsRef.current?.addDesignElement(nextElement);
+    setDesignElements((current) => [...current, nextElement]);
+    setSelectedElementId(id);
+    setActiveDesignTool("元素");
+  };
 
   const addTextElement = (preset: TextPreset) => {
     const presets: Record<
       TextPreset,
-      Pick<DesignElement, 'color' | 'fontSize' | 'fontWeight' | 'textContent' | 'width'>
+      Pick<
+        DesignElement,
+        "color" | "fontSize" | "fontWeight" | "textContent" | "width"
+      >
     > = {
       heading: {
-        color: '#ffffff',
+        color: "#ffffff",
         fontSize: 46,
-        fontWeight: 'bold',
-        textContent: '標題文字',
+        fontWeight: "bold",
+        textContent: "標題文字",
         width: 360,
       },
       subheading: {
-        color: '#ffffff',
+        color: "#ffffff",
         fontSize: 30,
-        fontWeight: 'bold',
-        textContent: '副標題',
+        fontWeight: "bold",
+        textContent: "副標題",
         width: 330,
       },
       body: {
-        color: '#ffffff',
+        color: "#ffffff",
         fontSize: 20,
-        fontWeight: 'normal',
-        textContent: '內文文字，點擊右邊編輯',
+        fontWeight: "normal",
+        textContent: "內文文字，點擊右邊編輯",
         width: 300,
       },
       caption: {
-        color: '#ffffff',
+        color: "#ffffff",
         fontSize: 14,
-        fontWeight: 'normal',
-        textContent: '說明文字',
+        fontWeight: "normal",
+        textContent: "說明文字",
         width: 240,
       },
-    }
-    const config = presets[preset]
-    const id = `text-${preset}-${Date.now()}`
+    };
+    const config = presets[preset];
+    const id = `text-${preset}-${Date.now()}`;
     const nextElement: DesignElement = {
       id,
-      kind: 'text',
+      kind: "text",
       item: preset,
-      label: '文字',
+      label: "文字",
       x: 50,
       y: 46,
       size: config.fontSize || 24,
       rotation: 0,
       opacity: 100,
-      color: config.color || '#ffffff',
+      color: config.color || "#ffffff",
       zIndex: 20 + designElements.length,
       textContent: config.textContent,
-      fontFamily: 'inherit',
+      fontFamily: brandKit.fontFamily,
       fontSize: config.fontSize,
       fontWeight: config.fontWeight,
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'center',
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "center",
       width: config.width,
       lineHeight: 1.25,
-    }
-    void fabricControlsRef.current?.addDesignElement(nextElement)
-    setDesignElements((current) => [...current, nextElement])
-    setSelectedElementId(id)
-    setActiveDesignTool('文字')
-  }
+    };
+    void fabricControlsRef.current?.addDesignElement(nextElement);
+    setDesignElements((current) => [...current, nextElement]);
+    setSelectedElementId(id);
+    setActiveDesignTool("文字");
+  };
 
-  const addTextStyleElement = (preset: TextStylePreset) => {
-    const id = `text-style-${preset.label}-${Date.now()}`
-    const fontWeight = preset.style.fontWeight === 'bold' || preset.style.fontWeight === 900 ? 'bold' : 'normal'
-    const nextElement: DesignElement = {
-      id,
-      kind: 'text',
-      item: preset.label,
-      label: '文字',
-      x: 50,
-      y: 46,
-      size: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
-      rotation: 0,
-      opacity: 100,
-      color: typeof preset.style.color === 'string' ? preset.style.color : '#111111',
-      zIndex: 20 + designElements.length,
-      textContent: preset.textContent,
-      fontFamily: typeof preset.style.fontFamily === 'string' ? preset.style.fontFamily : 'inherit',
-      fontSize: typeof preset.style.fontSize === 'number' ? preset.style.fontSize : 24,
-      fontWeight,
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'center',
-      width: 300,
-      lineHeight: 1.25,
-    }
-    void fabricControlsRef.current?.addDesignElement(nextElement)
-    setDesignElements((current) => [...current, nextElement])
-    setSelectedElementId(id)
-    setActiveDesignTool('文字')
-  }
-
-  const addImageElement = (imageUrl: string, label = '圖片') => {
+  const addImageElement = (imageUrl: string, label = "圖片") => {
     const nextElement: DesignElement = {
       id: crypto.randomUUID(),
-      kind: 'image',
-      item: 'photo',
+      kind: "image",
+      item: "photo",
       label,
       x: 50,
       y: 50,
@@ -1644,65 +2249,67 @@ function ScheduledPostsPageContent() {
       height: 220,
       rotation: 0,
       opacity: 100,
-      color: 'transparent',
+      color: "transparent",
       zIndex: 20 + designElements.length,
       imageUrl,
-    }
-    void fabricControlsRef.current?.addDesignElement(nextElement)
-    setDesignElements((current) => [...current, nextElement])
-    setSelectedElementId(nextElement.id)
-    setActiveDesignTool('媒體')
-  }
+    };
+    void fabricControlsRef.current?.addDesignElement(nextElement);
+    setDesignElements((current) => [...current, nextElement]);
+    setSelectedElementId(nextElement.id);
+    setActiveDesignTool("媒體");
+  };
 
   const updateImageElement = (id: string, changes: Partial<DesignElement>) => {
-    void fabricControlsRef.current?.updateDesignElement(id, changes)
+    void fabricControlsRef.current?.updateDesignElement(id, changes);
     setDesignElements((current) =>
-      current.map((element) => (element.id === id ? { ...element, ...changes } : element))
-    )
-  }
+      current.map((element) =>
+        element.id === id ? { ...element, ...changes } : element,
+      ),
+    );
+  };
 
   const addBrandTextElement = (
     label: string,
     textContent: string,
     fontSize: number,
-    fontWeight: DesignElement['fontWeight'],
-    color: string
+    fontWeight: DesignElement["fontWeight"],
+    color: string,
   ) => {
     const nextElement: DesignElement = {
       id: crypto.randomUUID(),
-      kind: 'text',
+      kind: "text",
       item: label,
       label,
       x: 50,
-      y: fontWeight === 'bold' ? 40 : 60,
+      y: fontWeight === "bold" ? 40 : 60,
       size: fontSize,
       rotation: 0,
       opacity: 100,
       color,
       zIndex: 20 + designElements.length,
       textContent,
-      fontFamily: 'inherit',
+      fontFamily: brandKit.fontFamily,
       fontSize,
       fontWeight,
-      fontStyle: 'normal',
-      textDecoration: 'none',
-      textAlign: 'center',
-      width: fontWeight === 'bold' ? 400 : 360,
-      lineHeight: fontWeight === 'bold' ? 1.12 : 1.45,
-    }
-    void fabricControlsRef.current?.addDesignElement(nextElement)
-    setDesignElements((current) => [...current, nextElement])
-    setSelectedElementId(nextElement.id)
-    setActiveDesignTool('品牌')
-  }
+      fontStyle: "normal",
+      textDecoration: "none",
+      textAlign: "center",
+      width: fontWeight === "bold" ? 400 : 360,
+      lineHeight: fontWeight === "bold" ? 1.12 : 1.45,
+    };
+    void fabricControlsRef.current?.addDesignElement(nextElement);
+    setDesignElements((current) => [...current, nextElement]);
+    setSelectedElementId(nextElement.id);
+    setActiveDesignTool("品牌");
+  };
 
   const applyBrandColor = (color: string) => {
     if (!selectedElementId) {
       const nextElement: DesignElement = {
         id: crypto.randomUUID(),
-        kind: 'shape',
-        item: 'rounded',
-        label: '品牌色塊',
+        kind: "shape",
+        item: "rounded",
+        label: "品牌色塊",
         x: 50,
         y: 50,
         size: 132,
@@ -1710,122 +2317,201 @@ function ScheduledPostsPageContent() {
         opacity: 100,
         color,
         zIndex: 20 + designElements.length,
-      }
-      void fabricControlsRef.current?.addDesignElement(nextElement)
-      setDesignElements((current) => [...current, nextElement])
-      setSelectedElementId(nextElement.id)
-      return
+      };
+      void fabricControlsRef.current?.addDesignElement(nextElement);
+      setDesignElements((current) => [...current, nextElement]);
+      setSelectedElementId(nextElement.id);
+      return;
     }
-    void fabricControlsRef.current?.updateDesignElement(selectedElementId, { color })
+    void fabricControlsRef.current?.updateDesignElement(selectedElementId, {
+      color,
+    });
     setDesignElements((current) =>
-      current.map((element) => (element.id === selectedElementId ? { ...element, color } : element))
-    )
-  }
-
-  const applyTemplatePreset = (templateId: TemplatePresetId) => {
-    if (!selectedPost) return
-    const currentImage =
-      designElements.find((element) => element.kind === 'image' && element.imageUrl)?.imageUrl || selectedPost.image
-    const nextElements = createTemplateDesignElements(selectedPost, templateId, currentImage)
-    setDesignElements(nextElements)
-    void fabricControlsRef.current?.loadDesignElements(nextElements)
-    setSelectedElementId(null)
-    setActiveDesignTool('模板')
-  }
+      current.map((element) =>
+        element.id === selectedElementId ? { ...element, color } : element,
+      ),
+    );
+  };
 
   const handleImageUpload = (files: FileList | null) => {
-    if (!files) return
+    if (!files) return;
     Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return
-      const url = URL.createObjectURL(file)
-      const label = file.name.replace(/\.[^.]+$/, '') || '圖片'
-      setUploadedImages((current) => [{ url, label }, ...current])
-      addImageElement(url, label)
-    })
-  }
+      if (!file.type.startsWith("image/")) return;
+      const url = URL.createObjectURL(file);
+      const label = file.name.replace(/\.[^.]+$/, "") || "圖片";
+      setUploadedImages((current) => [{ url, label }, ...current]);
+      addImageElement(url, label);
+    });
+  };
 
   const updateSelectedElement = (updates: Partial<DesignElement>) => {
-    if (!selectedElementId) return
-    void fabricControlsRef.current?.updateDesignElement(selectedElementId, updates)
+    if (!selectedElementId) return;
+    void fabricControlsRef.current?.updateDesignElement(
+      selectedElementId,
+      updates,
+    );
     setDesignElements((current) =>
-      current.map((element) => (element.id === selectedElementId ? { ...element, ...updates } : element))
-    )
-  }
+      current.map((element) =>
+        element.id === selectedElementId ? { ...element, ...updates } : element,
+      ),
+    );
+  };
 
   const deleteSelectedElement = () => {
-    void fabricControlsRef.current?.deleteSelected()
-    if (!selectedElementId) return
-    setDesignElements((current) => current.filter((element) => element.id !== selectedElementId))
-    setSelectedElementId(null)
-  }
+    void fabricControlsRef.current?.deleteSelected();
+    if (!selectedElementId) return;
+    setDesignElements((current) =>
+      current.filter((element) => element.id !== selectedElementId),
+    );
+    setSelectedElementId(null);
+  };
 
   const duplicateSelectedElement = () => {
-    if (!selectedElement) return
-    const id = `${selectedElement.kind}-${selectedElement.item}-${Date.now()}`
+    if (!selectedElement) return;
+    const id = `${selectedElement.kind}-${selectedElement.item}-${Date.now()}`;
     const clone = {
       ...selectedElement,
       id,
       x: Math.min(74, selectedElement.x + 6),
       y: Math.min(74, selectedElement.y + 6),
       zIndex: selectedElement.zIndex + 1,
-    }
-    void fabricControlsRef.current?.addDesignElement(clone)
-    setDesignElements((current) => [...current, clone])
-    setSelectedElementId(id)
-  }
+    };
+    void fabricControlsRef.current?.addDesignElement(clone);
+    setDesignElements((current) => [...current, clone]);
+    setSelectedElementId(id);
+  };
 
   const openElementEditor = (element: DesignElement) => {
-    setSelectedElementId(element.id)
-    setActiveDesignTool(element.kind === 'image' ? '媒體' : element.kind === 'text' ? '文字' : '元素')
-  }
+    setSelectedElementId(element.id);
+    setActiveDesignTool(
+      element.kind === "image"
+        ? "媒體"
+        : element.kind === "text"
+          ? "文字"
+          : "元素",
+    );
+  };
 
-  const moveSelectedLayer = (direction: 'forward' | 'front' | 'backward' | 'back') => {
-    if (!selectedElement) return
-    if (direction === 'forward' || direction === 'front') {
-      fabricControlsRef.current?.bringForward()
+  const moveSelectedLayer = (
+    direction: "forward" | "front" | "backward" | "back",
+  ) => {
+    if (!selectedElement) return;
+    if (direction === "forward" || direction === "front") {
+      fabricControlsRef.current?.bringForward();
     } else {
-      fabricControlsRef.current?.sendBackward()
+      fabricControlsRef.current?.sendBackward();
     }
     setDesignElements((current) => {
-      const zValues = current.map((element) => element.zIndex)
-      const maxZ = Math.max(...zValues, 12)
+      const zValues = current.map((element) => element.zIndex);
+      const maxZ = Math.max(...zValues, 12);
       return current.map((element) => {
-        if (element.id !== selectedElement.id) return element
+        if (element.id !== selectedElement.id) return element;
         const nextZ = {
           forward: element.zIndex + 5,
           front: maxZ + 5,
           backward: element.zIndex - 5,
           back: 2,
-        }[direction]
-        return { ...element, zIndex: Math.max(2, Math.min(80, nextZ)) }
-      })
-    })
-  }
+        }[direction];
+        return { ...element, zIndex: Math.max(2, Math.min(80, nextZ)) };
+      });
+    });
+  };
 
   const resizeCanvas = (size: CanvasSize) => {
     const nextSize = {
       label: size.label,
       w: Math.max(100, Math.round(size.w)),
       h: Math.max(100, Math.round(size.h)),
-    }
-    setCanvasSize(nextSize)
-    setSelectedElementId(null)
-    setActiveDesignTool('尺寸')
-  }
+    };
+    setCanvasSize(nextSize);
+    setSelectedElementId(null);
+    setActiveDesignTool("尺寸");
+  };
 
-  const startElementMove = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
-    if (!canvasRef.current) return
-    event.preventDefault()
-    setSelectedElementId(element.id)
-    const rect = canvasRef.current.getBoundingClientRect()
-    const startX = event.clientX
-    const startY = event.clientY
-    const initialX = element.x
-    const initialY = element.y
+  const saveCurrentDesign = async () => {
+    if (!selectedPost || !activeWorkspaceId || isSavingDesign) return;
+    const controls = fabricControlsRef.current;
+    const canvas = controls?.fabricRef.current;
+    if (!controls || !canvas) {
+      setSaveDesignMessage("畫布尚未準備好，請稍後再試。");
+      return;
+    }
+
+    setIsSavingDesign(true);
+    setSaveDesignMessage("");
+    try {
+      const multiplier = Math.max(1, canvasSize.w / Math.max(1, canvas.width || canvasSize.w));
+      const dataUrl = controls.exportPNG(multiplier);
+      if (!dataUrl) throw new Error("未能匯出畫布");
+      const imageBlob = await fetch(dataUrl).then((response) => response.blob());
+      const supabase = createClient();
+      const storagePath = `${activeWorkspaceId}/designs/${selectedPost.id}-${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from("brand-assets")
+        .upload(storagePath, imageBlob, { cacheControl: "3600", contentType: "image/png", upsert: false });
+      if (uploadError) throw uploadError;
+      const { data: publicUrlData } = supabase.storage.from("brand-assets").getPublicUrl(storagePath);
+      const imageUrl = publicUrlData.publicUrl;
+      const canvasJson = canvas.toObject(["data"]);
+
+      const isContentProjectDesign = Boolean(carouselEditorPayload?.projectId && externalEditImage);
+      const response = await fetch(
+        isContentProjectDesign ? "/api/content-projects/save-design" : "/api/posts/save-design",
+        {
+        body: JSON.stringify({
+          canvasHeight: canvasSize.h,
+          canvasJson,
+          canvasWidth: canvasSize.w,
+          imageUrl,
+          name: selectedPost.title,
+          page: carouselEditorPayload?.page,
+          postId: selectedPost.id,
+          projectId: carouselEditorPayload?.projectId,
+          workspaceId: activeWorkspaceId,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.detail || result.error || "儲存失敗");
+
+      if (isContentProjectDesign) {
+        window.sessionStorage.removeItem("soon-carousel-editor-payload-v1");
+        router.push(externalEditorReturnUrl);
+      } else {
+        setPersistedScheduledPosts((current) =>
+          current.map((post) => post.id === selectedPost.id ? { ...post, image: imageUrl } : post),
+        );
+      }
+      setSaveDesignMessage("設計已儲存。");
+      setDesignMode(false);
+      setSelectedPost(null);
+    } catch (error) {
+      setSaveDesignMessage(error instanceof Error ? error.message : "儲存失敗，請再試一次。");
+    } finally {
+      setIsSavingDesign(false);
+    }
+  };
+
+  const startElementMove = (
+    event: ReactPointerEvent<HTMLElement>,
+    element: DesignElement,
+  ) => {
+    if (!canvasRef.current) return;
+    event.preventDefault();
+    setSelectedElementId(element.id);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const initialX = element.x;
+    const initialY = element.y;
 
     const onMove = (moveEvent: PointerEvent) => {
-      const nextX = initialX + ((moveEvent.clientX - startX) / rect.width) * 100
-      const nextY = initialY + ((moveEvent.clientY - startY) / rect.height) * 100
+      const nextX =
+        initialX + ((moveEvent.clientX - startX) / rect.width) * 100;
+      const nextY =
+        initialY + ((moveEvent.clientY - startY) / rect.height) * 100;
       setDesignElements((current) =>
         current.map((item) =>
           item.id === element.id
@@ -1834,93 +2520,172 @@ function ScheduledPostsPageContent() {
                 x: Math.min(94, Math.max(6, nextX)),
                 y: Math.min(94, Math.max(6, nextY)),
               }
-            : item
-        )
-      )
-    }
+            : item,
+        ),
+      );
+    };
 
     const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
 
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
-  const startElementResize = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
-    if (!canvasRef.current) return
-    event.preventDefault()
-    event.stopPropagation()
-    setSelectedElementId(element.id)
-    const rect = canvasRef.current.getBoundingClientRect()
-    const centerX = rect.left + (element.x / 100) * rect.width
-    const centerY = rect.top + (element.y / 100) * rect.height
-    const initialSize = element.size
-    const initialDistance = Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY))
+  const startElementResize = (
+    event: ReactPointerEvent<HTMLElement>,
+    element: DesignElement,
+  ) => {
+    if (!canvasRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedElementId(element.id);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const centerX = rect.left + (element.x / 100) * rect.width;
+    const centerY = rect.top + (element.y / 100) * rect.height;
+    const initialSize = element.size;
+    const initialDistance = Math.max(
+      1,
+      Math.hypot(event.clientX - centerX, event.clientY - centerY),
+    );
 
     const onMove = (moveEvent: PointerEvent) => {
-      const nextDistance = Math.hypot(moveEvent.clientX - centerX, moveEvent.clientY - centerY)
+      const nextDistance = Math.hypot(
+        moveEvent.clientX - centerX,
+        moveEvent.clientY - centerY,
+      );
       setDesignElements((current) =>
         current.map((item) =>
           item.id === element.id
             ? {
                 ...item,
-                ...(item.kind === 'text'
+                ...(item.kind === "text"
                   ? {
-                      fontSize: Math.min(200, Math.max(8, Math.round((initialSize || 24) * (nextDistance / initialDistance)))),
-                      size: Math.min(200, Math.max(8, Math.round((initialSize || 24) * (nextDistance / initialDistance)))),
-                      width: Math.min(520, Math.max(140, Math.round((element.width || 300) * (nextDistance / initialDistance)))),
+                      fontSize: Math.min(
+                        200,
+                        Math.max(
+                          8,
+                          Math.round(
+                            (initialSize || 24) *
+                              (nextDistance / initialDistance),
+                          ),
+                        ),
+                      ),
+                      size: Math.min(
+                        200,
+                        Math.max(
+                          8,
+                          Math.round(
+                            (initialSize || 24) *
+                              (nextDistance / initialDistance),
+                          ),
+                        ),
+                      ),
+                      width: Math.min(
+                        520,
+                        Math.max(
+                          140,
+                          Math.round(
+                            (element.width || 300) *
+                              (nextDistance / initialDistance),
+                          ),
+                        ),
+                      ),
                     }
-                  : item.kind === 'image'
+                  : item.kind === "image"
                     ? {
-                        height: Math.min(760, Math.max(180, Math.round((element.height || 538) * (nextDistance / initialDistance)))),
-                        size: Math.min(760, Math.max(180, Math.round((initialSize || 430) * (nextDistance / initialDistance)))),
-                        width: Math.min(640, Math.max(150, Math.round((element.width || 430) * (nextDistance / initialDistance)))),
+                        height: Math.min(
+                          760,
+                          Math.max(
+                            180,
+                            Math.round(
+                              (element.height || 538) *
+                                (nextDistance / initialDistance),
+                            ),
+                          ),
+                        ),
+                        size: Math.min(
+                          760,
+                          Math.max(
+                            180,
+                            Math.round(
+                              (initialSize || 430) *
+                                (nextDistance / initialDistance),
+                            ),
+                          ),
+                        ),
+                        width: Math.min(
+                          640,
+                          Math.max(
+                            150,
+                            Math.round(
+                              (element.width || 430) *
+                                (nextDistance / initialDistance),
+                            ),
+                          ),
+                        ),
                       }
-                  : {
-                      size: Math.min(260, Math.max(34, Math.round(initialSize * (nextDistance / initialDistance)))),
-                    }),
+                    : {
+                        size: Math.min(
+                          260,
+                          Math.max(
+                            34,
+                            Math.round(
+                              initialSize * (nextDistance / initialDistance),
+                            ),
+                          ),
+                        ),
+                      }),
               }
-            : item
-        )
-      )
-    }
+            : item,
+        ),
+      );
+    };
 
     const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
 
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
-  const startElementRotate = (event: ReactPointerEvent<HTMLElement>, element: DesignElement) => {
-    if (!canvasRef.current) return
-    event.preventDefault()
-    event.stopPropagation()
-    setSelectedElementId(element.id)
-    const rect = canvasRef.current.getBoundingClientRect()
-    const centerX = rect.left + (element.x / 100) * rect.width
-    const centerY = rect.top + (element.y / 100) * rect.height
+  const startElementRotate = (
+    event: ReactPointerEvent<HTMLElement>,
+    element: DesignElement,
+  ) => {
+    if (!canvasRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedElementId(element.id);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const centerX = rect.left + (element.x / 100) * rect.width;
+    const centerY = rect.top + (element.y / 100) * rect.height;
 
     const onMove = (moveEvent: PointerEvent) => {
-      const radians = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX)
-      const degrees = Math.round((radians * 180) / Math.PI + 90)
+      const radians = Math.atan2(
+        moveEvent.clientY - centerY,
+        moveEvent.clientX - centerX,
+      );
+      const degrees = Math.round((radians * 180) / Math.PI + 90);
       setDesignElements((current) =>
-        current.map((item) => (item.id === element.id ? { ...item, rotation: degrees } : item))
-      )
-    }
+        current.map((item) =>
+          item.id === element.id ? { ...item, rotation: degrees } : item,
+        ),
+      );
+    };
 
     const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
 
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
 
   if (selectedPost && designMode) {
     return (
@@ -1928,11 +2693,30 @@ function ScheduledPostsPageContent() {
         <ClaimOnboardingSession />
         <header className="design-topbar">
           <div className="design-nav">
-            <button type="button" aria-label="選單">☰</button>
-            <button type="button" onClick={() => setDesignMode(false)} aria-label="返回貼文">
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding")}
+              aria-label="返回主頁"
+              title="返回主頁"
+            >
+              ☰
+            </button>
+            <button
+              type="button"
+              onClick={closeDesignEditor}
+              aria-label={externalEditImage ? "返回內容製作" : "返回貼文"}
+              title={externalEditImage ? "返回內容製作" : "返回貼文"}
+            >
               ←
             </button>
-            <button type="button" aria-label="日期">▣</button>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding/scheduled-posts")}
+              aria-label="前往已排程內容"
+              title="前往已排程內容"
+            >
+              ▣
+            </button>
           </div>
 
           <div className="design-title">
@@ -1949,9 +2733,9 @@ function ScheduledPostsPageContent() {
 
         <DesignToolbar
           activeDesignTool={activeDesignTool}
-          onRedo={() => restoreDesignHistory('redo')}
+          onRedo={() => restoreDesignHistory("redo")}
           onToolChange={switchDesignTool}
-          onUndo={() => restoreDesignHistory('undo')}
+          onUndo={() => restoreDesignHistory("undo")}
         />
 
         <section className="design-workbench">
@@ -1960,9 +2744,9 @@ function ScheduledPostsPageContent() {
             canvasRef={canvasRef}
             designElements={designElements}
             onFabricReady={(controls) => {
-              fabricControlsRef.current = controls
+              fabricControlsRef.current = controls;
             }}
-            onCloseDesignMode={() => setDesignMode(false)}
+            onCloseDesignMode={closeDesignEditor}
             onDelete={deleteSelectedElement}
             onDeselectElement={deselectDesignElement}
             onDuplicate={duplicateSelectedElement}
@@ -1980,42 +2764,49 @@ function ScheduledPostsPageContent() {
             activeDesignTool={activeDesignTool}
             brandLogoUrl={brandKit.logoUrl}
             brandName={brandKit.businessName}
+            brandColors={brandKit.brandColors}
+            brandFontFamily={brandKit.fontFamily}
+            brandKitLoading={brandKitLoading}
             canvasSize={canvasSize}
             expandedElementSection={expandedElementSection}
             isDraggingOver={isDraggingOver}
+            isSavingDesign={isSavingDesign}
             onAddBrandText={addBrandTextElement}
             onAddElement={addDesignElement}
             onAddImage={addImageElement}
             onAddText={addTextElement}
-            onAddTextStyle={addTextStyleElement}
             onApplyBrandColor={applyBrandColor}
-            onApplyTemplate={applyTemplatePreset}
-            onCloseDesignMode={() => setDesignMode(false)}
+            onCloseDesignMode={closeDesignEditor}
             onDelete={deleteSelectedElement}
             onDeselectElement={deselectDesignElement}
             onImageUpload={handleImageUpload}
-            onOpenCaptionEditor={() => openCaptionModal(selectedPost)}
+            onSaveDesign={() => void saveCurrentDesign()}
             onMoveLayer={moveSelectedLayer}
             onResizeCanvas={resizeCanvas}
             onSetActiveTool={setActiveDesignTool}
             onSetDraggingOver={setIsDraggingOver}
             onSetExpandedSection={setExpandedElementSection}
-            onTrackUploadedImage={(image) => setUploadedImages((current) => [image, ...current])}
+            onTrackUploadedImage={(image) =>
+              setUploadedImages((current) => [image, ...current])
+            }
             onUpdateElement={(id, changes) => {
-              void fabricControlsRef.current?.updateDesignElement(id, changes)
+              void fabricControlsRef.current?.updateDesignElement(id, changes);
               setDesignElements((current) =>
-                current.map((element) => (element.id === id ? { ...element, ...changes } : element))
-              )
+                current.map((element) =>
+                  element.id === id ? { ...element, ...changes } : element,
+                ),
+              );
             }}
             selectedElement={selectedElement}
             selectedPost={selectedPost}
+            saveDesignMessage={saveDesignMessage}
             uploadedImages={uploadedImages}
           />
         </section>
 
         <style dangerouslySetInnerHTML={{ __html: styles }} />
       </main>
-    )
+    );
   }
 
   if (selectedPost) {
@@ -2033,18 +2824,24 @@ function ScheduledPostsPageContent() {
               ←
             </button>
             <div className="post-editor-title-group">
-              <img alt="" className="post-editor-thumb" src={selectedPost.image} />
-              <span className="post-editor-campaign-name">{selectedPost.title}</span>
+              <img
+                alt=""
+                className="post-editor-thumb"
+                src={selectedPost.image}
+              />
+              <span className="post-editor-campaign-name">
+                {selectedPost.title}
+              </span>
               <span className={`post-editor-status-badge ${currentPostStatus}`}>
-                {currentPostStatus === 'approved'
-                  ? '已批准'
-                  : currentPostStatus === 'scheduled'
-                    ? '已排程'
-                    : currentPostStatus === 'published'
-                      ? '已發布'
-                  : currentPostStatus === 'rejected'
-                    ? '不發布'
-                    : '草稿'}
+                {currentPostStatus === "approved"
+                  ? "已批准"
+                  : currentPostStatus === "scheduled"
+                    ? "已排程"
+                    : currentPostStatus === "published"
+                      ? "已發布"
+                      : currentPostStatus === "rejected"
+                        ? "不發布"
+                        : "草稿"}
               </span>
             </div>
           </div>
@@ -2068,15 +2865,15 @@ function ScheduledPostsPageContent() {
             </button>
             <button
               className="post-editor-action-btn approve"
-              disabled={publishing || currentPostStatus === 'published'}
+              disabled={publishing || currentPostStatus === "published"}
               onClick={() => void approvePost(selectedPost)}
               type="button"
             >
               {publishing
-                ? '發布中...'
-                : currentPostStatus === 'published'
-                  ? '✓ 已發布'
-                  : '批准'}
+                ? "發布中..."
+                : currentPostStatus === "published"
+                  ? "✓ 已發布"
+                  : "批准"}
             </button>
             <button
               className="post-editor-nav-btn"
@@ -2101,11 +2898,22 @@ function ScheduledPostsPageContent() {
             <div className="improve-copy">
               <p>SOON 可以這樣改善這則貼文：</p>
               <ol>
-                <li><strong>更改相片內容：</strong>「在背景加入人物，令場景更豐富」</li>
-                <li><strong>調整背景：</strong>「將背景換成現代辦公室」</li>
-                <li><strong>更改文字疊加：</strong>「將標題放大並移到頂部」</li>
-                <li><strong>修改顏色：</strong>「令整體配色更鮮明」</li>
-                <li><strong>修改品牌：</strong>「將我的 logo 加到右下角」</li>
+                <li>
+                  <strong>更改相片內容：</strong>
+                  「在背景加入人物，令場景更豐富」
+                </li>
+                <li>
+                  <strong>調整背景：</strong>「將背景換成現代辦公室」
+                </li>
+                <li>
+                  <strong>更改文字疊加：</strong>「將標題放大並移到頂部」
+                </li>
+                <li>
+                  <strong>修改顏色：</strong>「令整體配色更鮮明」
+                </li>
+                <li>
+                  <strong>修改品牌：</strong>「將我的 logo 加到右下角」
+                </li>
               </ol>
               <p>你想怎樣調整？</p>
             </div>
@@ -2117,7 +2925,9 @@ function ScheduledPostsPageContent() {
                   <input type="file" />
                   <span>附件</span>
                 </label>
-                <button type="button" aria-label="送出要求">↑</button>
+                <button type="button" aria-label="送出要求">
+                  ↑
+                </button>
               </div>
             </form>
           </aside>
@@ -2127,36 +2937,44 @@ function ScheduledPostsPageContent() {
               <span>預覽</span>
               {PUBLISH_PLATFORMS.map((platform) => (
                 <button
-                  className={previewChannel === platform.channel ? 'active' : ''}
+                  className={
+                    previewChannel === platform.channel ? "active" : ""
+                  }
                   key={platform.id}
                   onClick={() => setPreviewChannel(platform.channel)}
                   type="button"
                 >
-                  {platform.channel === 'Instagram' ? 'IG' : platform.channel === 'Facebook' ? 'FB' : 'Th'}
+                  {platform.channel === "Instagram"
+                    ? "IG"
+                    : platform.channel === "Facebook"
+                      ? "FB"
+                      : "Th"}
                 </button>
               ))}
             </div>
 
-            <article className={`phone-preview ${previewChannel.toLowerCase()}`}>
+            <article
+              className={`phone-preview ${previewChannel.toLowerCase()}`}
+            >
               <header>
                 <div className="avatar">S</div>
                 <strong>
-                  {previewChannel === 'Instagram'
-                    ? platformAccountName('instagram') || 'soon_log'
-                    : previewChannel === 'Threads'
-                      ? platformAccountName('threads') || 'soon_threads'
-                      : platformAccountName('facebook') || 'SOON-LOG'}
+                  {previewChannel === "Instagram"
+                    ? platformAccountName("instagram") || "soon_log"
+                    : previewChannel === "Threads"
+                      ? platformAccountName("threads") || "soon_threads"
+                      : platformAccountName("facebook") || "SOON-LOG"}
                 </strong>
                 <span>
                   {platformConnections[
-                    previewChannel === 'Instagram'
-                      ? 'instagram'
-                      : previewChannel === 'Threads'
-                        ? 'threads'
-                        : 'facebook'
+                    previewChannel === "Instagram"
+                      ? "instagram"
+                      : previewChannel === "Threads"
+                        ? "threads"
+                        : "facebook"
                   ]
-                    ? '已連接'
-                    : '尚未連接帳戶'}
+                    ? "已連接"
+                    : "尚未連接帳戶"}
                 </span>
               </header>
               <div className="phone-image">
@@ -2165,28 +2983,38 @@ function ScheduledPostsPageContent() {
                   <strong>{selectedPost.title}</strong>
                   <span>{selectedPost.type}</span>
                 </div>
-                <button className="edit-design-overlay" type="button" onClick={() => openDesignEditor(selectedPost)}>
+                <button
+                  className="edit-design-overlay"
+                  type="button"
+                  onClick={() => openDesignEditor(selectedPost)}
+                >
                   ✎ 編輯設計
                 </button>
               </div>
-              {previewChannel === 'Threads' ? (
+              {previewChannel === "Threads" ? (
                 <div className="threads-preview-note">單張圖片 + 文字貼文</div>
               ) : (
                 <div className="phone-actions">
                   <span>♡</span>
                   <span>○</span>
                   <span>⌲</span>
-                  <button type="button" onClick={() => openCaptionModal(selectedPost)}>編輯 caption</button>
+                  <button
+                    type="button"
+                    onClick={() => openCaptionModal(selectedPost)}
+                  >
+                    編輯 caption
+                  </button>
                 </div>
               )}
               <p>
                 <strong>
-                  {previewChannel === 'Instagram'
-                    ? platformAccountName('instagram') || 'soon_log'
-                    : previewChannel === 'Threads'
-                      ? platformAccountName('threads') || 'soon_threads'
-                      : platformAccountName('facebook') || 'SOON-LOG'}
-                </strong> {selectedCaption}
+                  {previewChannel === "Instagram"
+                    ? platformAccountName("instagram") || "soon_log"
+                    : previewChannel === "Threads"
+                      ? platformAccountName("threads") || "soon_threads"
+                      : platformAccountName("facebook") || "SOON-LOG"}
+                </strong>{" "}
+                {selectedCaption}
               </p>
             </article>
 
@@ -2194,7 +3022,9 @@ function ScheduledPostsPageContent() {
               <span>你喜歡這個結果嗎？</span>
               <button type="button">不喜歡</button>
               <button type="button">喜歡</button>
-              <button type="button" onClick={() => setSelectedPost(null)}>關閉</button>
+              <button type="button" onClick={() => setSelectedPost(null)}>
+                關閉
+              </button>
             </div>
           </section>
 
@@ -2207,10 +3037,16 @@ function ScheduledPostsPageContent() {
 
             <section>
               <p>快速編輯</p>
-              <button type="button" onClick={() => openCaptionModal(selectedPost)}>
+              <button
+                type="button"
+                onClick={() => openCaptionModal(selectedPost)}
+              >
                 調整 caption <em>›</em>
               </button>
-              <button type="button" onClick={() => openDesignEditor(selectedPost)}>
+              <button
+                type="button"
+                onClick={() => openDesignEditor(selectedPost)}
+              >
                 編輯設計 <em>›</em>
               </button>
             </section>
@@ -2223,13 +3059,18 @@ function ScheduledPostsPageContent() {
             <section>
               <p>發布到</p>
               {PUBLISH_PLATFORMS.map((platform) => {
-                const connection = platformConnections[platform.id]
-                const isPublishingThis = publishingPlatform === platform.id
-                const hasPublished = Boolean(publishedPlatforms[`${selectedPost.id}:${platform.id}`])
+                const connection = platformConnections[platform.id];
+                const supportsAutoPublish = AUTO_PUBLISH_PLATFORM_IDS.has(
+                  platform.id,
+                );
+                const isPublishingThis = publishingPlatform === platform.id;
+                const hasPublished = Boolean(
+                  publishedPlatforms[`${selectedPost.id}:${platform.id}`],
+                );
                 return connection ? (
                   <button
                     className="connected-channel publish-btn"
-                    disabled={publishing || hasPublished}
+                    disabled={publishing || hasPublished || !supportsAutoPublish}
                     key={platform.id}
                     onClick={() => void publishPost(selectedPost, platform.id)}
                     type="button"
@@ -2238,25 +3079,37 @@ function ScheduledPostsPageContent() {
                       {platform.label}
                       <small>{platformAccountName(platform.id)}</small>
                     </span>
-                    <em>{hasPublished ? '✓ 已發布' : isPublishingThis ? '發布中...' : '立即發布'}</em>
+                    <em>
+                      {hasPublished
+                        ? "✓ 已發布"
+                        : !supportsAutoPublish
+                          ? "手動發布"
+                        : isPublishingThis
+                          ? "發布中..."
+                          : "立即發布"}
+                    </em>
                   </button>
                 ) : (
                   <button
                     className="connect-channel-btn"
                     key={platform.id}
-                    onClick={() => router.push('/onboarding/integrations')}
+                    onClick={() => router.push("/onboarding/integrations")}
                     type="button"
                   >
                     <span>{platform.label}</span>
                     <em>連接</em>
                   </button>
-                )
+                );
               })}
-              {publishResult === 'success' ? (
-                <div className="publish-success">{publishMessage || '✓ 已成功發布。'}</div>
+              {publishResult === "success" ? (
+                <div className="publish-success">
+                  {publishMessage || "✓ 已成功發布。"}
+                </div>
               ) : null}
-              {publishResult === 'error' ? (
-                <div className="publish-error">{publishMessage || '✗ 發布失敗，請確認帳戶已連接並重試'}</div>
+              {publishResult === "error" ? (
+                <div className="publish-error">
+                  {publishMessage || "✗ 發布失敗，請確認帳戶已連接並重試"}
+                </div>
               ) : null}
             </section>
 
@@ -2270,20 +3123,31 @@ function ScheduledPostsPageContent() {
 
         {captionModalOpen ? (
           <div className="caption-modal-backdrop" role="presentation">
-            <section className="caption-modal" role="dialog" aria-modal="true" aria-label="編輯 caption">
+            <section
+              className="caption-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="編輯 caption"
+            >
               <header>
                 <div>
                   <h2>編輯 Caption</h2>
-                  <p>為不同平台調整同一則貼文的語氣。儲存後，預覽會即時更新。</p>
+                  <p>
+                    為不同平台調整同一則貼文的語氣。儲存後，預覽會即時更新。
+                  </p>
                 </div>
-                <button type="button" onClick={() => setCaptionModalOpen(false)} aria-label="關閉">
+                <button
+                  type="button"
+                  onClick={() => setCaptionModalOpen(false)}
+                  aria-label="關閉"
+                >
                   ×
                 </button>
               </header>
 
               <div className="caption-grid">
                 {CHANNELS.map((channel) => {
-                  const value = draftCaptions[channel.id] || ''
+                  const value = draftCaptions[channel.id] || "";
                   return (
                     <article className="caption-column" key={channel.id}>
                       <div className="caption-channel-head">
@@ -2292,7 +3156,11 @@ function ScheduledPostsPageContent() {
                         <button type="button">連接</button>
                       </div>
                       <p>{channel.note}</p>
-                      <button className="caption-regenerate" type="button" aria-label={`重新生成 ${channel.label} caption`}>
+                      <button
+                        className="caption-regenerate"
+                        type="button"
+                        aria-label={`重新生成 ${channel.label} caption`}
+                      >
                         ↻
                       </button>
                       <textarea
@@ -2308,12 +3176,15 @@ function ScheduledPostsPageContent() {
                         字數：{value.length}/{channel.limit}
                       </small>
                     </article>
-                  )
+                  );
                 })}
               </div>
 
               <footer>
-                <button type="button" onClick={() => setCaptionModalOpen(false)}>
+                <button
+                  type="button"
+                  onClick={() => setCaptionModalOpen(false)}
+                >
                   取消
                 </button>
                 <button type="button" onClick={saveCaptionDrafts}>
@@ -2326,7 +3197,7 @@ function ScheduledPostsPageContent() {
 
         <style dangerouslySetInnerHTML={{ __html: styles }} />
       </main>
-    )
+    );
   }
 
   return (
@@ -2338,30 +3209,56 @@ function ScheduledPostsPageContent() {
         <header className="calendar-topbar">
           <div className="calendar-title">
             <h1>已排程內容</h1>
-            <span>{isBechillActive ? '客戶已確認的 Week 1 貼文' : '目前工作台已確認的貼文'}</span>
+            <span>
+              {isBechillActive
+                ? "客戶已確認的 Week 1 貼文"
+                : "目前工作台已確認的貼文"}
+            </span>
           </div>
 
           <div className="calendar-actions">
             <span>✦ {creditBalance ?? "—"} credits 剩餘</span>
-            <button type="button" className="upgrade-button">升級</button>
+            <button type="button" className="upgrade-button">
+              升級
+            </button>
           </div>
         </header>
 
         {platformConnectionsLoading ? (
-          <div className="connect-banner loading" aria-label="正在載入帳戶連接狀態" />
+          <div
+            className="connect-banner loading"
+            aria-label="正在載入帳戶連接狀態"
+          />
         ) : hasPublishConnection ? (
           <div className="connect-banner connected">
             <span>
-              ✓ 已連接 {connectedPublishPlatforms.map((platform) => platform.label).join('、')}。SOON 可以在發布權限開通後按排程自動發布。
+              ✓ 已連接{" "}
+              {connectedPublishPlatforms
+                .map((platform) => platform.label)
+                .join("、")}
+              。
+              {connectedAutoPublishPlatforms.length
+                ? `${connectedAutoPublishPlatforms
+                    .map((platform) => platform.label)
+                    .join("、")} 可按排程自動發布。`
+                : ""}
             </span>
-            <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding/integrations")}
+            >
               管理連接
             </button>
           </div>
         ) : (
           <div className="connect-banner">
-            <span>⚡ 你的貼文尚未自動發布。連接帳戶後，SOON 可以按排程自動發布。</span>
-            <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+            <span>
+              ⚡ 你的貼文尚未自動發布。連接帳戶後，SOON 可以按排程自動發布。
+            </span>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding/integrations")}
+            >
               連接
             </button>
           </div>
@@ -2369,7 +3266,7 @@ function ScheduledPostsPageContent() {
 
         {!postsLoading && scheduledPosts.length ? (
           <div className="calendar-date-pill">
-            {isBechillActive ? '8月13日 - 8月16日 已確認排程' : '已確認排程'}
+            {isBechillActive ? "8月13日 - 8月16日 已確認排程" : "已確認排程"}
           </div>
         ) : null}
 
@@ -2382,182 +3279,274 @@ function ScheduledPostsPageContent() {
           ) : postsLoadError ? (
             <div className="schedule-empty-panel">
               <strong>未能載入已排程內容</strong>
-              <span>請重新整理頁面；如果仍然見到這個畫面，SOON 會用工作台紀錄追查載入問題。</span>
+              <span>
+                請重新整理頁面；如果仍然見到這個畫面，SOON
+                會用工作台紀錄追查載入問題。
+              </span>
             </div>
-          ) : scheduledPosts.length ? scheduledPosts.map((post) => {
-            const media = post.media?.length ? post.media : [post.image]
-            const activeSlide = Math.min(postSlides[post.id] ?? 0, media.length - 1)
-            const captionExpanded = Boolean(expandedCaptions[post.id])
-            const isEditingCaption = editingCaptionPostId === post.id
-            const cardCaptionDraft = cardCaptionDrafts[post.id] ?? post.body
+          ) : scheduledPosts.length ? (
+            scheduledPosts.map((post) => {
+              const media = post.media?.length ? post.media : [post.image];
+              const activeSlide = Math.min(
+                postSlides[post.id] ?? 0,
+                media.length - 1,
+              );
+              const captionExpanded = Boolean(expandedCaptions[post.id]);
+              const isEditingCaption = editingCaptionPostId === post.id;
+              const cardCaptionDraft = cardCaptionDrafts[post.id] ?? post.body;
 
-            return (
-              <article className="post-card" key={post.id}>
-                <div className="post-card-head">
-                  <span className={post.type === '文章' ? 'post-type article' : 'post-type image'}>{post.type}</span>
-                  <div className="post-time-actions">
-                    <strong>{post.time}</strong>
-                    <button
-                      type="button"
-                      className="quick-publish-button"
-                      disabled={publishing || !hasPublishConnection || post.status === '已發布'}
-                      onClick={() => void publishPost(post, undefined, true)}
+              return (
+                <article className="post-card" key={post.id}>
+                  <div className="post-card-head">
+                    <span
+                      className={
+                        post.type === "文章"
+                          ? "post-type article"
+                          : "post-type image"
+                      }
                     >
-                      {publishingPlatform === 'all'
-                        ? '發布中...'
-                        : post.status === '已發布'
-                          ? '已發布'
-                          : hasPublishConnection
-                            ? '立即發布'
-                            : '未連接'}
-                    </button>
-                    <button type="button" onClick={() => openScheduleModal(post)}>
-                      改時間
-                    </button>
-                  </div>
-                </div>
-                <div className="post-image-wrap">
-                  <img src={media[activeSlide]} alt={`${post.title} 第 ${activeSlide + 1} 張`} />
-                  <span className="post-status-badge">{post.status}</span>
-                  {media.length > 1 ? (
-                    <>
-                      <span className="post-carousel-count">{activeSlide + 1} / {media.length}</span>
+                      {post.type}
+                    </span>
+                    <div className="post-time-actions">
+                      <strong>{post.time}</strong>
                       <button
                         type="button"
-                        className="post-carousel-button previous"
-                        aria-label="上一張圖"
-                        disabled={activeSlide === 0}
-                        onClick={() => movePostSlide(post.id, media.length, -1)}
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        className="post-carousel-button next"
-                        aria-label="下一張圖"
-                        disabled={activeSlide === media.length - 1}
-                        onClick={() => movePostSlide(post.id, media.length, 1)}
-                      >
-                        ›
-                      </button>
-                      <div className="post-carousel-dots" aria-label={`${post.title} 圖片頁數`}>
-                        {media.map((imageUrl, index) => (
-                          <button
-                            type="button"
-                            key={imageUrl}
-                            className={index === activeSlide ? 'active' : ''}
-                            aria-label={`第 ${index + 1} 張圖`}
-                            onClick={() => setPostSlide(post.id, media.length, index)}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-                <div className="post-copy">
-                  <h2>{post.title}</h2>
-                  {isEditingCaption ? (
-                    <div className="post-caption-editor">
-                      <textarea
-                        value={cardCaptionDraft}
-                        onChange={(event) =>
-                          setCardCaptionDrafts((current) => ({ ...current, [post.id]: event.target.value }))
+                        className="quick-publish-button"
+                        disabled={
+                          publishing ||
+                          !hasPublishConnection ||
+                          post.status === "已發布"
                         }
-                        aria-label={`${post.title} caption`}
-                      />
-                      <div className="post-caption-editor-actions">
-                        <button type="button" onClick={() => setEditingCaptionPostId(null)}>
-                          取消
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void saveCardCaption(post)}
-                          disabled={savingCaptionPostId === post.id}
-                        >
-                          {savingCaptionPostId === post.id ? '儲存中...' : '儲存'}
-                        </button>
-                      </div>
+                        onClick={() => void publishPost(post, undefined, true)}
+                      >
+                        {publishingPlatform === "all"
+                          ? "發布中..."
+                          : post.status === "已發布"
+                            ? "已發布"
+                            : hasPublishConnection
+                              ? "立即發布"
+                              : "未連接"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openScheduleModal(post)}
+                      >
+                        改時間
+                      </button>
                     </div>
-                  ) : (
-                    <>
-                      <p className={captionExpanded ? 'is-expanded' : ''}>{post.body}</p>
-                      <div className="post-caption-actions">
+                  </div>
+                  <div className="post-image-wrap">
+                    <img
+                      src={media[activeSlide]}
+                      alt={`${post.title} 第 ${activeSlide + 1} 張`}
+                    />
+                    <span className="post-status-badge">{post.status}</span>
+                    {media.length > 1 ? (
+                      <>
+                        <span className="post-carousel-count">
+                          {activeSlide + 1} / {media.length}
+                        </span>
                         <button
                           type="button"
+                          className="post-carousel-button previous"
+                          aria-label="上一張圖"
+                          disabled={activeSlide === 0}
                           onClick={() =>
-                            setExpandedCaptions((current) => ({ ...current, [post.id]: !captionExpanded }))
+                            movePostSlide(post.id, media.length, -1)
                           }
                         >
-                          {captionExpanded ? '收起' : '展開'}
+                          ‹
                         </button>
-                        <button type="button" onClick={() => startCardCaptionEdit(post)}>
-                          編輯 caption
+                        <button
+                          type="button"
+                          className="post-carousel-button next"
+                          aria-label="下一張圖"
+                          disabled={activeSlide === media.length - 1}
+                          onClick={() =>
+                            movePostSlide(post.id, media.length, 1)
+                          }
+                        >
+                          ›
                         </button>
+                        <div
+                          className="post-carousel-dots"
+                          aria-label={`${post.title} 圖片頁數`}
+                        >
+                          {media.map((imageUrl, index) => (
+                            <button
+                              type="button"
+                              key={imageUrl}
+                              className={index === activeSlide ? "active" : ""}
+                              aria-label={`第 ${index + 1} 張圖`}
+                              onClick={() =>
+                                setPostSlide(post.id, media.length, index)
+                              }
+                            />
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="post-copy">
+                    <h2>{post.title}</h2>
+                    {isEditingCaption ? (
+                      <div className="post-caption-editor">
+                        <textarea
+                          value={cardCaptionDraft}
+                          onChange={(event) =>
+                            setCardCaptionDrafts((current) => ({
+                              ...current,
+                              [post.id]: event.target.value,
+                            }))
+                          }
+                          aria-label={`${post.title} caption`}
+                        />
+                        <div className="post-caption-editor-actions">
+                          <button
+                            type="button"
+                            onClick={() => setEditingCaptionPostId(null)}
+                          >
+                            取消
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void saveCardCaption(post)}
+                            disabled={savingCaptionPostId === post.id}
+                          >
+                            {savingCaptionPostId === post.id
+                              ? "儲存中..."
+                              : "儲存"}
+                          </button>
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
-                <div className="post-card-actions">
-                  {PUBLISH_PLATFORMS.map((platform) => {
-                    const connection = platformConnections[platform.id]
-                    const status = platformPublishStatus(post, platform.id)
-                    const isPublishingThis = publishingPlatform === platform.id
-                    const failedMessage = post.publishStatus?.[platform.id]?.message
-                    return (
-                      <button
-                        type="button"
-                        key={platform.id}
-                        className={`post-publish-now-button ${status === 'published' ? 'is-published' : ''}`}
-                        disabled={publishing || !connection || status === 'published'}
-                        onClick={() => void publishPost(post, platform.id, true)}
-                        title={failedMessage || undefined}
-                      >
-                        <PublishPlatformIcon platform={platform.id} />
-                        <span className="publish-platform-label">
-                        {status === 'published'
-                          ? `已發布到 ${platform.label}`
-                          : isPublishingThis
-                            ? `${platform.label} 發布中...`
-                            : connection
-                              ? `發布到 ${platform.label}`
-                              : `未連接 ${platform.label}`}
-                        </span>
-                      </button>
-                    )
-                  })}
-                  <button
-                    type="button"
-                    className="post-delete-schedule-button"
-                    disabled={publishing || cancellingPostId === post.id}
-                    onClick={() => void cancelScheduledPost(post)}
-                  >
-                    {cancellingPostId === post.id ? '刪除中...' : '刪除排程'}
-                  </button>
-                  {!hasPublishConnection ? <span>請先連接發布帳戶</span> : null}
-                </div>
-              </article>
-            )
-          }) : (
+                    ) : (
+                      <>
+                        <p className={captionExpanded ? "is-expanded" : ""}>
+                          {post.body}
+                        </p>
+                        <div className="post-caption-actions">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedCaptions((current) => ({
+                                ...current,
+                                [post.id]: !captionExpanded,
+                              }))
+                            }
+                          >
+                            {captionExpanded ? "收起" : "展開"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startCardCaptionEdit(post)}
+                          >
+                            編輯 caption
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="post-card-actions">
+                    {PUBLISH_PLATFORMS.map((platform) => {
+                      const connection = platformConnections[platform.id];
+                      const supportsAutoPublish = AUTO_PUBLISH_PLATFORM_IDS.has(
+                        platform.id,
+                      );
+                      const status = platformPublishStatus(post, platform.id);
+                      const isPublishingThis =
+                        publishingPlatform === platform.id;
+                      const failedMessage =
+                        post.publishStatus?.[platform.id]?.message;
+                      return (
+                        <button
+                          type="button"
+                          key={platform.id}
+                          className={`post-publish-now-button ${status === "published" ? "is-published" : ""}`}
+                          disabled={
+                            publishing ||
+                            !connection ||
+                            status === "published" ||
+                            !supportsAutoPublish
+                          }
+                          onClick={() =>
+                            void publishPost(post, platform.id, true)
+                          }
+                          title={failedMessage || undefined}
+                        >
+                          <PublishPlatformIcon platform={platform.id} />
+                          <span className="publish-platform-label">
+                            {status === "published"
+                              ? `已發布到 ${platform.label}`
+                              : !supportsAutoPublish
+                                ? `${platform.label} 手動發布`
+                              : isPublishingThis
+                                ? `${platform.label} 發布中...`
+                                : connection
+                                  ? `發布到 ${platform.label}`
+                                  : `未連接 ${platform.label}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="post-delete-schedule-button"
+                      disabled={publishing || cancellingPostId === post.id}
+                      onClick={() => void cancelScheduledPost(post)}
+                    >
+                      {cancellingPostId === post.id ? "刪除中..." : "刪除排程"}
+                    </button>
+                    {!hasPublishConnection ? (
+                      <span>請先連接發布帳戶</span>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })
+          ) : (
             <div className="schedule-empty-panel">
               <strong>暫時未有已確認排程內容</strong>
-              <span>這裡只會顯示目前工作台已獲客戶確認的貼文；有新內容確認後會自動出現在這裡。</span>
+              <span>
+                這裡只會顯示目前工作台已獲客戶確認的貼文；有新內容確認後會自動出現在這裡。
+              </span>
             </div>
           )}
         </section>
-        {toolbarMessage ? <div className="toolbar-message">{toolbarMessage}</div> : null}
+        {toolbarMessage ? (
+          <div className="toolbar-message">{toolbarMessage}</div>
+        ) : null}
       </section>
 
       {createModalOpen ? (
-        <div className="toolbar-modal-backdrop" role="presentation" onMouseDown={() => setCreateModalOpen(false)}>
-          <section className="toolbar-modal" role="dialog" aria-modal="true" aria-labelledby="create-post-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div
+          className="toolbar-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setCreateModalOpen(false)}
+        >
+          <section
+            className="toolbar-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-post-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <header>
               <h2 id="create-post-title">建立新貼文</h2>
-              <button type="button" onClick={() => setCreateModalOpen(false)} aria-label="關閉">×</button>
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(false)}
+                aria-label="關閉"
+              >
+                ×
+              </button>
             </header>
             <form onSubmit={handleCreatePost} className="toolbar-form">
               <label>
                 <span>貼文類型</span>
-                <select value={createPostType} onChange={(event) => setCreatePostType(event.target.value)}>
+                <select
+                  value={createPostType}
+                  onChange={(event) => setCreatePostType(event.target.value)}
+                >
                   <option value="still-images">靜態圖片</option>
                   <option value="carousels">輪播貼文</option>
                   <option value="short-form-video">短影片</option>
@@ -2566,15 +3555,27 @@ function ScheduledPostsPageContent() {
               </label>
               <label>
                 <span>標題</span>
-                <input value={createTitle} onChange={(event) => setCreateTitle(event.target.value)} placeholder="輸入貼文主題" />
+                <input
+                  value={createTitle}
+                  onChange={(event) => setCreateTitle(event.target.value)}
+                  placeholder="輸入貼文主題"
+                />
               </label>
               <label>
                 <span>發布日期與時間（{localTimeZoneLabel}）</span>
-                <input type="datetime-local" value={createScheduledAt} onChange={(event) => setCreateScheduledAt(event.target.value)} />
+                <input
+                  type="datetime-local"
+                  value={createScheduledAt}
+                  onChange={(event) => setCreateScheduledAt(event.target.value)}
+                />
               </label>
               <footer>
-                <button type="button" onClick={() => setCreateModalOpen(false)}>取消</button>
-                <button type="submit" disabled={toolbarBusy}>{toolbarBusy ? '建立中...' : '建立貼文'}</button>
+                <button type="button" onClick={() => setCreateModalOpen(false)}>
+                  取消
+                </button>
+                <button type="submit" disabled={toolbarBusy}>
+                  {toolbarBusy ? "建立中..." : "建立貼文"}
+                </button>
               </footer>
             </form>
           </section>
@@ -2582,11 +3583,27 @@ function ScheduledPostsPageContent() {
       ) : null}
 
       {scheduleModalPost ? (
-        <div className="toolbar-modal-backdrop" role="presentation" onMouseDown={() => setScheduleModalPost(null)}>
-          <section className="toolbar-modal" role="dialog" aria-modal="true" aria-labelledby="edit-schedule-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div
+          className="toolbar-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setScheduleModalPost(null)}
+        >
+          <section
+            className="toolbar-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-schedule-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <header>
               <h2 id="edit-schedule-title">修改發布時間</h2>
-              <button type="button" onClick={() => setScheduleModalPost(null)} aria-label="關閉">×</button>
+              <button
+                type="button"
+                onClick={() => setScheduleModalPost(null)}
+                aria-label="關閉"
+              >
+                ×
+              </button>
             </header>
             <form onSubmit={handleUpdateSchedule} className="toolbar-form">
               <label>
@@ -2595,11 +3612,22 @@ function ScheduledPostsPageContent() {
               </label>
               <label>
                 <span>發布日期與時間（{localTimeZoneLabel}）</span>
-                <input type="datetime-local" value={scheduleDraftAt} onChange={(event) => setScheduleDraftAt(event.target.value)} />
+                <input
+                  type="datetime-local"
+                  value={scheduleDraftAt}
+                  onChange={(event) => setScheduleDraftAt(event.target.value)}
+                />
               </label>
               <footer>
-                <button type="button" onClick={() => setScheduleModalPost(null)}>取消</button>
-                <button type="submit" disabled={toolbarBusy}>{toolbarBusy ? '儲存中...' : '儲存時間'}</button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalPost(null)}
+                >
+                  取消
+                </button>
+                <button type="submit" disabled={toolbarBusy}>
+                  {toolbarBusy ? "儲存中..." : "儲存時間"}
+                </button>
               </footer>
             </form>
           </section>
@@ -2607,22 +3635,56 @@ function ScheduledPostsPageContent() {
       ) : null}
 
       {regenerateConfirmOpen ? (
-        <div className="toolbar-modal-backdrop" role="presentation" onMouseDown={() => setRegenerateConfirmOpen(false)}>
-          <section className="toolbar-modal" role="dialog" aria-modal="true" aria-labelledby="regenerate-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div
+          className="toolbar-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setRegenerateConfirmOpen(false)}
+        >
+          <section
+            className="toolbar-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="regenerate-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <header>
               <h2 id="regenerate-title">重新生成圖片</h2>
-              <button type="button" onClick={() => setRegenerateConfirmOpen(false)} aria-label="關閉">×</button>
+              <button
+                type="button"
+                onClick={() => setRegenerateConfirmOpen(false)}
+                aria-label="關閉"
+              >
+                ×
+              </button>
             </header>
             <p>重新為本週所有貼文生成圖片？這會消耗 credits。</p>
             <div className="affected-post-list">
-              {currentWeekPosts.length ? currentWeekPosts.map((post) => <span key={post.id}>{post.title}</span>) : <span>本週沒有貼文</span>}
+              {currentWeekPosts.length ? (
+                currentWeekPosts.map((post) => (
+                  <span key={post.id}>{post.title}</span>
+                ))
+              ) : (
+                <span>本週沒有貼文</span>
+              )}
             </div>
             {toolbarBusy && regenerateProgress.total ? (
-              <strong className="toolbar-progress">正在重新生成... ({regenerateProgress.current}/{regenerateProgress.total})</strong>
+              <strong className="toolbar-progress">
+                正在重新生成... ({regenerateProgress.current}/
+                {regenerateProgress.total})
+              </strong>
             ) : null}
             <footer>
-              <button type="button" onClick={() => setRegenerateConfirmOpen(false)}>取消</button>
-              <button type="button" disabled={toolbarBusy || !currentWeekPosts.length} onClick={handleConfirmRegenerate}>
+              <button
+                type="button"
+                onClick={() => setRegenerateConfirmOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={toolbarBusy || !currentWeekPosts.length}
+                onClick={handleConfirmRegenerate}
+              >
                 確認重新生成
               </button>
             </footer>
@@ -2631,32 +3693,70 @@ function ScheduledPostsPageContent() {
       ) : null}
 
       {improvePanelOpen ? (
-        <div className="toolbar-modal-backdrop" role="presentation" onMouseDown={() => setImprovePanelOpen(false)}>
-          <section className="toolbar-modal improve-modal" role="dialog" aria-modal="true" aria-labelledby="improve-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div
+          className="toolbar-modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setImprovePanelOpen(false)}
+        >
+          <section
+            className="toolbar-modal improve-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="improve-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <header>
               <h2 id="improve-title">改善本週內容</h2>
-              <button type="button" onClick={() => setImprovePanelOpen(false)} aria-label="關閉">×</button>
+              <button
+                type="button"
+                onClick={() => setImprovePanelOpen(false)}
+                aria-label="關閉"
+              >
+                ×
+              </button>
             </header>
             <div className="improve-options">
               <label>
-                <input type="radio" checked={improveMode === 'copy'} onChange={() => setImproveMode('copy')} />
+                <input
+                  type="radio"
+                  checked={improveMode === "copy"}
+                  onChange={() => setImproveMode("copy")}
+                />
                 <span>改善所有本週文案</span>
               </label>
               <label>
-                <input type="radio" checked={improveMode === 'image-prompt'} onChange={() => setImproveMode('image-prompt')} />
+                <input
+                  type="radio"
+                  checked={improveMode === "image-prompt"}
+                  onChange={() => setImproveMode("image-prompt")}
+                />
                 <span>改善所有本週圖片 prompt</span>
               </label>
             </div>
             <p>以下貼文會受影響：</p>
             <div className="affected-post-list">
-              {currentWeekPosts.length ? currentWeekPosts.map((post) => <span key={post.id}>{post.title}</span>) : <span>本週沒有貼文</span>}
+              {currentWeekPosts.length ? (
+                currentWeekPosts.map((post) => (
+                  <span key={post.id}>{post.title}</span>
+                ))
+              ) : (
+                <span>本週沒有貼文</span>
+              )}
             </div>
             {toolbarBusy && improveProgress.total ? (
-              <strong className="toolbar-progress">正在改善... ({improveProgress.current}/{improveProgress.total})</strong>
+              <strong className="toolbar-progress">
+                正在改善... ({improveProgress.current}/{improveProgress.total})
+              </strong>
             ) : null}
             <footer>
-              <button type="button" onClick={() => setImprovePanelOpen(false)}>取消</button>
-              <button type="button" disabled={toolbarBusy || !currentWeekPosts.length} onClick={handleImprovePosts}>
+              <button type="button" onClick={() => setImprovePanelOpen(false)}>
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={toolbarBusy || !currentWeekPosts.length}
+                onClick={handleImprovePosts}
+              >
                 確認改善
               </button>
             </footer>
@@ -2666,7 +3766,7 @@ function ScheduledPostsPageContent() {
 
       <style dangerouslySetInnerHTML={{ __html: styles }} />
     </main>
-  )
+  );
 }
 
 export default function ScheduledPostsPage() {
@@ -2674,7 +3774,7 @@ export default function ScheduledPostsPage() {
     <Suspense fallback={null}>
       <ScheduledPostsPageContent />
     </Suspense>
-  )
+  );
 }
 
 const styles = `${dashboardSidebarStyles}
@@ -4420,11 +5520,20 @@ const styles = `${dashboardSidebarStyles}
   }
 
   .history-tools button {
-    min-width: 34px;
-    width: 34px;
+    gap: 2px;
+    min-width: 52px;
+    width: 52px;
     border: 0;
     color: #afb2ba;
+  }
+
+  .history-tools button span {
     font-size: 20px;
+  }
+
+  .history-tools button strong {
+    font-size: 11px;
+    font-weight: 600;
   }
 
   .design-toolbar button.active {
@@ -4695,24 +5804,6 @@ const styles = `${dashboardSidebarStyles}
     text-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
   }
 
-  .canvas-side-actions {
-    position: absolute;
-    left: calc(50% - min(430px, 62vh) / 2 - 44px);
-    top: 50%;
-    display: grid;
-    gap: 10px;
-  }
-
-  .canvas-side-actions button {
-    width: 30px;
-    height: 30px;
-    border: 0;
-    background: transparent;
-    color: #3f424a;
-    font-size: 20px;
-    cursor: pointer;
-  }
-
   .design-result-bar,
   .zoom-control,
   .ask-soon-button {
@@ -4936,6 +6027,113 @@ const styles = `${dashboardSidebarStyles}
     color: #999faa;
   }
 
+  .image-ai-edit-section {
+    background: #f7f8fa;
+    border: 1px solid #e1e3e8;
+    border-radius: 14px;
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .image-ai-edit-section > p {
+    color: #6f7580;
+    font-size: 12px;
+    line-height: 1.45;
+    margin: -2px 0 0;
+  }
+
+  .image-edit-size-row {
+    padding-top: 2px;
+  }
+
+  .image-edit-message {
+    color: #287a46 !important;
+    font-size: 12px !important;
+    font-weight: 700;
+    margin: 0 !important;
+  }
+
+  .image-reference-dropzone {
+    align-items: center;
+    background: #f8f9fb;
+    border: 1px dashed #cfd3da;
+    border-radius: 10px;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 10px 12px;
+    transition: background 150ms ease, border-color 150ms ease;
+  }
+
+  .image-reference-dropzone.dragging {
+    background: #f0ecff;
+    border-color: #7c3aed;
+  }
+
+  .image-reference-dropzone > span {
+    color: #676c76;
+    font-size: 11px;
+  }
+
+  .image-reference-upload {
+    color: #202126;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .image-reference-upload input {
+    display: none;
+  }
+
+  .image-reference-grid {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .image-reference-card {
+    aspect-ratio: 1;
+    border: 1px solid #dfe2e8;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .image-reference-card img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .image-reference-card > span {
+    background: rgba(17, 17, 17, 0.82);
+    border-radius: 4px;
+    bottom: 4px;
+    color: #ffffff;
+    font-size: 10px;
+    left: 4px;
+    padding: 2px 5px;
+    position: absolute;
+  }
+
+  .image-reference-card button {
+    align-items: center;
+    background: rgba(17, 17, 17, 0.82);
+    border: 0;
+    border-radius: 999px;
+    color: #ffffff;
+    display: flex;
+    font-size: 13px;
+    height: 20px;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    width: 20px;
+  }
+
   .media-control-row {
     display: grid;
     gap: 7px;
@@ -5035,6 +6233,20 @@ const styles = `${dashboardSidebarStyles}
     width: 132px;
   }
 
+  .brand-logo-skeleton {
+    animation: brand-skeleton-pulse 1.25s ease-in-out infinite;
+    background: linear-gradient(90deg, #eef0f3 25%, #f8f9fa 50%, #eef0f3 75%);
+    background-size: 200% 100%;
+    border-radius: 12px;
+    height: 72px;
+    width: 132px;
+  }
+
+  @keyframes brand-skeleton-pulse {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+
   .media-brand-kit-row {
     display: flex;
     flex-wrap: wrap;
@@ -5081,8 +6293,6 @@ const styles = `${dashboardSidebarStyles}
     width: 100%;
   }
 
-  .templates-panel,
-  .backgrounds-panel,
   .resize-panel,
   .post-panel {
     border-left: 1px solid #e0e2e6;
@@ -5122,154 +6332,6 @@ const styles = `${dashboardSidebarStyles}
     font-size: 15px;
     font-weight: 700;
     margin: 0;
-  }
-
-  .templates-filter-row {
-    display: flex;
-    gap: 6px;
-  }
-
-  .templates-filter-select {
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    color: #202126;
-    cursor: pointer;
-    flex: 1;
-    font: inherit;
-    font-size: 12px;
-    min-width: 0;
-    padding: 6px 8px;
-  }
-
-  .templates-grid {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .template-thumb-btn {
-    background: none;
-    border: 0;
-    color: #202126;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 0;
-    text-align: left;
-  }
-
-  .template-thumb-preview {
-    align-items: center;
-    aspect-ratio: 1;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    display: flex;
-    font-size: 11px;
-    font-weight: 700;
-    justify-content: center;
-    overflow: hidden;
-    text-align: center;
-    transition: opacity 150ms ease, transform 150ms ease;
-    width: 100%;
-  }
-
-  .template-thumb-btn:hover .template-thumb-preview {
-    opacity: 0.82;
-    transform: translateY(-1px);
-  }
-
-  .template-thumb-label {
-    font-size: 10px;
-    padding: 0 4px;
-  }
-
-  .template-thumb-name {
-    color: #555b66;
-    font-size: 11px;
-    padding: 0 2px;
-  }
-
-  .template-grid {
-    display: grid;
-    gap: 12px;
-  }
-
-  .template-card {
-    background: #ffffff;
-    border: 1px solid #e1e3e8;
-    border-radius: 12px;
-    color: #202126;
-    cursor: pointer;
-    display: grid;
-    gap: 12px;
-    padding: 12px;
-    text-align: left;
-    transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
-  }
-
-  .template-card:hover {
-    border-color: #9aa0aa;
-    box-shadow: 0 10px 24px rgba(18, 20, 24, 0.08);
-    transform: translateY(-1px);
-  }
-
-  .template-preview {
-    aspect-ratio: 4 / 3;
-    background:
-      linear-gradient(135deg, color-mix(in srgb, var(--template-accent) 70%, #ffffff), #f3f4f6),
-      #f3f4f6;
-    border-radius: 10px;
-    color: #ffffff;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    overflow: hidden;
-    padding: 14px;
-    position: relative;
-  }
-
-  .template-preview::before {
-    background: rgba(17, 17, 17, 0.26);
-    border-radius: 999px;
-    content: "";
-    height: 88px;
-    position: absolute;
-    right: -22px;
-    top: -24px;
-    width: 88px;
-  }
-
-  .template-preview strong {
-    font-size: 20px;
-    line-height: 1;
-    position: relative;
-    z-index: 1;
-  }
-
-  .template-preview em {
-    font-size: 12px;
-    font-style: normal;
-    margin-top: 6px;
-    opacity: 0.88;
-    position: relative;
-    z-index: 1;
-  }
-
-  .template-card-copy {
-    display: grid;
-    gap: 4px;
-  }
-
-  .template-card-copy strong {
-    font-size: 14px;
-  }
-
-  .template-card-copy small {
-    color: #777b84;
-    font-size: 12px;
-    line-height: 1.4;
   }
 
   .post-panel-section {
@@ -5387,96 +6449,6 @@ const styles = `${dashboardSidebarStyles}
     background: #111111;
     color: #ffffff;
     min-height: 46px;
-  }
-
-  .bg-color-grid {
-    display: grid;
-    gap: 6px;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-
-  .bg-swatch {
-    aspect-ratio: 1;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    overflow: hidden;
-    padding: 0;
-    position: relative;
-    transition: transform 100ms ease;
-  }
-
-  .bg-swatch:hover,
-  .bg-gradient-swatch:hover {
-    transform: scale(1.08);
-  }
-
-  .custom-color-swatch {
-    align-items: center;
-    background: #f0f0f0;
-    color: #666b74;
-    display: flex;
-    font-size: 14px;
-    justify-content: center;
-  }
-
-  .custom-color-swatch input {
-    height: 0;
-    opacity: 0;
-    position: absolute;
-    width: 0;
-  }
-
-  .bg-gradient-grid {
-    display: grid;
-    gap: 6px;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .bg-gradient-swatch {
-    aspect-ratio: 1;
-    border: 0;
-    border-radius: 6px;
-    cursor: pointer;
-    padding: 0;
-    transition: transform 100ms ease;
-  }
-
-  .bg-texture-grid,
-  .bg-scene-grid {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .bg-texture-btn {
-    align-items: center;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    color: #555b66;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    font: inherit;
-    font-size: 11px;
-    gap: 5px;
-    padding: 8px;
-    transition: background 150ms ease, border-color 150ms ease;
-  }
-
-  .bg-texture-btn:hover {
-    background: #f7f8fa;
-    border-color: #b8bdc7;
-  }
-
-  .bg-texture-preview {
-    aspect-ratio: 2;
-    background:
-      linear-gradient(135deg, rgba(255,255,255,0.7), rgba(0,0,0,0.08)),
-      #e1e3e8;
-    border-radius: 4px;
-    width: 100%;
   }
 
   .resize-current {
@@ -5727,6 +6699,83 @@ const styles = `${dashboardSidebarStyles}
     box-shadow: 0 0 0 2px #202126;
   }
 
+  .brand-color-swatch.active {
+    box-shadow: 0 0 0 2px #111111;
+  }
+
+  .color-palette-groups,
+  .color-palette-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .color-palette-groups { gap: 16px; }
+
+  .color-palette-group h4 {
+    color: #555b66;
+    font-size: 12px;
+    margin: 0;
+  }
+
+  .color-palette-heading {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .eyedropper-button {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #d8dce4;
+    border-radius: 8px;
+    color: #343840;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 750;
+    gap: 5px;
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .eyedropper-button:hover {
+    background: #f5f6f8;
+    border-color: #aeb3bd;
+  }
+
+  .eyedropper-button svg {
+    fill: currentColor;
+    height: 16px;
+    width: 16px;
+  }
+
+  .color-palette-swatches,
+  .brand-colors-loading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+
+  .brand-colors-loading span {
+    animation: brand-skeleton-pulse 1.25s ease-in-out infinite;
+    background: linear-gradient(90deg, #e7e9ed 25%, #f6f7f8 50%, #e7e9ed 75%);
+    background-size: 200% 100%;
+    border-radius: 999px;
+    height: 34px;
+    width: 34px;
+  }
+
+  .brand-colors-empty {
+    background: #f7f8fa;
+    border: 1px dashed #d8dce4;
+    border-radius: 10px;
+    color: #7b818c;
+    font-size: 12px;
+    margin: 0;
+    padding: 10px 12px;
+  }
+
   .brand-font-btn {
     align-items: center;
     background: #ffffff;
@@ -5814,8 +6863,7 @@ const styles = `${dashboardSidebarStyles}
     transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
   }
 
-  .text-preset-btn:hover,
-  .text-style-card:hover {
+  .text-preset-btn:hover {
     background: #f6f7f8;
     border-color: #b9bdc6;
     transform: translateY(-1px);
@@ -5844,26 +6892,6 @@ const styles = `${dashboardSidebarStyles}
   .text-preset-label {
     color: #828690;
     font-size: 12px;
-  }
-
-  .text-style-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .text-style-card {
-    align-items: center;
-    background: #ffffff;
-    border: 1px solid #e1e3e8;
-    border-radius: 10px;
-    color: #202126;
-    cursor: pointer;
-    display: grid;
-    min-height: 82px;
-    overflow: hidden;
-    padding: 10px;
-    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
   }
 
   .text-style-card span {
@@ -6128,6 +7156,79 @@ const styles = `${dashboardSidebarStyles}
     width: 42px;
   }
 
+  .text-font-select {
+    background: #ffffff;
+    border: 1px solid #dfe2e7;
+    border-radius: 10px;
+    color: #202126;
+    font-size: 15px;
+    height: 44px;
+    padding: 0 12px;
+    width: 100%;
+  }
+
+  .shape-color-section {
+    gap: 12px;
+  }
+
+  .shape-color-controls {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+  }
+
+  .shape-color-controls input[type="color"] {
+    background: #ffffff;
+    border: 1px solid #dfe2e7;
+    border-radius: 10px;
+    height: 46px;
+    padding: 4px;
+    width: 58px;
+  }
+
+  .shape-hex-input {
+    background: #ffffff;
+    border: 1px solid #dfe2e7;
+    border-radius: 10px;
+    color: #202126;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 14px;
+    font-weight: 650;
+    height: 42px;
+    padding: 0 11px;
+    text-transform: uppercase;
+    width: 132px;
+  }
+
+  .shape-hex-input[aria-invalid="true"] {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.12);
+  }
+
+  .shape-color-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+
+  .shape-color-swatches button {
+    border: 2px solid #ffffff;
+    border-radius: 999px;
+    box-shadow: 0 0 0 1px #d8dbe1;
+    cursor: pointer;
+    height: 30px;
+    padding: 0;
+    width: 30px;
+  }
+
+  .shape-color-swatches button.active {
+    box-shadow: 0 0 0 2px #111111;
+  }
+
+  .shape-legacy-color-control {
+    display: none !important;
+  }
+
   .elements-panel input {
     width: 100%;
     height: 54px;
@@ -6363,10 +7464,6 @@ const styles = `${dashboardSidebarStyles}
       grid-template-columns: 1fr;
     }
 
-    .sidebar {
-      display: none;
-    }
-
     .calendar-topbar,
     .calendar-actions {
       flex-wrap: wrap;
@@ -6387,4 +7484,4 @@ const styles = `${dashboardSidebarStyles}
       border-left: 0;
     }
   }
-`
+`;

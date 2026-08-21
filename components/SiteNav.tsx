@@ -10,6 +10,7 @@ const AUTH_ROUTES = ['/signup', '/login', '/forgot-password', '/reset-password']
 export default function SiteNav() {
   const pathname = usePathname()
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const isDashboardRoute = DASHBOARD_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   )
@@ -21,6 +22,10 @@ export default function SiteNav() {
     window.addEventListener('scroll', updateScrolled, { passive: true })
     return () => window.removeEventListener('scroll', updateScrolled)
   }, [])
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
 
   if (isDashboardRoute) return null
 
@@ -37,12 +42,22 @@ export default function SiteNav() {
           />
         </Link>
 
-        <div className="nav-links">
-          <Link href="/soon-log">SOON LOG</Link>
-          <Link href="/match-for-you">Match for You 創作者配對</Link>
-          <Link href="/about">關於我們</Link>
-          <Link href="/customers">客戶案例</Link>
-          <Link href="/pricing">定價</Link>
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-label={menuOpen ? '關閉導覽選單' : '開啟導覽選單'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+        </button>
+
+        <div className={`nav-links ${menuOpen ? 'nav-links--open' : ''}`}>
+          <Link href="/#product">產品功能</Link>
+          <Link href="/#features">品牌增長</Link>
+          <Link href="/#about">內容流程</Link>
+          <Link href="/#pricing">定價</Link>
           <Link href="/login">登入</Link>
           <Link href="/contact" className="nav-secondary">
             聯絡我們
@@ -85,8 +100,12 @@ export default function SiteNav() {
 
             .brand-logo {
               display: block;
-              height: 108px;
+              height: 82px;
               width: auto;
+            }
+
+            .nav-toggle {
+              display: none;
             }
 
             .nav-links {
@@ -136,34 +155,68 @@ export default function SiteNav() {
 
             @media (max-width: 980px) {
               .site-nav {
-                padding: 16px 20px;
-                flex-direction: column;
-                align-items: stretch;
-                background: rgba(0, 0, 0, 0.72);
+                padding: 12px 20px;
+                background: rgba(0, 0, 0, 0.82);
+                backdrop-filter: blur(16px);
               }
 
               .brand-logo {
-                height: 72px;
+                height: 58px;
+              }
+
+              .nav-toggle {
+                width: 46px;
+                height: 46px;
+                margin-left: auto;
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 10px;
+                background: rgba(255,255,255,0.06);
+                display: grid;
+                place-content: center;
+                gap: 7px;
+              }
+
+              .nav-toggle span {
+                display: block;
+                width: 20px;
+                height: 2px;
+                border-radius: 999px;
+                background: #ffffff;
               }
 
               .nav-links {
-                justify-content: flex-start;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 16px;
+                right: 16px;
+                padding: 14px;
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 14px;
+                background: rgba(10,10,11,0.98);
+                box-shadow: 0 24px 60px rgba(0,0,0,0.42);
+                display: none;
+                align-items: stretch;
+                flex-direction: column;
+                gap: 2px;
+              }
+
+              .nav-links--open {
+                display: flex;
+              }
+
+              .nav-links a {
+                padding: 12px 10px;
               }
 
               .nav-secondary,
               .nav-primary {
-                flex: 1;
                 text-align: center;
               }
             }
 
             @media (max-width: 640px) {
               .brand-logo {
-                height: 56px;
-              }
-
-              .nav-links {
-                gap: 10px 14px;
+                height: 48px;
               }
 
               .nav-links a {

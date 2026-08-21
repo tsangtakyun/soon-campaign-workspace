@@ -92,7 +92,7 @@ export default function HomePage() {
             <p className="hero__subtitle">
               SOON 制定你的策略 創造你的內容
               <br />
-              不需要再請人打理社交媒體——每月只需 HK$588 起
+              由策略、內容到發布，一個工作台完成——每月 HK$799 起
             </p>
             <div className="hero__actions">
               <Link href="/signup" className="hero__cta hero__cta--primary">
@@ -122,7 +122,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="product-preview">
+      <section id="product" className="product-preview">
         <div className="product-preview__header">
           <span>產品預覽</span>
           <h2>一個工作台，從策略到發布</h2>

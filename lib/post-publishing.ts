@@ -348,6 +348,61 @@ async function createInstagramCarouselContainer({
   })
 }
 
+async function publishToThreads(post: CampaignPost, connection: SocialConnection, baseUrl: string) {
+  if (isTokenExpired(connection)) throw tokenExpiredError('threads')
+  if (!connection.account_id || !connection.access_token) {
+    throw new Error('請重新連接你的 Threads 帳戶')
+  }
+
+  const imageUrl = imageUrlsForPost(post, baseUrl)[0] || ''
+  const text = Array.from(post.body || post.title || '').slice(0, 500).join('')
+  if (!imageUrl && !text) throw new Error('Threads 發布需要文字或圖片。')
+
+  const graphOrigin = 'https://graph.threads.net/v1.0'
+  const containerParams = new URLSearchParams({
+    access_token: connection.access_token,
+    media_type: imageUrl ? 'IMAGE' : 'TEXT',
+    text,
+  })
+  if (imageUrl) {
+    containerParams.set('image_url', imageUrl)
+    containerParams.set('alt_text', post.title || 'SOON content image')
+  }
+
+  console.log('[posts/publish] Threads creating container:', {
+    accountId: connection.account_id,
+    hasImage: Boolean(imageUrl),
+    mediaType: imageUrl ? 'IMAGE' : 'TEXT',
+  })
+  const container = await readGraphJson(
+    await fetch(`${graphOrigin}/me/threads`, {
+      body: containerParams,
+      method: 'POST',
+    })
+  )
+  const creationId = typeof container.id === 'string' ? container.id : ''
+  if (!creationId) throw new Error('Threads media container 建立失敗。')
+
+  console.log('[posts/publish] Threads publishing container:', {
+    accountId: connection.account_id,
+    creationId,
+  })
+  const published = await readGraphJson(
+    await fetch(`${graphOrigin}/me/threads_publish`, {
+      body: new URLSearchParams({
+        access_token: connection.access_token,
+        creation_id: creationId,
+      }),
+      method: 'POST',
+    })
+  )
+  if (!published.id) throw new Error('Threads 發布失敗。')
+
+  return {
+    media_id: String(published.id),
+  }
+}
+
 async function publishToFacebook(post: CampaignPost, connection: SocialConnection, baseUrl: string) {
   if (isTokenExpired(connection)) throw tokenExpiredError('facebook')
   console.log('Facebook connection found:', sanitizeConnection(connection))
@@ -513,7 +568,7 @@ export async function publishPostToConnectedPlatforms(input: {
       } else if (connection.platform === 'facebook') {
         result.platform_results.facebook = await publishToFacebook(input.post, connection, input.baseUrl)
       } else if (connection.platform === 'threads') {
-        throw new Error('Threads 自動發布尚未啟用，請先使用手動發布。')
+        result.platform_results.threads = await publishToThreads(input.post, connection, input.baseUrl)
       } else {
         continue
       }
