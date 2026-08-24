@@ -846,6 +846,10 @@ function formatScheduleDateRange(posts: ScheduledPost[]) {
   return `${first}${first === last ? "" : ` - ${last}`} 已確認排程`;
 }
 
+function isVideoMedia(post: ScheduledPost, mediaUrl?: string) {
+  return post.type === "短影片" || /\.(mp4|mov|webm)(?:$|[?#])/i.test(mediaUrl || "");
+}
+
 function currentTimeZoneLabel() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "你的本地時區";
@@ -2841,11 +2845,22 @@ function ScheduledPostsPageContent() {
               ←
             </button>
             <div className="post-editor-title-group">
-              <img
-                alt=""
-                className="post-editor-thumb"
-                src={selectedPost.image}
-              />
+              {isVideoMedia(selectedPost, selectedPost.image) ? (
+                <video
+                  aria-label={`${selectedPost.title} 短影片`}
+                  className="post-editor-thumb"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  src={selectedPost.image}
+                />
+              ) : (
+                <img
+                  alt=""
+                  className="post-editor-thumb"
+                  src={selectedPost.image}
+                />
+              )}
               <span className="post-editor-campaign-name">
                 {selectedPost.title}
               </span>
@@ -2995,7 +3010,17 @@ function ScheduledPostsPageContent() {
                 </span>
               </header>
               <div className="phone-image">
-                <img src={selectedPost.image} alt="" />
+                {isVideoMedia(selectedPost, selectedPost.image) ? (
+                  <video
+                    aria-label={`${selectedPost.title} 短影片預覽`}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    src={selectedPost.image}
+                  />
+                ) : (
+                  <img src={selectedPost.image} alt="" />
+                )}
                 <div className="phone-overlay">
                   <strong>{selectedPost.title}</strong>
                   <span>{selectedPost.type}</span>
@@ -3349,10 +3374,20 @@ function ScheduledPostsPageContent() {
                     </div>
                   </div>
                   <div className="post-image-wrap">
-                    <img
-                      src={media[activeSlide]}
-                      alt={`${post.title} 第 ${activeSlide + 1} 張`}
-                    />
+                    {isVideoMedia(post, media[activeSlide]) ? (
+                      <video
+                        aria-label={`${post.title} 短影片預覽`}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        src={media[activeSlide]}
+                      />
+                    ) : (
+                      <img
+                        src={media[activeSlide]}
+                        alt={`${post.title} 第 ${activeSlide + 1} 張`}
+                      />
+                    )}
                     <span className="post-status-badge">{post.status}</span>
                     {media.length > 1 ? (
                       <>
@@ -4080,7 +4115,8 @@ const styles = `${dashboardSidebarStyles}
     overflow: hidden;
   }
 
-  .post-image-wrap img {
+  .post-image-wrap img,
+  .post-image-wrap video {
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -4806,7 +4842,8 @@ const styles = `${dashboardSidebarStyles}
     cursor: pointer;
   }
 
-  .phone-image img {
+  .phone-image img,
+  .phone-image video {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -4814,7 +4851,8 @@ const styles = `${dashboardSidebarStyles}
     transition: transform 180ms ease, filter 180ms ease;
   }
 
-  .phone-image:hover img {
+  .phone-image:hover img,
+  .phone-image:hover video {
     transform: scale(1.015);
     filter: brightness(0.62);
   }
