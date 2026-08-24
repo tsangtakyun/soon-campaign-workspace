@@ -49,27 +49,33 @@ const eggSoonTypeface = 'GenSenRounded2 / 系統圓體'
 const bunchillCoreAssets = [
   {
     category: '角色設定',
-    description: '2D 平面角色比例、正面設定與基本造型，用於故事卡及平面內容。',
+    description: '現行唯一角色體態、比例、服裝、肚腩及 chill 位置基準；每次生成必傳。',
     image: '/brand-assets/bechilltogether/bunchill-2D-character-sheet.png',
-    title: 'Bunchill 2D 角色設定',
-  },
-  {
-    category: '角色設定',
-    description: '3D 角色比例與毛感參考，用於 AI 短片、動態場景及立體演繹。',
-    image: '/brand-assets/bechilltogether/bunchill-3D-character-sheet.png',
-    title: 'Bunchill 3D 角色設定',
-  },
-  {
-    category: '表情與動作',
-    description: '常用情緒、表情和反應參考，方便內容維持同一個角色性格。',
-    image: '/brand-assets/bechilltogether/bunchill-expression-library.png',
-    title: 'Bunchill 表情庫',
+    title: 'Bunchill Character Sheet',
   },
   {
     category: '視覺語言',
-    description: '故事卡、金句、柔和留白和情緒畫面方向，用於保持內容一致。',
-    image: '/brand-assets/bechilltogether/bunchill-visualexpression.png',
-    title: 'Bunchill 視覺表現',
+    description: '線條、厚上色、柔和陰影、暖米白底及生活場景處理；每次生成必傳。',
+    image: '/brand-assets/bechilltogether/bunchill-visual-language.png',
+    title: 'Bunchill Visual Language',
+  },
+  {
+    category: '表情 Clean',
+    description: '日常、興奮、驚、煩躁。無標籤文字，供模型直接參考。',
+    image: '/brand-assets/bechilltogether/bunchill-expression-core-clean.png',
+    title: 'Expression Core',
+  },
+  {
+    category: '表情 Clean',
+    description: '悶、自信、拜託、傷心、嬲。無標籤文字，供模型直接參考。',
+    image: '/brand-assets/bechilltogether/bunchill-expression-extended-clean.png',
+    title: 'Expression Extended',
+  },
+  {
+    category: '表情索引',
+    description: '九種表情中英對照。生成時只作語義索引，禁止複製標籤或 sheet 排版。',
+    image: '/brand-assets/bechilltogether/bunchill-expression-master-annotated.png',
+    title: 'Nine-expression Master',
   },
 ]
 
@@ -501,7 +507,7 @@ export default function BrandKitPage() {
   const visualStyleNote = isEggActive
     ? '資料核查、強 hook、4:5 editorial 排版，適合新聞、熱話、文化現象及品牌空間分析。'
     : isBechillActive
-      ? '溫柔、留白、手繪感，適合人生金句故事卡及情緒共鳴內容。'
+      ? '2D 手繪角色、清晰中粗深啡描邊、厚上色與柔和陰影；暖米白及低飽和生活場景，角色保持畫面主體。'
       : ''
 
   useEffect(() => {

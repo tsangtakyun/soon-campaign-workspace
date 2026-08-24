@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+import {
+  BECHILL_REFERENCE_PROMPT,
+  isBechillBrand,
+  loadBechillReferenceFiles,
+} from '@/lib/bechill-brand-references'
 import { createAdminSupabase } from '@/lib/server-supabase'
 
 export const maxDuration = 60
@@ -319,7 +324,7 @@ export async function POST(request: Request) {
       ? { column: 'user_id', value: post.user_id }
       : { column: 'onboarding_session_id', value: post.onboarding_session_id }
 
-    const [{ data: brandKitRows }, { data: preferenceRows }] = await Promise.all([
+    const [{ data: brandKitRows }, { data: preferenceRows }, { data: workspaceRow }] = await Promise.all([
       supabase
         .from('brand_kits')
         .select('business_name,business_type,visual_style_id,visual_style_keywords')
@@ -330,9 +335,14 @@ export async function POST(request: Request) {
         .select('photo_control_id,photo_control_prompt,content_mood,raw_photo_control,raw_content_mix')
         .eq(ownerFilter.column, ownerFilter.value)
         .limit(1),
+      post.workspace_id
+        ? supabase.from('workspaces').select('name').eq('id', post.workspace_id).maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
 
     const brandKit = asRecord(brandKitRows?.[0])
+    const isBechill =
+      isBechillBrand(brandKit.business_name) || isBechillBrand(workspaceRow?.name)
     const preferences = asRecord(preferenceRows?.[0])
     const captions = asRecord(post.captions)
     const topicPayload = asRecord(captions.topic)
@@ -382,6 +392,7 @@ export async function POST(request: Request) {
       `Composition: ${compositionDirection}`,
       photoControlInstruction,
       post.typeface ? `Typography direction: ${normalizeId(post.typeface).replace(/_/g, ' ')}` : '',
+      isBechill ? BECHILL_REFERENCE_PROMPT : '',
     ]
       .filter(Boolean)
       .join('. ')
@@ -418,6 +429,7 @@ export async function POST(request: Request) {
       styleInstruction,
       compositionDirection,
       moodCount: contentMoods.length,
+      mandatoryBrandReferenceCount: isBechill ? 5 : 0,
     })
 
     const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
@@ -427,6 +439,7 @@ export async function POST(request: Request) {
       mode: productImageUrl ? 'edit' : 'generation',
     })
 
+    const brandReferenceFiles = isBechill ? await loadBechillReferenceFiles() : []
     let generatedBase64 = ''
     try {
       generatedBase64 = await retryOnce(
@@ -437,7 +450,15 @@ export async function POST(request: Request) {
                 model: imageModel,
                 prompt,
                 productImageUrl,
+                brandReferenceFiles,
               })
+            : brandReferenceFiles.length
+              ? editImageFromBrandReferences({
+                  apiKey,
+                  model: imageModel,
+                  prompt,
+                  brandReferenceFiles,
+                })
             : generateImage({
                 apiKey,
                 model: imageModel,
@@ -603,16 +624,23 @@ async function editImageFromProduct({
   model,
   prompt,
   productImageUrl,
+  brandReferenceFiles = [],
 }: {
   apiKey: string
   model: string
   prompt: string
   productImageUrl: string
+  brandReferenceFiles?: File[]
 }) {
   const productImage = await loadImageFile(productImageUrl)
   const form = new FormData()
   form.append('model', model)
-  form.append('image', productImage)
+  if (brandReferenceFiles.length) {
+    form.append('image[]', productImage)
+    brandReferenceFiles.forEach((reference) => form.append('image[]', reference))
+  } else {
+    form.append('image', productImage)
+  }
   form.append('prompt', prompt)
   form.append('size', '1024x1024')
   form.append('quality', 'medium')
@@ -632,6 +660,41 @@ async function editImageFromProduct({
     throw new Error(data?.error?.message || 'OpenAI image edit failed')
   }
 
+  const base64 = data?.data?.[0]?.b64_json
+  if (!base64) throw new Error('OpenAI returned no image data')
+  return base64 as string
+}
+
+async function editImageFromBrandReferences({
+  apiKey,
+  model,
+  prompt,
+  brandReferenceFiles,
+}: {
+  apiKey: string
+  model: string
+  prompt: string
+  brandReferenceFiles: File[]
+}) {
+  const form = new FormData()
+  form.append('model', model)
+  brandReferenceFiles.forEach((reference) => form.append('image[]', reference))
+  form.append('prompt', prompt)
+  form.append('size', '1024x1024')
+  form.append('quality', 'medium')
+  form.append('output_format', 'jpeg')
+  form.append('input_fidelity', 'high')
+
+  const response = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    console.error('[generate-post-image] OpenAI brand-reference edit error:', data)
+    throw new Error(data?.error?.message || 'OpenAI image edit failed')
+  }
   const base64 = data?.data?.[0]?.b64_json
   if (!base64) throw new Error('OpenAI returned no image data')
   return base64 as string

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { PHOTO_GENERATION_CREDIT_COST, getUserCredits, spendCredits } from '@/lib/credits'
+import {
+  BECHILL_REFERENCE_PROMPT,
+  isBechillBrand,
+  loadBechillReferenceFiles,
+} from '@/lib/bechill-brand-references'
 import { createServerSupabase } from '@/lib/server-supabase'
 
 type PhotoControlMode = 'minimal' | 'balanced' | 'full' | 'strict'
@@ -53,6 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   let payload: {
+    brandName?: string
     mode?: PhotoControlMode
     originalImageUrl?: string
     referenceImageUrls?: string[]
@@ -81,6 +87,9 @@ export async function POST(request: NextRequest) {
     const referenceImages = await Promise.all(
       referenceImageUrls.map((source) => loadImage(source, request)),
     )
+    const bechillReferenceImages = isBechillBrand(payload.brandName)
+      ? await loadBechillReferenceFiles()
+      : []
     const imageModel = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2'
     const requestedSize = payload.requestedSize || 'portrait'
     const outputSize = requestedSize === 'landscape'
@@ -90,13 +99,17 @@ export async function POST(request: NextRequest) {
         : '1024x1536'
     const form = new FormData()
     form.append('model', imageModel)
-    if (referenceImages.length) {
+    if (referenceImages.length || bechillReferenceImages.length) {
       form.append('image[]', sourceImage)
       referenceImages.forEach((image) => form.append('image[]', image))
+      bechillReferenceImages.forEach((image) => form.append('image[]', image))
     } else {
       form.append('image', sourceImage)
     }
-    form.append('prompt', prompt)
+    form.append(
+      'prompt',
+      bechillReferenceImages.length ? `${prompt} ${BECHILL_REFERENCE_PROMPT}` : prompt,
+    )
     form.append('size', outputSize)
     form.append('quality', 'high')
     form.append('input_fidelity', mode === 'full' ? 'low' : 'high')

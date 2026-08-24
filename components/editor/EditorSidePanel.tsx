@@ -318,6 +318,7 @@ export function EditorSidePanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          brandName,
           mode: 'balanced',
           originalImageUrl: source,
           referenceImageUrls: imageReferenceAssets.map((asset) => asset.url),
