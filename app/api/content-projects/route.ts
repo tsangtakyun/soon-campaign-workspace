@@ -82,6 +82,10 @@ export async function POST(req: Request) {
     }
 
     const topicIdeaId = isUuid(body.topicIdeaId) ? body.topicIdeaId : null
+    const allowedFormats = new Set(['carousel', 'single_image', 'short_video', 'story_series'])
+    const selectedFormat = typeof body.selectedFormat === 'string' && allowedFormats.has(body.selectedFormat)
+      ? body.selectedFormat
+      : null
     const { data: prompt } = await access.admin
       .from('workspace_prompt_versions')
       .select('id')
@@ -101,6 +105,7 @@ export async function POST(req: Request) {
         source_url: typeof body.sourceUrl === 'string' ? body.sourceUrl : null,
         source_name: typeof body.sourceName === 'string' ? body.sourceName.slice(0, 200) : null,
         source_note: typeof body.sourceNote === 'string' ? body.sourceNote.slice(0, 3000) : null,
+        selected_format: selectedFormat,
         stage: 'brief',
         created_by: user.id,
         updated_by: user.id,
