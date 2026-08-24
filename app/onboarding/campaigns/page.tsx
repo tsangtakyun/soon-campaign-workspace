@@ -30,96 +30,9 @@ type ReferenceIdea = {
 const bechillFilters = ['全部', '笨chill 詞典', '笨chill 任務報告', '如果笨chill 識…', 'IG Reel · 15 seconds'] as const
 const eggFilters = ['全部', 'Trending 最新資訊', 'Entertainment 娛樂資訊', 'Celebrity 人物介紹', 'Travel 旅遊資訊', '兩性關係 relationship'] as const
 
-const bechillReferenceIdeas: ReferenceIdea[] = [
-  {
-    id: 'bunchill-secret-mission',
-    title: '笨chill 今日嘅秘密任務係？',
-    source: '系列 02 · 核准原型《每日秘密任務》',
-    image: '/assets/content-strategies/photos/lifestyle-content.jpg',
-    height: 'tall',
-    category: '笨chill 任務報告',
-    tags: ['6–7 頁', '主觀任務', '可愛反轉'],
-    note: '由笨chill 對一件日常小事嘅主觀理解推進：觀察、等待或誤會，最後用可愛思維反轉收結。',
-    format: 'carousel',
-  },
-  {
-    id: 'bunchill-waiting-inspection',
-    title: '主人出門後，笨chill 巡屋報告',
-    source: '系列 02 · 延伸題材',
-    image: '/mood/mood-warm.jpg',
-    height: 'medium',
-    category: '笨chill 任務報告',
-    tags: ['主人 POV', '觀察', '尾頁 payoff'],
-    note: '把等主人返屋企理解成一項認真任務；相鄰頁要換鏡頭、pose 或新資訊，唔可以只換字。',
-    format: 'carousel',
-  },
-  {
-    id: 'bunchill-dictionary-belly',
-    title: '一肚墨水，一肚碳水',
-    source: '笨chill 詞典 · 核准原型',
-    image: '/assets/content-strategies/photos/problem-solution.jpg',
-    height: 'short',
-    category: '笨chill 詞典',
-    tags: ['雙格', '一詞兩解', '中英文字'],
-    note: '同一個詞、物件或身體部位，上下格用兩個意思；上格一本正經，下格用食、瞓或舒服邏輯反轉。',
-    format: 'single_image',
-  },
-  {
-    id: 'bunchill-dictionary-private-kingdom',
-    title: '只有廁所門關上，世界先真正屬於自己',
-    source: '笨chill 詞典 · 核准原型',
-    image: '/assets/content-strategies/photos/behind-the-scenes.jpg',
-    height: 'medium',
-    category: '笨chill 詞典',
-    tags: ['雙格', '生活反差', '視覺 gag'],
-    note: '同一地點做前後對照：上格係日常壓力，下格將普通私人空間變成舒服小王國；中英句子要短。',
-    format: 'single_image',
-  },
-  {
-    id: 'bunchill-human-tool-whatsapp',
-    title: '如果笨chill 識用 WhatsApp',
-    source: '系列 04 · 核准原型',
-    image: '/assets/content-strategies/photos/community-content.jpg',
-    height: 'tall',
-    category: '如果笨chill 識…',
-    tags: ['6 頁', '人類工具', '否定工具'],
-    note: '用狗嘅邏輯重演人類工具；中段逐頁換鏡頭，最後必須反轉返現實：見真人好過用工具。',
-    format: 'carousel',
-  },
-  {
-    id: 'bunchill-human-tool-calendar',
-    title: '如果笨chill 識用行事曆',
-    source: '系列 04 · 延伸題材',
-    image: '/visual-styles/previews/magic-hour.jpg',
-    height: 'medium',
-    category: '如果笨chill 識…',
-    tags: ['主人 POV', '工具用歪', '現實重逢'],
-    note: '測試句要成立：「如果笨chill 識用行事曆，佢會……」；主人只用 POV 手、腳或長髮背影出現。',
-    format: 'carousel',
-  },
-  {
-    id: 'bunchill-easy-to-coax',
-    title: 'POV：笨chill 其實好易氹',
-    source: '系列 05 · 核准原型',
-    image: '/assets/content-strategies/photos/trend-hijacking.jpg',
-    height: 'short',
-    category: 'IG Reel · 15 seconds',
-    tags: ['15 秒', '主人 POV', '情緒階梯'],
-    note: '嬲 → 第一次氹時眼神先軟化 → 企耳微震 → 回頭思考 → 開心撲抱；情緒只升不退。',
-    format: 'short_video',
-  },
-  {
-    id: 'bunchill-pretend-not-to-hear',
-    title: 'POV：扮聽唔到，耳仔先投降',
-    source: '系列 05 · 延伸題材',
-    image: '/assets/content-strategies/photos/series-content.jpg',
-    height: 'tall',
-    category: 'IG Reel · 15 seconds',
-    tags: ['9:16', '口硬身體誠實', '無音樂'],
-    note: '固定同一場景及主人第一身視角，用眼神、企耳、回頭、全身四級反應呈現口硬但逐步被氹好。',
-    format: 'short_video',
-  },
-]
+// Bunchill has no seeded topic cards. Its library should contain only real ideas
+// deliberately added to the workspace, never template or speculative placeholders.
+const bechillReferenceIdeas: ReferenceIdea[] = []
 
 const eggReferenceIdeas: ReferenceIdea[] = [
   {
