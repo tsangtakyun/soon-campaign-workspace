@@ -27,7 +27,7 @@ type ReferenceIdea = {
   format?: 'carousel' | 'single_image' | 'short_video' | 'story_series'
 }
 
-const bechillFilters = ['全部', '笨chill 任務報告', '高光時刻', '如果笨chill 識…', 'POV：其實好易氹'] as const
+const bechillFilters = ['全部', '笨chill 詞典', '笨chill 任務報告', '如果笨chill 識…', 'IG Reel · 15 seconds'] as const
 const eggFilters = ['全部', 'Trending 最新資訊', 'Entertainment 娛樂資訊', 'Celebrity 人物介紹', 'Travel 旅遊資訊', '兩性關係 relationship'] as const
 
 const bechillReferenceIdeas: ReferenceIdea[] = [
@@ -54,25 +54,25 @@ const bechillReferenceIdeas: ReferenceIdea[] = [
     format: 'carousel',
   },
   {
-    id: 'bunchill-tiny-private-kingdom',
-    title: '普通私人空間，變成笨chill 小王國',
-    source: '系列 03 · 核准原型《只有廁所門關上》',
+    id: 'bunchill-dictionary-belly',
+    title: '一肚墨水，一肚碳水',
+    source: '笨chill 詞典 · 核准原型',
     image: '/assets/content-strategies/photos/problem-solution.jpg',
     height: 'short',
-    category: '高光時刻',
-    tags: ['雙格', '前後反差', '舒服小王國'],
-    note: '上格係外界壓力或終於關門；下格將卑微小事誇張成人生巔峰，主動享受而唔係可憐躲藏。',
+    category: '笨chill 詞典',
+    tags: ['雙格', '一詞兩解', '中英文字'],
+    note: '同一個詞、物件或身體部位，上下格用兩個意思；上格一本正經，下格用食、瞓或舒服邏輯反轉。',
     format: 'single_image',
   },
   {
-    id: 'bunchill-after-work-highlight',
-    title: '返到屋企第一個高光時刻',
-    source: '系列 03 · 延伸題材',
+    id: 'bunchill-dictionary-private-kingdom',
+    title: '只有廁所門關上，世界先真正屬於自己',
+    source: '笨chill 詞典 · 核准原型',
     image: '/assets/content-strategies/photos/behind-the-scenes.jpg',
     height: 'medium',
-    category: '高光時刻',
-    tags: ['1×2', '香港日常', '視覺 gag'],
-    note: '同一地點做前後對照，用皇冠、金光或一件荒謬舒適用品放大反差；中英句子要短。',
+    category: '笨chill 詞典',
+    tags: ['雙格', '生活反差', '視覺 gag'],
+    note: '同一地點做前後對照：上格係日常壓力，下格將普通私人空間變成舒服小王國；中英句子要短。',
     format: 'single_image',
   },
   {
@@ -103,7 +103,7 @@ const bechillReferenceIdeas: ReferenceIdea[] = [
     source: '系列 05 · 核准原型',
     image: '/assets/content-strategies/photos/trend-hijacking.jpg',
     height: 'short',
-    category: 'POV：其實好易氹',
+    category: 'IG Reel · 15 seconds',
     tags: ['15 秒', '主人 POV', '情緒階梯'],
     note: '嬲 → 第一次氹時眼神先軟化 → 企耳微震 → 回頭思考 → 開心撲抱；情緒只升不退。',
     format: 'short_video',
@@ -114,7 +114,7 @@ const bechillReferenceIdeas: ReferenceIdea[] = [
     source: '系列 05 · 延伸題材',
     image: '/assets/content-strategies/photos/series-content.jpg',
     height: 'tall',
-    category: 'POV：其實好易氹',
+    category: 'IG Reel · 15 seconds',
     tags: ['9:16', '口硬身體誠實', '無音樂'],
     note: '固定同一場景及主人第一身視角，用眼神、企耳、回頭、全身四級反應呈現口硬但逐步被氹好。',
     format: 'short_video',
