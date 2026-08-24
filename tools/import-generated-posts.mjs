@@ -117,7 +117,8 @@ function hktToIso(value) {
 function mapPostType(value) {
   if (value === 'short_video') return 'video'
   if (value === 'threads_post') return 'text'
-  if (value === 'carousel' || value === 'single_image') return 'still_image'
+  if (value === 'carousel') return 'carousel'
+  if (value === 'single_image') return 'still_image'
   return value
 }
 
@@ -162,20 +163,25 @@ async function uploadAsset(supabase, options, workspace, post, asset, index) {
         : ext === '.mp4'
           ? 'video/mp4'
           : 'image/jpeg'
+  const bucket = ext === '.mp4' ? 'public-assets' : 'brand-assets'
   const safeTitle = post.title
     .toLowerCase()
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'post'
-  const storagePath = `imported-posts/${workspace.id}/${Date.now()}-${index + 1}-${safeTitle}/${path.basename(filename)}`
+  const stablePostKey = String(post.source_key || `${index + 1}-${safeTitle}`)
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+  const storagePath = `${workspace.id}/imported-posts/${stablePostKey}/${path.basename(filename)}`
   const bytes = await readFile(assetPath)
-  const { error } = await supabase.storage.from('public-assets').upload(storagePath, bytes, {
+  const { error } = await supabase.storage.from(bucket).upload(storagePath, bytes, {
     cacheControl: '31536000',
     contentType,
     upsert: true,
   })
   if (error) throw error
-  const { data } = supabase.storage.from('public-assets').getPublicUrl(storagePath)
+  const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath)
   return { ...asset, url: data.publicUrl }
 }
 
@@ -203,8 +209,8 @@ async function upsertImportCampaign(supabase, workspace, posts) {
       source_key: sourceKey,
       starts_on: firstDate || new Date().toISOString().slice(0, 10),
       status: 'pending_approval',
-      strategy_emoji: '🥚',
-      strategy_title: 'Egg.soon imported content',
+      strategy_emoji: '✦',
+      strategy_title: `${workspace.name} imported content`,
       user_id: workspace.owner_id,
       workspace_id: workspace.id,
       updated_at: new Date().toISOString(),
@@ -231,6 +237,20 @@ async function main() {
     }
   )
   const workspace = await findWorkspace(supabase, options.workspace || posts[0]?.workspace)
+  const sourceKeys = posts.map((post, index) =>
+    typeof post.source_key === 'string' && post.source_key.trim()
+      ? post.source_key.trim()
+      : `manual-import-${post.scheduled_at_hkt.slice(0, 10)}-${index + 1}`,
+  )
+  const { data: duplicatePosts, error: duplicateError } = await supabase
+    .from('campaign_posts')
+    .select('id,title,source_key')
+    .eq('workspace_id', workspace.id)
+    .in('source_key', sourceKeys)
+  if (duplicateError) throw duplicateError
+  if (duplicatePosts?.length) {
+    throw new Error(`Import already exists: ${duplicatePosts.map((post) => `${post.title} (${post.source_key})`).join(', ')}`)
+  }
   const campaignId = options.dryRun
     ? 'dry-run-campaign-id'
     : await upsertImportCampaign(supabase, workspace, posts)
@@ -257,7 +277,7 @@ async function main() {
       image_url: uploadedAssets[0]?.url || null,
       post_type: mapPostType(post.post_type),
       scheduled_at: hktToIso(post.scheduled_at_hkt),
-      source_key: `import-${Date.now()}-${index + 1}`,
+      source_key: sourceKeys[index],
       status: post.status === 'approved' ? 'approved' : 'ready',
       title: post.title,
       updated_at: new Date().toISOString(),

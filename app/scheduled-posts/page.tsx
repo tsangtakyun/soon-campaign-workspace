@@ -829,6 +829,23 @@ function formatPostTime(value: unknown, fallback: string) {
   });
 }
 
+function formatScheduleDateRange(posts: ScheduledPost[]) {
+  const dates = posts
+    .map((post) => (post.scheduledAt ? new Date(post.scheduledAt) : null))
+    .filter((date): date is Date => Boolean(date && !Number.isNaN(date.getTime())))
+    .sort((left, right) => left.getTime() - right.getTime());
+  if (!dates.length) return "已確認排程";
+
+  const formatter = new Intl.DateTimeFormat("zh-HK", {
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Hong_Kong",
+  });
+  const first = formatter.format(dates[0]);
+  const last = formatter.format(dates[dates.length - 1]);
+  return `${first}${first === last ? "" : ` - ${last}`} 已確認排程`;
+}
+
 function currentTimeZoneLabel() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "你的本地時區";
@@ -3209,11 +3226,7 @@ function ScheduledPostsPageContent() {
         <header className="calendar-topbar">
           <div className="calendar-title">
             <h1>已排程內容</h1>
-            <span>
-              {isBechillActive
-                ? "客戶已確認的 Week 1 貼文"
-                : "目前工作台已確認的貼文"}
-            </span>
+            <span>目前工作台已確認的貼文</span>
           </div>
 
           <div className="calendar-actions">
@@ -3266,7 +3279,7 @@ function ScheduledPostsPageContent() {
 
         {!postsLoading && scheduledPosts.length ? (
           <div className="calendar-date-pill">
-            {isBechillActive ? "8月13日 - 8月16日 已確認排程" : "已確認排程"}
+            {formatScheduleDateRange(scheduledPosts)}
           </div>
         ) : null}
 
