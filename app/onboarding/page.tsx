@@ -254,7 +254,13 @@ function approvalImageSrc(path: string) {
   return `https://soon-approval.vercel.app/${path}`
 }
 
-function ApprovalBoard({ week }: { week: ApprovalWeek }) {
+function ApprovalBoard({
+  week,
+  onReviewNotesSaved,
+}: {
+  week: ApprovalWeek
+  onReviewNotesSaved?: () => Promise<void> | void
+}) {
   const [decisions, setDecisions] = useState<(ApprovalDecision | null)[]>(
     () => week.posts.map((post) => post.production?.approvalStatus === 'changes_requested' ? 'edit' : null)
   )
@@ -527,6 +533,8 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
         if (!saved) throw new Error(`「${post.title}」未能儲存`)
       }
 
+      await onReviewNotesSaved?.()
+
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(buildApprovalText())}`
       if (whatsappWindow) {
         whatsappWindow.opener = null
@@ -782,12 +790,14 @@ function ImportedApprovalBoard({
   workspaceId,
   reviewNotes,
   permissions,
+  onReviewNotesSaved,
 }: {
   brandName: string
   posts: HomePost[]
   workspaceId: string | null
   reviewNotes: ReviewNote[]
   permissions: DashboardPermissions
+  onReviewNotesSaved?: () => Promise<void> | void
 }) {
   const approvalPosts: ApprovalPost[] = posts
     .map((post, index) => {
@@ -827,6 +837,7 @@ function ImportedApprovalBoard({
         workspaceId,
         permissions,
       }}
+      onReviewNotesSaved={onReviewNotesSaved}
     />
   )
 }
@@ -1192,6 +1203,16 @@ export default function OnboardingHomePage() {
 
   const displayedCredits = creditBalance ?? TRIAL_CREDITS
 
+  async function refreshReviewNotes() {
+    if (!activeWorkspaceId) return
+    const response = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(activeWorkspaceId)}`, {
+      cache: 'no-store',
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(payload?.detail || payload?.error || '未能更新客戶修改紀錄')
+    setReviewNotes(Array.isArray(payload?.reviewNotes) ? payload.reviewNotes : [])
+  }
+
   return (
     <main className="dashboard-page">
       <ClaimOnboardingSession />
@@ -1239,7 +1260,14 @@ export default function OnboardingHomePage() {
         <div className="home-body">
           <section className="home-main">
             {dashboardPosts.length ? (
-              <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} reviewNotes={reviewNotes} permissions={dashboardPermissions} />
+              <ImportedApprovalBoard
+                brandName={brandName || 'Egg.soon'}
+                posts={dashboardPosts}
+                workspaceId={activeWorkspaceId}
+                reviewNotes={reviewNotes}
+                permissions={dashboardPermissions}
+                onReviewNotesSaved={refreshReviewNotes}
+              />
             ) : (
               <section className="workspace-empty-panel">
                 <span>SOON WORKSPACE</span>
