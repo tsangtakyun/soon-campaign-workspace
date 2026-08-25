@@ -320,6 +320,18 @@ export default function IntegrationsPage() {
             )}
           </div>
 
+          <div className="integration-security-card" role="note">
+            <span className="integration-security-icon" aria-hidden="true">✓</span>
+            <div>
+              <strong>由帳戶擁有人安全連接</strong>
+              <p>
+                請由客戶本人透過 Meta 官方頁面登入及授權。SOON 不會取得或保存 Facebook／Instagram
+                密碼，只會連接客戶揀選嘅 Page、Instagram 專業帳戶及廣告帳戶。
+              </p>
+              <small>每個工作台嘅連接互相獨立，客戶亦可以隨時解除授權。</small>
+            </div>
+          </div>
+
           <section className="integrations-section">
             <h3>網站流量</h3>
             {connectionsLoading ? <IntegrationLoadingRows count={1} /> : TRACKING_PLATFORMS.map((platform) => {
@@ -462,7 +474,11 @@ export default function IntegrationsPage() {
                           }}
                           type="button"
                         >
-                          {connecting === platform.id ? '連接中...' : 'Connect'}
+                          {connecting === platform.id
+                            ? '連接中...'
+                            : platform.id === 'instagram' || platform.id === 'facebook'
+                              ? '由客戶登入授權'
+                              : 'Connect'}
                         </button>
                       </>
                     )}
@@ -508,9 +524,14 @@ export default function IntegrationsPage() {
 
             <div className="ig-modal-instructions">
               <div className="ig-modal-instructions-header">
-                <span>⚠️</span>
-                <strong>連接前請確認</strong>
+                <span>🔒</span>
+                <strong>請由帳戶擁有人親自完成</strong>
               </div>
+
+              <p className="ig-modal-privacy-note">
+                請勿將 Instagram 或 Facebook 密碼交俾 SOON 或其他人。下一步會前往 Meta
+                官方頁面，SOON 不會取得或保存密碼。
+              </p>
 
               <div className="ig-modal-step">
                 <span className="ig-modal-step-num">1</span>
@@ -536,8 +557,8 @@ export default function IntegrationsPage() {
                 <span className="ig-modal-step-num">2</span>
                 <div>
                   <p>
-                    點擊下方按鈕，透過 Facebook 完成驗證。我們會將你跳轉至 Facebook
-                    （Meta）登入並連接你的帳戶。
+                    由帳戶擁有人點擊下方按鈕，透過 Meta 官方授權頁面登入，並只揀選要連接到目前工作台嘅
+                    Facebook Page、Instagram 專業帳戶及廣告帳戶。
                   </p>
                 </div>
               </div>
@@ -559,7 +580,7 @@ export default function IntegrationsPage() {
                 }}
                 type="button"
               >
-                前往 Facebook Business ↗
+                由客戶登入 Meta 並授權 ↗
               </button>
             </div>
           </div>
@@ -586,9 +607,14 @@ export default function IntegrationsPage() {
 
             <div className="ig-modal-instructions">
               <div className="ig-modal-instructions-header">
-                <span>⚠️</span>
-                <strong>連接前請確認</strong>
+                <span>🔒</span>
+                <strong>請由帳戶擁有人親自完成</strong>
               </div>
+
+              <p className="ig-modal-privacy-note">
+                請勿將 Facebook 密碼交俾 SOON 或其他人。下一步會前往 Meta 官方頁面，SOON
+                不會取得或保存密碼。
+              </p>
 
               <div className="ig-modal-step">
                 <span className="ig-modal-step-num">1</span>
@@ -601,7 +627,10 @@ export default function IntegrationsPage() {
               <div className="ig-modal-step">
                 <span className="ig-modal-step-num">2</span>
                 <div>
-                  <p>點擊下方按鈕，系統會跳轉至 Facebook 進行授權，完成後會自動返回。</p>
+                  <p>
+                    由帳戶擁有人點擊下方按鈕，在 Meta 官方頁面登入並揀選要連接到目前工作台嘅
+                    Facebook Page；完成後會自動返回 SOON。
+                  </p>
                 </div>
               </div>
             </div>
@@ -622,7 +651,7 @@ export default function IntegrationsPage() {
                 }}
                 type="button"
               >
-                前往 Facebook 授權
+                由客戶登入 Meta 並授權
               </button>
             </div>
           </div>
@@ -865,6 +894,49 @@ const styles = `
   .integrations-header-note {
     display: block;
     color: #4b5563;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .integration-security-card {
+    align-items: flex-start;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    color: #14532d;
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .integration-security-icon {
+    align-items: center;
+    background: #15803d;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 24px;
+    font-size: 13px;
+    font-weight: 800;
+    height: 24px;
+    justify-content: center;
+  }
+
+  .integration-security-card strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .integration-security-card p {
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0 0 4px;
+  }
+
+  .integration-security-card small {
+    color: #3f6212;
+    display: block;
     font-size: 12px;
     line-height: 1.45;
   }
@@ -1439,6 +1511,17 @@ const styles = `
     font-size: 15px;
     font-weight: 700;
     color: #202126;
+  }
+
+  .ig-modal-privacy-note {
+    background: #ffffff;
+    border: 1px solid #bbf7d0;
+    border-radius: 9px;
+    color: #166534;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 11px 12px;
   }
 
   .ig-modal-step {
