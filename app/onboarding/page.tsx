@@ -256,7 +256,7 @@ function approvalImageSrc(path: string) {
 
 function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   const [decisions, setDecisions] = useState<(ApprovalDecision | null)[]>(
-    () => week.posts.map(() => null)
+    () => week.posts.map((post) => post.production?.approvalStatus === 'changes_requested' ? 'edit' : null)
   )
   const [notes, setNotes] = useState(() => week.posts.map((post) => post.reviewNote || ''))
   const [slides, setSlides] = useState(() => week.posts.map(() => 0))
@@ -266,6 +266,7 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
   const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
   const [savingIndex, setSavingIndex] = useState<number | null>(null)
+  const [sharingToWhatsApp, setSharingToWhatsApp] = useState(false)
   const [decisionErrors, setDecisionErrors] = useState<Record<number, string>>({})
   const [failedDecisions, setFailedDecisions] = useState<Record<number, ApprovalDecision>>({})
   const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null)
@@ -291,9 +292,14 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     setDecisions((current) => current.map((item, itemIndex) => (itemIndex === index ? decision : item)))
   }
 
-  async function persistDecision(index: number, decision: ApprovalDecision, previousDecision: ApprovalDecision | null) {
+  async function persistDecision(
+    index: number,
+    decision: ApprovalDecision,
+    previousDecision: ApprovalDecision | null,
+    options: { quiet?: boolean } = {},
+  ) {
     const post = week.posts[index]
-    if (!post?.id || !week.workspaceId) return
+    if (!post?.id || !week.workspaceId) return true
 
     setSavingIndex(index)
     setDecisionErrors((current) => {
@@ -320,13 +326,15 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
         delete next[index]
         return next
       })
-      showToast(decision === 'ok' ? '已儲存：可以出' : '已儲存：需要跟進')
+      if (!options.quiet) showToast(decision === 'ok' ? '已儲存：可以出' : '已儲存：需要跟進')
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : '未能儲存審批狀態'
       setDecisions((current) => current.map((item, itemIndex) => itemIndex === index ? previousDecision : item))
       setFailedDecisions((current) => ({ ...current, [index]: decision }))
       setDecisionErrors((current) => ({ ...current, [index]: message }))
-      showToast(message)
+      if (!options.quiet) showToast(message)
+      return false
     } finally {
       setSavingIndex((current) => current === index ? null : current)
     }
@@ -494,8 +502,45 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
     }
   }
 
-  function sendToWhatsApp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(buildApprovalText())}`, '_blank', 'noopener')
+  async function sendToWhatsApp() {
+    if (sharingToWhatsApp) return
+
+    const missingNoteIndex = visiblePosts.findIndex((post) => {
+      const index = week.posts.findIndex((item) => item === post)
+      const decision = decisions[index]
+      return (decision === 'edit' || decision === 'no') && !notes[index].trim()
+    })
+    if (missingNoteIndex >= 0) {
+      showToast('請先填寫需要修改嘅內容')
+      return
+    }
+
+    // Open synchronously so browsers do not block WhatsApp after the save requests finish.
+    const whatsappWindow = window.open('', '_blank')
+    setSharingToWhatsApp(true)
+    try {
+      for (const post of visiblePosts) {
+        const index = week.posts.findIndex((item) => item === post)
+        const decision = decisions[index]
+        if (!decision || post.status === 'confirmed') continue
+        const saved = await persistDecision(index, decision, decision, { quiet: true })
+        if (!saved) throw new Error(`「${post.title}」未能儲存`)
+      }
+
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(buildApprovalText())}`
+      if (whatsappWindow) {
+        whatsappWindow.opener = null
+        whatsappWindow.location.href = whatsappUrl
+      } else {
+        window.location.href = whatsappUrl
+      }
+      showToast('審批決定及修改意見已儲存')
+    } catch (error) {
+      whatsappWindow?.close()
+      showToast(error instanceof Error ? error.message : '未能儲存，暫停傳送 WhatsApp')
+    } finally {
+      setSharingToWhatsApp(false)
+    }
   }
 
   return (
@@ -526,8 +571,8 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
           <button type="button" onClick={copyApprovalText}>
             複製文字
           </button>
-          <button type="button" className="send" onClick={sendToWhatsApp}>
-            傳送到 WhatsApp 工作小組
+          <button type="button" className="send" disabled={sharingToWhatsApp} onClick={() => void sendToWhatsApp()}>
+            {sharingToWhatsApp ? '儲存中…' : '傳送到 WhatsApp 工作小組'}
           </button>
         </div>
       </div>

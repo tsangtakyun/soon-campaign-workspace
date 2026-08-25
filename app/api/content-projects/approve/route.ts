@@ -107,10 +107,30 @@ export async function POST(req: Request) {
       .eq('workspace_id', workspaceId)
     if (updateError) throw updateError
     if (note) {
-      const { error: noteError } = await access.admin.from('review_notes').insert({
-        workspace_id: workspaceId, project_id: projectId, original_text: note,
-        reviewer_id: user.id, reviewer: user.email || null,
-      })
+      const { data: existingNote, error: existingNoteError } = await access.admin
+        .from('review_notes')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('project_id', projectId)
+        .eq('resolved', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (existingNoteError) throw existingNoteError
+
+      const noteValues = {
+        original_text: note,
+        reviewer_id: user.id,
+        reviewer: user.email || null,
+      }
+      const noteResult = existingNote?.id
+        ? await access.admin.from('review_notes').update(noteValues).eq('id', existingNote.id)
+        : await access.admin.from('review_notes').insert({
+          workspace_id: workspaceId,
+          project_id: projectId,
+          ...noteValues,
+        })
+      const noteError = noteResult.error
       if (noteError) throw noteError
     }
 

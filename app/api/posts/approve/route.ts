@@ -39,7 +39,21 @@ export async function POST(req: Request) {
 
     if (error) throw error
     if (note) {
-      const { error: noteError } = await supabase.from('review_notes').insert({ workspace_id: workspaceId, post_id: postId, original_text: note, reviewer_id: user.id, reviewer: user.email || null })
+      const { data: existingNote, error: existingNoteError } = await supabase
+        .from('review_notes')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('post_id', postId)
+        .eq('resolved', false)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (existingNoteError) throw existingNoteError
+      const noteValues = { original_text: note, reviewer_id: user.id, reviewer: user.email || null }
+      const noteResult = existingNote?.id
+        ? await supabase.from('review_notes').update(noteValues).eq('id', existingNote.id)
+        : await supabase.from('review_notes').insert({ workspace_id: workspaceId, post_id: postId, ...noteValues })
+      const noteError = noteResult.error
       if (noteError) throw noteError
     }
 
