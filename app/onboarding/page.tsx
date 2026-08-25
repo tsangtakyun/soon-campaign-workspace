@@ -1846,9 +1846,6 @@ const homeStyles = `
   }
 
   .approval-progress-card {
-    position: sticky;
-    top: 74px;
-    z-index: 4;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(140px, 0.35fr) auto;
     gap: 16px;
@@ -1902,9 +1899,14 @@ const homeStyles = `
   }
 
   .approval-progress-actions .send {
-    border-color: #111111;
-    background: #111111;
+    border-color: #25d366;
+    background: #25d366;
     color: #ffffff;
+  }
+
+  .approval-progress-actions .send:hover:not(:disabled) {
+    border-color: #1ebe57;
+    background: #1ebe57;
   }
 
   .approval-progress-actions .send:disabled {
