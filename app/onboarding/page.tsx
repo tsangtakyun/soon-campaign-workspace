@@ -195,24 +195,6 @@ function isPlaceholderImage(value: string | null) {
   return !value || value.startsWith('data:image/svg+xml') || value.includes('placeholder')
 }
 
-const clientChangeRecords = [
-  {
-    date: '2026年8月7日（五）',
-    title: '客戶提出修改',
-    desc: '04《休息不是懶惰》需要改表情，其餘內容維持原狀。',
-  },
-  {
-    date: '2026年8月12日（三）',
-    title: '客戶確認 Week 1',
-    desc: '本週 5 條 IG Post 已確認，01 已發布，其餘 4 條準備按排程發布。',
-  },
-  {
-    date: '2026年8月12日（三）',
-    title: '排程時間更新',
-    desc: '02-05 已更新為 8月13日至8月16日每日 18:00 發布。',
-  },
-]
-
 type ApprovalDecision = 'ok' | 'edit' | 'no'
 
 type ApprovalPost = {
@@ -266,99 +248,6 @@ const approvalQuickNotes = [
   '修改 hashtag',
   '想看多個版本',
 ]
-
-const bechillApprovalWeek: ApprovalWeek = {
-  brandLine: '笨chill × SOON ・ 內容審批',
-  completedText: '01 已發布，其餘內容會留在這裡準備按排程發布。',
-  label: 'Week 1（2026年8月10-16日）',
-  deadline: '客人已確認本週全部內容',
-  summary: '2026年8月 Week 1 ・ 第四版 ・ 5 條 IG Post',
-  remark: '01 已發布，其餘 4 條準備按排程發布',
-  whatsappPrefix: '【笨chill × SOON】內容審批',
-  posts: [
-    {
-      no: '01',
-      kind: '金句 Carousel',
-      meta: '3 格輪播 ・ 已發布：2026年8月12日（三）18:00 HKT',
-      goal: '主打 Save · 共鳴',
-      title: '《煩惱可以分兩種》',
-      badge: '已發布',
-      status: 'published',
-      publishedAt: '2026年8月12日（三）18:00 HKT',
-      media: ['a/01_worries_1.webp', 'a/01_worries_2.webp', 'a/01_worries_3.webp'],
-      caption:
-        'Tag 一個很多煩惱的朋友\n-\n煩惱可以分兩種：\n解決到嘅，慢慢做。\n解決唔到嘅，坐低先。\n可以舒服，點解要辛苦。',
-      note: '中英對照排版，三格遞進：有煩惱 → 解決到 → 解決唔到。',
-    },
-    {
-      no: '02',
-      kind: '金句 Carousel',
-      meta: '7 格輪播 ・ 建議出帖：8月13日（四）18:00',
-      goal: '主打 Save · 共鳴',
-      title: '《乖乖等你》',
-      badge: '已確認',
-      status: 'confirmed',
-      media: [
-        'a/02_wait_1.webp',
-        'a/02_wait_2.webp',
-        'a/02_wait_3.webp',
-        'a/02_wait_4.webp',
-        'a/02_wait_5.webp',
-        'a/02_wait_6.webp',
-        'a/02_wait_7.webp',
-      ],
-      caption:
-        '你諗起邊個？\n\n有些人會陪你一段路。\n有些人會在某個時間明白你。\n有些關係很好，只是未必能一直留在原地。\n但笨chill 不太懂講大道理。\n牠一直在你回來之前，乖乖等你。\n-\n你同你屋企寵物之間，有冇一件好窩心嘅小事？\n留言講俾我哋聽',
-      note: '六格鋪陳（情人／朋友／同事／親人／難過／OT），第七格改成笨chill 開心迎接主人，收「或許我不能陪你一輩子，但我會用我的一輩子陪你」。',
-    },
-    {
-      no: '03',
-      kind: '金句 Carousel',
-      meta: '4 格輪播 ・ 建議出帖：8月14日（五）18:00',
-      goal: '主打 Save · 共鳴',
-      title: '《有你嘅世界》',
-      badge: '已確認',
-      status: 'confirmed',
-      media: ['a/03_world_1.webp', 'a/03_world_2.webp', 'a/03_world_3.webp', 'a/03_world_4.webp'],
-      caption:
-        'Tag 一個成日好忙嘅朋友\n你開心，世界照樣轉。\n你唔開心，世界一樣照樣轉。\n唔係你唔重要，\n係唔使咩都攬上身。\n舒服啲啦 —— 世界唔會因為你抖五分鐘而停。',
-      note: '四格遞進：開心／唔開心 → 其實一樣 → 做咩俾咁大壓力自己。',
-    },
-    {
-      no: '04',
-      kind: '金句 Carousel',
-      meta: '7 格輪播 ・ 建議出帖：8月15日（六）18:00',
-      goal: '主打 Save · 共鳴',
-      title: '《休息不是懶惰》',
-      badge: '已確認',
-      status: 'confirmed',
-      media: [
-        'a/04_rest_1.webp',
-        'a/04_rest_2.webp',
-        'a/04_rest_3.webp',
-        'a/04_rest_4.webp',
-        'a/04_rest_5.webp',
-        'a/04_rest_6.webp',
-        'a/04_rest_7.webp',
-      ],
-      caption:
-        'Tag 一個最近需要休息嘅朋友\n\n「休息並不是懶惰。在夏日某天躺在樹下草地上，聽水聲潺潺，或看雲在天上飄過，絕不是浪費時間。」\n\n“Rest is not idleness, and to lie sometimes on the grass under trees on a summer’s day, listening to the murmur of the water, or watching the clouds float across the sky, is by no means a waste of time.”\n\nJohn Lubbock',
-      note: '中英對照，七格：由「最累的不是忙」鋪到「休息不是懶惰」，尾格以 John Lubbock 收。',
-    },
-    {
-      no: '05',
-      kind: '金句 Carousel',
-      meta: '4 格輪播 ・ 建議出帖：8月16日（日）18:00',
-      goal: '主打 Share · 吸新粉',
-      title: '《沖完涼的髮型》',
-      badge: '已確認',
-      status: 'confirmed',
-      media: ['a/05_hair_1.webp', 'a/05_hair_2.webp', 'a/05_hair_3.webp', 'a/05_hair_4.webp'],
-      caption: '你喜歡笨chill沖完涼的髮型嗎？',
-      note: '第 4 格為笨chill 真實相片，用真人真狗畫面吸引新粉絲。',
-    },
-  ],
-}
 
 function approvalImageSrc(path: string) {
   if (/^https?:\/\//i.test(path)) return path
@@ -842,10 +731,6 @@ function ApprovalBoard({ week }: { week: ApprovalWeek }) {
   )
 }
 
-function BechillApprovalBoard() {
-  return <ApprovalBoard week={bechillApprovalWeek} />
-}
-
 function ImportedApprovalBoard({
   brandName,
   posts,
@@ -1085,6 +970,10 @@ export default function OnboardingHomePage() {
         setPublishedPostSummary(summarizePublishedPosts(postsData))
 
         const contentProjectPosts: HomePost[] = contentProjectsData
+          .filter((project: any) => {
+            const production = project?.production && typeof project.production === 'object' ? project.production : {}
+            return production.approvalStatus !== 'approved'
+          })
           .map((project: any) => {
             const production = project?.production && typeof project.production === 'object' ? project.production : {}
             const generatedPages = Array.isArray(production.generatedPages) ? production.generatedPages : []
@@ -1116,7 +1005,7 @@ export default function OnboardingHomePage() {
           const displayPosts = postsData
             .filter((post: any) => {
               const sourceKey = String(post.source_key || '')
-              if (['published', 'posted', 'rejected', 'withdrawn', 'publishing'].includes(post.status)) return false
+              if (['approved', 'scheduled', 'published', 'posted', 'rejected', 'withdrawn', 'publishing'].includes(post.status)) return false
               return (
                 sourceKey.startsWith('campaign-1-') ||
                 !isPlaceholderImage(post.image_url || null) ||
@@ -1304,15 +1193,17 @@ export default function OnboardingHomePage() {
 
         <div className="home-body">
           <section className="home-main">
-            {isBechillActive ? (
-              <BechillApprovalBoard />
-            ) : dashboardPosts.length ? (
+            {dashboardPosts.length ? (
               <ImportedApprovalBoard brandName={brandName || 'Egg.soon'} posts={dashboardPosts} workspaceId={activeWorkspaceId} reviewNotes={reviewNotes} permissions={dashboardPermissions} />
             ) : (
               <section className="workspace-empty-panel">
                 <span>SOON WORKSPACE</span>
-                <h2>{brandName || '這個工作台'} 內容準備中</h2>
-                <p>這裡只會顯示目前工作台的內容。Egg.soon 尚未加入內容審批、已發布貼文或修改紀錄。</p>
+                <h2>{isBechillActive ? '8月31日–9月4日內容準備中' : `${brandName || '這個工作台'} 內容準備中`}</h2>
+                <p>
+                  {isBechillActive
+                    ? '舊一週內容已完成並從首頁收起。新內容加入待審批後，會在這裡逐條顯示。'
+                    : '這裡只會顯示目前工作台尚待處理的內容。'}
+                </p>
               </section>
             )}
           </section>
@@ -1322,16 +1213,11 @@ export default function OnboardingHomePage() {
               <h3>過去 7 天</h3>
               <div className="stats-grid">
                 <div className="stat-card">
-                  <span className="stat-number">{isBechillActive ? '1' : publishedPostSummary.count}</span>
+                  <span className="stat-number">{publishedPostSummary.count}</span>
                   <span className="stat-label">已發布貼文</span>
                 </div>
               </div>
-              {isBechillActive ? (
-                <div className="published-post-mini">
-                  <strong>《煩惱可以分兩種》</strong>
-                  <span>2026年8月12日 18:00 HKT</span>
-                </div>
-              ) : publishedPostSummary.latestTitle ? (
+              {publishedPostSummary.latestTitle ? (
                 <div className="published-post-mini">
                   <strong>{publishedPostSummary.latestTitle}</strong>
                   <span>{publishedPostSummary.latestTime || '最近 7 天已發布'}</span>
