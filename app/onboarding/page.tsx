@@ -23,6 +23,7 @@ type HomePost = {
   title: string
   body: string
   time: string
+  scheduledAt?: string | null
   image: string | null
   media?: string[]
   status: string
@@ -134,6 +135,12 @@ function formatDashboardTime(value: unknown) {
     return `今天 ${time}`
   }
   return `${Number(targetParts.month)}月${Number(targetParts.day)}日 ${time}`
+}
+
+function scheduledTimeValue(value: string | null | undefined) {
+  if (!value) return Number.POSITIVE_INFINITY
+  const timestamp = new Date(value).getTime()
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp
 }
 
 function formatDashboardDate(value: unknown) {
@@ -1069,6 +1076,10 @@ export default function OnboardingHomePage() {
               time: formatDashboardTime(
                 production.proposedScheduledAt || production.submittedForApprovalAt || project.updated_at,
               ),
+              scheduledAt:
+                typeof production.proposedScheduledAt === 'string'
+                  ? production.proposedScheduledAt
+                  : null,
               image: media[0] || null,
               media,
               status: production.approvalStatus === 'approved' ? '已確認' : production.approvalStatus === 'changes_requested' ? '要修改' : '待審批',
@@ -1109,13 +1120,16 @@ export default function OnboardingHomePage() {
                 title: post.title || fallbackUpcomingPosts[index % fallbackUpcomingPosts.length].title,
                 body: post.body || fallbackUpcomingPosts[index % fallbackUpcomingPosts.length].body,
                 time: formatDashboardTime(post.scheduled_at),
+                scheduledAt: typeof post.scheduled_at === 'string' ? post.scheduled_at : null,
                 image,
                 media,
                 status: mapPostStatus(post.status),
                 recordType: 'campaign_post' as const,
               }
             }),
-          ].slice(0, 10))
+          ]
+            .sort((a, b) => scheduledTimeValue(a.scheduledAt) - scheduledTimeValue(b.scheduledAt))
+            .slice(0, 10))
 
           if (firstWeekMissingImages.length) {
             void (async () => {
@@ -1156,7 +1170,11 @@ export default function OnboardingHomePage() {
           }
         } else {
           hasGeneratingImagesRef.current = false
-          setDashboardPosts(contentProjectPosts.slice(0, 10))
+          setDashboardPosts(
+            contentProjectPosts
+              .sort((a, b) => scheduledTimeValue(a.scheduledAt) - scheduledTimeValue(b.scheduledAt))
+              .slice(0, 10),
+          )
         }
 
         if (!campaignsError && campaignsData?.length) {
