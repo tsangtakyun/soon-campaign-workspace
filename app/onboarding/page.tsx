@@ -1243,7 +1243,7 @@ export default function OnboardingHomePage() {
                     </div>
                   ))
                 ) : (
-                  <p className="stats-hint">暫時未有 Egg.soon 客戶修改紀錄。</p>
+                  <p className="stats-hint">暫時未有{brandName ? ` ${brandName} ` : ' '}客戶修改紀錄。</p>
                 )}
               </div>
             </section>
