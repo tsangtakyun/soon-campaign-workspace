@@ -752,10 +752,14 @@ function ApprovalBoard({
                 ) : null}
                 {!isConfirmed && needsNote ? (
                   <div className="approval-note-box">
+                    <p className="approval-note-share-hint">
+                      <strong>① 喺下面輸入修改意見</strong>
+                      <span>② 撳「傳送到 WhatsApp 工作小組」，系統會自動儲存並將意見加入訊息</span>
+                    </p>
                     <textarea
                       value={notes[postIndex]}
                       onChange={(event) => setNote(postIndex, event.target.value)}
-                      placeholder="請說明修改方向，例：第 3 格文字太小、最後一格想換一句 caption。"
+                      placeholder="輸入要修改嘅內容，例如：第 3 格文字太小"
                     />
                     <div className="approval-quick">
                       {approvalQuickNotes.map((quickNote) => (
@@ -2364,17 +2368,41 @@ const homeStyles = `
     margin-top: 11px;
   }
 
+  .approval-note-share-hint {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0 0 8px;
+    color: #4a3b37;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .approval-note-share-hint strong {
+    color: #111111;
+    font-size: 13px;
+  }
+
   .approval-note-box textarea {
     width: 100%;
     min-height: 78px;
     resize: vertical;
     border: 1.5px solid var(--approval-line);
     border-radius: 8px;
+    background: #ffffff;
     outline: 0;
-    color: var(--approval-ink);
+    color: #111111;
+    -webkit-text-fill-color: #111111;
+    color-scheme: light;
     font: inherit;
     font-size: 14px;
     padding: 11px 13px;
+  }
+
+  .approval-note-box textarea::placeholder {
+    color: #8a8a8a;
+    -webkit-text-fill-color: #8a8a8a;
+    opacity: 1;
   }
 
   .approval-note-box textarea:focus {
