@@ -108,15 +108,32 @@ function formatDashboardTime(value: unknown) {
   if (Number.isNaN(date.getTime())) return '今天 10:00'
 
   const today = new Date()
-  const time = date.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const hongKongParts = (target: Date) =>
+    Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Hong_Kong',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      })
+        .formatToParts(target)
+        .filter((part) => part.type !== 'literal')
+        .map((part) => [part.type, part.value]),
+    )
+  const targetParts = hongKongParts(date)
+  const todayParts = hongKongParts(today)
+  const time = `${targetParts.hour}:${targetParts.minute}`
   if (
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate()
+    targetParts.year === todayParts.year &&
+    targetParts.month === todayParts.month &&
+    targetParts.day === todayParts.day
   ) {
     return `今天 ${time}`
   }
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`
+  return `${Number(targetParts.month)}月${Number(targetParts.day)}日 ${time}`
 }
 
 function formatDashboardDate(value: unknown) {
@@ -1049,7 +1066,9 @@ export default function OnboardingHomePage() {
               typeKind: 'image' as const,
               title: project.title || '未命名 Carousel',
               body: typeof production.captionDraft === 'string' ? production.captionDraft : '',
-              time: formatDashboardTime(production.submittedForApprovalAt || project.updated_at),
+              time: formatDashboardTime(
+                production.proposedScheduledAt || production.submittedForApprovalAt || project.updated_at,
+              ),
               image: media[0] || null,
               media,
               status: production.approvalStatus === 'approved' ? '已確認' : production.approvalStatus === 'changes_requested' ? '要修改' : '待審批',
