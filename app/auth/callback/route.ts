@@ -62,7 +62,18 @@ export async function GET(request: NextRequest) {
         membershipError ||
         (!ownedWorkspace.data?.length && !userMembership.data?.length && !emailInvite.data?.length)
       ) {
-        console.warn('[auth/callback] blocked account without invitation', { email, userId: user.id })
+        console.warn('[auth/callback] blocked account without invitation', {
+          email,
+          errors: [ownedWorkspace.error, userMembership.error, emailInvite.error]
+            .filter(Boolean)
+            .map((error) => error?.message),
+          matches: {
+            email: emailInvite.data?.length || 0,
+            membership: userMembership.data?.length || 0,
+            owned: ownedWorkspace.data?.length || 0,
+          },
+          userId: user.id,
+        })
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
       }
