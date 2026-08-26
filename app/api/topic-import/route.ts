@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePlatformUser } from '@/lib/platform-access'
+import { assertSafeExternalUrl, fetchSafeExternal } from '@/lib/safe-external-url'
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; SOON Topic Library/1.0)'
 
@@ -26,23 +28,9 @@ function meta(html: string, property: string) {
   return ''
 }
 
-function safeUrl(raw: string) {
-  const url = new URL(raw)
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('只支援 http 或 https 連結')
-  const host = url.hostname.toLowerCase()
-  if (
-    host === 'localhost' ||
-    host === '0.0.0.0' ||
-    host === '::1' ||
-    host.endsWith('.local') ||
-    /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)
-  ) throw new Error('不支援內部網絡連結')
-  return url
-}
-
 async function fetchPage(raw: string) {
-  const url = safeUrl(raw)
-  const response = await fetch(url, {
+  const url = await assertSafeExternalUrl(raw)
+  const response = await fetchSafeExternal(url.toString(), {
     headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml' },
     redirect: 'follow',
     signal: AbortSignal.timeout(12000),
@@ -70,9 +58,12 @@ function categoryFor(text: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+
   try {
     const body = await request.json()
-    const sourceUrl = safeUrl(String(body.url || '')).toString()
+    const sourceUrl = (await assertSafeExternalUrl(String(body.url || ''))).toString()
     const { html, url } = await fetchPage(sourceUrl)
     const rawTitle = meta(html, 'og:title') || meta(html, 'twitter:title') || html.match(/<title[^>]*>([^<]+)/i)?.[1] || ''
     const description = meta(html, 'og:description') || meta(html, 'description') || ''
@@ -106,10 +97,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+
   try {
     if (request.nextUrl.searchParams.get('image') !== '1') throw new Error('Invalid request')
     const source = request.nextUrl.searchParams.get('source') || ''
-    const sourceUrl = safeUrl(source)
+    const sourceUrl = await assertSafeExternalUrl(source)
     const instagramMatch = sourceUrl.hostname.endsWith('instagram.com')
       ? sourceUrl.pathname.match(/\/(?:p|reel)\/([^/]+)/i)
       : null
@@ -121,14 +115,20 @@ export async function GET(request: NextRequest) {
       imageUrl = meta(html, 'og:image') || meta(html, 'twitter:image')
     }
     if (!imageUrl) throw new Error('找不到圖片')
-    const response = await fetch(safeUrl(imageUrl), {
+    const response = await fetchSafeExternal((await assertSafeExternalUrl(imageUrl)).toString(), {
       headers: { 'user-agent': USER_AGENT, referer: source },
       signal: AbortSignal.timeout(12000),
     })
     if (!response.ok) throw new Error('未能讀取圖片')
-    return new NextResponse(await response.arrayBuffer(), {
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.toLowerCase().startsWith('image/')) throw new Error('Invalid image response')
+    const contentLength = Number(response.headers.get('content-length') || 0)
+    if (contentLength > 10 * 1024 * 1024) throw new Error('Image is too large')
+    const body = await response.arrayBuffer()
+    if (body.byteLength > 10 * 1024 * 1024) throw new Error('Image is too large')
+    return new NextResponse(body, {
       headers: {
-        'content-type': response.headers.get('content-type') || 'image/jpeg',
+        'content-type': contentType,
         'cache-control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
       },
     })

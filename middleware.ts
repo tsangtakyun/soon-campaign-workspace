@@ -8,6 +8,13 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
 
+  if (pathname === '/signup') {
+    const next = request.nextUrl.searchParams.get('next') || ''
+    if (!/^\/invite\/[0-9a-f-]{36}$/i.test(next)) {
+      return NextResponse.redirect(new URL('/login?error=invite_required', request.url))
+    }
+  }
+
   if (pathname === '/onboarding/campaigns') {
     return NextResponse.redirect(new URL('/onboarding/topic-library', request.url))
   }
@@ -26,7 +33,6 @@ export async function middleware(request: NextRequest) {
     pathname === '/pricing' ||
     pathname === '/signup' ||
     pathname === '/dashboard' ||
-    pathname.startsWith('/onboarding') ||
     pathname === '/submit-brief' ||
     pathname.startsWith('/paid-analysis') ||
     pathname.startsWith('/creator-matching') ||
@@ -36,7 +42,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/delivery-tracking') ||
     pathname === '/login' ||
     pathname.startsWith('/invite') ||
-    pathname.startsWith('/workspace') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/api/stripe') ||
     pathname.startsWith('/api/paid-analysis') ||
@@ -68,6 +73,39 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
     return response
+  }
+
+  const isProtectedWorkspacePage =
+    pathname === '/select-workspace' ||
+    pathname === '/scheduled-posts' ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/workspace')
+
+  if (isProtectedWorkspacePage) {
+    const email = user.email?.trim().toLowerCase() || ''
+    const [{ data: membership }, { data: ownedWorkspace }] = await Promise.all([
+      supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    if (!membership && !ownedWorkspace) {
+      await supabase.auth.signOut()
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('error', 'unauthorized')
+      if (email) loginUrl.searchParams.set('email', email)
+      return NextResponse.redirect(loginUrl)
+    }
   }
 
   if (pathname.startsWith('/ops') && ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(user.email || '')) {

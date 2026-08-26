@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { anthropicModel } from '@/lib/anthropic-models'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
 
 type CampaignThemesRequestBody = {
   profile?: any
@@ -68,6 +69,12 @@ function moodPreference(contentMood: CampaignThemesRequestBody['contentMood']) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'campaign-themes', 30))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   try {
     const input = (await request.json()) as CampaignThemesRequestBody
     const apiKey = process.env.ANTHROPIC_API_KEY

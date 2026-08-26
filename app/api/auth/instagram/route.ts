@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { isUuid } from '@/lib/oauth-connections'
+import { requireWorkspaceUser } from '@/lib/platform-access'
 
 function instagramRedirectUri(req: Request) {
   return new URL('/api/auth/callback/instagram', new URL(req.url).origin).toString()
@@ -22,6 +23,8 @@ export async function GET(req: Request) {
   if (!isUuid(workspaceId)) {
     return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 })
   }
+  const auth = await requireWorkspaceUser(workspaceId, 'canManageWorkspace')
+  if (auth.error) return auth.error
 
   const redirectUri = instagramRedirectUri(req)
   const scope = [

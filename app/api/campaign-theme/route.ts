@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server'
 
 import { generateCampaignTheme } from '@/lib/campaign-theme'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
 
 export async function POST(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'campaign-theme', 30))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   let body: unknown
 
   try {

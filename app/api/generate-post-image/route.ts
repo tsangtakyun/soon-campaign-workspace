@@ -6,6 +6,8 @@ import {
   loadBechillReferenceFiles,
 } from '@/lib/bechill-brand-references'
 import { createAdminSupabase } from '@/lib/server-supabase'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 export const maxDuration = 60
 
@@ -268,6 +270,12 @@ The image should be optimized for social media, square format (1:1), high qualit
 
 export async function POST(request: Request) {
   try {
+    const auth = await requirePlatformUser()
+    if (auth.error) return auth.error
+    if (!(await consumeApiQuota(auth.access.user.id, 'generate-post-image', 20))) {
+      return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+    }
+
     console.log('[generate-post-image] request received')
 
     const apiKey = process.env.OPENAI_API_KEY
@@ -287,26 +295,6 @@ export async function POST(request: Request) {
     }
 
     const supabase = createAdminSupabase()
-    if (postId === WRONG_WEBSITE_IMAGE_POST_ID) {
-      const { error: resetError } = await supabase
-        .from('campaign_posts')
-        .update({
-          image_url: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', WRONG_WEBSITE_IMAGE_POST_ID)
-        .like('image_url', '%/api/website-image%')
-
-      if (resetError) {
-        console.error('[generate-post-image] failed to reset wrong website image URL:', {
-          postId,
-          error: resetError,
-        })
-      } else {
-        console.log('[generate-post-image] reset wrong website image URL before regeneration:', { postId })
-      }
-    }
-
     const { data: post, error: postError } = await supabase
       .from('campaign_posts')
       .select('id,campaign_id,user_id,workspace_id,onboarding_session_id,title,body,post_type,captions,visual_style,content_mood,typeface,photo_control')
@@ -316,6 +304,31 @@ export async function POST(request: Request) {
     if (postError || !post) {
       console.error('[generate-post-image] post not found:', { postId, postError })
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    }
+
+    if (!post.workspace_id) {
+      return NextResponse.json({ error: 'Post is not assigned to a workspace' }, { status: 403 })
+    }
+    const workspaceAccess = await getWorkspaceAccess({
+      email: auth.access.user.email,
+      userId: auth.access.user.id,
+      workspaceId: post.workspace_id,
+    })
+    if (!workspaceAccess?.canEdit) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (postId === WRONG_WEBSITE_IMAGE_POST_ID) {
+      const { error: resetError } = await supabase
+        .from('campaign_posts')
+        .update({ image_url: null, updated_at: new Date().toISOString() })
+        .eq('id', WRONG_WEBSITE_IMAGE_POST_ID)
+        .eq('workspace_id', post.workspace_id)
+        .like('image_url', '%/api/website-image%')
+
+      if (resetError) {
+        console.error('[generate-post-image] failed to reset wrong website image URL:', { postId, error: resetError })
+      }
     }
 
     const ownerFilter = post.workspace_id

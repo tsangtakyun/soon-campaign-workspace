@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
+import { requirePlatformUser } from '@/lib/platform-access'
+import { fetchSafeExternal } from '@/lib/safe-external-url'
 
 export async function GET(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+
   const { searchParams } = new URL(request.url)
   const rawUrl = searchParams.get('url')
 
@@ -20,7 +25,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(imageUrl.toString(), {
+    const response = await fetchSafeExternal(imageUrl.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
@@ -35,8 +40,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unable to fetch image' }, { status: 502 })
     }
 
-    const contentType = response.headers.get('content-type') || 'image/png'
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return NextResponse.json({ error: 'Remote resource is not an image' }, { status: 415 })
+    }
+    const contentLength = Number(response.headers.get('content-length') || 0)
+    if (contentLength > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Remote image is too large' }, { status: 413 })
+    }
     const body = await response.arrayBuffer()
+    if (body.byteLength > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Remote image is too large' }, { status: 413 })
+    }
 
     return new Response(body, {
       headers: {

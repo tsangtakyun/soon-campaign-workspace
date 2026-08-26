@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { grantTrialCredits } from '@/lib/credits'
+import { createAdminSupabase } from '@/lib/server-supabase'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -28,11 +29,43 @@ export async function GET(request: NextRequest) {
         },
       }
     )
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    if (exchangeError) {
+      return NextResponse.redirect(new URL('/login?error=oauth_failed', request.url))
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.id) {
+      const admin = createAdminSupabase()
+      const email = user.email?.trim().toLowerCase() || ''
+      const [ownedWorkspace, userMembership, emailInvite] = await Promise.all([
+        admin.from('workspaces').select('id').eq('owner_id', user.id).limit(1).maybeSingle(),
+        admin
+          .from('workspace_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('status', ['active', 'pending'])
+          .limit(1)
+          .maybeSingle(),
+        email
+          ? admin
+              .from('workspace_members')
+              .select('id')
+              .ilike('email', email)
+              .in('status', ['active', 'pending'])
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+
+      const membershipError = ownedWorkspace.error || userMembership.error || emailInvite.error
+      if (membershipError || (!ownedWorkspace.data && !userMembership.data && !emailInvite.data)) {
+        console.warn('[auth/callback] blocked account without invitation', { email, userId: user.id })
+        await supabase.auth.signOut()
+        return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
+      }
+
       await grantTrialCredits(user.id).catch((error) => {
         console.warn('[auth/callback] grantTrialCredits failed:', error)
       })

@@ -80,6 +80,16 @@ function LoginContent() {
                 目前無法授權此帳號登入，請聯絡管理員協助處理。
               </div>
             ) : null}
+            {error === 'invite_required' ? (
+              <div className="auth-error">
+                SOON 現時只開放予獲邀請用戶。請使用管理員提供的邀請連結。
+              </div>
+            ) : null}
+            {error === 'oauth_failed' ? (
+              <div className="auth-error">
+                登入流程未完成，請重新選擇帳戶再試。
+              </div>
+            ) : null}
 
             <button
               type="button"

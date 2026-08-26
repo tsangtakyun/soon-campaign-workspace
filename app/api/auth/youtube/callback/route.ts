@@ -135,6 +135,7 @@ export async function GET(req: Request) {
     if (workspaceId && user?.id) {
       await assertWorkspaceAccess({
         email: user.email,
+        requireManagement: true,
         userId: user.id,
         workspaceId,
       })

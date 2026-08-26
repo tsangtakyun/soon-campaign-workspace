@@ -54,6 +54,7 @@ export async function GET(req: Request) {
 
     await assertWorkspaceAccess({
       email: user.email,
+      requireManagement: true,
       userId: user.id,
       workspaceId,
     })

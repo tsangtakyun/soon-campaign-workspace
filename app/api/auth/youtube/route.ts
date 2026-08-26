@@ -2,6 +2,7 @@
 // and YouTube Data API v3 must be enabled in Google Cloud Console.
 
 import { NextResponse } from 'next/server'
+import { requireWorkspaceUser } from '@/lib/platform-access'
 
 function appUrl(req: Request) {
   return process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
@@ -22,6 +23,8 @@ export async function GET(req: Request) {
   if (!clientId) {
     return NextResponse.redirect(`${appUrl(req)}/onboarding/integrations?error=youtube_auth_failed`)
   }
+  const auth = await requireWorkspaceUser(workspaceId, 'canManageWorkspace')
+  if (auth.error) return auth.error
 
   const redirectUri = `${appUrl(req)}/api/auth/youtube/callback`
   const state = JSON.stringify({ platform: 'youtube', sessionId, workspaceId })

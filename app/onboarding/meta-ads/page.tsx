@@ -54,9 +54,14 @@ export default function MetaAdsPage() {
   const [error, setError] = useState<string | null>(null)
   const [workspaceId, setWorkspaceId] = useState('')
   const [showWizard, setShowWizard] = useState(false)
+  const [canManageAds, setCanManageAds] = useState(false)
 
   async function openWizard() {
     setError(null)
+    if (!canManageAds) {
+      setError('只有 Owner 或 Admin 可以建立及管理 Meta Ads。')
+      return
+    }
     if (workspaceId) {
       setShowWizard(true)
       return
@@ -83,8 +88,9 @@ export default function MetaAdsPage() {
       setError(null)
 
       try {
-        const { workspaceId } = await resolveActiveWorkspace()
+        const { activeWorkspace, workspaceId } = await resolveActiveWorkspace()
         if (!cancelled) setWorkspaceId(workspaceId || '')
+        if (!cancelled) setCanManageAds(activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin')
         if (!workspaceId) {
           if (!cancelled) setPayload({ connections: [], posts: [] })
           return
@@ -136,7 +142,7 @@ export default function MetaAdsPage() {
             <h1>Meta Ads</h1>
             <span>連接真實 Meta Ad Account、建立 Campaign、素材及受眾設定。</span>
           </div>
-          <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+          <button type="button" disabled={!canManageAds} onClick={() => router.push('/onboarding/integrations')}>
             管理連接
           </button>
         </header>
@@ -170,7 +176,7 @@ export default function MetaAdsPage() {
                     <strong>{hasMetaConnection ? 'Meta 已連接' : 'Meta 未連接'}</strong>
                     <span>{hasMetaConnection ? '建立時會驗證 Ads 權限' : '需要先連接帳戶'}</span>
                   </div>
-                  <button type="button" onClick={() => router.push('/onboarding/integrations')}>
+                  <button type="button" disabled={!canManageAds} onClick={() => router.push('/onboarding/integrations')}>
                     {hasMetaConnection ? '查看連接' : '立即連接'}
                   </button>
                 </div>
@@ -213,9 +219,10 @@ export default function MetaAdsPage() {
                     <span>CAMPAIGNS</span>
                     <h3>廣告活動草稿</h3>
                   </div>
-                  <button type="button" onClick={() => void openWizard()}>
+                  <button type="button" disabled={!canManageAds} onClick={() => void openWizard()}>
                     ＋ 建立廣告活動
                   </button>
+                  {!canManageAds ? <small>只有 Owner 或 Admin 可以建立及管理 Meta Ads。</small> : null}
                 </div>
 
                 <div className="campaign-table-wrap">

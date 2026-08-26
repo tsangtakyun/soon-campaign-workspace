@@ -7,6 +7,8 @@ import {
   loadBechillReferenceFiles,
 } from '@/lib/bechill-brand-references'
 import { createServerSupabase } from '@/lib/server-supabase'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
+import { fetchSafeExternal } from '@/lib/safe-external-url'
 
 type PhotoControlMode = 'minimal' | 'balanced' | 'full' | 'strict'
 
@@ -34,6 +36,12 @@ const modePrompts: Record<PhotoControlMode, string> = {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'photo-control-generate', 20))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: 'OPENAI_API_KEY not configured' }, { status: 500 })
@@ -161,10 +169,11 @@ export async function POST(request: NextRequest) {
 
 async function loadImage(source: string, request: NextRequest) {
   if (source.startsWith('data:')) {
-    const match = source.match(/^data:(.+?);base64,(.+)$/)
+    const match = source.match(/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/)
     if (!match) throw new Error('Invalid data image')
     const [, mimeType, base64] = match
     const bytes = Buffer.from(base64, 'base64')
+    if (bytes.byteLength > 10 * 1024 * 1024) throw new Error('Source image is too large')
     return new File([bytes], 'source-image.png', { type: mimeType })
   }
 
@@ -172,10 +181,14 @@ async function loadImage(source: string, request: NextRequest) {
     ? source
     : new URL(source, request.nextUrl.origin).toString()
 
-  const response = await fetch(url)
+  const response = await fetchSafeExternal(url)
   if (!response.ok) throw new Error(`Unable to load source image (${response.status})`)
 
-  const contentType = response.headers.get('content-type') || 'image/jpeg'
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.toLowerCase().startsWith('image/')) throw new Error('Source is not an image')
+  const contentLength = Number(response.headers.get('content-length') || 0)
+  if (contentLength > 10 * 1024 * 1024) throw new Error('Source image is too large')
   const bytes = await response.arrayBuffer()
+  if (bytes.byteLength > 10 * 1024 * 1024) throw new Error('Source image is too large')
   return new File([bytes], 'source-image.jpg', { type: contentType })
 }

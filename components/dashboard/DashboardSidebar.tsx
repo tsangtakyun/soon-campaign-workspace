@@ -63,7 +63,10 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     : isEggWorkspaceLabel(activeWorkspaceLabel)
       ? EGG_SOON_LOGO_URL
       : '')
-  const canUseContentStudio = activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin'
+  const canUseContentStudio =
+    activeWorkspace?.role === 'owner' ||
+    activeWorkspace?.role === 'admin' ||
+    activeWorkspace?.role === 'member'
 
   useEffect(() => {
     let cancelled = false

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { analyzeWebsiteWithClaude } from '@/lib/website-analysis'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
 
 type AnalyzeWebsiteRequest = {
   website?: string
@@ -12,6 +13,12 @@ type AnalyzeWebsiteRequest = {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'analyze-website', 20))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   let body: AnalyzeWebsiteRequest
 
   try {

@@ -84,6 +84,7 @@ export default function IntegrationsPage() {
   const [autoRepliesEnabled, setAutoRepliesEnabled] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
+  const [canManageConnections, setCanManageConnections] = useState(false)
   const connectedCount = AVAILABLE_SOCIAL_PLATFORMS.filter((platform) => connections[platform.id]).length
 
   useEffect(() => {
@@ -93,7 +94,10 @@ export default function IntegrationsPage() {
       setConnectionsLoading(true)
       try {
         const supabase = createClient()
-        const { workspaceId } = await resolveActiveWorkspace()
+        const { activeWorkspace, workspaceId } = await resolveActiveWorkspace()
+        if (!cancelled) {
+          setCanManageConnections(activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin')
+        }
         const sessionId = getStoredOnboardingSessionId()
         const {
           data: { user },
@@ -220,6 +224,10 @@ export default function IntegrationsPage() {
 
   async function handleConnect(platform: string) {
     if (!ALL_PLATFORMS.some((item) => item.id === platform)) return
+    if (!canManageConnections) {
+      setNotice({ kind: 'warning', text: '只有 Owner 或 Admin 可以連接社交帳戶。' })
+      return
+    }
     setConnecting(platform)
 
     try {
@@ -247,6 +255,10 @@ export default function IntegrationsPage() {
   }
 
   async function disconnectConnection(platform: string) {
+    if (!canManageConnections) {
+      setNotice({ kind: 'warning', text: '只有 Owner 或 Admin 可以解除社交帳戶連接。' })
+      return
+    }
     setDisconnecting(true)
     try {
       const supabase = createClient()
@@ -355,7 +367,7 @@ export default function IntegrationsPage() {
                       <span className="integration-connected-badge">✓ 已連接</span>
                       <button
                         className="integration-disconnect-btn"
-                        disabled={disconnecting}
+                        disabled={!canManageConnections || disconnecting}
                         onClick={() => disconnectConnection(platform.id)}
                         type="button"
                       >
@@ -365,7 +377,7 @@ export default function IntegrationsPage() {
                   ) : (
                     <button
                       className="integration-connect-btn primary"
-                      disabled={connecting === platform.id}
+                      disabled={!canManageConnections || connecting === platform.id}
                       onClick={() => handleConnect(platform.id)}
                       type="button"
                     >
@@ -409,7 +421,7 @@ export default function IntegrationsPage() {
                         </span>
                         <button
                           className="integration-disconnect-btn"
-                          disabled={disconnecting}
+                          disabled={!canManageConnections || disconnecting}
                           onClick={() => disconnectConnection(platform.id)}
                           type="button"
                         >
@@ -452,7 +464,7 @@ export default function IntegrationsPage() {
                         {isNextRecommended ? <span className="integration-next-badge">下一步 →</span> : null}
                         <button
                           className="integration-connect-btn primary"
-                          disabled={connecting === platform.id}
+                          disabled={!canManageConnections || connecting === platform.id}
                           onClick={() => {
                             if (platform.id === 'instagram') {
                               setShowInstagramModal(true)
@@ -574,6 +586,7 @@ export default function IntegrationsPage() {
               </button>
               <button
                 className="ig-modal-go-btn"
+                disabled={!canManageConnections}
                 onClick={() => {
                   setShowInstagramModal(false)
                   handleConnect('instagram')
@@ -645,6 +658,7 @@ export default function IntegrationsPage() {
               </button>
               <button
                 className="ig-modal-go-btn"
+                disabled={!canManageConnections}
                 onClick={() => {
                   setShowFacebookModal(false)
                   handleConnect('facebook')
@@ -707,6 +721,7 @@ export default function IntegrationsPage() {
               </button>
               <button
                 className="ig-modal-go-btn"
+                disabled={!canManageConnections}
                 onClick={() => {
                   setShowThreadsModal(false)
                   handleConnect('threads')
@@ -769,6 +784,7 @@ export default function IntegrationsPage() {
               </button>
               <button
                 className="ig-modal-go-btn"
+                disabled={!canManageConnections}
                 onClick={() => {
                   setShowYouTubeModal(false)
                   handleConnect('youtube')

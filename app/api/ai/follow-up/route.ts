@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { generateFollowUpAnswer } from '@/lib/ai-follow-up'
 import type { CampaignFormInput } from '@/lib/analysis'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
 
 type FollowUpRequest = {
   form?: CampaignFormInput
@@ -11,6 +12,12 @@ type FollowUpRequest = {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'ai-follow-up', 30))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   let body: FollowUpRequest
 
   try {

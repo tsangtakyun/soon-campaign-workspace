@@ -1,4 +1,5 @@
 import { anthropicModel } from '@/lib/anthropic-models'
+import { fetchSafeExternal } from '@/lib/safe-external-url'
 
 export type WebsiteAnalysisInput = {
   website: string
@@ -365,7 +366,7 @@ async function findWebsiteImageCandidates(html: string, baseUrl: string, brandHi
 }
 
 async function fetchWebsiteHtml(url: string, throwOnError: boolean) {
-  const response = await fetch(url, {
+  const response = await fetchSafeExternal(url, {
     headers: BROWSER_HEADERS,
     signal: AbortSignal.timeout(15000),
   })
@@ -453,7 +454,7 @@ async function findReachableCommonLogoUrl(baseUrl: string) {
 
 async function isReachableImage(url: string) {
   try {
-    const response = await fetch(url, {
+    const response = await fetchSafeExternal(url, {
       method: 'HEAD',
       headers: IMAGE_HEADERS,
       signal: AbortSignal.timeout(5000),

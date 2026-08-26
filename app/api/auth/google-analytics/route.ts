@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { appUrl, isUuid } from '@/lib/oauth-connections'
+import { requireWorkspaceUser } from '@/lib/platform-access'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -14,6 +15,8 @@ export async function GET(req: Request) {
   if (!isUuid(workspaceId)) {
     return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 })
   }
+  const auth = await requireWorkspaceUser(workspaceId, 'canManageWorkspace')
+  if (auth.error) return auth.error
 
   const redirectUri = `${appUrl(req)}/api/auth/google-analytics/callback`
   const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')

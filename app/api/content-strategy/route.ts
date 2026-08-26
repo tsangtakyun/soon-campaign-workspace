@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server'
 import { recommendContentStrategy } from '@/lib/content-strategy'
 import { getContentStrategyLibrary } from '@/lib/content-strategy-library-store'
 import { getStrategyLibrary } from '@/lib/strategy-library-store'
+import { consumeApiQuota, requirePlatformUser } from '@/lib/platform-access'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
+  const auth = await requirePlatformUser()
+  if (auth.error) return auth.error
+  if (!(await consumeApiQuota(auth.access.user.id, 'content-strategy', 30))) {
+    return NextResponse.json({ error: '請求次數過多，請稍後再試。' }, { status: 429 })
+  }
+
   try {
     const body = await request.json()
     const profile = body?.profile

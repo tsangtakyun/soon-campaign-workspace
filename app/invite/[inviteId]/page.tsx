@@ -19,6 +19,7 @@ type InvitePayload = {
 
 function roleLabel(role?: string | null) {
   if (role === 'admin') return '管理員'
+  if (role === 'client_approver') return '客戶審批人'
   if (role === 'viewer') return '只讀成員'
   return '成員'
 }

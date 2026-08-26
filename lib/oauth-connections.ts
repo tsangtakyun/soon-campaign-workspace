@@ -32,10 +32,12 @@ export function expiresAtFromSeconds(seconds: unknown) {
 
 export async function assertWorkspaceAccess({
   email,
+  requireManagement = false,
   userId,
   workspaceId,
 }: {
   email?: string | null
+  requireManagement?: boolean
   userId: string
   workspaceId: string
 }) {
@@ -56,7 +58,7 @@ export async function assertWorkspaceAccess({
 
   let membershipQuery = supabase
     .from('workspace_members')
-    .select('workspace_id')
+    .select('workspace_id,role')
     .eq('workspace_id', workspaceId)
     .eq('status', 'active')
     .limit(1)
@@ -71,6 +73,9 @@ export async function assertWorkspaceAccess({
   if (membershipError) throw membershipError
   if (!membership?.workspace_id) {
     throw new Error('Workspace is not available to this user')
+  }
+  if (requireManagement && membership.role !== 'admin') {
+    throw new Error('Only workspace owners or admins can manage social connections')
   }
 }
 
