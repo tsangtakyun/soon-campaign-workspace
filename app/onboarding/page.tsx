@@ -3005,4 +3005,79 @@ const homeStyles = `
       grid-template-columns: minmax(0, 1fr);
     }
   }
+
+  @media (max-width: 640px) {
+    .dashboard-page,
+    .home-shell,
+    .home-body,
+    .home-main,
+    .home-aside {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .dashboard-page,
+    .home-shell {
+      overflow-x: hidden;
+    }
+
+    .home-topbar {
+      min-height: auto;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 16px;
+    }
+
+    .home-topbar-left,
+    .home-topbar-right {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .home-topbar-left h1 {
+      font-size: 17px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .home-topbar-right {
+      justify-content: space-between;
+    }
+
+    .credits-badge,
+    .upgrade-button {
+      font-size: 13px;
+    }
+
+    .connect-banner {
+      min-height: auto;
+      align-items: flex-start;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .connect-banner span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .connect-banner button {
+      flex: 0 0 auto;
+    }
+
+    .home-body {
+      overflow: hidden;
+    }
+
+    .workspace-empty-panel,
+    .home-aside-section,
+    .approval-board,
+    .approval-post-card {
+      max-width: 100%;
+      min-width: 0;
+    }
+  }
 `
