@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 import { pricingPlans } from '@/lib/pricing'
 
@@ -53,7 +54,7 @@ const platformIcons = [
   },
   {
     label: 'Threads',
-    svg: `<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/><path d="M15.9 11.5c-.2-2.4-1.5-3.9-3.7-3.9-1.6 0-2.8.7-3.6 1.9l1.6 1.1c.5-.7 1.1-1.1 2-1.1 1 0 1.6.6 1.8 1.7-.5-.1-1.1-.1-1.6-.1-2.4 0-3.9 1.2-3.9 2.9 0 1.7 1.4 2.9 3.4 2.9 1.8 0 3.1-.9 3.7-2.4.8.5 1.2 1.1 1.2 1.8 0 1.9-1.9 3.2-4.7 3.2-3.2 0-5.2-2.1-5.2-5.4 0-3.5 2.1-5.6 5.2-5.6 2.1 0 3.6.8 4.6 2.5l1.7-1.2c-1.3-2.1-3.4-3.3-6.3-3.3C7.8 6.5 5 9.4 5 14.1c0 4.5 2.8 7.4 7.1 7.4 3.9 0 6.6-2.1 6.6-5.1 0-2.1-1.3-3.7-2.8-4.9Zm-4 3.5c-.8 0-1.4-.4-1.4-1 0-.7.7-1.1 1.8-1.1.6 0 1.1.1 1.7.2-.3 1.1-1 1.9-2.1 1.9Z" fill="#000"/></svg>`,
+    imageSrc: '/assets/threads-icon.png',
   },
 ]
 
@@ -107,12 +108,13 @@ export default function HomePage() {
           <span className="platform-bar__label">支援連接</span>
           <div className="platform-bar__icons">
             {platformIcons.map((icon) => (
-              <span
-                key={icon.label}
-                className="platform-icon"
-                aria-label={icon.label}
-                dangerouslySetInnerHTML={{ __html: icon.svg }}
-              />
+              <span key={icon.label} className="platform-icon" aria-label={icon.label}>
+                {'imageSrc' in icon ? (
+                  <Image src={icon.imageSrc} alt="" width={28} height={28} className="platform-icon__image" />
+                ) : (
+                  <span aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon.svg }} />
+                )}
+              </span>
             ))}
           </div>
         </div>
@@ -389,10 +391,17 @@ export default function HomePage() {
             }
 
             .platform-icon,
-            .platform-icon svg {
+            .platform-icon > span,
+            .platform-icon svg,
+            .platform-icon__image {
               display: block;
               width: 28px;
               height: 28px;
+            }
+
+            .platform-icon__image {
+              border-radius: 6px;
+              object-fit: contain;
             }
 
             .product-preview {
