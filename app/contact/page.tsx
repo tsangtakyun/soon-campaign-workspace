@@ -25,7 +25,24 @@ const initialForm: ContactForm = {
   companyFax: '',
 }
 
-const locations = ['香港', '台灣', '日本', '韓國', '英國', '美國', '其他地區']
+const locations = [
+  '香港',
+  '中國內地',
+  '澳門',
+  '台灣',
+  '日本',
+  '韓國',
+  '新加坡',
+  '馬來西亞',
+  '泰國',
+  '越南',
+  '菲律賓',
+  '印尼',
+  '印度',
+  '英國',
+  '美國',
+  '其他地區',
+]
 const budgets = ['HK$8,000 以下', 'HK$8,000 - 15,000', 'HK$15,000 - 30,000', 'HK$30,000 - 50,000', 'HK$50,000 以上']
 
 export default function ContactPage() {
