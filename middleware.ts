@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -83,21 +84,36 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedWorkspacePage) {
     const email = user.email?.trim().toLowerCase() || ''
-    const [{ data: membership }, { data: ownedWorkspace }] = await Promise.all([
-      supabase
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    )
+    let membershipQuery = admin
         .from('workspace_members')
         .select('id')
-        .eq('user_id', user.id)
         .eq('status', 'active')
-        .limit(1),
-      supabase
+        .limit(1)
+    membershipQuery = email
+      ? membershipQuery.or(`user_id.eq.${user.id},email.ilike.${email}`)
+      : membershipQuery.eq('user_id', user.id)
+
+    const [{ data: membership, error: membershipError }, { data: ownedWorkspace, error: ownerError }] = await Promise.all([
+      membershipQuery,
+      admin
         .from('workspaces')
         .select('id')
         .eq('owner_id', user.id)
         .limit(1),
     ])
 
-    if (!membership?.length && !ownedWorkspace?.length) {
+    if (membershipError || ownerError || (!membership?.length && !ownedWorkspace?.length)) {
+      if (membershipError || ownerError) {
+        console.error('[middleware] unable to verify workspace access', {
+          membership: membershipError?.message,
+          owner: ownerError?.message,
+        })
+      }
       await supabase.auth.signOut()
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'unauthorized')
