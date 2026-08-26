@@ -72,6 +72,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === '/login') {
+    if (request.nextUrl.searchParams.get('google') === '1') return response
     const next = request.nextUrl.searchParams.get('next')
     const safeNext = normalizeAuthNext(next)
     return NextResponse.redirect(new URL(safeNext, request.url))
@@ -82,7 +83,7 @@ export async function middleware(request: NextRequest) {
 
 function normalizeAuthNext(value: string | null) {
   if (!value || value === '/my-workspace' || value.startsWith('/my-workspace/')) return '/onboarding'
-  return value.startsWith('/') ? value : '/onboarding'
+  return value.startsWith('/') && !value.startsWith('//') ? value : '/onboarding'
 }
 
 export const config = {

@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { Suspense, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -12,23 +12,35 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
   const next = normalizeAuthNext(searchParams.get('next'))
-  const supabase = createClient()
+  const startGoogleAutomatically = searchParams.get('google') === '1'
+  const automaticGoogleStarted = useRef(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState<'google' | 'email' | ''>('')
   const [message, setMessage] = useState('')
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = useCallback(async () => {
     setLoading('google')
     document.cookie = `soon_auth_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax`
+    document.cookie = 'soon_auth_flow=login; Path=/; Max-Age=600; SameSite=Lax'
+    const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
-  }
+  }, [next])
+
+  useEffect(() => {
+    if (!startGoogleAutomatically || automaticGoogleStarted.current) return
+    automaticGoogleStarted.current = true
+    void handleGoogleLogin()
+  }, [handleGoogleLogin, startGoogleAutomatically])
 
   async function handleEmailLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -36,6 +48,7 @@ function LoginContent() {
     setLoading('email')
 
     try {
+      const supabase = createClient()
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -43,7 +56,7 @@ function LoginContent() {
 
       if (loginError) throw loginError
 
-      window.location.href = next
+      window.location.href = `/select-workspace?next=${encodeURIComponent(next)}`
     } catch (err: any) {
       setMessage(err.message || '登入失敗，請檢查電郵或密碼。')
     } finally {
@@ -356,7 +369,7 @@ function LoginContent() {
 
 function normalizeAuthNext(value: string | null) {
   if (!value || value === '/my-workspace' || value.startsWith('/my-workspace/')) return '/onboarding'
-  return value.startsWith('/') ? value : '/onboarding'
+  return value.startsWith('/') && !value.startsWith('//') ? value : '/onboarding'
 }
 
 function getAppUrl() {

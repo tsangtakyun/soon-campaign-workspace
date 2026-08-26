@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const nextFromQuery = requestUrl.searchParams.get('next')
   const nextFromCookie = request.cookies.get('soon_auth_next')?.value
+  const authFlow = request.cookies.get('soon_auth_flow')?.value
 
   if (code) {
     const cookieStore = await cookies()
@@ -40,12 +41,16 @@ export async function GET(request: NextRequest) {
 
   const next = nextFromQuery || nextFromCookie || '/onboarding'
   const safeNext = normalizeAuthNext(next)
-  const response = NextResponse.redirect(new URL(safeNext, request.url))
+  const destination = authFlow === 'login'
+    ? `/select-workspace?next=${encodeURIComponent(safeNext)}`
+    : safeNext
+  const response = NextResponse.redirect(new URL(destination, request.url))
   response.cookies.set('soon_auth_next', '', { path: '/', maxAge: 0 })
+  response.cookies.set('soon_auth_flow', '', { path: '/', maxAge: 0 })
   return response
 }
 
 function normalizeAuthNext(value: string) {
   if (!value || value === '/my-workspace' || value.startsWith('/my-workspace/')) return '/onboarding'
-  return value.startsWith('/') ? value : '/onboarding'
+  return value.startsWith('/') && !value.startsWith('//') ? value : '/onboarding'
 }

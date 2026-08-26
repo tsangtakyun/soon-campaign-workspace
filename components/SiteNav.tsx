@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 const DASHBOARD_PREFIXES = ['/onboarding', '/scheduled-posts', '/ops']
-const AUTH_ROUTES = ['/signup', '/login', '/forgot-password', '/reset-password']
+const AUTH_ROUTES = ['/signup', '/login', '/select-workspace', '/forgot-password', '/reset-password']
 
 export default function SiteNav() {
   const pathname = usePathname()
@@ -59,7 +59,7 @@ export default function SiteNav() {
           <Link href="/#workflow">內容流程</Link>
           <Link href="/#about">關於 SOON</Link>
           <Link href="/#pricing">定價</Link>
-          <Link href="/login">登入</Link>
+          <Link href="/login?google=1">登入</Link>
           <Link href="/contact" className="nav-secondary">
             聯絡我們
           </Link>

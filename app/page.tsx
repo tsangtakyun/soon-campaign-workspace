@@ -95,7 +95,7 @@ export default function HomePage() {
               <Link href="/signup" className="hero__cta hero__cta--primary">
                 開始使用
               </Link>
-              <Link href="/login" className="hero__cta hero__cta--login">
+              <Link href="/login?google=1" className="hero__cta hero__cta--login">
                 客戶登入
               </Link>
             </div>
