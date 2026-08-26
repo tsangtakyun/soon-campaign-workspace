@@ -89,17 +89,15 @@ export async function middleware(request: NextRequest) {
         .select('id')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .limit(1)
-        .maybeSingle(),
+        .limit(1),
       supabase
         .from('workspaces')
         .select('id')
         .eq('owner_id', user.id)
-        .limit(1)
-        .maybeSingle(),
+        .limit(1),
     ])
 
-    if (!membership && !ownedWorkspace) {
+    if (!membership?.length && !ownedWorkspace?.length) {
       await supabase.auth.signOut()
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'unauthorized')

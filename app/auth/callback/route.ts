@@ -40,14 +40,13 @@ export async function GET(request: NextRequest) {
       const admin = createAdminSupabase()
       const email = user.email?.trim().toLowerCase() || ''
       const [ownedWorkspace, userMembership, emailInvite] = await Promise.all([
-        admin.from('workspaces').select('id').eq('owner_id', user.id).limit(1).maybeSingle(),
+        admin.from('workspaces').select('id').eq('owner_id', user.id).limit(1),
         admin
           .from('workspace_members')
           .select('id')
           .eq('user_id', user.id)
           .in('status', ['active', 'pending'])
-          .limit(1)
-          .maybeSingle(),
+          .limit(1),
         email
           ? admin
               .from('workspace_members')
@@ -55,12 +54,14 @@ export async function GET(request: NextRequest) {
               .ilike('email', email)
               .in('status', ['active', 'pending'])
               .limit(1)
-              .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ])
 
       const membershipError = ownedWorkspace.error || userMembership.error || emailInvite.error
-      if (membershipError || (!ownedWorkspace.data && !userMembership.data && !emailInvite.data)) {
+      if (
+        membershipError ||
+        (!ownedWorkspace.data?.length && !userMembership.data?.length && !emailInvite.data?.length)
+      ) {
         console.warn('[auth/callback] blocked account without invitation', { email, userId: user.id })
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))

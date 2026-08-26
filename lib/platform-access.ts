@@ -16,14 +16,13 @@ export async function getPlatformUser() {
   const admin = createAdminSupabase()
   const email = user.email?.trim().toLowerCase() || ''
   const [ownedWorkspace, userMembership, emailMembership] = await Promise.all([
-    admin.from('workspaces').select('id').eq('owner_id', user.id).limit(1).maybeSingle(),
+    admin.from('workspaces').select('id').eq('owner_id', user.id).limit(1),
     admin
       .from('workspace_members')
       .select('id,workspace_id,role')
       .eq('user_id', user.id)
       .eq('status', 'active')
-      .limit(1)
-      .maybeSingle(),
+      .limit(1),
     email
       ? admin
           .from('workspace_members')
@@ -31,13 +30,14 @@ export async function getPlatformUser() {
           .ilike('email', email)
           .eq('status', 'active')
           .limit(1)
-          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
 
   const accessError = ownedWorkspace.error || userMembership.error || emailMembership.error
   if (accessError) throw accessError
-  if (!ownedWorkspace.data && !userMembership.data && !emailMembership.data) return null
+  if (!ownedWorkspace.data?.length && !userMembership.data?.length && !emailMembership.data?.length) {
+    return null
+  }
 
   return { admin, user }
 }
