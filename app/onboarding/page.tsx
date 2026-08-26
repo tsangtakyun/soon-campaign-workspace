@@ -1294,7 +1294,7 @@ export default function OnboardingHomePage() {
           <div className="home-topbar-right">
             <button
               className={`credits-badge ${displayedCredits < 50 ? 'warning' : ''}`}
-              onClick={() => router.push('/pricing')}
+              disabled
               type="button"
             >
               ✦ {displayedCredits} credits 剩餘（暫時未公開）
