@@ -1269,7 +1269,7 @@ export default function OnboardingHomePage() {
     }
   }, [])
 
-  const displayedCredits = creditBalance ?? TRIAL_CREDITS
+  const displayedCredits = 0
 
   async function refreshReviewNotes() {
     if (!activeWorkspaceId) return
@@ -1297,10 +1297,10 @@ export default function OnboardingHomePage() {
               onClick={() => router.push('/pricing')}
               type="button"
             >
-              {dashboardLoading ? '載入 credits...' : `✦ ${displayedCredits} credits 剩餘`}
+              ✦ {displayedCredits} credits 剩餘（暫時未公開）
             </button>
-            <button type="button" className="upgrade-button">
-              升級
+            <button type="button" className="upgrade-button" disabled>
+              暫時未公開
             </button>
           </div>
         </header>

@@ -17,17 +17,18 @@ import {
 } from '@/lib/workspace-client'
 
 type SidebarItem = {
+  disabled?: boolean
   icon: string
   label: string
   href: string
-  meta?: string
+  notice?: string
 }
 
 const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
   { icon: '▣', label: '已排程內容', href: '/onboarding/scheduled-posts' },
   { icon: '▱', label: '題材庫', href: '/onboarding/topic-library' },
-  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio' },
+  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio', notice: '暫時未公開', disabled: true },
   { icon: '↯', label: '整合', href: '/onboarding/integrations' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
   { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
@@ -38,13 +39,11 @@ type DashboardSidebarProps = {
   activeItem: string
 }
 
-const TRIAL_CREDITS = 200
 const BECHILL_LOGO_URL = '/brand-assets/bechilltogether/bunchill-logo.png'
 const EGG_SOON_LOGO_URL = '/brand-assets/eggsoon/soon-egg.png'
 
 export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const router = useRouter()
-  const [creditBalance, setCreditBalance] = useState(TRIAL_CREDITS)
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
@@ -80,14 +79,10 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           data: { user },
         } = await supabase.auth.getUser()
         if (!user?.id) {
-          if (!cancelled) setCreditBalance(TRIAL_CREDITS)
           return
         }
 
-        const [{ data: creditData }, workspaceResponse] = await Promise.all([
-          supabase.from('user_credits').select('balance').eq('user_id', user.id).maybeSingle(),
-          fetch('/api/workspaces', { cache: 'no-store' }),
-        ])
+        const workspaceResponse = await fetch('/api/workspaces', { cache: 'no-store' })
         const workspacePayload = await workspaceResponse.json().catch(() => null)
 
         console.log('[DashboardSidebar] workspace query debug', {
@@ -96,12 +91,6 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           responseStatus: workspaceResponse.status,
           workspacePayload,
         })
-
-        if (!cancelled && typeof creditData?.balance === 'number') {
-          setCreditBalance(creditData.balance)
-        } else if (!cancelled) {
-          setCreditBalance(TRIAL_CREDITS)
-        }
 
         if (!cancelled) {
           const mappedWorkspaces = Array.isArray(workspacePayload?.workspaces)
@@ -229,33 +218,35 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
-        {visibleSidebarItems.map((item) => (
-          <Link
-            aria-current={item.label === activeItem ? 'page' : undefined}
-            className={item.label === activeItem ? 'active' : ''}
-            href={item.href}
-            key={item.label}
-            onClick={(event) => {
-              event.preventDefault()
-              router.push(item.href)
-            }}
-          >
+        {visibleSidebarItems.map((item) => {
+          const content = <>
             <span>{item.icon}</span>
-            <strong>{item.label}</strong>
-            {item.meta ? <em>{item.meta}</em> : null}
-          </Link>
-        ))}
+            <strong>{item.label}{item.notice ? <small>（{item.notice}）</small> : null}</strong>
+          </>
+
+          return item.disabled ? (
+            <span className="sidebar-disabled" aria-disabled="true" key={item.label}>{content}</span>
+          ) : (
+            <Link
+              aria-current={item.label === activeItem ? 'page' : undefined}
+              className={item.label === activeItem ? 'active' : ''}
+              href={item.href}
+              key={item.label}
+              onClick={(event) => {
+                event.preventDefault()
+                router.push(item.href)
+              }}
+            >
+              {content}
+            </Link>
+          )
+        })}
       </nav>
 
-      <Link
-        className={`sidebar-credit-card ${creditBalance < 50 ? 'warning' : ''}`}
-        href="/pricing"
-      >
-        <span className="sidebar-credit-balance">{creditBalance} credits 剩餘</span>
-        <span className="sidebar-credit-action">
-          {creditBalance < 50 ? '積分不足，請升級方案' : '查看方案與用量'}
-        </span>
-      </Link>
+      <div className="sidebar-credit-card is-unavailable" aria-label="Credits 暫時未公開">
+        <span className="sidebar-credit-balance">0 credits 剩餘</span>
+        <span className="sidebar-credit-action">暫時未公開</span>
+      </div>
 
       <div className="sidebar-group">
         <p>觸及</p>
@@ -458,6 +449,7 @@ export const dashboardSidebarStyles = `
   }
 
   .sidebar-nav a,
+  .sidebar-nav .sidebar-disabled,
   .sidebar-group a,
   .sidebar-footer a {
     min-height: 34px;
@@ -482,6 +474,16 @@ export const dashboardSidebarStyles = `
   .sidebar-nav a.active {
     background: #e5e7eb;
     color: #202126;
+  }
+
+  .sidebar-nav .sidebar-disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
+  .sidebar-nav strong small {
+    font-size: 10px;
+    font-weight: 500;
   }
 
   .sidebar-nav strong {
@@ -600,7 +602,8 @@ export const dashboardSidebarStyles = `
       display: none;
     }
 
-    .sidebar-nav a {
+    .sidebar-nav a,
+    .sidebar-nav .sidebar-disabled {
       background: #ffffff;
       border: 1px solid #e2e4e8;
       border-radius: 999px;

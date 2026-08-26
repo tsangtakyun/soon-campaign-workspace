@@ -2747,8 +2747,8 @@ function ScheduledPostsPageContent() {
           </div>
 
           <div className="design-account">
-            <span>✦ {creditBalance ?? "—"} credits 剩餘</span>
-            <button type="button">升級</button>
+            <span>✦ 0 credits 剩餘（暫時未公開）</span>
+            <button type="button" disabled>暫時未公開</button>
           </div>
         </header>
 
@@ -2918,9 +2918,9 @@ function ScheduledPostsPageContent() {
           </div>
 
           <div className="post-editor-topbar-right">
-            <span>✦ {creditBalance ?? "—"} credits 剩餘</span>
-            <button className="upgrade-button" type="button">
-              升級
+            <span>✦ 0 credits 剩餘（暫時未公開）</span>
+            <button className="upgrade-button" type="button" disabled>
+              暫時未公開
             </button>
           </div>
         </header>
@@ -3255,9 +3255,9 @@ function ScheduledPostsPageContent() {
           </div>
 
           <div className="calendar-actions">
-            <span>✦ {creditBalance ?? "—"} credits 剩餘</span>
-            <button type="button" className="upgrade-button">
-              升級
+            <span>✦ 0 credits 剩餘（暫時未公開）</span>
+            <button type="button" className="upgrade-button" disabled>
+              暫時未公開
             </button>
           </div>
         </header>
