@@ -1,4 +1,5 @@
 import { createAdminSupabase } from '@/lib/server-supabase'
+import sharp from 'sharp'
 
 export type PublishError = {
   message: string
@@ -85,12 +86,70 @@ function mediaUrlFromAsset(asset: unknown) {
   return typeof value === 'string' ? value : ''
 }
 
-function imageUrlsForPost(post: CampaignPost, baseUrl: string) {
+function mediaUrlsForPost(post: CampaignPost, baseUrl: string) {
   const assets = Array.isArray(post.captions?.assets) ? post.captions.assets : []
   const assetUrls = assets.map(mediaUrlFromAsset).filter(Boolean)
   const urls = assetUrls.length ? assetUrls : post.image_url ? [post.image_url] : []
 
   return Array.from(new Set(urls.map((url) => absoluteUrl(url, baseUrl)))).slice(0, 10)
+}
+
+function isVideoUrl(value: string) {
+  try {
+    return /\.(?:m4v|mov|mp4|webm)$/i.test(new URL(value).pathname)
+  } catch {
+    return /\.(?:m4v|mov|mp4|webm)(?:[?#]|$)/i.test(value)
+  }
+}
+
+type InstagramImageInfo = {
+  height: number
+  ratio: number
+  url: string
+  width: number
+}
+
+async function inspectInstagramImage(url: string): Promise<InstagramImageInfo> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Instagram 無法讀取圖片（HTTP ${response.status}）。`)
+  }
+
+  const contentType = response.headers.get('content-type') || ''
+  if (contentType && !contentType.startsWith('image/')) {
+    throw new Error(`Instagram 素材格式錯誤：預期圖片，實際為 ${contentType}。`)
+  }
+
+  const metadata = await sharp(Buffer.from(await response.arrayBuffer())).metadata()
+  const width = metadata.width || 0
+  const height = metadata.height || 0
+  if (!width || !height) throw new Error('Instagram 無法辨認圖片尺寸。')
+
+  return { height, ratio: width / height, url, width }
+}
+
+async function validateInstagramImages(urls: string[]) {
+  const imageUrls = urls.filter((url) => !isVideoUrl(url))
+  if (!imageUrls.length) return
+
+  const images = await Promise.all(imageUrls.map(inspectInstagramImage))
+  for (const image of images) {
+    // Instagram Feed accepts portrait images down to 4:5 and landscape images up to 1.91:1.
+    // Reject instead of silently allowing Instagram to centre-crop important artwork or text.
+    if (image.ratio < 0.8 - 0.001 || image.ratio > 1.91 + 0.001) {
+      throw new Error(
+        `Instagram 圖片比例不安全：${image.width}×${image.height}。Feed 圖必須介乎 4:5 至 1.91:1，請先轉成 1080×1350。`
+      )
+    }
+  }
+
+  if (urls.length > 1 && images.length > 1) {
+    const firstRatio = images[0].ratio
+    const mismatch = images.find((image) => Math.abs(image.ratio - firstRatio) > 0.001)
+    if (mismatch) {
+      throw new Error('Instagram 輪播圖片比例不一致，可能被裁切。請將所有頁統一為 1080×1350。')
+    }
+  }
 }
 
 function instagramGraphOrigin(connection: SocialConnection) {
@@ -146,7 +205,7 @@ async function createInstagramContainer({
 }
 
 async function waitForInstagramContainer(graphOrigin: string, creationId: string, accessToken: string) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
     const statusUrl = new URL(`${graphOrigin}/${creationId}`)
     statusUrl.searchParams.set('fields', 'status_code')
     statusUrl.searchParams.set('access_token', accessToken)
@@ -240,8 +299,11 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
   if (!connection.account_id || !tokens.length) {
     throw new Error('請重新連接你的 Instagram 帳戶')
   }
-  const imageUrls = imageUrlsForPost(post, baseUrl)
-  if (!imageUrls.length) throw new Error('Instagram 發布需要圖片。')
+  const mediaUrls = mediaUrlsForPost(post, baseUrl)
+  if (!mediaUrls.length) throw new Error('Instagram 發布需要圖片或影片。')
+  await validateInstagramImages(mediaUrls)
+
+  const isSingleVideo = mediaUrls.length === 1 && isVideoUrl(mediaUrls[0])
 
   // Instagram publishing requires Meta approval for the Instagram Business publishing permission.
   if (process.env.INSTAGRAM_PUBLISHING_ENABLED !== 'true') {
@@ -256,27 +318,40 @@ async function publishToInstagram(post: CampaignPost, connection: SocialConnecti
     try {
       console.log('[posts/publish] Instagram publish token attempt:', {
         accountId: connection.account_id,
-        mediaCount: imageUrls.length,
+        mediaCount: mediaUrls.length,
+        mediaType: isSingleVideo ? 'REELS' : mediaUrls.length > 1 ? 'CAROUSEL' : 'IMAGE',
         token_source: label,
         token_preview: tokenPreview(token),
       })
 
       const creationId =
-        imageUrls.length > 1
+        mediaUrls.length > 1
           ? await createInstagramCarouselContainer({
               accountId: connection.account_id,
               caption,
               graphOrigin,
-              imageUrls,
+              mediaUrls,
               token,
             })
+          : isSingleVideo
+            ? await createInstagramContainer({
+                accountId: connection.account_id,
+                graphOrigin,
+                params: new URLSearchParams({
+                  access_token: token,
+                  caption,
+                  media_type: 'REELS',
+                  share_to_feed: 'true',
+                  video_url: mediaUrls[0],
+                }),
+              })
           : await createInstagramContainer({
               accountId: connection.account_id,
               graphOrigin,
               params: new URLSearchParams({
                 access_token: token,
                 caption,
-                image_url: imageUrls[0],
+                image_url: mediaUrls[0],
               }),
             })
       await waitForInstagramContainer(graphOrigin, creationId, token)
@@ -311,25 +386,28 @@ async function createInstagramCarouselContainer({
   accountId,
   caption,
   graphOrigin,
-  imageUrls,
+  mediaUrls,
   token,
 }: {
   accountId: string
   caption: string
   graphOrigin: string
-  imageUrls: string[]
+  mediaUrls: string[]
   token: string
 }) {
   const childIds: string[] = []
 
-  for (const imageUrl of imageUrls) {
+  for (const mediaUrl of mediaUrls) {
+    const video = isVideoUrl(mediaUrl)
     const childId = await createInstagramContainer({
       accountId,
       graphOrigin,
       params: new URLSearchParams({
         access_token: token,
-        image_url: imageUrl,
         is_carousel_item: 'true',
+        ...(video
+          ? { media_type: 'VIDEO', video_url: mediaUrl }
+          : { image_url: mediaUrl }),
       }),
     })
     await waitForInstagramContainer(graphOrigin, childId, token)
@@ -354,7 +432,7 @@ async function publishToThreads(post: CampaignPost, connection: SocialConnection
     throw new Error('請重新連接你的 Threads 帳戶')
   }
 
-  const imageUrl = imageUrlsForPost(post, baseUrl)[0] || ''
+  const imageUrl = mediaUrlsForPost(post, baseUrl)[0] || ''
   const text = Array.from(post.body || post.title || '').slice(0, 500).join('')
   if (!imageUrl && !text) throw new Error('Threads 發布需要文字或圖片。')
 
