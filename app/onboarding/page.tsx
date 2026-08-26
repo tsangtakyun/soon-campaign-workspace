@@ -2947,7 +2947,7 @@ const homeStyles = `
 
   @media (max-width: 980px) {
     .dashboard-page {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .home-body {
@@ -3017,9 +3017,14 @@ const homeStyles = `
       max-width: 100%;
     }
 
-    .dashboard-page,
+    .dashboard-page {
+      width: 100vw;
+      max-width: 100vw;
+    }
+
     .home-shell {
-      overflow-x: hidden;
+      width: auto;
+      max-width: 100vw;
     }
 
     .home-topbar {
