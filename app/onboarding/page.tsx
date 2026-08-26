@@ -232,6 +232,7 @@ type ApprovalPost = {
   status?: 'published' | 'confirmed'
   publishedAt?: string
   media: string[]
+  mediaKind?: HomePost['typeKind']
   caption: string
   note: string
   recordType?: 'campaign_post' | 'content_project'
@@ -276,6 +277,10 @@ const approvalQuickNotes = [
 function approvalImageSrc(path: string) {
   if (/^https?:\/\//i.test(path)) return path
   return `https://soon-approval.vercel.app/${path}`
+}
+
+function isVideoMedia(path: string, mediaKind?: HomePost['typeKind']) {
+  return mediaKind === 'video' || /\.(?:mp4|mov|m4v|webm)(?:$|[?#])/i.test(path)
 }
 
 function ApprovalBoard({
@@ -615,7 +620,8 @@ function ApprovalBoard({
           const decision = decisions[postIndex]
           const isSavingDecision = savingIndex === postIndex
           const decisionError = decisionErrors[postIndex]
-          const currentImage = approvalImageSrc(post.media[slide])
+          const currentMedia = approvalImageSrc(post.media[slide])
+          const currentMediaIsVideo = isVideoMedia(currentMedia, post.mediaKind)
           const isPublished = post.status === 'published'
           const isConfirmed = post.status === 'confirmed'
           const needsNote = decision === 'edit' || decision === 'no'
@@ -678,19 +684,34 @@ function ApprovalBoard({
                 >
                   ›
                 </button>
-                <button
-                  type="button"
-                  className="approval-image-button"
-                  onClick={() =>
-                    setPreview({
-                      src: currentImage,
-                      caption: `${post.title} ・ 第 ${slide + 1} / ${post.media.length} 格`,
-                    })
-                  }
-                >
-                  <img src={currentImage} alt={`${post.title} 第 ${slide + 1} 格`} loading="lazy" />
-                  <span>{`${slide + 1} / ${post.media.length}`}</span>
-                </button>
+                {currentMediaIsVideo ? (
+                  <div className="approval-image-button approval-video-player">
+                    <video
+                      src={currentMedia}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      aria-label={`${post.title} 短影片`}
+                    >
+                      你的瀏覽器不支援影片播放
+                    </video>
+                    <span>短影片</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="approval-image-button"
+                    onClick={() =>
+                      setPreview({
+                        src: currentMedia,
+                        caption: `${post.title} ・ 第 ${slide + 1} / ${post.media.length} 格`,
+                      })
+                    }
+                  >
+                    <img src={currentMedia} alt={`${post.title} 第 ${slide + 1} 格`} loading="lazy" />
+                    <span>{`${slide + 1} / ${post.media.length}`}</span>
+                  </button>
+                )}
                 <div className="approval-dots">
                   {post.media.map((_, slideIndex) => (
                     <button
@@ -836,12 +857,13 @@ function ImportedApprovalBoard({
         id: post.id,
         no: String(index + 1).padStart(2, '0'),
         kind: post.type,
-        meta: `${post.media?.length || 1} 格輪播 ・ 建議出帖：${post.time}`,
+        meta: `${post.typeKind === 'video' ? post.type : `${post.media?.length || 1} 格輪播`} ・ 建議出帖：${post.time}`,
         goal: post.status,
         title: post.title,
         badge: post.status,
         status: persistedStatus,
         media: post.media?.length ? post.media : post.image ? [post.image] : [],
+        mediaKind: post.typeKind,
         caption: post.body,
         note: '由 SOON import 流程加入，等待檢查內容、圖片及 caption。',
         recordType: post.recordType,
@@ -1064,14 +1086,19 @@ export default function OnboardingHomePage() {
             const media = generatedPages
               .map((page: any) => page?.url)
               .filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+            const isVideo =
+              project.selected_format === 'short_video' ||
+              generatedPages.some(
+                (page: any) => page?.mediaType === 'video' || (typeof page?.url === 'string' && isVideoMedia(page.url)),
+              )
             return {
               id: project.id,
               recordType: 'content_project' as const,
               production,
               sourceKey: `content-project-${project.id}`,
-              type: '輪播貼文',
-              typeKind: 'image' as const,
-              title: project.title || '未命名 Carousel',
+              type: isVideo ? '短影片' : '輪播貼文',
+              typeKind: isVideo ? ('video' as const) : ('image' as const),
+              title: project.title || (isVideo ? '未命名短影片' : '未命名 Carousel'),
               body: typeof production.captionDraft === 'string' ? production.captionDraft : '',
               time: formatDashboardTime(
                 production.proposedScheduledAt || production.submittedForApprovalAt || project.updated_at,
@@ -2163,6 +2190,21 @@ const homeStyles = `
     max-height: 620px;
     object-fit: contain;
     display: block;
+  }
+
+  .approval-video-player {
+    cursor: default;
+    background: #111111;
+  }
+
+  .approval-video-player video {
+    width: 100%;
+    max-height: 720px;
+    aspect-ratio: 9 / 16;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    background: #111111;
   }
 
   .approval-image-button span {
