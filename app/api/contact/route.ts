@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminSupabase } from '@/lib/server-supabase'
 
 type ContactPayload = {
   name?: string
@@ -9,10 +9,21 @@ type ContactPayload = {
   location?: string
   budget?: string
   goal?: string
+  companyFax?: string
 }
 
 const CONTACT_TO_EMAIL = 'hello@sooncreator.network'
 const CONTACT_FROM_EMAIL = process.env.CONTACT_FROM_EMAIL || 'SOON <hello@sooncreator.network>'
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MAX_LENGTHS = {
+  name: 120,
+  email: 254,
+  website: 500,
+  phone: 80,
+  location: 80,
+  budget: 80,
+  goal: 4000,
+} as const
 
 function clean(value?: string) {
   return (value || '').trim()
@@ -85,24 +96,45 @@ async function sendContactEmail(payload: Required<ContactPayload>) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ContactPayload
+    if (clean(body.companyFax)) {
+      return NextResponse.json({ ok: true, emailSent: false })
+    }
+
     const payload: Required<ContactPayload> = {
       name: clean(body.name),
-      email: clean(body.email),
+      email: clean(body.email).toLowerCase(),
       website: clean(body.website),
       phone: clean(body.phone),
       location: clean(body.location),
       budget: clean(body.budget),
       goal: clean(body.goal),
+      companyFax: '',
     }
 
-    if (!payload.name || !payload.email || !payload.goal) {
+    if (!payload.name || !payload.email || !payload.goal || !EMAIL_RE.test(payload.email)) {
       return NextResponse.json({ error: '請填寫姓名、公司電郵和希望協助方向。' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const tooLong = (Object.keys(MAX_LENGTHS) as Array<keyof typeof MAX_LENGTHS>).some(
+      (key) => payload[key].length > MAX_LENGTHS[key]
     )
+    if (tooLong) {
+      return NextResponse.json({ error: '部分資料過長，請縮短後再提交。' }, { status: 400 })
+    }
+
+    const supabase = createAdminSupabase()
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { count: recentCount, error: rateLimitError } = await supabase
+      .from('campaign_intakes')
+      .select('id', { count: 'exact', head: true })
+      .eq('source_channel', 'soon-contact-page')
+      .eq('email', payload.email)
+      .gte('created_at', oneHourAgo)
+
+    if (rateLimitError) throw rateLimitError
+    if ((recentCount || 0) >= 3) {
+      return NextResponse.json({ error: '提交次數過多，請稍後再試。' }, { status: 429 })
+    }
 
     const brief = [
       payload.goal,
@@ -127,6 +159,9 @@ export async function POST(request: Request) {
     if (error) throw error
 
     const emailResult = await sendContactEmail(payload)
+    if (!emailResult.sent) {
+      console.error('[contact] submission saved but email notification failed')
+    }
 
     return NextResponse.json({
       ok: true,

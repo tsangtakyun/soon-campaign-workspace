@@ -56,14 +56,15 @@ export default function SiteNav() {
         <div className={`nav-links ${menuOpen ? 'nav-links--open' : ''}`}>
           <Link href="/#product">產品功能</Link>
           <Link href="/#features">品牌增長</Link>
-          <Link href="/#about">內容流程</Link>
+          <Link href="/#workflow">內容流程</Link>
+          <Link href="/#about">關於 SOON</Link>
           <Link href="/#pricing">定價</Link>
           <Link href="/login">登入</Link>
           <Link href="/contact" className="nav-secondary">
             聯絡我們
           </Link>
           <Link href="/signup" className="nav-primary">
-            開始試用
+            開始使用
           </Link>
         </div>
       </nav>
@@ -78,14 +79,14 @@ export default function SiteNav() {
               z-index: 1000;
               width: 100%;
               margin: 0;
-              padding: 18px 7vw;
+              padding: 12px 5vw;
               border: 0;
               background: transparent;
               transition: background 220ms ease, padding 220ms ease;
               display: flex;
               align-items: center;
               justify-content: space-between;
-              gap: 16px;
+              gap: 14px;
             }
 
             .site-nav--scrolled {
@@ -100,7 +101,7 @@ export default function SiteNav() {
 
             .brand-logo {
               display: block;
-              height: 82px;
+              height: 60px;
               width: auto;
             }
 
@@ -112,7 +113,7 @@ export default function SiteNav() {
               display: flex;
               align-items: center;
               justify-content: flex-end;
-              gap: 24px;
+              gap: clamp(12px, 1.4vw, 20px);
               flex: 1;
               flex-wrap: wrap;
             }
@@ -120,7 +121,7 @@ export default function SiteNav() {
             .nav-links a {
               color: #ffffff;
               text-decoration: none;
-              font-size: 1rem;
+              font-size: 0.92rem;
               font-weight: 650;
               letter-spacing: -0.02em;
               transition: color 160ms ease;
@@ -134,8 +135,8 @@ export default function SiteNav() {
             .nav-primary {
               text-decoration: none;
               border-radius: 6px;
-              padding: 12px 18px;
-              font-size: 1rem;
+              padding: 10px 15px;
+              font-size: 0.92rem;
               font-weight: 750;
               letter-spacing: -0.02em;
               white-space: nowrap;

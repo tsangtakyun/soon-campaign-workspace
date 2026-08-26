@@ -4,7 +4,6 @@ import type { CSSProperties, FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 
 import { type AnalysisPreview, type CampaignFormInput, type StoredPaidAnalysisDraft } from '@/lib/analysis'
-import { createClient } from '@/lib/supabase'
 
 const PAID_ANALYSIS_STORAGE_KEY = 'soon-paid-analysis-draft-v1'
 
@@ -173,30 +172,21 @@ export default function SubmitBriefPage() {
       if (!previewResponse.ok) throw new Error(previewData.error || 'Unable to generate analysis preview')
       setAiPreview(nextPreview)
 
-      const supabase = createClient()
       const nextCampaignIntakeId = getOrCreateCampaignIntakeId()
-      const { error } = await supabase
-        .from('campaign_intakes')
-        .insert({
-        id: nextCampaignIntakeId,
-        contact_name: form.contactName.trim(),
-        objective: form.objective,
-        business_name: form.businessName.trim(),
-        whatsapp: form.whatsapp.trim(),
-        email: form.email.trim(),
-        campaign_title: form.campaignTitle.trim(),
-        vertical: form.vertical,
-        budget_range: form.budgetRange,
-        brief: form.brief.trim(),
-        must_include: form.mustInclude.trim(),
-        ai_summary: nextPreview?.summary || '',
-        suggested_budget_shape: nextPreview?.budgetGuide || '',
-        suggested_angle: nextPreview?.angleA || '',
-        suggested_deliverable_shape: nextPreview?.angleB || '',
-        source_channel: 'soon-campaign-workspace',
+      const intakeResponse = await fetch('/api/campaign-intakes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: nextCampaignIntakeId,
+          ...form,
+          aiSummary: nextPreview?.summary || '',
+          suggestedBudgetShape: nextPreview?.budgetGuide || '',
+          suggestedAngle: nextPreview?.angleA || '',
+          suggestedDeliverableShape: nextPreview?.angleB || '',
+        }),
       })
-
-      if (error) throw error
+      const intakeData = await intakeResponse.json()
+      if (!intakeResponse.ok) throw new Error(intakeData.error || 'Unable to save campaign intake')
       try {
         const payload: StoredPaidAnalysisDraft = {
           campaignIntakeId: nextCampaignIntakeId,

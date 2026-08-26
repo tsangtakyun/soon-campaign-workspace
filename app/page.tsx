@@ -20,19 +20,19 @@ const primaryButtonStyle = {
 
 const proofItems = [
   {
-    value: '2.3x',
-    title: '更快啟動宣傳',
-    body: '由品牌需求到內容方向，減少反覆溝通與人手整理。',
+    value: '策略',
+    title: '更快整理內容方向',
+    body: '將品牌目標、受眾與內容角度放入同一條清晰流程。',
   },
   {
-    value: '87%',
-    title: '更清楚配對創作者',
-    body: '根據目標、內容風格與製作需要，整理更合適的創作者方向。',
+    value: '審批',
+    title: '更清楚完成客戶審批',
+    body: '集中處理內容預覽、修改意見及最終確認，減少來回追蹤。',
   },
   {
-    value: '99%',
-    title: '減少人手規劃',
-    body: '將策略、內容規劃、分鏡與交付流程集中在同一個工作台。',
+    value: '排程',
+    title: '更集中管理發布流程',
+    body: '核准內容直接進入排程，連接帳戶後按設定時間發布。',
   },
 ]
 
@@ -54,10 +54,6 @@ const platformIcons = [
   {
     label: 'Threads',
     svg: `<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/><path d="M15.9 11.5c-.2-2.4-1.5-3.9-3.7-3.9-1.6 0-2.8.7-3.6 1.9l1.6 1.1c.5-.7 1.1-1.1 2-1.1 1 0 1.6.6 1.8 1.7-.5-.1-1.1-.1-1.6-.1-2.4 0-3.9 1.2-3.9 2.9 0 1.7 1.4 2.9 3.4 2.9 1.8 0 3.1-.9 3.7-2.4.8.5 1.2 1.1 1.2 1.8 0 1.9-1.9 3.2-4.7 3.2-3.2 0-5.2-2.1-5.2-5.4 0-3.5 2.1-5.6 5.2-5.6 2.1 0 3.6.8 4.6 2.5l1.7-1.2c-1.3-2.1-3.4-3.3-6.3-3.3C7.8 6.5 5 9.4 5 14.1c0 4.5 2.8 7.4 7.1 7.4 3.9 0 6.6-2.1 6.6-5.1 0-2.1-1.3-3.7-2.8-4.9Zm-4 3.5c-.8 0-1.4-.4-1.4-1 0-.7.7-1.1 1.8-1.1.6 0 1.1.1 1.7.2-.3 1.1-1 1.9-2.1 1.9Z" fill="#000"/></svg>`,
-  },
-  {
-    label: 'YouTube',
-    svg: `<svg viewBox="0 0 24 24" role="img" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="#FF0000"/><path d="M10.2 9.1v5.8l5-2.9-5-2.9Z" fill="#fff"/></svg>`,
   },
 ]
 
@@ -90,13 +86,13 @@ export default function HomePage() {
               自己做廣告
             </h1>
             <p className="hero__subtitle">
-              SOON 制定你的策略 創造你的內容
+              SOON 制定你的策略，協助你創造內容
               <br />
-              由策略、內容到發布，一個工作台完成——每月 HK$799 起
+              由內容方向、製作、審批到排程發布，一個工作台完成
             </p>
             <div className="hero__actions">
               <Link href="/signup" className="hero__cta hero__cta--primary">
-                立即免費試用
+                開始使用
               </Link>
               <Link href="/login" className="hero__cta hero__cta--login">
                 客戶登入
@@ -106,9 +102,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="platform-bar" aria-label="支援發布平台">
+      <section className="platform-bar" aria-label="支援連接平台">
         <div className="platform-bar__inner">
-          <span className="platform-bar__label">支援發布至</span>
+          <span className="platform-bar__label">支援連接</span>
           <div className="platform-bar__icons">
             {platformIcons.map((icon) => (
               <span
@@ -126,7 +122,7 @@ export default function HomePage() {
         <div className="product-preview__header">
           <span>產品預覽</span>
           <h2>一個工作台，從策略到發布</h2>
-          <p>管理所有社交平台，AI 生成內容，一鍵排程發布。</p>
+          <p>集中管理內容方向、素材、審批及已連接帳戶的排程發布。</p>
         </div>
 
         <div className="workspace-mockup" aria-label="Campaign Workspace dashboard preview">
@@ -171,7 +167,7 @@ export default function HomePage() {
         </div>
 
         <Link href="/signup" className="product-preview__cta">
-          立即免費試用
+          開始使用
         </Link>
       </section>
 
@@ -193,17 +189,27 @@ export default function HomePage() {
         </div>
 
         <Link href="/signup" className="growth__cta" style={primaryButtonStyle}>
-          開始 7 日試用
+          開始使用
         </Link>
       </section>
 
-      <section id="about" className="content-strip">
+      <section id="workflow" className="content-strip">
         <div className="content-strip__title">一個工作台，處理品牌所需的一切內容。</div>
         <div className="content-types">
           {contentTypes.map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>
+      </section>
+
+      <section id="about" className="about-section">
+        <span>關於 SOON</span>
+        <h2>讓品牌自己掌握內容，亦可以隨時有人同行。</h2>
+        <p>
+          SOON 將宣傳策略、內容製作、客戶審批、團隊協作及排程發布集中在同一個工作台。
+          你可以自己完成日常內容；需要更多協助時，亦可以同專人傾一個適合品牌現況的執行方案。
+        </p>
+        <Link href="/contact">與專人傾一傾</Link>
       </section>
 
       <section id="pricing" className="pricing-section">
@@ -221,10 +227,7 @@ export default function HomePage() {
                 <span>{plan.price}</span>
                 <small>{plan.cadence}</small>
               </div>
-              <p className="pricing-card__credits">
-                {plan.trialDays ? `${plan.trialDays} 日試用包含 ${plan.trialCredits} credits` : `每月 ${plan.monthlyCredits} credits 起`}
-              </p>
-              <Link href={plan.id === 'creator-campaign' ? '/contact' : `/signup?plan=${plan.id}`} className={plan.highlight ? 'pricing-card__button pricing-card__button--highlight' : 'pricing-card__button'}>
+              <Link href={plan.id === 'growth-workspace' ? `/signup?plan=${plan.id}` : '/contact'} className={plan.highlight ? 'pricing-card__button pricing-card__button--highlight' : 'pricing-card__button'}>
                 {plan.cta}
               </Link>
               <div className="pricing-card__features">
@@ -799,7 +802,7 @@ export default function HomePage() {
             }
 
             .pricing-card__price span {
-              font-size: clamp(3.2rem, 5vw, 4.6rem);
+              font-size: clamp(2.55rem, 4vw, 4rem);
               line-height: 0.9;
               letter-spacing: -0.07em;
             }
@@ -807,13 +810,6 @@ export default function HomePage() {
             .pricing-card__price small {
               color: rgba(255,255,255,0.7);
               font-size: 1.25rem;
-            }
-
-            .pricing-card__credits {
-              margin: -16px 0 24px;
-              color: rgba(255,255,255,0.7);
-              font-size: 0.98rem;
-              line-height: 1.45;
             }
 
             .pricing-card__button {
@@ -876,6 +872,54 @@ export default function HomePage() {
               background: #ffffff;
               color: #26221f;
               font-size: 15px;
+            }
+
+            .about-section {
+              padding: 118px 24px;
+              background: #111217;
+              color: #ffffff;
+              display: grid;
+              justify-items: center;
+              text-align: center;
+              gap: 24px;
+            }
+
+            .about-section > span {
+              color: #f6c945;
+              font-size: 0.82rem;
+              font-weight: 800;
+              letter-spacing: 0.16em;
+            }
+
+            .about-section h2 {
+              margin: 0;
+              max-width: 900px;
+              font-size: clamp(2.6rem, 4.5vw, 5rem);
+              line-height: 1.08;
+              letter-spacing: -0.045em;
+              font-weight: 650;
+            }
+
+            .about-section p {
+              margin: 0;
+              max-width: 820px;
+              color: rgba(255,255,255,0.72);
+              font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+              line-height: 1.7;
+            }
+
+            .about-section a {
+              min-height: 54px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              margin-top: 12px;
+              padding: 0 24px;
+              border: 1px solid rgba(255,255,255,0.28);
+              border-radius: 8px;
+              color: #ffffff;
+              text-decoration: none;
+              font-weight: 800;
             }
 
             @media (max-width: 900px) {

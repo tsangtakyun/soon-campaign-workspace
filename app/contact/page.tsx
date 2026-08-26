@@ -11,6 +11,7 @@ type ContactForm = {
   location: string
   budget: string
   goal: string
+  companyFax: string
 }
 
 const initialForm: ContactForm = {
@@ -21,6 +22,7 @@ const initialForm: ContactForm = {
   location: '',
   budget: '',
   goal: '',
+  companyFax: '',
 }
 
 const locations = ['香港', '台灣', '日本', '韓國', '英國', '美國', '其他地區']
@@ -50,11 +52,15 @@ export default function ContactPage() {
 
       if (!response.ok) throw new Error(data.error || '未能提交資料。')
 
-      setMessage('已收到你的資料，我們會盡快聯絡你。')
+      setMessage(
+        data.emailSent
+          ? '已收到你的資料，SOON 專人會盡快聯絡你。'
+          : '資料已安全收到。SOON 專人會查看你的需要並盡快跟進。'
+      )
       setForm(initialForm)
     } catch (error) {
       console.error(error)
-      setMessage('暫時未能提交資料。請稍後再試，或直接透過 WhatsApp 聯絡我們。')
+      setMessage('暫時未能提交資料。請稍後再試，或電郵至 hello@sooncreator.network。')
     } finally {
       setSubmitting(false)
     }
@@ -71,7 +77,7 @@ export default function ContactPage() {
             你的增長目標
           </h1>
           <p className="lead">
-            告訴我們你的品牌、預算和希望改善的宣傳問題。我們會根據你的情況，建議最適合的內容策略、創作者合作和廣告方向。
+            告訴我們你的品牌、現況和希望改善的宣傳問題。SOON 專人會先了解你的需要，再同你傾最適合的內容、創作者合作及執行方式。
           </p>
 
           <div className="benefits">
@@ -79,7 +85,7 @@ export default function ContactPage() {
               ['策略先行', '先釐清目標、客群和轉換路徑，再決定內容形式。'],
               ['內容製作', '將宣傳角度變成題材、腳本、拍攝方向和交付清單。'],
               ['數據回饋', '用表現數據修正下一輪內容，避免每次都重新估。'],
-              ['真人跟進', '適合需要有人協助整理方向、創作者和製作流程的品牌。'],
+              ['專人跟進', '由真人先了解品牌目標，再一齊商量適合的合作方式。'],
             ].map(([title, body]) => (
               <div className="benefit" key={title}>
                 <span />
@@ -95,6 +101,16 @@ export default function ContactPage() {
 
         <form className="contact-form" onSubmit={handleSubmit}>
           <h2>聯絡我們</h2>
+
+          <label className="contact-honeypot" aria-hidden="true">
+            <span>公司傳真</span>
+            <input
+              autoComplete="off"
+              tabIndex={-1}
+              value={form.companyFax}
+              onChange={(event) => updateField('companyFax', event.target.value)}
+            />
+          </label>
 
           <label>
             <span>姓名</span>
@@ -146,28 +162,31 @@ export default function ContactPage() {
           </button>
 
           {message && <p className="form-message">{message}</p>}
+          <p className="privacy-note">
+            提交即表示你同意 SOON 使用以上資料回覆查詢。我們不會將聯絡資料出售予第三方。
+          </p>
         </form>
       </section>
 
       <style jsx>{`
         .contact-page {
           min-height: 100vh;
-          padding: 64px 7vw 88px;
+          padding: 108px 6vw 72px;
           background: #07080b;
           color: #f7f8fb;
         }
 
         .contact-shell {
-          max-width: 1380px;
+          max-width: 1260px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(420px, 0.72fr);
-          gap: clamp(40px, 6vw, 92px);
+          grid-template-columns: minmax(0, 1fr) minmax(400px, 0.68fr);
+          gap: clamp(36px, 5vw, 72px);
           align-items: start;
         }
 
         .contact-copy {
-          padding-top: 56px;
+          padding-top: 30px;
         }
 
         .eyebrow {
@@ -180,7 +199,7 @@ export default function ContactPage() {
 
         h1 {
           margin: 0;
-          font-size: clamp(3.4rem, 7vw, 7rem);
+          font-size: clamp(3.2rem, 6vw, 6.2rem);
           line-height: 0.94;
           letter-spacing: 0;
           font-weight: 620;
@@ -189,7 +208,7 @@ export default function ContactPage() {
 
         .lead {
           max-width: 740px;
-          margin: 28px 0 42px;
+          margin: 22px 0 32px;
           color: rgba(247, 248, 251, 0.78);
           font-size: clamp(1.08rem, 1.7vw, 1.38rem);
           line-height: 1.75;
@@ -197,7 +216,7 @@ export default function ContactPage() {
 
         .benefits {
           display: grid;
-          gap: 18px;
+          gap: 14px;
           max-width: 820px;
         }
 
@@ -247,14 +266,14 @@ export default function ContactPage() {
           background: #ffffff;
           color: #111111;
           border-radius: 8px;
-          padding: clamp(28px, 4vw, 46px);
+          padding: clamp(24px, 3vw, 36px);
           display: grid;
-          gap: 18px;
+          gap: 14px;
           box-shadow: 0 26px 90px rgba(0, 0, 0, 0.34);
         }
 
         .contact-form h2 {
-          margin: 0 0 12px;
+          margin: 0 0 8px;
           color: #111111;
           font-size: clamp(2rem, 3vw, 2.8rem);
           line-height: 1.05;
@@ -279,7 +298,7 @@ export default function ContactPage() {
           color: #111111;
           font: inherit;
           font-weight: 500;
-          padding: 15px 16px;
+          padding: 12px 14px;
           outline: none;
           transition: border-color 160ms ease, box-shadow 160ms ease;
         }
@@ -294,7 +313,7 @@ export default function ContactPage() {
         }
 
         textarea {
-          min-height: 132px;
+          min-height: 112px;
           resize: vertical;
           line-height: 1.65;
         }
@@ -339,9 +358,25 @@ export default function ContactPage() {
           line-height: 1.55;
         }
 
+        .contact-honeypot {
+          position: absolute !important;
+          width: 1px !important;
+          height: 1px !important;
+          overflow: hidden !important;
+          clip: rect(0 0 0 0) !important;
+          white-space: nowrap !important;
+        }
+
+        .privacy-note {
+          margin: -4px 0 0;
+          color: #777b84;
+          font-size: 0.78rem;
+          line-height: 1.5;
+        }
+
         @media (max-width: 980px) {
           .contact-page {
-            padding: 42px 20px 64px;
+            padding: 96px 20px 64px;
           }
 
           .contact-shell {
