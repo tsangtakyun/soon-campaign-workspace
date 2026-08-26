@@ -17,18 +17,16 @@ import {
 } from '@/lib/workspace-client'
 
 type SidebarItem = {
-  disabled?: boolean
   icon: string
   label: string
   href: string
-  notice?: string
 }
 
 const sidebarItems: SidebarItem[] = [
   { icon: '⌂', label: '首頁', href: '/onboarding' },
   { icon: '▣', label: '已排程內容', href: '/onboarding/scheduled-posts' },
   { icon: '▱', label: '題材庫', href: '/onboarding/topic-library' },
-  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio', notice: '暫時未公開', disabled: true },
+  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio' },
   { icon: '↯', label: '整合', href: '/onboarding/integrations' },
   { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
   { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
@@ -65,9 +63,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     : isEggWorkspaceLabel(activeWorkspaceLabel)
       ? EGG_SOON_LOGO_URL
       : '')
-  const visibleSidebarItems = sidebarItems.filter(
-    (item) => item.label !== '內容製作' || activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin'
-  )
+  const canUseContentStudio = activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin'
 
   useEffect(() => {
     let cancelled = false
@@ -218,13 +214,15 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
       </div>
 
       <nav className="sidebar-nav" aria-label="工作台導覽">
-        {visibleSidebarItems.map((item) => {
+        {sidebarItems.map((item) => {
+          const isContentStudio = item.label === '內容製作'
+          const itemDisabled = isContentStudio && !canUseContentStudio
           const content = <>
             <span>{item.icon}</span>
-            <strong>{item.label}{item.notice ? <small>（{item.notice}）</small> : null}</strong>
+            <strong>{item.label}{itemDisabled ? <small>（暫時未公開）</small> : null}</strong>
           </>
 
-          return item.disabled ? (
+          return itemDisabled ? (
             <span className="sidebar-disabled" aria-disabled="true" key={item.label}>{content}</span>
           ) : (
             <Link
