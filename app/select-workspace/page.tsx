@@ -7,10 +7,21 @@ import { createClient } from '@/lib/supabase'
 import {
   cacheActiveWorkspace,
   clearActiveWorkspaceId,
+  isBechillWorkspace,
+  isEggWorkspace,
   setActiveWorkspaceId,
   workspaceInitial,
   type WorkspaceSummary,
 } from '@/lib/workspace-client'
+
+const SOON_LOGO_URL = 'https://wmpipimxqsnjwztuijbp.supabase.co/storage/v1/object/public/public-assets/Soon_logo.png'
+
+function workspaceLogoUrl(workspace: WorkspaceSummary) {
+  if (workspace.logoUrl) return workspace.logoUrl
+  if (isBechillWorkspace(workspace)) return '/brand-assets/bechilltogether/bunchill-logo.png'
+  if (isEggWorkspace(workspace)) return '/brand-assets/eggsoon/soon-egg.png'
+  return null
+}
 
 const roleLabels: Record<string, string> = {
   owner: '擁有者',
@@ -73,7 +84,9 @@ function WorkspaceSelector() {
 
       <section className="workspace-select-shell">
         <header>
-          <span className="soon-mark">SOON</span>
+          <a className="soon-mark" href="/" aria-label="返回 SOON 首頁">
+            <img src={SOON_LOGO_URL} alt="SOON" />
+          </a>
           <button type="button" onClick={signOut}>使用其他帳戶</button>
         </header>
 
@@ -89,6 +102,7 @@ function WorkspaceSelector() {
             <div className="workspace-list">
               {workspaces.map((workspace) => {
                 const label = workspace.brandName || workspace.name
+                const logoUrl = workspaceLogoUrl(workspace)
                 return (
                   <button
                     type="button"
@@ -97,7 +111,9 @@ function WorkspaceSelector() {
                     key={workspace.id}
                     onClick={() => selectWorkspace(workspace)}
                   >
-                    <span className="workspace-avatar">{workspaceInitial(label)}</span>
+                    <span className={`workspace-avatar${logoUrl ? ' workspace-avatar--logo' : ''}`}>
+                      {logoUrl ? <img src={logoUrl} alt={`${label} logo`} /> : workspaceInitial(label)}
+                    </span>
                     <span className="workspace-copy">
                       <strong>{label}</strong>
                       <small>{workspace.description || workspace.name || '品牌工作空間'}</small>
@@ -158,7 +174,8 @@ function WorkspaceSelector() {
           text-decoration: underline;
           text-underline-offset: 4px;
         }
-        .soon-mark { color: #ffffff; font-size: 1.15rem; font-weight: 900; font-style: italic; letter-spacing: -0.08em; }
+        .soon-mark { display: inline-flex; align-items: center; }
+        .soon-mark img { display: block; width: auto; height: 52px; object-fit: contain; }
         .workspace-card {
           border: 1px solid rgba(255,255,255,0.11);
           border-radius: 22px;
@@ -188,6 +205,8 @@ function WorkspaceSelector() {
         .workspace-option:hover { border-color: rgba(255,211,55,0.62); background: rgba(255,255,255,0.075); transform: translateY(-1px); }
         .workspace-option:disabled { cursor: wait; opacity: 0.7; transform: none; }
         .workspace-avatar { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; background: #ef3f2f; font-weight: 900; }
+        .workspace-avatar--logo { overflow: hidden; background: #ffffff; }
+        .workspace-avatar--logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
         .workspace-copy { min-width: 0; display: grid; gap: 4px; }
         .workspace-copy strong, .workspace-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .workspace-copy strong { font-size: 1rem; }
@@ -216,6 +235,7 @@ function WorkspaceSelector() {
           .workspace-card { border-radius: 18px; }
           .workspace-option { grid-template-columns: 42px minmax(0, 1fr) auto; }
           .workspace-avatar { width: 42px; height: 42px; }
+          .soon-mark img { height: 44px; }
           .workspace-role { display: none; }
         }
       `}</style>
