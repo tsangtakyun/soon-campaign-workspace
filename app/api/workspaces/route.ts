@@ -144,6 +144,17 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Workspace provisioning is temporarily handled internally. Keep the server
+  // guard even while the UI entry points are hidden so direct API calls cannot
+  // create unapproved workspaces.
+  const workspaceCreationEnabled = false
+  if (!workspaceCreationEnabled) {
+    return NextResponse.json(
+      { error: 'Workspace creation is temporarily unavailable' },
+      { status: 403 }
+    )
+  }
+
   try {
     const serverSupabase = createServerSupabase(await cookies())
     const {

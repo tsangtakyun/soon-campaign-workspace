@@ -220,9 +220,6 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
               )}
             </div>
             <div className="workspace-menu-actions">
-              <button type="button" onClick={() => router.push('/onboarding/new-workspace')}>
-                ＋ 建立新工作台
-              </button>
               <button type="button" className="logout" onClick={handleSignOut}>
                 登出
               </button>

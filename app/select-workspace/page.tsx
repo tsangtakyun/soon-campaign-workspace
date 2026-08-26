@@ -133,11 +133,6 @@ function WorkspaceSelector() {
             </div>
           ) : null}
 
-          {!loading && !message ? (
-            <button className="create-workspace" type="button" onClick={() => router.push('/onboarding/new-workspace')}>
-              ＋ 建立新工作空間
-            </button>
-          ) : null}
         </div>
       </section>
 
@@ -213,19 +208,6 @@ function WorkspaceSelector() {
         .workspace-copy small { color: rgba(255,255,255,0.5); font-size: 0.8rem; }
         .workspace-role { border-radius: 999px; background: rgba(255,255,255,0.08); padding: 5px 9px; color: rgba(255,255,255,0.7); font-size: 0.72rem; white-space: nowrap; }
         .workspace-arrow { min-width: 24px; color: #ffd337; font-size: 1rem; text-align: right; white-space: nowrap; }
-        .create-workspace {
-          width: 100%;
-          margin-top: 18px;
-          border: 1px dashed rgba(255,255,255,0.2);
-          border-radius: 12px;
-          background: transparent;
-          color: rgba(255,255,255,0.72);
-          padding: 13px 16px;
-          font: inherit;
-          font-weight: 700;
-          cursor: pointer;
-        }
-        .create-workspace:hover { border-color: rgba(255,211,55,0.55); color: #ffffff; }
         .status, .empty-state { border-radius: 14px; background: rgba(255,255,255,0.05); padding: 22px; color: rgba(255,255,255,0.7); text-align: center; }
         .status.error { color: #ffb7b0; }
         .empty-state p { margin: 7px 0 0; color: rgba(255,255,255,0.52); font-size: 0.9rem; }

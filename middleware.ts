@@ -16,6 +16,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
+  if (pathname === '/onboarding/new-workspace') {
+    return NextResponse.redirect(new URL('/select-workspace', request.url))
+  }
+
   const isPublicPage =
     pathname === '/' ||
     pathname === '/contact' ||
