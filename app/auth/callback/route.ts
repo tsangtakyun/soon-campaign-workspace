@@ -50,14 +50,32 @@ export async function GET(request: NextRequest) {
         email
           ? admin
               .from('workspace_members')
-              .select('id')
+              .select('id,status')
               .ilike('email', email)
               .in('status', ['active', 'pending'])
-              .limit(1)
+              .limit(20)
           : Promise.resolve({ data: null, error: null }),
       ])
 
-      const membershipError = ownedWorkspace.error || userMembership.error || emailInvite.error
+      let invitationActivationError: { message?: string } | null = null
+      const pendingInviteIds = (emailInvite.data || [])
+        .filter((invite) => invite.status === 'pending')
+        .map((invite) => invite.id)
+
+      if (!ownedWorkspace.error && !userMembership.error && !emailInvite.error && pendingInviteIds.length) {
+        const { error } = await admin
+          .from('workspace_members')
+          .update({
+            display_name: user.user_metadata?.full_name || user.email,
+            status: 'active',
+            user_id: user.id,
+          })
+          .in('id', pendingInviteIds)
+          .eq('status', 'pending')
+        invitationActivationError = error
+      }
+
+      const membershipError = ownedWorkspace.error || userMembership.error || emailInvite.error || invitationActivationError
       if (
         membershipError ||
         (!ownedWorkspace.data?.length && !userMembership.data?.length && !emailInvite.data?.length)
