@@ -1,226 +1,327 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
-import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
-import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
-import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
-import { createClient } from '@/lib/supabase'
-import { resolveActiveWorkspace } from '@/lib/workspace-client'
+import {
+  DashboardSidebar,
+  dashboardSidebarStyles,
+} from "@/components/dashboard/DashboardSidebar";
+import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
+import { getStoredOnboardingSessionId } from "@/lib/onboarding-session";
+import { createClient } from "@/lib/supabase";
+import { resolveActiveWorkspace } from "@/lib/workspace-client";
 
 type CampaignDetail = {
-  cover_image_url?: string | null
-  id: string
-  name: string
-  status: string
-  target_audience?: string | null
-  strategy_emoji: string | null
-  strategy_title: string | null
-  theme: string | null
-  call_to_action: string | null
-  target_link: string | null
-  starts_on: string | null
-  duration_weeks: number | null
-  campaign_themes: unknown
-}
+  cover_image_url?: string | null;
+  id: string;
+  name: string;
+  status: string;
+  target_audience?: string | null;
+  strategy_emoji: string | null;
+  strategy_title: string | null;
+  theme: string | null;
+  call_to_action: string | null;
+  target_link: string | null;
+  starts_on: string | null;
+  duration_weeks: number | null;
+  campaign_themes: unknown;
+  kol_open?: boolean | null;
+};
+
+type KolApplication = {
+  id: string;
+  creator_display_name: string | null;
+  creator_username: string | null;
+  creator_ig_handle: string | null;
+  creator_ig_followers: number | null;
+  creator_mediakit_url: string | null;
+  pitch_message: string | null;
+  status: string;
+};
 
 type CampaignPost = {
-  image_url?: string | null
-  id: string
-  title: string | null
-  post_type: string | null
-  status: string
-  scheduled_at: string | null
-}
+  image_url?: string | null;
+  id: string;
+  title: string | null;
+  post_type: string | null;
+  status: string;
+  scheduled_at: string | null;
+};
 
 type SocialConnection = {
-  id: string
-  platform: string
-  account_name: string | null
-}
+  id: string;
+  platform: string;
+  account_name: string | null;
+};
 
 const fallbackCampaign: CampaignDetail = {
   cover_image_url: null,
-  id: 'fallback-1',
-  name: '差點沒拍下來的片段',
-  status: 'posting',
+  id: "fallback-1",
+  name: "差點沒拍下來的片段",
+  status: "posting",
   target_audience: null,
-  strategy_emoji: '🎯',
-  strategy_title: '生活內容',
+  strategy_emoji: "🎯",
+  strategy_title: "生活內容",
   theme:
-    'SOON-LOG 透過邀請用戶捕捉並分享與朋友的小時刻，慶祝日常的美好。溫暖的視覺和 AI 驅動的創意，強調情感連結。',
-  call_to_action: '捕捉並分享一個特別時刻！',
-  target_link: 'https://sooncreator.network/',
-  starts_on: '2026-05-01',
+    "SOON-LOG 透過邀請用戶捕捉並分享與朋友的小時刻，慶祝日常的美好。溫暖的視覺和 AI 驅動的創意，強調情感連結。",
+  call_to_action: "捕捉並分享一個特別時刻！",
+  target_link: "https://sooncreator.network/",
+  starts_on: "2026-05-01",
   duration_weeks: 1,
+  kol_open: false,
   campaign_themes: [
-    { id: '1', title: '差點沒拍下來的片段', body: '最細小的片段，往往承載最真實的感覺。' },
-    { id: '2', title: '一個簡單房間，幾段短片', body: '和朋友聚在一起，本來可以很平常。' },
+    {
+      id: "1",
+      title: "差點沒拍下來的片段",
+      body: "最細小的片段，往往承載最真實的感覺。",
+    },
+    {
+      id: "2",
+      title: "一個簡單房間，幾段短片",
+      body: "和朋友聚在一起，本來可以很平常。",
+    },
   ],
-}
+};
 
 const fallbackPosts: CampaignPost[] = [
-  { id: 'p1', title: '差點沒拍下來的片段', post_type: 'still_image', status: 'draft', scheduled_at: '2026-05-08T10:00:00Z', image_url: null },
-  { id: 'p2', title: '一個簡單房間，幾段短片', post_type: 'blog', status: 'draft', scheduled_at: '2026-05-08T14:00:00Z', image_url: null },
-  { id: 'p3', title: '今天值得留下的一秒', post_type: 'video', status: 'draft', scheduled_at: '2026-05-08T18:00:00Z', image_url: null },
-]
+  {
+    id: "p1",
+    title: "差點沒拍下來的片段",
+    post_type: "still_image",
+    status: "draft",
+    scheduled_at: "2026-05-08T10:00:00Z",
+    image_url: null,
+  },
+  {
+    id: "p2",
+    title: "一個簡單房間，幾段短片",
+    post_type: "blog",
+    status: "draft",
+    scheduled_at: "2026-05-08T14:00:00Z",
+    image_url: null,
+  },
+  {
+    id: "p3",
+    title: "今天值得留下的一秒",
+    post_type: "video",
+    status: "draft",
+    scheduled_at: "2026-05-08T18:00:00Z",
+    image_url: null,
+  },
+];
 
-function formatDateRange(startsOn: string | null, durationWeeks: number | null) {
-  if (!startsOn) return '—'
-  const start = new Date(startsOn)
-  if (Number.isNaN(start.getTime())) return '—'
-  const end = new Date(start)
-  end.setDate(end.getDate() + (durationWeeks ?? 1) * 7 - 1)
-  const fmt = (date: Date) => `${date.getMonth() + 1}月${date.getDate()}日`
-  return `${fmt(start)} - ${fmt(end)}`
+function formatDateRange(
+  startsOn: string | null,
+  durationWeeks: number | null,
+) {
+  if (!startsOn) return "—";
+  const start = new Date(startsOn);
+  if (Number.isNaN(start.getTime())) return "—";
+  const end = new Date(start);
+  end.setDate(end.getDate() + (durationWeeks ?? 1) * 7 - 1);
+  const fmt = (date: Date) => `${date.getMonth() + 1}月${date.getDate()}日`;
+  return `${fmt(start)} - ${fmt(end)}`;
 }
 
 function getPostTypeLabel(type: string | null) {
   const map: Record<string, string> = {
-    still_image: '靜態圖片',
-    still_images: '靜態圖片',
-    'still-images': '靜態圖片',
-    video: '短影片',
-    feed_video: '短影片',
-    feed_videos: '短影片',
-    'feed-videos': '短影片',
-    blog: '文章',
-    carousel: '輪播',
-    carousels: '輪播',
-    email: '電郵',
-    emails: '電郵',
-  }
-  return type ? map[type] ?? type : '貼文'
+    still_image: "靜態圖片",
+    still_images: "靜態圖片",
+    "still-images": "靜態圖片",
+    video: "短影片",
+    feed_video: "短影片",
+    feed_videos: "短影片",
+    "feed-videos": "短影片",
+    blog: "文章",
+    carousel: "輪播",
+    carousels: "輪播",
+    email: "電郵",
+    emails: "電郵",
+  };
+  return type ? (map[type] ?? type) : "貼文";
 }
 
 function getStatusLabel(status: string) {
   const map: Record<string, string> = {
-    posting: '發布中',
-    generating: '生成中',
-    completed: '已完成',
-    draft: '草稿',
-    failed: '失敗',
-    approved: '已審批',
-    pending_approval: '待審批',
-    posted: '已發布',
-  }
-  return map[status] ?? status
+    posting: "發布中",
+    generating: "生成中",
+    completed: "已完成",
+    draft: "草稿",
+    failed: "失敗",
+    approved: "已審批",
+    pending_approval: "待審批",
+    posted: "已發布",
+  };
+  return map[status] ?? status;
 }
 
 function getStatusClass(status: string) {
-  if (status === 'posting' || status === 'generating' || status === 'pending_approval') return 'generating'
-  if (status === 'completed' || status === 'approved' || status === 'posted') return 'done'
-  if (status === 'failed') return 'failed'
-  return 'draft'
+  if (
+    status === "posting" ||
+    status === "generating" ||
+    status === "pending_approval"
+  )
+    return "generating";
+  if (status === "completed" || status === "approved" || status === "posted")
+    return "done";
+  if (status === "failed") return "failed";
+  return "draft";
 }
 
 function categoryGradient(campaign: CampaignDetail) {
-  const seed = `${campaign.strategy_title || ''}${campaign.name}`.toLowerCase()
-  if (seed.includes('教育') || seed.includes('educ')) return 'educational'
-  if (seed.includes('生活') || seed.includes('life')) return 'lifestyle'
-  if (seed.includes('品牌') || seed.includes('brand')) return 'brand'
-  return 'default'
+  const seed = `${campaign.strategy_title || ""}${campaign.name}`.toLowerCase();
+  if (seed.includes("教育") || seed.includes("educ")) return "educational";
+  if (seed.includes("生活") || seed.includes("life")) return "lifestyle";
+  if (seed.includes("品牌") || seed.includes("brand")) return "brand";
+  return "default";
 }
 
 function platformLabel(platform: string) {
   const map: Record<string, string> = {
-    instagram: 'Instagram',
-    facebook: 'Facebook',
-    threads: 'Threads',
-  }
-  return map[platform] ?? platform
+    instagram: "Instagram",
+    facebook: "Facebook",
+    threads: "Threads",
+  };
+  return map[platform] ?? platform;
 }
 
 function platformIcon(platform: string) {
   const map: Record<string, string> = {
-    instagram: 'IG',
-    facebook: 'f',
-    threads: '@',
-  }
-  return map[platform] ?? platform.slice(0, 1).toUpperCase()
+    instagram: "IG",
+    facebook: "f",
+    threads: "@",
+  };
+  return map[platform] ?? platform.slice(0, 1).toUpperCase();
 }
 
 function postIcon(type: string | null) {
-  if (type === 'carousel' || type === 'carousels') return '▱'
-  if (type === 'video' || type === 'feed_video' || type === 'feed_videos' || type === 'feed-videos') return '▶'
-  if (type === 'email' || type === 'emails') return '✉'
-  return '▧'
+  if (type === "carousel" || type === "carousels") return "▱";
+  if (
+    type === "video" ||
+    type === "feed_video" ||
+    type === "feed_videos" ||
+    type === "feed-videos"
+  )
+    return "▶";
+  if (type === "email" || type === "emails") return "✉";
+  return "▧";
 }
 
 function contentPerWeekSummary(posts: CampaignPost[]) {
   const counts = posts.reduce(
     (acc, post) => {
-      const type = post.post_type || ''
-      if (type === 'carousel' || type === 'carousels') acc.carousel += 1
-      else if (type === 'video' || type === 'feed_video' || type === 'feed_videos' || type === 'feed-videos') acc.video += 1
-      else if (type === 'email' || type === 'emails') acc.email += 1
-      else acc.static += 1
-      return acc
+      const type = post.post_type || "";
+      if (type === "carousel" || type === "carousels") acc.carousel += 1;
+      else if (
+        type === "video" ||
+        type === "feed_video" ||
+        type === "feed_videos" ||
+        type === "feed-videos"
+      )
+        acc.video += 1;
+      else if (type === "email" || type === "emails") acc.email += 1;
+      else acc.static += 1;
+      return acc;
     },
-    { static: 0, carousel: 0, video: 0, email: 0 }
-  )
+    { static: 0, carousel: 0, video: 0, email: 0 },
+  );
 
-  return `${counts.static} 張靜態圖、${counts.carousel} 個輪播、${counts.video} 支影片、${counts.email} 封電郵`
+  return `${counts.static} 張靜態圖、${counts.carousel} 個輪播、${counts.video} 支影片、${counts.email} 封電郵`;
 }
 
 function audienceText(value?: string | null) {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : '點擊新增目標受眾'
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "點擊新增目標受眾";
 }
 
 export default function CampaignDetailPage() {
-  const router = useRouter()
-  const params = useParams()
-  const id = typeof params?.id === 'string' ? params.id : ''
+  const router = useRouter();
+  const params = useParams();
+  const id = typeof params?.id === "string" ? params.id : "";
 
-  const [campaign, setCampaign] = useState<CampaignDetail>(fallbackCampaign)
-  const [posts, setPosts] = useState<CampaignPost[]>(fallbackPosts)
-  const [connections, setConnections] = useState<SocialConnection[]>([])
-  const [loading, setLoading] = useState(true)
-  const pendingReviewCount = posts.filter((post) => ['pending', 'ready', 'pending_approval'].includes(post.status)).length
-  const startDateLabel = campaign.starts_on ? new Date(campaign.starts_on).toLocaleDateString('zh-HK') : '開始日期'
+  const [campaign, setCampaign] = useState<CampaignDetail>(fallbackCampaign);
+  const [posts, setPosts] = useState<CampaignPost[]>(fallbackPosts);
+  const [connections, setConnections] = useState<SocialConnection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [kolOpenSaving, setKolOpenSaving] = useState(false);
+  const pendingReviewCount = posts.filter((post) =>
+    ["pending", "ready", "pending_approval"].includes(post.status),
+  ).length;
+  const startDateLabel = campaign.starts_on
+    ? new Date(campaign.starts_on).toLocaleDateString("zh-HK")
+    : "開始日期";
   const heroStyle = campaign.cover_image_url
-    ? { backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.82)), url("${campaign.cover_image_url}")` }
-    : undefined
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.82)), url("${campaign.cover_image_url}")`,
+      }
+    : undefined;
+
+  async function toggleKolOpen() {
+    if (campaign.id.startsWith("fallback")) return;
+    setKolOpenSaving(true);
+    const nextValue = !campaign.kol_open;
+    const response = await fetch(`/api/campaigns/${campaign.id}/kol-open`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kol_open: nextValue }),
+    });
+    if (response.ok)
+      setCampaign((current) => ({ ...current, kol_open: nextValue }));
+    setKolOpenSaving(false);
+  }
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     async function loadCampaign() {
-      if (!id || id.startsWith('fallback')) {
-        setLoading(false)
-        return
+      if (!id || id.startsWith("fallback")) {
+        setLoading(false);
+        return;
       }
 
       try {
-        const supabase = createClient()
+        const supabase = createClient();
         const {
           data: { user },
-        } = await supabase.auth.getUser()
-        const sessionId = getStoredOnboardingSessionId()
-        let workspaceId: string | null = null
+        } = await supabase.auth.getUser();
+        const sessionId = getStoredOnboardingSessionId();
+        let workspaceId: string | null = null;
 
-        if (!user?.id && !sessionId) return
+        if (!user?.id && !sessionId) return;
 
-        let campaignQuery = supabase.from('marketing_campaigns').select('*').eq('id', id)
-        let postsQuery = supabase.from('campaign_posts').select('*').eq('campaign_id', id).order('scheduled_at', { ascending: true })
+        let campaignQuery = supabase
+          .from("marketing_campaigns")
+          .select("*")
+          .eq("id", id);
+        let postsQuery = supabase
+          .from("campaign_posts")
+          .select("*")
+          .eq("campaign_id", id)
+          .order("scheduled_at", { ascending: true });
         let connectionsQuery = supabase
-          .from('social_connections')
-          .select('id,platform,account_name')
-          .in('platform', ['instagram', 'facebook', 'threads'])
+          .from("social_connections")
+          .select("id,platform,account_name")
+          .in("platform", ["instagram", "facebook", "threads"]);
 
         if (user?.id) {
-          ;({ workspaceId } = await resolveActiveWorkspace())
-          campaignQuery = workspaceId ? campaignQuery.eq('workspace_id', workspaceId) : campaignQuery.eq('user_id', user.id)
-          postsQuery = workspaceId ? postsQuery.eq('workspace_id', workspaceId) : postsQuery.eq('user_id', user.id)
+          ({ workspaceId } = await resolveActiveWorkspace());
+          campaignQuery = workspaceId
+            ? campaignQuery.eq("workspace_id", workspaceId)
+            : campaignQuery.eq("user_id", user.id);
+          postsQuery = workspaceId
+            ? postsQuery.eq("workspace_id", workspaceId)
+            : postsQuery.eq("user_id", user.id);
           connectionsQuery = workspaceId
-            ? connectionsQuery.eq('workspace_id', workspaceId)
-            : connectionsQuery.eq('user_id', user.id)
+            ? connectionsQuery.eq("workspace_id", workspaceId)
+            : connectionsQuery.eq("user_id", user.id);
         } else if (sessionId) {
-          campaignQuery = campaignQuery.eq('onboarding_session_id', sessionId)
-          postsQuery = postsQuery.eq('onboarding_session_id', sessionId)
-          connectionsQuery = connectionsQuery.eq('onboarding_session_id', sessionId)
+          campaignQuery = campaignQuery.eq("onboarding_session_id", sessionId);
+          postsQuery = postsQuery.eq("onboarding_session_id", sessionId);
+          connectionsQuery = connectionsQuery.eq(
+            "onboarding_session_id",
+            sessionId,
+          );
         }
 
         const [
@@ -231,25 +332,27 @@ export default function CampaignDetailPage() {
           campaignQuery.maybeSingle(),
           postsQuery,
           connectionsQuery,
-        ])
+        ]);
 
-        if (cancelled) return
-        if (!campaignError && campaignData) setCampaign(campaignData as CampaignDetail)
-        if (!postsError) setPosts((postsData || []) as CampaignPost[])
-        if (!connectionError) setConnections((connectionData || []) as SocialConnection[])
+        if (cancelled) return;
+        if (!campaignError && campaignData)
+          setCampaign(campaignData as CampaignDetail);
+        if (!postsError) setPosts((postsData || []) as CampaignPost[]);
+        if (!connectionError)
+          setConnections((connectionData || []) as SocialConnection[]);
       } catch {
         // Keep fallback when Supabase has no rows or auth is not available.
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
     }
 
-    void loadCampaign()
+    void loadCampaign();
 
     return () => {
-      cancelled = true
-    }
-  }, [id])
+      cancelled = true;
+    };
+  }, [id]);
 
   return (
     <main className="dashboard-page">
@@ -257,16 +360,22 @@ export default function CampaignDetailPage() {
       <DashboardSidebar activeItem="宣傳活動" />
       <section className="home-shell">
         <div
-          className={`campaign-detail-hero ${campaign.cover_image_url ? 'has-image' : categoryGradient(campaign)}`}
+          className={`campaign-detail-hero ${campaign.cover_image_url ? "has-image" : categoryGradient(campaign)}`}
           style={heroStyle}
         >
-          <button type="button" className="campaign-detail-back" onClick={() => router.push('/onboarding/topic-library')}>
+          <button
+            type="button"
+            className="campaign-detail-back"
+            onClick={() => router.push("/onboarding/topic-library")}
+          >
             ← 返回
           </button>
           <div className="campaign-hero-actions">
             <button
               aria-label="分享活動"
-              onClick={() => navigator.clipboard?.writeText(window.location.href)}
+              onClick={() =>
+                navigator.clipboard?.writeText(window.location.href)
+              }
               title="分享活動"
               type="button"
             >
@@ -281,7 +390,8 @@ export default function CampaignDetailPage() {
           </div>
           <div className="campaign-detail-hero-content">
             <span className="campaign-detail-category">
-              {campaign.strategy_emoji ?? '🎯'} {campaign.strategy_title ?? '生活內容'}
+              {campaign.strategy_emoji ?? "🎯"}{" "}
+              {campaign.strategy_title ?? "生活內容"}
             </span>
             <h1>{campaign.name}</h1>
           </div>
@@ -292,14 +402,40 @@ export default function CampaignDetailPage() {
             <div className="campaign-action-info">
               <div className="campaign-action-badges">
                 {pendingReviewCount > 0 ? (
-                  <span className="action-badge review">{pendingReviewCount} 個帖子待審批</span>
+                  <span className="action-badge review">
+                    {pendingReviewCount} 個帖子待審批
+                  </span>
                 ) : null}
-                {connections.length === 0 ? <span className="action-badge disconnected">尚未連接帳號</span> : null}
-                <span className={`campaign-status ${getStatusClass(campaign.status)}`}>{getStatusLabel(campaign.status)}</span>
+                {connections.length === 0 ? (
+                  <span className="action-badge disconnected">
+                    尚未連接帳號
+                  </span>
+                ) : null}
+                <span
+                  className={`campaign-status ${getStatusClass(campaign.status)}`}
+                >
+                  {getStatusLabel(campaign.status)}
+                </span>
+                <button
+                  className="kol-open-button"
+                  disabled={kolOpenSaving}
+                  onClick={() => void toggleKolOpen()}
+                  type="button"
+                >
+                  {kolOpenSaving
+                    ? "儲存中…"
+                    : campaign.kol_open
+                      ? "✓ 已開放 KOL 申請"
+                      : "開放 KOL 申請"}
+                </button>
               </div>
               <p>請於 {startDateLabel} 前審批以準時發布</p>
             </div>
-            <button type="button" className="campaign-review-btn" onClick={() => router.push('/onboarding/scheduled-posts')}>
+            <button
+              type="button"
+              className="campaign-review-btn"
+              onClick={() => router.push("/onboarding/scheduled-posts")}
+            >
               審批帖子
             </button>
           </section>
@@ -312,11 +448,15 @@ export default function CampaignDetailPage() {
             <div className="campaign-detail-fields">
               <div className="campaign-detail-field">
                 <label>主題</label>
-                <p>{campaign.theme ?? '—'}</p>
+                <p>{campaign.theme ?? "—"}</p>
               </div>
               <div className="campaign-detail-field">
                 <label>目標受眾</label>
-                <p className={campaign.target_audience ? '' : 'field-placeholder'}>
+                <p
+                  className={
+                    campaign.target_audience ? "" : "field-placeholder"
+                  }
+                >
                   {audienceText(campaign.target_audience)}
                 </p>
               </div>
@@ -326,9 +466,13 @@ export default function CampaignDetailPage() {
               </div>
               <div className="campaign-detail-field">
                 <label>行動呼籲</label>
-                <p>{campaign.call_to_action ?? '—'}</p>
+                <p>{campaign.call_to_action ?? "—"}</p>
                 {campaign.target_link ? (
-                  <a href={campaign.target_link} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={campaign.target_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {campaign.target_link}
                   </a>
                 ) : null}
@@ -341,7 +485,11 @@ export default function CampaignDetailPage() {
             <div className="campaign-detail-schedule">
               <div className="schedule-row">
                 <span>開始日期</span>
-                <span>{campaign.starts_on ? new Date(campaign.starts_on).toLocaleDateString('zh-HK') : '—'}</span>
+                <span>
+                  {campaign.starts_on
+                    ? new Date(campaign.starts_on).toLocaleDateString("zh-HK")
+                    : "—"}
+                </span>
               </div>
               <div className="schedule-row">
                 <span>持續時間</span>
@@ -349,7 +497,9 @@ export default function CampaignDetailPage() {
               </div>
               <div className="schedule-row">
                 <span>日期範圍</span>
-                <span>{formatDateRange(campaign.starts_on, campaign.duration_weeks)}</span>
+                <span>
+                  {formatDateRange(campaign.starts_on, campaign.duration_weeks)}
+                </span>
               </div>
               <div className="schedule-row schedule-accounts-row">
                 <span>帳號</span>
@@ -359,12 +509,18 @@ export default function CampaignDetailPage() {
                       <span className="connected-account" key={connection.id}>
                         <span>{platformIcon(connection.platform)}</span>
                         {platformLabel(connection.platform)}
-                        {connection.account_name ? ` · ${connection.account_name}` : ''}
+                        {connection.account_name
+                          ? ` · ${connection.account_name}`
+                          : ""}
                       </span>
                     ))}
                   </span>
                 ) : (
-                  <button type="button" className="connect-account-btn" onClick={() => router.push('/onboarding/integrations')}>
+                  <button
+                    type="button"
+                    className="connect-account-btn"
+                    onClick={() => router.push("/onboarding/integrations")}
+                  >
                     連接帳號
                   </button>
                 )}
@@ -375,7 +531,11 @@ export default function CampaignDetailPage() {
           <section className="campaign-detail-section">
             <div className="campaign-detail-section-head">
               <h2>貼文列表</h2>
-              <button type="button" className="home-create-btn" onClick={() => router.push('/onboarding/scheduled-posts')}>
+              <button
+                type="button"
+                className="home-create-btn"
+                onClick={() => router.push("/onboarding/scheduled-posts")}
+              >
                 ＋ 新增貼文
               </button>
             </div>
@@ -395,37 +555,200 @@ export default function CampaignDetailPage() {
                   <div
                     key={post.id}
                     className="campaign-post-row"
-                    onClick={() => router.push('/onboarding/scheduled-posts')}
+                    onClick={() => router.push("/onboarding/scheduled-posts")}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') router.push('/onboarding/scheduled-posts')
+                      if (event.key === "Enter")
+                        router.push("/onboarding/scheduled-posts");
                     }}
                     role="button"
                     tabIndex={0}
                   >
                     {post.image_url ? (
-                      <img alt="" className="campaign-post-thumb" src={post.image_url} />
+                      <img
+                        alt=""
+                        className="campaign-post-thumb"
+                        src={post.image_url}
+                      />
                     ) : (
-                      <span className={`campaign-post-thumb placeholder ${post.post_type || 'default'}`}>
+                      <span
+                        className={`campaign-post-thumb placeholder ${post.post_type || "default"}`}
+                      >
                         {postIcon(post.post_type)}
                       </span>
                     )}
-                    <span className="campaign-post-type">{getPostTypeLabel(post.post_type)}</span>
-                    <span className="campaign-post-title">{post.title ?? '未命名貼文'}</span>
-                    <span className="campaign-post-date">
-                      {post.scheduled_at ? new Date(post.scheduled_at).toLocaleDateString('zh-HK') : '未排程'}
+                    <span className="campaign-post-type">
+                      {getPostTypeLabel(post.post_type)}
                     </span>
-                    <span className={`post-status-badge ${getStatusClass(post.status)}`}>{getStatusLabel(post.status)}</span>
+                    <span className="campaign-post-title">
+                      {post.title ?? "未命名貼文"}
+                    </span>
+                    <span className="campaign-post-date">
+                      {post.scheduled_at
+                        ? new Date(post.scheduled_at).toLocaleDateString(
+                            "zh-HK",
+                          )
+                        : "未排程"}
+                    </span>
+                    <span
+                      className={`post-status-badge ${getStatusClass(post.status)}`}
+                    >
+                      {getStatusLabel(post.status)}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
           </section>
+          {!campaign.id.startsWith("fallback") ? (
+            <KolApplicationsPanel campaignId={campaign.id} />
+          ) : null}
         </div>
       </section>
 
-      <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${campaignDetailStyles}` }} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `${dashboardSidebarStyles}\n${campaignDetailStyles}`,
+        }}
+      />
     </main>
-  )
+  );
+}
+
+function KolApplicationsPanel({ campaignId }: { campaignId: string }) {
+  const [applications, setApplications] = useState<KolApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    void fetch(`/api/campaigns/${campaignId}/applications`, {
+      cache: "no-store",
+    })
+      .then(async (response) => ({
+        ok: response.ok,
+        payload: await response.json().catch(() => null),
+      }))
+      .then(({ ok, payload }) => {
+        if (ok) setApplications(payload?.applications || []);
+        else setError("暫時未能載入 KOL 申請。");
+      })
+      .finally(() => setLoading(false));
+  }, [campaignId]);
+
+  async function updateStatus(applicationId: string, status: string) {
+    setSavingId(applicationId);
+    setError("");
+    const response = await fetch(`/api/campaigns/${campaignId}/applications`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ application_id: applicationId, status }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (response.ok)
+      setApplications((current) =>
+        current.map((item) =>
+          item.id === applicationId ? { ...item, status } : item,
+        ),
+      );
+    else setError(payload?.error || "狀態更新失敗，兩邊資料未能同步。");
+    setSavingId(null);
+  }
+
+  return (
+    <section className="campaign-detail-section kol-applications-panel">
+      <div className="campaign-detail-section-head">
+        <div>
+          <h2>KOL 合作申請</h2>
+          <p>由 Egg.soon 提交；狀態會同步返創作者平台。</p>
+        </div>
+      </div>
+      {error ? <p className="kol-error">{error}</p> : null}
+      {loading ? (
+        <p>載入中…</p>
+      ) : applications.length === 0 ? (
+        <p className="kol-empty">暫時未有 KOL 申請</p>
+      ) : (
+        applications.map((application) => (
+          <article className="kol-application" key={application.id}>
+            <div>
+              <strong>
+                {application.creator_display_name ||
+                  application.creator_username}
+              </strong>
+              <span>
+                @{application.creator_ig_handle || application.creator_username}{" "}
+                · {(application.creator_ig_followers || 0).toLocaleString()}{" "}
+                followers
+              </span>
+              {application.pitch_message ? (
+                <p>{application.pitch_message}</p>
+              ) : null}
+            </div>
+            <div className="kol-application-actions">
+              {application.creator_mediakit_url ? (
+                <a
+                  href={application.creator_mediakit_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Media Kit
+                </a>
+              ) : null}
+              {application.status === "pending" ? (
+                <>
+                  <button
+                    disabled={savingId === application.id}
+                    onClick={() =>
+                      void updateStatus(application.id, "accepted")
+                    }
+                  >
+                    接受
+                  </button>
+                  <button
+                    disabled={savingId === application.id}
+                    onClick={() =>
+                      void updateStatus(application.id, "declined")
+                    }
+                  >
+                    婉拒
+                  </button>
+                </>
+              ) : null}
+              {application.status === "accepted" ? (
+                <button
+                  disabled={savingId === application.id}
+                  onClick={() =>
+                    void updateStatus(application.id, "in_progress")
+                  }
+                >
+                  開始合作
+                </button>
+              ) : null}
+              {application.status === "in_progress" ? (
+                <button
+                  disabled={savingId === application.id}
+                  onClick={() => void updateStatus(application.id, "completed")}
+                >
+                  標記完成
+                </button>
+              ) : null}
+              <em>
+                {application.status === "pending"
+                  ? "待審核"
+                  : application.status === "accepted"
+                    ? "已接受"
+                    : application.status === "in_progress"
+                      ? "進行中"
+                      : application.status === "completed"
+                        ? "已完成"
+                        : "已婉拒"}
+              </em>
+            </div>
+          </article>
+        ))
+      )}
+    </section>
+  );
 }
 
 const campaignDetailStyles = `
@@ -573,6 +896,31 @@ const campaignDetailStyles = `
     background: #f1f2f4;
     color: #6f737d;
   }
+
+  .kol-open-button {
+    background: #ede9fe;
+    border: 0;
+    border-radius: 999px;
+    color: #6d28d9;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+  }
+
+  .kol-open-button:disabled { cursor: wait; opacity: .55; }
+  .kol-applications-panel { margin-top: 0; }
+  .kol-applications-panel .campaign-detail-section-head p { color: #858992; font-size: 13px; margin: 5px 0 0; }
+  .kol-empty { border: 1px dashed #e3e4e8; border-radius: 10px; color: #92959c; padding: 28px; text-align: center; }
+  .kol-error { background: #fef2f2; border-radius: 8px; color: #b91c1c; padding: 10px; }
+  .kol-application { align-items: center; border: 1px solid #e7e8eb; border-radius: 12px; display: flex; gap: 20px; justify-content: space-between; margin-top: 12px; padding: 16px; }
+  .kol-application strong, .kol-application span { display: block; }
+  .kol-application span { color: #858992; font-size: 12px; margin-top: 4px; }
+  .kol-application p { color: #5f636b; font-size: 13px; margin: 10px 0 0; }
+  .kol-application-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .kol-application-actions a, .kol-application-actions button { background: #fff; border: 1px solid #dfe1e5; border-radius: 8px; color: #25262a; cursor: pointer; font-size: 12px; padding: 8px 10px; text-decoration: none; }
+  .kol-application-actions button:first-of-type { background: #111; border-color: #111; color: #fff; }
+  .kol-application-actions em { color: #6d28d9; font-size: 12px; font-style: normal; font-weight: 700; }
 
   .campaign-detail-body {
     padding: 24px 20px;
@@ -925,5 +1273,8 @@ const campaignDetailStyles = `
     .connected-accounts {
       justify-content: flex-start;
     }
+
+    .kol-application { align-items: stretch; flex-direction: column; }
+    .kol-application-actions { justify-content: flex-start; }
   }
-`
+`;
