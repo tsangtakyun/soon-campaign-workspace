@@ -8,9 +8,6 @@ import {
   dashboardSidebarStyles,
 } from "@/components/dashboard/DashboardSidebar";
 import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
-import { getStoredOnboardingSessionId } from "@/lib/onboarding-session";
-import { createClient } from "@/lib/supabase";
-import { resolveActiveWorkspace } from "@/lib/workspace-client";
 
 type CampaignDetail = {
   cover_image_url?: string | null;
@@ -281,65 +278,20 @@ export default function CampaignDetailPage() {
       }
 
       try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        const sessionId = getStoredOnboardingSessionId();
-        let workspaceId: string | null = null;
-
-        if (!user?.id && !sessionId) return;
-
-        let campaignQuery = supabase
-          .from("marketing_campaigns")
-          .select("*")
-          .eq("id", id);
-        let postsQuery = supabase
-          .from("campaign_posts")
-          .select("*")
-          .eq("campaign_id", id)
-          .order("scheduled_at", { ascending: true });
-        let connectionsQuery = supabase
-          .from("social_connections")
-          .select("id,platform,account_name")
-          .in("platform", ["instagram", "facebook", "threads"]);
-
-        if (user?.id) {
-          ({ workspaceId } = await resolveActiveWorkspace());
-          campaignQuery = workspaceId
-            ? campaignQuery.eq("workspace_id", workspaceId)
-            : campaignQuery.eq("user_id", user.id);
-          postsQuery = workspaceId
-            ? postsQuery.eq("workspace_id", workspaceId)
-            : postsQuery.eq("user_id", user.id);
-          connectionsQuery = workspaceId
-            ? connectionsQuery.eq("workspace_id", workspaceId)
-            : connectionsQuery.eq("user_id", user.id);
-        } else if (sessionId) {
-          campaignQuery = campaignQuery.eq("onboarding_session_id", sessionId);
-          postsQuery = postsQuery.eq("onboarding_session_id", sessionId);
-          connectionsQuery = connectionsQuery.eq(
-            "onboarding_session_id",
-            sessionId,
-          );
-        }
-
-        const [
-          { data: campaignData, error: campaignError },
-          { data: postsData, error: postsError },
-          { data: connectionData, error: connectionError },
-        ] = await Promise.all([
-          campaignQuery.maybeSingle(),
-          postsQuery,
-          connectionsQuery,
-        ]);
+        const response = await fetch(`/api/campaigns/${id}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          campaign?: CampaignDetail;
+          posts?: CampaignPost[];
+          connections?: SocialConnection[];
+        };
 
         if (cancelled) return;
-        if (!campaignError && campaignData)
-          setCampaign(campaignData as CampaignDetail);
-        if (!postsError) setPosts((postsData || []) as CampaignPost[]);
-        if (!connectionError)
-          setConnections((connectionData || []) as SocialConnection[]);
+        if (data.campaign) setCampaign(data.campaign);
+        setPosts(data.posts || []);
+        setConnections(data.connections || []);
       } catch {
         // Keep fallback when Supabase has no rows or auth is not available.
       } finally {
