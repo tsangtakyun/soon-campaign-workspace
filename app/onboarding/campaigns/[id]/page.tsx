@@ -241,6 +241,7 @@ export default function CampaignDetailPage() {
   const [posts, setPosts] = useState<CampaignPost[]>(fallbackPosts);
   const [connections, setConnections] = useState<SocialConnection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [kolOpenSaving, setKolOpenSaving] = useState(false);
   const pendingReviewCount = posts.filter((post) =>
     ["pending", "ready", "pending_approval"].includes(post.status),
@@ -278,10 +279,20 @@ export default function CampaignDetailPage() {
       }
 
       try {
+        setLoadError("");
         const response = await fetch(`/api/campaigns/${id}`, {
           cache: "no-store",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          const errorData = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          if (!cancelled)
+            setLoadError(
+              errorData?.error || "暫時未能載入此 Campaign，請重新整理。",
+            );
+          return;
+        }
         const data = (await response.json()) as {
           campaign?: CampaignDetail;
           posts?: CampaignPost[];
@@ -293,7 +304,8 @@ export default function CampaignDetailPage() {
         setPosts(data.posts || []);
         setConnections(data.connections || []);
       } catch {
-        // Keep fallback when Supabase has no rows or auth is not available.
+        if (!cancelled)
+          setLoadError("暫時未能載入此 Campaign，請重新整理。");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -305,6 +317,36 @@ export default function CampaignDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  if (loading && id && !id.startsWith("fallback")) {
+    return (
+      <main className="dashboard-page">
+        <ClaimOnboardingSession />
+        <DashboardSidebar activeItem="宣傳活動" />
+        <section className="home-shell">
+          <p className="campaign-detail-state">載入 Campaign 中...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="dashboard-page">
+        <ClaimOnboardingSession />
+        <DashboardSidebar activeItem="宣傳活動" />
+        <section className="home-shell">
+          <div className="campaign-detail-state">
+            <strong>未能載入 Campaign</strong>
+            <p>{loadError}</p>
+            <button type="button" onClick={() => window.location.reload()}>
+              重新整理
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="dashboard-page">
