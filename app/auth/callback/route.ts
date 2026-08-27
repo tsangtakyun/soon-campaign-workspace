@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         .filter((invite) => invite.status === 'pending')
         .map((invite) => invite.id)
 
-      if (!ownedWorkspace.error && !userMembership.error && !emailInvite.error && pendingInviteIds.length) {
+      if (!emailInvite.error && pendingInviteIds.length) {
         const { error } = await admin
           .from('workspace_members')
           .update({
@@ -75,11 +75,17 @@ export async function GET(request: NextRequest) {
         invitationActivationError = error
       }
 
-      const membershipError = ownedWorkspace.error || userMembership.error || emailInvite.error || invitationActivationError
-      if (
-        membershipError ||
-        (!ownedWorkspace.data?.length && !userMembership.data?.length && !emailInvite.data?.length)
-      ) {
+      const hasWorkspaceAccess = Boolean(
+        ownedWorkspace.data?.length ||
+          userMembership.data?.length ||
+          emailInvite.data?.length,
+      )
+      const hasEstablishedAccess = Boolean(
+        ownedWorkspace.data?.length ||
+          userMembership.data?.length ||
+          (emailInvite.data || []).some((invite) => invite.status === 'active'),
+      )
+      if (!hasWorkspaceAccess || (invitationActivationError && !hasEstablishedAccess)) {
         console.warn('[auth/callback] blocked account without invitation', {
           email,
           errors: [ownedWorkspace.error, userMembership.error, emailInvite.error]
@@ -94,6 +100,22 @@ export async function GET(request: NextRequest) {
         })
         await supabase.auth.signOut()
         return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
+      }
+
+      const lookupErrors = [ownedWorkspace.error, userMembership.error, emailInvite.error]
+        .filter(Boolean)
+        .map((error) => error?.message)
+      if (lookupErrors.length) {
+        console.warn('[auth/callback] access confirmed despite partial lookup failure', {
+          email,
+          errors: lookupErrors,
+          matches: {
+            email: emailInvite.data?.length || 0,
+            membership: userMembership.data?.length || 0,
+            owned: ownedWorkspace.data?.length || 0,
+          },
+          userId: user.id,
+        })
       }
 
       await grantTrialCredits(user.id).catch((error) => {
