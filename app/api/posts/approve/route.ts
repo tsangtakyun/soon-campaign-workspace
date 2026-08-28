@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     if (note) {
       const { data: existingNote, error: existingNoteError } = await supabase
         .from('review_notes')
-        .select('id')
+        .select('id,original_text,reviewer_id')
         .eq('workspace_id', workspaceId)
         .eq('post_id', postId)
         .eq('resolved', false)
@@ -50,8 +50,9 @@ export async function POST(req: Request) {
         .maybeSingle()
       if (existingNoteError) throw existingNoteError
       const noteValues = { original_text: note, reviewer_id: user.id, reviewer: user.email || null }
-      const noteResult = existingNote?.id
-        ? await supabase.from('review_notes').update(noteValues).eq('id', existingNote.id)
+      const previousNote = existingNote as { id: string; original_text?: string; reviewer_id?: string } | null
+      const noteResult = previousNote?.original_text === note && previousNote.reviewer_id === user.id
+        ? { error: null }
         : await supabase.from('review_notes').insert({ workspace_id: workspaceId, post_id: postId, ...noteValues })
       const noteError = noteResult.error
       if (noteError) throw noteError

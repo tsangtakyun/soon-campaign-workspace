@@ -301,6 +301,7 @@ function ApprovalBoard({
   const [editingCaptionPostId, setEditingCaptionPostId] = useState<string | null>(null)
   const [savingCaptionPostId, setSavingCaptionPostId] = useState<string | null>(null)
   const [savingIndex, setSavingIndex] = useState<number | null>(null)
+  const [savingNoteIndex, setSavingNoteIndex] = useState<number | null>(null)
   const [sharingToWhatsApp, setSharingToWhatsApp] = useState(false)
   const [decisionErrors, setDecisionErrors] = useState<Record<number, string>>({})
   const [failedDecisions, setFailedDecisions] = useState<Record<number, ApprovalDecision>>({})
@@ -473,6 +474,33 @@ function ApprovalBoard({
         return item.trim() ? `${item.trim().replace(/[、,]$/, '')}、${value}` : value
       })
     )
+  }
+
+  async function saveReviewNote(index: number) {
+    const post = week.posts[index]
+    const note = notes[index]?.trim()
+    if (!post?.id || !week.workspaceId || !note || savingNoteIndex !== null) return
+
+    setSavingNoteIndex(index)
+    try {
+      const response = await fetch('/api/review-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: week.workspaceId,
+          note,
+          ...(post.recordType === 'content_project' ? { projectId: post.id } : { postId: post.id }),
+        }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result?.success) throw new Error(result?.detail || result?.error || '儲存失敗')
+      await onReviewNotesSaved?.()
+      showToast(result.duplicate ? '呢條意見已經儲存過' : '修改意見已儲存')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '未能儲存修改意見')
+    } finally {
+      setSavingNoteIndex((current) => current === index ? null : current)
+    }
   }
 
   function moveSlide(postIndex: number, direction: number) {
@@ -815,6 +843,16 @@ function ApprovalBoard({
                           {quickNote}
                         </button>
                       ))}
+                    </div>
+                    <div className="approval-note-save-row">
+                      <span>儲存後會記錄留言人及香港時間</span>
+                      <button
+                        type="button"
+                        disabled={!notes[postIndex].trim() || savingNoteIndex !== null || week.permissions?.canApprove === false}
+                        onClick={() => void saveReviewNote(postIndex)}
+                      >
+                        {savingNoteIndex === postIndex ? '儲存中…' : '儲存意見'}
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -1380,7 +1418,8 @@ export default function OnboardingHomePage() {
                     <div key={item.id} className="client-record-item">
                       <span className="client-record-dot" aria-hidden="true" />
                       <div className="client-record-content">
-                        <span>{new Date(item.created_at).toLocaleString('zh-HK')}</span>
+                        <span>{new Date(item.created_at).toLocaleString('zh-HK', { timeZone: 'Asia/Hong_Kong' })}</span>
+                        <em>{item.reviewer || '客戶審批人'}</em>
                         <strong>{item.resolved ? '已處理' : '待跟進'}</strong>
                         <p>{item.original_text}</p>
                       </div>
@@ -2493,6 +2532,39 @@ const homeStyles = `
     border-color: #111111;
   }
 
+  .approval-note-save-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .approval-note-save-row span {
+    color: #777777;
+    font-size: 12px;
+  }
+
+  .approval-note-save-row button {
+    flex: 0 0 auto;
+    border: 1px solid #111111;
+    border-radius: 8px;
+    background: #111111;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 13px;
+  }
+
+  .approval-note-save-row button:disabled {
+    border-color: #d4d4d4;
+    background: #e7e7e7;
+    color: #999999;
+    cursor: not-allowed;
+  }
+
   .approval-quick {
     display: flex;
     flex-wrap: wrap;
@@ -2939,6 +3011,14 @@ const homeStyles = `
   .client-record-content strong {
     font-size: 13px;
     font-weight: 650;
+  }
+
+  .client-record-content em {
+    color: #4b4f58;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 650;
+    overflow-wrap: anywhere;
   }
 
   .client-record-content p {
