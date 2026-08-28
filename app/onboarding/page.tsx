@@ -550,8 +550,16 @@ function ApprovalBoard({
       return
     }
 
-    // Open synchronously so browsers do not block WhatsApp after the save requests finish.
-    const whatsappWindow = window.open('', '_blank')
+    const approvalText = buildApprovalText()
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(approvalText)}`
+    let copied = false
+    try {
+      await navigator.clipboard.writeText(approvalText)
+      copied = true
+    } catch {
+      // WhatsApp still receives the pre-filled text. Clipboard is only a fallback.
+    }
+
     setSharingToWhatsApp(true)
     try {
       for (const post of visiblePosts) {
@@ -564,17 +572,12 @@ function ApprovalBoard({
 
       await onReviewNotesSaved?.()
 
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(buildApprovalText())}`
-      if (whatsappWindow) {
-        whatsappWindow.opener = null
-        whatsappWindow.location.href = whatsappUrl
-      } else {
-        window.location.href = whatsappUrl
-      }
-      showToast('審批決定及修改意見已儲存')
+      // A top-level navigation is reliable on iPhone Safari and in-app browsers.
+      // Opening a blank popup before async saves is commonly blocked or discarded.
+      window.location.assign(whatsappUrl)
     } catch (error) {
-      whatsappWindow?.close()
-      showToast(error instanceof Error ? error.message : '未能儲存，暫停傳送 WhatsApp')
+      const message = error instanceof Error ? error.message : '未能儲存，暫停開啟 WhatsApp'
+      showToast(copied ? `${message}；分享文字已複製` : message)
     } finally {
       setSharingToWhatsApp(false)
     }
@@ -609,7 +612,7 @@ function ApprovalBoard({
             複製文字
           </button>
           <button type="button" className="send" disabled={sharingToWhatsApp} onClick={() => void sendToWhatsApp()}>
-            {sharingToWhatsApp ? '儲存中…' : '傳送到 WhatsApp 工作小組'}
+            {sharingToWhatsApp ? '儲存並開啟中…' : '開啟 WhatsApp 並分享'}
           </button>
         </div>
       </div>
@@ -799,7 +802,7 @@ function ApprovalBoard({
                   <div className="approval-note-box">
                     <p className="approval-note-share-hint">
                       <strong>① 喺下面輸入修改意見</strong>
-                      <span>② 撳「傳送到 WhatsApp 工作小組」，系統會自動儲存並將意見加入訊息</span>
+                      <span>② 撳「開啟 WhatsApp 並分享」，系統會自動儲存及預填訊息；請再選擇工作小組並按傳送</span>
                     </p>
                     <textarea
                       value={notes[postIndex]}
