@@ -107,12 +107,13 @@ export async function DELETE(request: NextRequest) {
   const body = await request.json().catch(() => null)
   const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : ''
   const ideaId = typeof body?.ideaId === 'string' ? body.ideaId : ''
+  const central = body?.central === true
   if (!workspaceId || !ideaId) return NextResponse.json({ error: 'Missing workspace or idea' }, { status: 400 })
   const auth = await requireWorkspace(workspaceId)
   if (auth.error) return auth.error
 
   const isDatabaseIdea = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(ideaId)
-  if (isDatabaseIdea) {
+  if (isDatabaseIdea && !central) {
     const { error } = await auth.admin
       .from('workspace_topic_ideas')
       .delete()

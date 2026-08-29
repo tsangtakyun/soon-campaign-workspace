@@ -25,6 +25,58 @@ type ReferenceIdea = {
   tags: string[]
   note: string
   format?: 'carousel' | 'single_image' | 'short_video' | 'story_series'
+  central?: boolean
+  recommended?: boolean
+  countries?: string[]
+  regions?: string[]
+  localities?: string[]
+  whyNow?: string
+  hook?: string
+}
+
+type CentralTopic = {
+  id: string
+  title: string
+  summary?: string | null
+  why_now?: string | null
+  hook?: string | null
+  content_formats?: string[] | null
+  countries?: string[] | null
+  regions?: string[] | null
+  localities?: string[] | null
+  keywords?: string[] | null
+  cover_url?: string | null
+  topic_item_directions?: Array<{
+    is_primary?: boolean
+    topic_directions?: { label_zh?: string | null } | null
+  }> | null
+  topic_sources?: Array<{ url?: string | null; source_name?: string | null }> | null
+}
+
+function centralTopicToIdea(topic: CentralTopic): ReferenceIdea {
+  const primary = topic.topic_item_directions?.find((item) => item.is_primary)?.topic_directions?.label_zh
+    || topic.topic_item_directions?.[0]?.topic_directions?.label_zh
+    || '最新精選'
+  const source = topic.topic_sources?.[0]
+  const format = topic.content_formats?.[0]
+  return {
+    id: topic.id,
+    title: topic.title,
+    source: source?.source_name || 'SOON 編輯團隊',
+    url: source?.url || undefined,
+    image: topic.cover_url || '',
+    height: 'medium',
+    category: primary,
+    tags: Array.isArray(topic.keywords) ? topic.keywords.slice(0, 6) : [],
+    note: topic.summary || '',
+    format: format === 'carousel' || format === 'single_image' || format === 'short_video' || format === 'story_series' ? format : 'short_video',
+    central: true,
+    countries: topic.countries || [],
+    regions: topic.regions || [],
+    localities: topic.localities || [],
+    whyNow: topic.why_now || undefined,
+    hook: topic.hook || undefined,
+  }
 }
 
 const bechillFilters = ['全部', '笨chill 詞典', '笨chill 任務報告', '如果笨chill 識…', 'IG Reel · 15 seconds'] as const
@@ -128,6 +180,7 @@ const eggReferenceIdeas: ReferenceIdea[] = [
 export default function CampaignsPage() {
   const router = useRouter()
   const [activeFilter, setActiveFilter] = useState('全部')
+  const [activeLocation, setActiveLocation] = useState('全部地區')
   const [query, setQuery] = useState('')
   const [reactions, setReactions] = useState<Record<string, Reaction | undefined>>({})
   const [isBechillActive, setIsBechillActive] = useState(false)
@@ -144,6 +197,28 @@ export default function CampaignsPage() {
   const [pendingDelete, setPendingDelete] = useState<ReferenceIdea | null>(null)
   const [deletingIdea, setDeletingIdea] = useState(false)
   const [creatingProjectId, setCreatingProjectId] = useState<string | null>(null)
+  const [centralIdeas, setCentralIdeas] = useState<ReferenceIdea[]>([])
+  const [centralFeedStatus, setCentralFeedStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadCentralTopics() {
+      try {
+        const response = await fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60')
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || !Array.isArray(payload?.topics)) throw new Error(payload?.error || '未能載入中央題材')
+        if (!cancelled) {
+          setCentralIdeas(payload.topics.map(centralTopicToIdea))
+          setCentralFeedStatus('ready')
+        }
+      } catch (error) {
+        console.error('Central topic feed unavailable', error)
+        if (!cancelled) setCentralFeedStatus('error')
+      }
+    }
+    void loadCentralTopics()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -242,16 +317,31 @@ export default function CampaignsPage() {
     return () => window.removeEventListener('resize', updateColumnCount)
   }, [])
 
-  const filters = workspaceLoading ? ['全部'] : isEggActive ? eggFilters : bechillFilters
+  const fallbackFilters = isEggActive ? eggFilters : bechillFilters
+  const centralFilters = ['全部', ...Array.from(new Set(centralIdeas.map((idea) => idea.category)))]
+  const filters = workspaceLoading || centralFeedStatus === 'loading'
+    ? ['全部']
+    : centralFeedStatus === 'ready'
+      ? centralFilters
+      : fallbackFilters
   const baseReferenceIdeas = workspaceLoading
     ? []
-    : isEggActive
-      ? eggReferenceIdeas
-      : isBechillActive
-        ? bechillReferenceIdeas
+    : centralFeedStatus === 'ready'
+      ? centralIdeas
+      : centralFeedStatus === 'error'
+        ? isEggActive
+          ? eggReferenceIdeas
+          : isBechillActive
+            ? bechillReferenceIdeas
+            : []
         : []
   const referenceIdeas = [...userIdeas, ...baseReferenceIdeas]
     .filter((idea) => !dismissedIdeaIds.includes(idea.id))
+  const locations = ['全部地區', ...Array.from(new Set(referenceIdeas.flatMap((idea) => [
+    ...(idea.localities || []),
+    ...(idea.regions || []),
+    ...(idea.countries || []),
+  ])))]
 
   useEffect(() => {
     if (!filters.includes(activeFilter as never)) {
@@ -263,10 +353,15 @@ export default function CampaignsPage() {
     const normalizedQuery = query.trim().toLowerCase()
     return referenceIdeas.filter((idea) => {
       const matchesFilter = activeFilter === '全部' || idea.category === activeFilter
+      const matchesLocation = activeLocation === '全部地區' || [
+        ...(idea.localities || []),
+        ...(idea.regions || []),
+        ...(idea.countries || []),
+      ].includes(activeLocation)
       const searchable = `${idea.title} ${idea.source} ${idea.category} ${idea.tags.join(' ')} ${idea.note}`.toLowerCase()
-      return matchesFilter && (!normalizedQuery || searchable.includes(normalizedQuery))
+      return matchesFilter && matchesLocation && (!normalizedQuery || searchable.includes(normalizedQuery))
     })
-  }, [activeFilter, query, referenceIdeas])
+  }, [activeFilter, activeLocation, query, referenceIdeas])
 
   function setReaction(ideaId: string, reaction: Reaction) {
     setReactions((current) => ({
@@ -345,7 +440,7 @@ export default function CampaignsPage() {
       const response = await fetch('/api/workspace-topic-ideas', {
         method: 'DELETE',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId: activeWorkspaceId, ideaId: pendingDelete.id }),
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, ideaId: pendingDelete.id, central: pendingDelete.central === true }),
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || '未能刪除題材')
@@ -372,13 +467,11 @@ export default function CampaignsPage() {
           <div>
             <h1>題材庫</h1>
             <span>
-              {workspaceLoading
-                ? '正在載入目前工作台的題材方向'
-                : isEggActive
-                ? '按 Egg.soon 內容方向整理最新資訊、娛樂、人物、旅遊及 relationship 題材'
-                : isBechillActive
-                  ? '按 Bunchill 內容格式整理 reference、題材方向和 brainstorm'
-                  : '這裡會按目前工作台整理 reference、題材方向和 brainstorm'}
+              {workspaceLoading || centralFeedStatus === 'loading'
+                ? '正在載入 SOON 最新題材'
+                : centralFeedStatus === 'error'
+                  ? '中央題材暫時未能更新，現正顯示工作台已保存的內容'
+                  : 'SOON 每日整理新題材，並按目前工作台的內容方向優先排列'}
             </span>
           </div>
           <form className="idea-importer" onSubmit={importIdea}>
@@ -402,7 +495,7 @@ export default function CampaignsPage() {
         </header>
 
         <section className="library-body">
-          {workspaceLoading ? (
+          {workspaceLoading || centralFeedStatus === 'loading' ? (
             <div className="library-loading" aria-label="正在載入題材庫">
               <div className="library-loading-search" />
               <div className="library-loading-filters">
@@ -443,6 +536,15 @@ export default function CampaignsPage() {
                     </button>
                   ))}
                 </div>
+                {locations.length > 1 ? (
+                  <div className="library-locations" aria-label="地區篩選">
+                    {locations.map((location) => (
+                      <button type="button" key={location} className={location === activeLocation ? 'active' : ''} onClick={() => setActiveLocation(location)}>
+                        {location}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div
@@ -483,6 +585,8 @@ export default function CampaignsPage() {
                           ) : idea.title}
                         </h2>
                         <span>{idea.note}</span>
+                        {idea.whyNow ? <span className="idea-why-now"><b>點解值得留意：</b>{idea.whyNow}</span> : null}
+                        {idea.hook ? <span className="idea-hook"><b>開場 Hook：</b>{idea.hook}</span> : null}
                         <div className="idea-tags">
                           {idea.tags.map((tag) => (
                             <em key={tag}>{tag}</em>
@@ -524,7 +628,7 @@ export default function CampaignsPage() {
                   <strong>暫時未有相符題材</strong>
                   <span>可以清除搜尋或切換分類。</span>
                   {referenceIdeas.length > 0 ? (
-                    <button type="button" onClick={() => { setQuery(''); setActiveFilter('全部') }}>
+                    <button type="button" onClick={() => { setQuery(''); setActiveFilter('全部'); setActiveLocation('全部地區') }}>
                       查看全部
                     </button>
                   ) : null}
@@ -788,6 +892,34 @@ const libraryStyles = `
     color: #ffffff;
   }
 
+  .library-locations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 9px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .library-locations button {
+    border: 1px solid #e1e3e7;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #686c74;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .library-locations button.active {
+    border-color: #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+  }
+
   .idea-masonry {
     display: grid;
     align-items: start;
@@ -878,6 +1010,17 @@ const libraryStyles = `
     color: #5d616a;
     font-size: 12px;
     line-height: 1.45;
+  }
+
+  .idea-copy .idea-why-now {
+    border-radius: 9px;
+    background: #fffbeb;
+    color: #78350f;
+    padding: 8px 9px;
+  }
+
+  .idea-copy .idea-hook {
+    color: #34363c;
   }
 
   .idea-tags {
