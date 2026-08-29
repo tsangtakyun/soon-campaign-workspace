@@ -317,24 +317,15 @@ export default function CampaignsPage() {
     return () => window.removeEventListener('resize', updateColumnCount)
   }, [])
 
-  const fallbackFilters = isEggActive ? eggFilters : bechillFilters
   const centralFilters = ['全部', ...Array.from(new Set(centralIdeas.map((idea) => idea.category)))]
   const filters = workspaceLoading || centralFeedStatus === 'loading'
     ? ['全部']
-    : centralFeedStatus === 'ready'
-      ? centralFilters
-      : fallbackFilters
+    : centralFeedStatus === 'ready' ? centralFilters : ['全部']
   const baseReferenceIdeas = workspaceLoading
     ? []
     : centralFeedStatus === 'ready'
       ? centralIdeas
-      : centralFeedStatus === 'error'
-        ? isEggActive
-          ? eggReferenceIdeas
-          : isBechillActive
-            ? bechillReferenceIdeas
-            : []
-        : []
+      : []
   const referenceIdeas = [...userIdeas, ...baseReferenceIdeas]
     .filter((idea) => !dismissedIdeaIds.includes(idea.id))
   const locations = ['全部地區', ...Array.from(new Set(referenceIdeas.flatMap((idea) => [
