@@ -15,6 +15,14 @@ const statuses = [
   "completed",
   "declined",
 ] as const;
+const allowedTransitions: Record<string, readonly string[]> = {
+  pending: ["accepted", "declined"],
+  applied: ["accepted", "declined"],
+  accepted: ["in_progress", "declined"],
+  in_progress: ["completed"],
+  completed: [],
+  declined: [],
+};
 
 async function context(campaignId: string) {
   const server = createServerSupabase(await cookies());
@@ -104,6 +112,16 @@ export async function PATCH(req: Request, { params }: RouteProps) {
           { error: "Application not found" },
           { status: 404 },
         );
+      if (previous.status !== body.status) {
+        const nextStatuses = allowedTransitions[previous.status] ?? [];
+        if (!nextStatuses.includes(body.status as string))
+          return NextResponse.json(
+            {
+              error: `Invalid status transition: ${previous.status} → ${body.status}`,
+            },
+            { status: 409 },
+          );
+      }
 
       const { data: application, error } = await admin
         .from("kol_campaign_applications")
