@@ -32,6 +32,7 @@ type ReferenceIdea = {
   localities?: string[]
   whyNow?: string
   hook?: string
+  media?: string[]
 }
 
 type CentralTopic = {
@@ -46,6 +47,7 @@ type CentralTopic = {
   localities?: string[] | null
   keywords?: string[] | null
   cover_url?: string | null
+  media_urls?: string[] | null
   topic_item_directions?: Array<{
     is_primary?: boolean
     topic_directions?: { label_zh?: string | null } | null
@@ -76,7 +78,31 @@ function centralTopicToIdea(topic: CentralTopic): ReferenceIdea {
     localities: topic.localities || [],
     whyNow: topic.why_now || undefined,
     hook: topic.hook || undefined,
+    media: Array.from(new Set([...(topic.media_urls || []), topic.cover_url || ''].filter(Boolean))),
   }
+}
+
+function IdeaMedia({ idea }: { idea: ReferenceIdea }) {
+  const media = idea.media?.length ? idea.media : [idea.image].filter(Boolean)
+  const [page, setPage] = useState(0)
+  const hasCarousel = media.length > 1
+  const image = media[page] || idea.image
+
+  if (!hasCarousel && idea.url) {
+    return <a className="idea-image-wrap" href={idea.url} target="_blank" rel="noopener noreferrer" aria-label={`查看原文：${idea.title}`}>
+      <img src={image} alt="" /><span>{idea.category}</span>
+    </a>
+  }
+  return <div className="idea-image-wrap idea-carousel">
+    <img src={image} alt={`${idea.title}，第 ${page + 1} 張`} />
+    <span>{idea.category}</span>
+    {hasCarousel ? <>
+      <button type="button" className="idea-carousel-arrow previous" aria-label="上一張圖片" onClick={() => setPage((current) => (current - 1 + media.length) % media.length)}>‹</button>
+      <button type="button" className="idea-carousel-arrow next" aria-label="下一張圖片" onClick={() => setPage((current) => (current + 1) % media.length)}>›</button>
+      <b className="idea-carousel-count">{page + 1}/{media.length}</b>
+      <div className="idea-carousel-dots" aria-hidden="true">{media.map((url, index) => <i key={`${url}-${index}`} className={index === page ? 'active' : ''} />)}</div>
+    </> : null}
+  </div>
 }
 
 const bechillFilters = ['全部', '笨chill 詞典', '笨chill 任務報告', '如果笨chill 識…', 'IG Reel · 15 seconds'] as const
@@ -557,23 +583,7 @@ export default function CampaignsPage() {
                       const reaction = reactions[idea.id]
                       return (
                         <article className={`idea-card ${idea.height}`} key={idea.id}>
-                      {idea.url ? (
-                        <a
-                          className="idea-image-wrap"
-                          href={idea.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`查看原文：${idea.title}`}
-                        >
-                          <img src={idea.image} alt="" />
-                          <span>{idea.category}</span>
-                        </a>
-                      ) : (
-                        <div className="idea-image-wrap">
-                          <img src={idea.image} alt="" />
-                          <span>{idea.category}</span>
-                        </div>
-                      )}
+                      <IdeaMedia idea={idea} />
                       <div className="idea-copy">
                         <p>{idea.source}</p>
                         <h2>
@@ -972,6 +982,59 @@ const libraryStyles = `
     font-weight: 650;
     padding: 5px 8px;
   }
+
+  .idea-carousel-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.72);
+    color: #fff;
+    cursor: pointer;
+    font: 500 29px/34px system-ui, sans-serif;
+    transform: translateY(-50%);
+    backdrop-filter: blur(6px);
+  }
+
+  .idea-carousel-arrow:hover { background: rgba(17, 17, 17, 0.9); }
+  .idea-carousel-arrow.previous { left: 10px; }
+  .idea-carousel-arrow.next { right: 10px; }
+
+  .idea-carousel-count {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    z-index: 2;
+    border-radius: 999px;
+    background: rgba(17, 17, 17, 0.72);
+    color: #fff;
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .idea-carousel-dots {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    z-index: 2;
+    display: flex;
+    max-width: calc(100% - 24px);
+    gap: 4px;
+    transform: translateX(-50%);
+  }
+
+  .idea-carousel-dots i {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.62);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
+  .idea-carousel-dots i.active { width: 16px; background: #fff; }
 
   .idea-copy {
     padding: 12px;
