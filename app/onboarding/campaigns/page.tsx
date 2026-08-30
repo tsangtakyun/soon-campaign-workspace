@@ -204,11 +204,19 @@ export default function CampaignsPage() {
     let cancelled = false
     async function loadCentralTopics() {
       try {
-        const response = await fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60')
-        const payload = await response.json().catch(() => null)
-        if (!response.ok || !Array.isArray(payload?.topics)) throw new Error(payload?.error || '未能載入中央題材')
+        const feeds = await Promise.allSettled([
+          fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60'),
+          fetch('https://egg.sooncreator.network/api/public/topics'),
+        ])
+        const payloads = await Promise.all(feeds.map(async (result) => {
+          if (result.status !== 'fulfilled' || !result.value.ok) return [] as CentralTopic[]
+          const payload = await result.value.json().catch(() => null)
+          return Array.isArray(payload?.topics) ? payload.topics as CentralTopic[] : []
+        }))
+        const mergedTopics = Array.from(new Map(payloads.flat().map((topic) => [topic.id, topic])).values())
+        if (!mergedTopics.length) throw new Error('未能載入中央題材')
         if (!cancelled) {
-          setCentralIdeas(payload.topics.map(centralTopicToIdea))
+          setCentralIdeas(mergedTopics.map(centralTopicToIdea))
           setCentralFeedStatus('ready')
         }
       } catch (error) {
