@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { inferContentDirections } from '@/lib/content-directions'
 
 type JsonRecord = Record<string, unknown>
 
@@ -298,6 +299,14 @@ export async function POST(req: Request) {
     const topicReviewItems = asArray(topicReview)
     const campaignThemes = body.campaignThemes
     const campaignThemeItems = asArray(campaignThemes)
+    const contentDirections = inferContentDirections(
+      businessProfile,
+      contentStrategy,
+      contentMix,
+      campaignThemeItems,
+      topicReviewItems,
+      websiteAnalysisData
+    )
 
     const businessName =
       firstString(businessProfile.businessName, websiteAnalysisData.businessName, websiteOnboarding.name) ||
@@ -334,6 +343,7 @@ export async function POST(req: Request) {
               owner_id: userId,
               content_modification: contentModification || null,
               description: firstString(businessProfile.elevatorPitch, websiteAnalysisData.elevatorPitch),
+              content_directions: contentDirections,
             })
             .eq('id', workspaceId)
 
@@ -351,6 +361,7 @@ export async function POST(req: Request) {
             owner_id: userId,
             content_modification: contentModification || null,
             description: firstString(businessProfile.elevatorPitch, websiteAnalysisData.elevatorPitch),
+            content_directions: contentDirections,
           })
           .select('id')
           .single()

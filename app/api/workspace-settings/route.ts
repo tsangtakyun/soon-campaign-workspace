@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { normalizeContentDirections } from '@/lib/content-directions'
 
 const ALLOWED_WORKSPACE_FIELDS = new Set([
   'logo_url',
@@ -14,6 +15,7 @@ const ALLOWED_WORKSPACE_FIELDS = new Set([
   'content_persona_age',
   'content_persona_gender',
   'content_persona_ethnicity',
+  'content_directions',
 ])
 
 export async function GET(req: Request) {
@@ -34,13 +36,13 @@ export async function GET(req: Request) {
     const supabase = createAdminSupabase()
     const { data: workspace } = await supabase
       .from('workspaces')
-      .select('id, owner_id, logo_url, visual_style, font_style, visual_identity_description, brand_colors, avoided_keywords, market_locations, audience_gender, content_persona_age, content_persona_gender, content_persona_ethnicity')
+      .select('id, owner_id, logo_url, visual_style, font_style, visual_identity_description, brand_colors, avoided_keywords, market_locations, audience_gender, content_persona_age, content_persona_gender, content_persona_ethnicity, content_directions')
       .eq('id', workspaceId)
       .single()
 
     const { data: membership } = await supabase
       .from('workspace_members')
-      .select('workspace_id')
+      .select('workspace_id,role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -55,6 +57,7 @@ export async function GET(req: Request) {
       avoided_keywords: normalizeStringArray(workspace.avoided_keywords),
       brand_colors: normalizeBrandColorsForResponse(workspace.brand_colors),
       market_locations: normalizeStringArray(workspace.market_locations),
+      content_directions: normalizeContentDirections(workspace.content_directions),
       visual_identity_description: workspace.visual_identity_description || '',
     }
 
@@ -116,7 +119,7 @@ export async function PATCH(req: Request) {
 
     const { data: membership } = await supabase
       .from('workspace_members')
-      .select('workspace_id')
+      .select('workspace_id,role')
       .eq('workspace_id', workspaceId)
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -126,11 +129,20 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
     }
 
+    if (
+      Object.prototype.hasOwnProperty.call(updatePayload, 'content_directions') &&
+      workspace.owner_id !== user.id &&
+      membership?.role !== 'owner' &&
+      membership?.role !== 'admin'
+    ) {
+      return NextResponse.json({ error: '只有擁有者或管理員可以修改內容方向' }, { status: 403 })
+    }
+
     const { data: updatedWorkspace, error } = await supabase
       .from('workspaces')
       .update(updatePayload)
       .eq('id', workspaceId)
-      .select('logo_url,visual_style,font_style,visual_identity_description,brand_colors,avoided_keywords,market_locations,audience_gender,content_persona_age,content_persona_gender,content_persona_ethnicity')
+      .select('logo_url,visual_style,font_style,visual_identity_description,brand_colors,avoided_keywords,market_locations,audience_gender,content_persona_age,content_persona_gender,content_persona_ethnicity,content_directions')
       .single()
 
     if (error) throw error
@@ -176,6 +188,7 @@ function normalizeWorkspaceSetting(field: string, value: unknown) {
           .filter((item): item is { hex: string; name: string } => Boolean(item?.hex) && !isGenericSystemBlue(item.hex))
       : []
   }
+  if (field === 'content_directions') return normalizeContentDirections(value)
   if (field === 'avoided_keywords' || field === 'market_locations') {
     return normalizeStringArray(value)
   }

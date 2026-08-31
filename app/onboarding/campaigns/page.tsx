@@ -11,6 +11,7 @@ import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
 } from '@/lib/workspace-client'
+import { normalizeContentDirections, topicRelevanceScore } from '@/lib/content-directions'
 
 type Reaction = 'like' | 'try' | 'pass'
 
@@ -225,6 +226,7 @@ export default function CampaignsPage() {
   const [creatingProjectId, setCreatingProjectId] = useState<string | null>(null)
   const [centralIdeas, setCentralIdeas] = useState<ReferenceIdea[]>([])
   const [centralFeedStatus, setCentralFeedStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [contentDirections, setContentDirections] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -267,6 +269,11 @@ export default function CampaignsPage() {
           setActiveWorkspaceId(workspaceId)
           setCanStartContent(activeWorkspace?.role === 'owner' || activeWorkspace?.role === 'admin')
           if (workspaceId) {
+            const settingsResponse = await fetch(`/api/workspace-settings?workspace_id=${encodeURIComponent(workspaceId)}`, { cache: 'no-store' })
+            const settingsPayload = await settingsResponse.json().catch(() => null)
+            if (!cancelled && settingsResponse.ok) {
+              setContentDirections(normalizeContentDirections(settingsPayload?.workspace?.content_directions))
+            }
             const legacyKey = `soon-topic-library-user-ideas:${workspaceId}`
             const globalLegacyKey = 'soon-topic-library-user-ideas'
             let legacyIdeas: ReferenceIdea[] = []
@@ -314,6 +321,7 @@ export default function CampaignsPage() {
             }
           } else {
             setUserIdeas([])
+            setContentDirections([])
           }
         }
       } catch {
@@ -362,6 +370,9 @@ export default function CampaignsPage() {
       : []
   const referenceIdeas = [...userIdeas, ...baseReferenceIdeas]
     .filter((idea) => !dismissedIdeaIds.includes(idea.id))
+    .map((idea, index) => ({ idea, index, score: topicRelevanceScore(idea, contentDirections) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ idea, score }) => ({ ...idea, recommended: score > 0 }))
   const locations = ['全部地區', ...Array.from(new Set(referenceIdeas.flatMap((idea) => [
     ...(idea.localities || []),
     ...(idea.regions || []),
