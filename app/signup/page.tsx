@@ -37,6 +37,7 @@ function SignupContent() {
   async function handleGoogleSignup() {
     setLoading('google')
     document.cookie = `soon_auth_next=${encodeURIComponent(onboardingNext)}; Path=/; Max-Age=600; SameSite=Lax`
+    document.cookie = 'soon_auth_flow=signup; Path=/; Max-Age=600; SameSite=Lax'
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -49,6 +50,7 @@ function SignupContent() {
     event.preventDefault()
     setMessage('')
     setLoading('email')
+    document.cookie = 'soon_auth_flow=signup; Path=/; Max-Age=86400; SameSite=Lax'
 
     try {
       const { error } = await supabase.auth.signUp({

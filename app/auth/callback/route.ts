@@ -85,7 +85,59 @@ export async function GET(request: NextRequest) {
           userMembership.data?.length ||
           (emailInvite.data || []).some((invite) => invite.status === 'active'),
       )
-      if (!hasWorkspaceAccess || (invitationActivationError && !hasEstablishedAccess)) {
+      const accessLookupErrors = [ownedWorkspace.error, userMembership.error, emailInvite.error]
+        .filter(Boolean)
+      const isSignupFlow = authFlow === 'signup'
+
+      if (!hasWorkspaceAccess && isSignupFlow && !accessLookupErrors.length) {
+        const displayName = String(
+          user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0] || '新用戶',
+        ).trim()
+        const { data: workspace, error: workspaceError } = await admin
+          .from('workspaces')
+          .insert({
+            name: `${displayName} 的工作空間`,
+            type: 'brand',
+            owner: user.email ?? null,
+            owner_id: user.id,
+            description: '尚未完成設定',
+          })
+          .select('id')
+          .single()
+
+        if (workspaceError || !workspace?.id) {
+          console.error('[auth/callback] failed to provision signup workspace', {
+            email,
+            error: workspaceError?.message || 'Workspace id was not returned',
+            userId: user.id,
+          })
+          await supabase.auth.signOut()
+          return NextResponse.redirect(new URL('/login?error=signup_failed', request.url))
+        }
+
+        const { error: memberError } = await admin.from('workspace_members').upsert(
+          {
+            workspace_id: workspace.id,
+            user_id: user.id,
+            email: user.email ?? user.id,
+            display_name: displayName,
+            role: 'owner',
+            status: 'active',
+          },
+          { onConflict: 'workspace_id,user_id' },
+        )
+
+        if (memberError) {
+          console.error('[auth/callback] signup workspace membership failed', {
+            email,
+            error: memberError.message,
+            userId: user.id,
+            workspaceId: workspace.id,
+          })
+          await supabase.auth.signOut()
+          return NextResponse.redirect(new URL('/login?error=signup_failed', request.url))
+        }
+      } else if (!hasWorkspaceAccess || (invitationActivationError && !hasEstablishedAccess)) {
         console.warn('[auth/callback] blocked account without invitation', {
           email,
           errors: [ownedWorkspace.error, userMembership.error, emailInvite.error]
@@ -102,8 +154,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
       }
 
-      const lookupErrors = [ownedWorkspace.error, userMembership.error, emailInvite.error]
-        .filter(Boolean)
+      const lookupErrors = accessLookupErrors
         .map((error) => error?.message)
       if (lookupErrors.length) {
         console.warn('[auth/callback] access confirmed despite partial lookup failure', {

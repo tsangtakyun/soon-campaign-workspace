@@ -9,13 +9,6 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
 
-  if (pathname === '/signup') {
-    const next = request.nextUrl.searchParams.get('next') || ''
-    if (!/^\/invite\/[0-9a-f-]{36}$/i.test(next)) {
-      return NextResponse.redirect(new URL('/login?error=invite_required', request.url))
-    }
-  }
-
   if (pathname === '/onboarding/campaigns') {
     return NextResponse.redirect(new URL('/onboarding/topic-library', request.url))
   }

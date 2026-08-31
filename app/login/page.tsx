@@ -90,6 +90,11 @@ function LoginContent() {
                 登入流程未完成，請重新選擇帳戶再試。
               </div>
             ) : null}
+            {error === 'signup_failed' ? (
+              <div className="auth-error">
+                帳戶已登入，但未能建立工作空間。請稍後再試或聯絡管理員。
+              </div>
+            ) : null}
 
             <button
               type="button"
