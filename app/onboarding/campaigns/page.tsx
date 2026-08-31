@@ -560,6 +560,12 @@ export default function CampaignsPage() {
                     placeholder="搜尋題材、reference、tag"
                   />
                 </label>
+                {contentDirections.length ? (
+                  <div className="workspace-directions" aria-label="工作空間內容方向">
+                    <b>為此工作空間優先</b>
+                    {contentDirections.map((direction) => <span key={direction}>{direction}</span>)}
+                  </div>
+                ) : null}
                 <div className="library-filters" aria-label="內容格式分類">
                   {filters.map((filter) => (
                     <button
@@ -596,6 +602,7 @@ export default function CampaignsPage() {
                         <article className={`idea-card ${idea.height}`} key={idea.id}>
                       <IdeaMedia idea={idea} />
                       <div className="idea-copy">
+                        {idea.recommended ? <strong className="recommended-badge">為你推薦</strong> : null}
                         <p>{idea.source}</p>
                         <h2>
                           {idea.url ? (
@@ -893,6 +900,29 @@ const libraryStyles = `
     overflow-x: auto;
     padding-bottom: 2px;
   }
+
+  .workspace-directions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    color: #6f3b2e;
+    font-size: 12px;
+  }
+
+  .workspace-directions b { margin-right: 2px; }
+  .workspace-directions span,
+  .recommended-badge {
+    width: fit-content;
+    border-radius: 999px;
+    background: #fff3d2;
+    color: #7a4a00;
+    padding: 5px 9px;
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .recommended-badge { display: inline-flex; margin-bottom: 7px; }
 
   .library-filters button {
     border: 0;
