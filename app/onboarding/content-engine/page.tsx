@@ -80,6 +80,23 @@ function inferContentPersona(data: any): ContentPersona {
   return '無特定'
 }
 
+function inferBusinessType(data: any): ManualBusinessType {
+  const text = [
+    data?.businessName,
+    data?.elevatorPitch,
+    data?.brandProfile?.type,
+    data?.brandProfile?.offer,
+    data?.sourceSummary?.title,
+    data?.sourceSummary?.description,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  if (/物理治療|復康|診所|治療師|教練|顧問|專業服務|physio|physiotherapy|rehab|clinic|therapist|coach|consult/.test(text)) {
+    return 'services'
+  }
+
+  return data?.businessType || ''
+}
+
 type ManualProfile = {
   businessName: string
   businessType: ManualBusinessType
@@ -145,7 +162,7 @@ function ContentEngineContent() {
   function mapAnalysisToManual(data: any): ManualProfile {
     return {
       businessName: data?.businessName || searchParams.get('name') || '',
-      businessType: data?.businessType || '',
+      businessType: inferBusinessType(data),
       elevatorPitch: data?.elevatorPitch || '',
       logoUrl: data?.logoUrl || '',
       targetAudience: data?.audience?.summary || data?.brandProfile?.audience || '',
