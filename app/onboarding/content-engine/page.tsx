@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 type ManualBusinessType = 'services' | 'local' | 'products' | ''
 type ContentPersona = '老闆本人' | '產品' | '團隊' | '無特定' | ''
 type PrimaryLanguage = '繁體中文' | 'English' | '中英雙語' | ''
-type MarketPositioning = '平價親民' | '中價優質' | '高端奢華' | ''
+type MarketPositioning = '平價親民' | '中價優質' | '高端專業' | ''
 
 const progressMessages = ['正在讀取網站', '識別品牌核心', '整理受眾輪廓', '抽取內容方向', '建立品牌資料']
 const DOWNSTREAM_ONBOARDING_KEYS = [
@@ -30,7 +30,7 @@ const businessTypeOptions: Array<{ label: string; value: Exclude<ManualBusinessT
 ]
 const personaOptions: ContentPersona[] = ['老闆本人', '產品', '團隊', '無特定']
 const languageOptions: PrimaryLanguage[] = ['繁體中文', 'English', '中英雙語']
-const positioningOptions: MarketPositioning[] = ['平價親民', '中價優質', '高端奢華']
+const positioningOptions: MarketPositioning[] = ['平價親民', '中價優質', '高端專業']
 const industryOptions = ['餐飲', '旅遊與體驗', '美妝護膚', '時尚穿搭', '健康健身', '親子家庭', '寵物', '教育', '生活風格', '專業服務', '零售電商', '其他']
 const regionOptions = ['香港', '台灣', '日本', '韓國', '新加坡', '馬來西亞', '泰國', '澳門', '中國內地', '其他地區']
 
@@ -714,82 +714,62 @@ function ContentEngineContent() {
             </div>
           ) : (
             <div className="path-panel manual-path">
-              <label className="manual-field">
-                <span>品牌名稱</span>
-                <input
-                  required
-                  value={manualProfile.businessName}
-                  onChange={(event) => updateManualProfile('businessName', event.target.value)}
-                  placeholder="例如：Rosary Lifestyle"
-                />
-              </label>
-
-              <fieldset className="toggle-field">
-                <legend>業務類型</legend>
-                <div className="toggle-grid three">
-                  {businessTypeOptions.map((option) => (
-                    <button
-                      className={manualProfile.businessType === option.value ? 'selected' : ''}
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateManualProfile('businessType', option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <label className="manual-field">
-                <span>品牌／內容分類</span>
-                <select
-                  required
-                  value={manualProfile.industryCategory}
-                  onChange={(event) => updateManualProfile('industryCategory', event.target.value)}
-                >
-                  <option value="">選擇最接近的分類</option>
-                  {industryOptions.map((option) => <option value={option} key={option}>{option}</option>)}
-                </select>
-              </label>
-
-              <label className="manual-field">
-                <span>品牌簡介</span>
-                <textarea
-                  required
-                  rows={3}
-                  value={manualProfile.elevatorPitch}
-                  onChange={(event) => updateManualProfile('elevatorPitch', event.target.value)}
-                  placeholder="簡單描述你的品牌、主要產品或服務，以及你的獨特之處。例如：我係香港手工皮具品牌，主打原創設計，透過 Instagram 售賣。"
-                />
-              </label>
-
-              <label className="manual-field upload-field">
-                <span>上傳 Logo 或品牌圖片（選填）</span>
-                <input type="file" accept="image/*" onChange={handleLogoUpload} />
-                {manualProfile.logoUrl ? (
-                  <div className="logo-preview-card">
-                    <div className="logo-preview-image">
-                      <img src={displayImageUrl(manualProfile.logoUrl)} alt="" />
-                    </div>
-                    <div>
-                      <strong>已自動擷取品牌圖片</strong>
-                      <em>你可以保留這張圖，或重新上傳另一張。</em>
-                    </div>
+              {website.trim() ? (
+                <div className="source-strip">
+                  <div>
+                    <span>分析來源</span>
+                    <strong>{websiteHost(website)}</strong>
                   </div>
-                ) : null}
-              </label>
+                  <button type="button" onClick={() => { setMode('website'); setError('') }}>重新分析</button>
+                </div>
+              ) : null}
 
-              <label className="manual-field">
-                <span>目標受眾</span>
-                <input
-                  required
-                  value={manualProfile.targetAudience}
-                  onChange={(event) => updateManualProfile('targetAudience', event.target.value)}
-                  placeholder="例如：25-35歲香港女性，注重生活品味"
-                />
-              </label>
+              <section className="form-section">
+                <div className="section-heading">
+                  <div><span>01</span><h2>基本資料</h2></div>
+                  {analysisPreview.data ? <em>AI 已整理·可直接修改</em> : null}
+                </div>
+                <div className="field-grid two">
+                  <label className="manual-field">
+                    <span>品牌名稱</span>
+                    <input required value={manualProfile.businessName} onChange={(event) => updateManualProfile('businessName', event.target.value)} placeholder="例如：Rosary Lifestyle" />
+                  </label>
+                  <label className="manual-field">
+                    <span>品牌／內容分類</span>
+                    <select required value={manualProfile.industryCategory} onChange={(event) => updateManualProfile('industryCategory', event.target.value)}>
+                      <option value="">選擇最接近的分類</option>
+                      {industryOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <fieldset className="toggle-field">
+                  <legend>業務類型</legend>
+                  <div className="toggle-grid three">
+                    {businessTypeOptions.map((option) => (
+                      <button className={manualProfile.businessType === option.value ? 'selected' : ''} key={option.value} type="button" onClick={() => updateManualProfile('businessType', option.value)}>{option.label}</button>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="manual-field">
+                  <span>品牌簡介</span>
+                  <textarea required rows={3} value={manualProfile.elevatorPitch} onChange={(event) => updateManualProfile('elevatorPitch', event.target.value)} placeholder="簡單描述品牌、主要產品或服務，以及獨特之處。" />
+                </label>
+                <label className="manual-field upload-field">
+                  <span>上傳 Logo 或品牌圖片（選填）</span>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} />
+                  {manualProfile.logoUrl ? (
+                    <div className="logo-preview-card"><div className="logo-preview-image"><img src={displayImageUrl(manualProfile.logoUrl)} alt="" /></div><div><strong>已自動擷取品牌圖片</strong><em>你可以保留這張圖，或重新上傳另一張。</em></div></div>
+                  ) : null}
+                </label>
+              </section>
 
-              <div className="location-grid">
+              <section className="form-section">
+                <div className="section-heading"><div><span>02</span><h2>市場與受眾</h2></div></div>
+                <label className="manual-field">
+                  <span>目標受眾</span>
+                  <input required value={manualProfile.targetAudience} onChange={(event) => updateManualProfile('targetAudience', event.target.value)} placeholder="例如：25-35歲香港女性，注重生活品味" />
+                </label>
+                <div className="location-grid">
                 <label className="manual-field">
                   <span>主要市場／地區</span>
                   <select
@@ -808,62 +788,22 @@ function ContentEngineContent() {
                     placeholder="例如：台南、東京"
                   />
                 </label>
+                </div>
+              </section>
+
+              <section className="form-section">
+                <div className="section-heading"><div><span>03</span><h2>內容設定</h2></div></div>
+                <fieldset className="toggle-field"><legend>內容主角</legend><div className="toggle-grid four">{personaOptions.map((option) => <button className={manualProfile.contentPersona === option ? 'selected' : ''} key={option} type="button" onClick={() => updateManualProfile('contentPersona', option)}>{option}</button>)}</div></fieldset>
+                <div className="field-grid two toggles">
+                  <fieldset className="toggle-field"><legend>內容語言</legend><div className="toggle-grid three">{languageOptions.map((option) => <button className={manualProfile.primaryLanguage === option ? 'selected' : ''} key={option} type="button" onClick={() => updateManualProfile('primaryLanguage', option)}>{option}</button>)}</div></fieldset>
+                  <fieldset className="toggle-field"><legend>市場定位</legend><div className="toggle-grid three">{positioningOptions.map((option) => <button className={manualProfile.marketPositioning === option ? 'selected' : ''} key={option} type="button" onClick={() => updateManualProfile('marketPositioning', option)}>{option}</button>)}</div></fieldset>
+                </div>
+              </section>
+
+              <div className="sticky-action">
+                <div><strong>品牌資料可以之後再修改</strong><span>繼續後，SOON 會根據這份資料建立內容策略。</span></div>
+                <button className="continue-button" type="submit" disabled={!canContinueManual}>繼續</button>
               </div>
-
-              <fieldset className="toggle-field">
-                <legend>內容主角</legend>
-                <div className="toggle-grid four">
-                  {personaOptions.map((option) => (
-                    <button
-                      className={manualProfile.contentPersona === option ? 'selected' : ''}
-                      key={option}
-                      type="button"
-                      onClick={() => updateManualProfile('contentPersona', option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="toggle-field">
-                <legend>內容語言</legend>
-                <div className="toggle-grid three">
-                  {languageOptions.map((option) => (
-                    <button
-                      className={manualProfile.primaryLanguage === option ? 'selected' : ''}
-                      key={option}
-                      type="button"
-                      onClick={() => updateManualProfile('primaryLanguage', option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="toggle-field">
-                <legend>市場定位</legend>
-                <div className="toggle-grid three">
-                  {positioningOptions.map((option) => (
-                    <button
-                      className={manualProfile.marketPositioning === option ? 'selected' : ''}
-                      key={option}
-                      type="button"
-                      onClick={() => updateManualProfile('marketPositioning', option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <button className="continue-button" type="submit" disabled={!canContinueManual}>
-                繼續
-              </button>
-              <button className="switch-link" type="button" onClick={() => { setMode('website'); setError('') }}>
-                返回輸入網站／Instagram ←
-              </button>
             </div>
           )}
 
@@ -878,7 +818,7 @@ function ContentEngineContent() {
         }
 
         .engine-form {
-          width: min(100%, 820px);
+          width: min(100%, 980px);
           display: grid;
           justify-items: center;
           text-align: center;
@@ -984,10 +924,119 @@ function ContentEngineContent() {
         }
 
         .manual-path {
-          width: min(100%, 720px);
+          width: min(100%, 940px);
           justify-items: stretch;
           text-align: left;
+          gap: 20px;
+          padding-bottom: 96px;
+        }
+
+        .source-strip {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           gap: 18px;
+          padding: 13px 16px;
+          border: 1px solid #e6e6e6;
+          border-radius: 12px;
+          background: #fafafa;
+        }
+
+        .source-strip div {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+
+        .source-strip span {
+          color: #777b82;
+          font-size: 0.78rem;
+          font-weight: 700;
+        }
+
+        .source-strip strong {
+          overflow: hidden;
+          color: #1b1c1f;
+          font-size: 0.94rem;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .source-strip button {
+          flex-shrink: 0;
+          border: 0;
+          background: transparent;
+          color: #555960;
+          font: inherit;
+          font-size: 0.9rem;
+          font-weight: 750;
+          cursor: pointer;
+        }
+
+        .form-section {
+          display: grid;
+          gap: 18px;
+          padding: 24px;
+          border: 1px solid #e4e4e4;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 8px 28px rgba(20, 21, 24, 0.035);
+        }
+
+        .section-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid #eeeeee;
+        }
+
+        .section-heading > div {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .section-heading span {
+          display: grid;
+          width: 30px;
+          height: 30px;
+          place-items: center;
+          border-radius: 9px;
+          background: #202126;
+          color: #ffffff;
+          font-size: 0.78rem;
+          font-weight: 800;
+        }
+
+        .section-heading h2 {
+          margin: 0;
+          font-size: 1.12rem;
+          line-height: 1.2;
+        }
+
+        .section-heading em {
+          border-radius: 999px;
+          background: #eef8f1;
+          color: #287448;
+          font-size: 0.78rem;
+          font-style: normal;
+          font-weight: 750;
+          padding: 7px 10px;
+        }
+
+        .field-grid {
+          display: grid;
+          gap: 16px;
+        }
+
+        .field-grid.two {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .field-grid.toggles {
+          align-items: start;
         }
 
         .manual-field,
@@ -1127,8 +1176,8 @@ function ContentEngineContent() {
         }
 
         .continue-button {
-          min-height: 54px;
-          margin-top: 8px;
+          min-width: 176px;
+          min-height: 50px;
           border: 0;
           border-radius: 8px;
           background: #202126;
@@ -1138,6 +1187,37 @@ function ContentEngineContent() {
           font-weight: 500;
           cursor: pointer;
           transition: opacity 160ms ease, background 160ms ease;
+        }
+
+        .sticky-action {
+          position: sticky;
+          z-index: 5;
+          bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          padding: 14px 16px 14px 20px;
+          border: 1px solid #dddddd;
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 14px 44px rgba(15, 16, 18, 0.14);
+          backdrop-filter: blur(14px);
+        }
+
+        .sticky-action > div {
+          display: grid;
+          gap: 3px;
+        }
+
+        .sticky-action strong {
+          color: #1b1c1f;
+          font-size: 0.91rem;
+        }
+
+        .sticky-action span {
+          color: #777b82;
+          font-size: 0.82rem;
         }
 
         .continue-button:disabled {
@@ -1181,6 +1261,31 @@ function ContentEngineContent() {
 
           .location-grid {
             grid-template-columns: 1fr;
+          }
+
+          .field-grid.two {
+            grid-template-columns: 1fr;
+          }
+
+          .form-section {
+            padding: 18px;
+            border-radius: 14px;
+          }
+
+          .section-heading {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .sticky-action {
+            bottom: 10px;
+            align-items: stretch;
+            flex-direction: column;
+            gap: 12px;
+          }
+
+          .sticky-action .continue-button {
+            width: 100%;
           }
 
           .manual-path {
