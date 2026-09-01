@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -14,25 +14,17 @@ function SignupContent() {
   const requestedNext = normalizeAuthNext(searchParams.get('next'))
   const next = requestedNext || (selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine')
   const contentEngineBase = selectedPlan ? `/onboarding/content-engine?plan=${selectedPlan}` : '/onboarding/content-engine'
-  const onboardingNext = requestedNext || (selectedPlan ? `/signup?onboarding=1&plan=${selectedPlan}` : '/signup?onboarding=1')
-  const nextWithOnboarding = (name: string, budget: string, category: string) => {
-    const url = new URL(contentEngineBase, getAppUrl())
-    url.searchParams.set('name', name)
-    url.searchParams.set('budget', budget)
-    url.searchParams.set('category', category)
-    return `${url.pathname}${url.search}`
-  }
+  const onboardingNext = requestedNext || contentEngineBase
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [step, setStep] = useState<'account' | 'onboarding'>(
-    searchParams.get('onboarding') === '1' ? 'onboarding' : 'account'
-  )
-  const [fullName, setFullName] = useState('')
-  const [monthlyBudget, setMonthlyBudget] = useState('')
-  const [businessCategory, setBusinessCategory] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState('')
   const supabase = createClient()
+
+  useEffect(() => {
+    if (searchParams.get('onboarding') !== '1') return
+    window.location.replace(onboardingNext)
+  }, [onboardingNext, searchParams])
 
   async function handleGoogleSignup() {
     setLoading('google')
@@ -66,8 +58,7 @@ function SignupContent() {
       if (requestedNext) {
         setMessage('已建立帳戶。請檢查電郵確認帳戶，之後回到邀請連結接受邀請。')
       } else {
-        setMessage('已建立帳戶。請檢查電郵確認帳戶；你亦可以先完成以下設定。')
-        setStep('onboarding')
+        setMessage('已建立帳戶。請檢查電郵確認帳戶，確認後會繼續建立品牌資料。')
       }
     } catch (error: any) {
       setMessage(error.message || '暫時未能建立帳戶，請稍後再試。')
@@ -76,12 +67,13 @@ function SignupContent() {
     }
   }
 
-  function handleOnboardingSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    window.location.href = nextWithOnboarding(fullName.trim(), monthlyBudget, businessCategory)
+  if (searchParams.get('onboarding') === '1') {
+    return (
+      <main className="signup-page signup-redirecting">
+        <p>正在前往品牌資料設定…</p>
+      </main>
+    )
   }
-
-  const canContinue = fullName.trim() && monthlyBudget && businessCategory
 
   return (
     <main className="signup-page">
@@ -89,8 +81,7 @@ function SignupContent() {
       <section className="signup-shell">
         <div className="signup-panel">
           <div className="auth-form-stack">
-            {step === 'account' ? (
-              <>
+            <>
               <h1>開始使用 SOON</h1>
               <p className="login-line">
                 已有帳戶？<Link href={`/login?next=${encodeURIComponent(next)}`}>登入</Link>
@@ -149,63 +140,7 @@ function SignupContent() {
               <p className="terms">
                 建立帳戶即表示你同意 SOON 根據提交資料跟進你的試用與宣傳需求。
               </p>
-              </>
-            ) : (
-              <>
-              <Link className="sign-out-link" href="/">
-                離開
-              </Link>
-              <h1>
-                你的內容增長
-                <br />
-                由今日開始
-              </h1>
-              <p className="login-line">先讓 SOON 了解你的品牌情況。</p>
-
-              <form className="onboarding-form" onSubmit={handleOnboardingSubmit}>
-                <label>
-                  <span>你的姓名</span>
-                  <input
-                    required
-                    value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
-                    placeholder="輸入你的姓名"
-                  />
-                </label>
-
-                <label>
-                  <span>每月宣傳預算</span>
-                  <select required value={monthlyBudget} onChange={(event) => setMonthlyBudget(event.target.value)}>
-                    <option value="">選擇預算範圍</option>
-                    <option value="HK$8,000 以下">HK$8,000 以下</option>
-                    <option value="HK$8,000 - 15,000">HK$8,000 - 15,000</option>
-                    <option value="HK$15,000 - 30,000">HK$15,000 - 30,000</option>
-                    <option value="HK$30,000 - 50,000">HK$30,000 - 50,000</option>
-                    <option value="HK$50,000 以上">HK$50,000 以上</option>
-                  </select>
-                </label>
-
-                <label>
-                  <span>業務類別</span>
-                  <select required value={businessCategory} onChange={(event) => setBusinessCategory(event.target.value)}>
-                    <option value="">選擇類別</option>
-                    <option value="餐飲">餐飲</option>
-                    <option value="本地服務">本地服務</option>
-                    <option value="電商">電商</option>
-                    <option value="教育">教育</option>
-                    <option value="健康與美容">健康與美容</option>
-                    <option value="旅遊與體驗">旅遊與體驗</option>
-                    <option value="創作者 / 個人品牌">創作者 / 個人品牌</option>
-                    <option value="其他">其他</option>
-                  </select>
-                </label>
-
-                <button className="submit onboarding-submit" type="submit" disabled={!canContinue}>
-                  繼續
-                </button>
-              </form>
-              </>
-            )}
+            </>
           </div>
         </div>
 
