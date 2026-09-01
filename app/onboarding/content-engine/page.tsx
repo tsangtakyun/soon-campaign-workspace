@@ -841,6 +841,10 @@ function ContentEngineContent() {
           text-align: center;
         }
 
+        .engine-form.mode-manual {
+          padding-top: 32px;
+        }
+
         h1 {
           margin: 0 0 24px;
           font-size: 1.875rem;
@@ -1261,6 +1265,10 @@ function ContentEngineContent() {
         }
 
         @media (max-width: 760px) {
+          .engine-form.mode-manual {
+            padding-top: 20px;
+          }
+
           .steps {
             overflow-x: auto;
             max-width: 100%;
