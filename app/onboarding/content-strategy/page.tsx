@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import type { CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -26,8 +27,10 @@ type StrategyResponse = {
 
 const fallbackStrategy: StrategyResponse = {
   recommended: mapLibraryItem(defaultContentStrategyLibrary[0]),
-  alternatives: defaultContentStrategyLibrary.slice(1, 4).map(mapLibraryItem),
+  alternatives: defaultContentStrategyLibrary.slice(1, 5).map(mapLibraryItem),
 }
+
+const STRATEGY_STORAGE_KEY = 'soon-content-strategy-v1'
 
 function mapLibraryItem(item: (typeof defaultContentStrategyLibrary)[number]): StrategyOption {
   return {
@@ -77,7 +80,7 @@ function ContentStrategyContent() {
         if (!isActive) return
         setStrategy({
           recommended: data.recommended || fallbackStrategy.recommended,
-          alternatives: Array.isArray(data.alternatives) && data.alternatives.length ? data.alternatives.slice(0, 3) : fallbackStrategy.alternatives,
+          alternatives: Array.isArray(data.alternatives) && data.alternatives.length ? data.alternatives : fallbackStrategy.alternatives,
         })
         setSelectedId((data.recommended || fallbackStrategy.recommended).id)
       } catch (error: any) {
@@ -98,7 +101,9 @@ function ContentStrategyContent() {
   }, [searchParams])
 
   function handleContinue() {
-    sessionStorage.setItem('soon-content-strategy-v1', JSON.stringify(selected))
+    const serializedSelection = JSON.stringify(selected)
+    sessionStorage.setItem(STRATEGY_STORAGE_KEY, serializedSelection)
+    localStorage.setItem(STRATEGY_STORAGE_KEY, serializedSelection)
 
     const url = new URL('/onboarding/campaign-details', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName'].forEach((key) => {
@@ -128,8 +133,9 @@ function ContentStrategyContent() {
       <Steps />
       <section className="strategy-shell">
         <header>
-          <h1>選擇第一個內容方向</h1>
-          <p>SOON 已從 16 種內容策略中，揀出最適合你品牌的 {allStrategies.length} 個方向。</p>
+          <span className="eyebrow">你的第一輪內容方向</span>
+          <h1>SOON 建議你先從這個方向開始</h1>
+          <p>我哋分析咗你的品牌、受眾及定位，再由 16 種策略框架整理出 {allStrategies.length} 個可以立即執行的方向。</p>
         </header>
 
         {error ? <p className="notice">{error} 已先使用預設策略，你仍然可以繼續。</p> : null}
@@ -156,10 +162,11 @@ function ContentStrategyContent() {
                     <span className="expanded-copy">
                       <strong>
                         <span>{item.emoji} {item.directionTitle || item.titleZh || item.title}</span>
-                        <em>{item.titleZh || item.title} · {funnelStageLabel(item.funnelStage)}</em>
+                        <em>{funnelStageLabel(item.funnelStage)}</em>
                       </strong>
                       <p>{item.description}</p>
                     </span>
+                    <span className="example-heading">可以立即拍</span>
                     <span className="example-list">
                       {(item.examples || []).slice(0, 3).map((example) => <i key={example}>{example}</i>)}
                     </span>
@@ -168,12 +175,12 @@ function ContentStrategyContent() {
                 ) : (
                   <>
                     <span className="thumb">
-                      <img src={imageUrl} alt="" />
+                      <Image src={imageUrl} alt="" width={144} height={144} sizes="72px" unoptimized />
                     </span>
                     <span className="compact-copy">
                       <strong>
                         <span>{item.emoji} {item.directionTitle || item.titleZh || item.title}</span>
-                        <em>{item.titleZh || item.title} · {funnelStageLabel(item.funnelStage)}</em>
+                        <em>{funnelStageLabel(item.funnelStage)}</em>
                       </strong>
                       <p>{item.description}</p>
                     </span>
@@ -184,11 +191,21 @@ function ContentStrategyContent() {
             )
           })}
         </div>
+
+        <details className="framework-details">
+          <summary>了解 SOON 使用的 16 種內容策略框架</summary>
+          <p>呢啲係系統用作分析的底層框架；實際執行時，以上面為你翻譯好的內容方向為準。</p>
+          <div>
+            {defaultContentStrategyLibrary.map((item) => (
+              <span key={item.id}>{item.emoji} {item.nameZh}</span>
+            ))}
+          </div>
+        </details>
       </section>
 
       <footer className="strategy-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
-        <button type="button" onClick={handleContinue}>以「{selected.titleZh || selected.title}」繼續</button>
+        <button type="button" onClick={handleContinue}>以「{selected.directionTitle || selected.titleZh || selected.title}」繼續</button>
       </footer>
 
       <style jsx>{styles}</style>
@@ -259,6 +276,15 @@ const styles = `
 
   header {
     margin-bottom: 28px;
+  }
+
+  .eyebrow {
+    display: block;
+    margin-bottom: 9px;
+    color: #7a3026;
+    font-size: 0.84rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
   }
 
   h1 {
@@ -425,7 +451,17 @@ const styles = `
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    margin-top: 16px;
+    margin-top: 8px;
+  }
+
+  .example-heading {
+    position: relative;
+    z-index: 2;
+    margin-top: 18px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
   }
 
   .example-list i {
@@ -459,7 +495,7 @@ const styles = `
     overflow: hidden;
   }
 
-  .thumb img {
+  .thumb :global(img) {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -480,6 +516,40 @@ const styles = `
     font-size: 0.82rem;
     font-weight: 800;
     padding: 7px 10px;
+  }
+
+  .framework-details {
+    margin-top: 24px;
+    border: 1px solid #e6e7e9;
+    border-radius: 12px;
+    background: #fafafa;
+    padding: 16px 18px;
+  }
+
+  .framework-details summary {
+    cursor: pointer;
+    font-weight: 750;
+  }
+
+  .framework-details p {
+    margin: 12px 0;
+    color: #6c7077;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .framework-details div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .framework-details div span {
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e3e4e7;
+    padding: 7px 10px;
+    font-size: 0.82rem;
   }
 
   .strategy-footer {
