@@ -15,6 +15,8 @@ type StrategyOption = {
   reason?: string
   funnelStage?: string
   imageUrl?: string
+  directionTitle?: string
+  examples?: string[]
 }
 
 type StrategyResponse = {
@@ -37,6 +39,8 @@ function mapLibraryItem(item: (typeof defaultContentStrategyLibrary)[number]): S
     reason: item.purpose,
     funnelStage: item.funnelStage,
     imageUrl: item.imageUrl,
+    directionTitle: item.nameZh,
+    examples: item.examples,
   }
 }
 
@@ -47,7 +51,7 @@ function ContentStrategyContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const allStrategies = useMemo(() => [strategy.recommended, ...strategy.alternatives].slice(0, 4), [strategy])
+  const allStrategies = useMemo(() => [strategy.recommended, ...strategy.alternatives], [strategy])
   const selected = allStrategies.find((item) => item.id === selectedId) || strategy.recommended
 
   useEffect(() => {
@@ -122,12 +126,10 @@ function ContentStrategyContent() {
   return (
     <main className="strategy-page">
       <Steps />
-      <button className="more-button" type="button" aria-label="More options">...</button>
-
       <section className="strategy-shell">
         <header>
-          <h1>選擇你的內容策略</h1>
-          <p>內容策略會決定之後每一段內容的方向。</p>
+          <h1>選擇第一個內容方向</h1>
+          <p>SOON 已從 16 種內容策略中，揀出最適合你品牌的 {allStrategies.length} 個方向。</p>
         </header>
 
         {error ? <p className="notice">{error} 已先使用預設策略，你仍然可以繼續。</p> : null}
@@ -149,16 +151,19 @@ function ContentStrategyContent() {
                 {isSelected ? (
                   <>
                     <span className="image-wash" aria-hidden="true" />
-                    {isRecommended ? <span className="badge">Recommended</span> : null}
+                    {isRecommended ? <span className="badge">最適合你</span> : null}
                     <span className="check">✓</span>
                     <span className="expanded-copy">
                       <strong>
-                        <span>{item.emoji} {item.title}</span>
-                        {item.titleZh ? <em>{item.titleZh}</em> : null}
+                        <span>{item.emoji} {item.directionTitle || item.titleZh || item.title}</span>
+                        <em>{item.titleZh || item.title} · {funnelStageLabel(item.funnelStage)}</em>
                       </strong>
                       <p>{item.description}</p>
                     </span>
-                    <small><b>推薦原因：</b>{item.reason || item.description}</small>
+                    <span className="example-list">
+                      {(item.examples || []).slice(0, 3).map((example) => <i key={example}>{example}</i>)}
+                    </span>
+                    <small><b>為甚麼適合你：</b>{item.reason || item.description}</small>
                   </>
                 ) : (
                   <>
@@ -167,12 +172,12 @@ function ContentStrategyContent() {
                     </span>
                     <span className="compact-copy">
                       <strong>
-                        <span>{item.emoji} {item.title}</span>
-                        {item.titleZh ? <em>{item.titleZh}</em> : null}
+                        <span>{item.emoji} {item.directionTitle || item.titleZh || item.title}</span>
+                        <em>{item.titleZh || item.title} · {funnelStageLabel(item.funnelStage)}</em>
                       </strong>
                       <p>{item.description}</p>
                     </span>
-                    {isRecommended ? <span className="mini-badge">建議</span> : null}
+                    {isRecommended ? <span className="mini-badge">最適合你</span> : null}
                   </>
                 )}
               </button>
@@ -189,6 +194,12 @@ function ContentStrategyContent() {
       <style jsx>{styles}</style>
     </main>
   )
+}
+
+function funnelStageLabel(stage?: string) {
+  if (stage === 'top') return '吸引新受眾'
+  if (stage === 'bottom') return '推動查詢與行動'
+  return '建立理解與信任'
 }
 
 function Steps() {
@@ -239,17 +250,6 @@ const styles = `
     color: #b4b4b4;
     font-size: 1.05rem;
     font-weight: 500;
-  }
-
-  .more-button {
-    position: absolute;
-    top: 28px;
-    right: 36px;
-    border: 0;
-    background: transparent;
-    color: #1b1c1f;
-    font-size: 1.05rem;
-    cursor: pointer;
   }
 
   .strategy-shell {
@@ -417,6 +417,25 @@ const styles = `
     color: rgba(255, 255, 255, 0.88);
     font-size: 1.05rem;
     line-height: 1.45;
+  }
+
+  .example-list {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 16px;
+  }
+
+  .example-list i {
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.92);
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    font-style: normal;
   }
 
   .strategy-card.expanded small {

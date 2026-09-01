@@ -45,6 +45,8 @@ export type ContentStrategyOption = {
   reason?: string
   funnelStage?: string
   imageUrl?: string
+  directionTitle?: string
+  examples?: string[]
 }
 
 export type ContentStrategyRecommendation = {
@@ -70,7 +72,7 @@ export async function recommendContentStrategy(
     return fallbackStrategy(catalog)
   }
 
-  const systemPrompt = "You are a senior content strategist for SOON, an AI marketing platform. The user's brand profile has been analyzed. A shortlist of the most suitable content strategies has already been pre-selected based on their business type and budget. Your job is to pick the single BEST strategy from this shortlist for this specific brand, and explain why in one sentence. Return only valid JSON. No markdown. All human-facing strings must use the requested language. For Traditional Chinese, use polished written Traditional Chinese suitable for a client-facing SaaS product. Do not invent, rename, or modify strategy names. You must pick from the provided shortlist only."
+  const systemPrompt = "You are a senior content strategist for SOON, an AI marketing platform. The user's brand profile has been analyzed. A shortlist of the most suitable content strategies has already been pre-selected based on business type and budget. Pick the single BEST strategy, then tailor every shortlisted option into a concrete, client-friendly content direction for this specific brand. Return only valid JSON. No markdown. All human-facing strings must use the requested language. For Traditional Chinese, use concise, polished written Traditional Chinese. Keep canonical strategy IDs unchanged and only use IDs from the shortlist. Do not make medical, financial, legal, performance, or business claims that are not supported by the supplied profile."
 
   const libraryContext = library ? summarizeLibrary(library) : 'No internal strategy library provided.'
   const allowedIds = candidateIds.join(', ')
@@ -103,7 +105,13 @@ export async function recommendContentStrategy(
     'Return JSON with this exact shape:',
     JSON.stringify({
       recommendedId: `one of: ${allowedIds}`,
-      reason: 'one sentence explaining why',
+      reason: 'one concise sentence explaining why the recommended direction fits this brand',
+      options: catalog.map((item) => ({
+        id: item.id,
+        directionTitle: 'a concrete Traditional Chinese direction title tailored to this brand (maximum 14 Chinese characters)',
+        summary: 'one concise sentence describing how this brand would use this direction',
+        examples: ['specific content example 1', 'specific content example 2', 'specific content example 3'],
+      })),
     }),
   ].join('\n')
 
@@ -140,8 +148,9 @@ export async function recommendContentStrategy(
     const parsed = parseJsonObject(text)
     const recommendedId = normalizeStrategyId(parsed.recommendedId, catalog)
     const reason = stringValue(parsed.reason, catalog.find((item) => item.id === recommendedId)?.reason || '')
+    const tailoredOptions = normalizeTailoredOptions(parsed.options, catalog)
 
-    return buildRecommendation(recommendedId, catalog, reason, 'anthropic', model)
+    return buildRecommendation(recommendedId, catalog, reason, 'anthropic', model, tailoredOptions)
   } catch {
     return fallbackStrategy(catalog)
   }
@@ -158,6 +167,7 @@ function strategyCatalog(contentStrategies: ContentStrategyLibraryItem[]) {
     funnelStage: item.funnelStage,
     imageUrl: item.imageUrl,
     fitFor: item.fitFor,
+    examples: item.examples,
   }))
 }
 
@@ -186,12 +196,22 @@ function buildRecommendation(
   catalog: ReturnType<typeof strategyCatalog>,
   reason: string,
   provider: 'anthropic' | 'fallback',
-  model: string
+  model: string,
+  tailoredOptions: Map<string, { directionTitle: string; summary: string; examples: string[] }> = new Map()
 ): ContentStrategyRecommendation {
-  const recommended = catalog.find((item) => item.id === recommendedId) || catalog[0]
+  const applyTailoring = (item: (typeof catalog)[number]) => {
+    const tailored = tailoredOptions.get(item.id)
+    return {
+      ...item,
+      directionTitle: tailored?.directionTitle || item.titleZh,
+      description: tailored?.summary || item.description,
+      examples: tailored?.examples?.length ? tailored.examples : item.examples,
+    }
+  }
+  const recommended = applyTailoring(catalog.find((item) => item.id === recommendedId) || catalog[0])
   const alternatives = catalog
     .filter((item) => item.id !== recommended.id)
-    .slice(0, 3)
+    .map(applyTailoring)
 
   return {
     recommended: {
@@ -202,6 +222,28 @@ function buildRecommendation(
     provider,
     model,
   }
+}
+
+function normalizeTailoredOptions(
+  value: unknown,
+  catalog: ReturnType<typeof strategyCatalog>
+) {
+  const result = new Map<string, { directionTitle: string; summary: string; examples: string[] }>()
+  if (!Array.isArray(value)) return result
+
+  value.forEach((option: any) => {
+    const id = typeof option?.id === 'string' ? option.id : ''
+    if (!catalog.some((item) => item.id === id)) return
+    const directionTitle = stringValue(option?.directionTitle, '')
+    const summary = stringValue(option?.summary, '')
+    const examples = Array.isArray(option?.examples)
+      ? option.examples.map((item: unknown) => stringValue(item, '')).filter(Boolean).slice(0, 3)
+      : []
+    if (directionTitle || summary || examples.length) {
+      result.set(id, { directionTitle, summary, examples })
+    }
+  })
+  return result
 }
 
 function fallbackStrategy(catalog: ReturnType<typeof strategyCatalog>): ContentStrategyRecommendation {
