@@ -31,6 +31,8 @@ const businessTypeOptions: Array<{ label: string; value: Exclude<ManualBusinessT
 const personaOptions: ContentPersona[] = ['老闆本人', '產品', '團隊', '無特定']
 const languageOptions: PrimaryLanguage[] = ['繁體中文', 'English', '中英雙語']
 const positioningOptions: MarketPositioning[] = ['平價親民', '中價優質', '高端奢華']
+const industryOptions = ['餐飲', '旅遊與體驗', '美妝護膚', '時尚穿搭', '健康健身', '親子家庭', '寵物', '教育', '生活風格', '專業服務', '零售電商', '其他']
+const regionOptions = ['香港', '台灣', '日本', '韓國', '新加坡', '馬來西亞', '泰國', '澳門', '中國內地', '其他地區']
 
 const businessTypeLabels: Record<Exclude<ManualBusinessType, ''>, string> = {
   services: '服務業',
@@ -47,6 +49,9 @@ type ManualProfile = {
   contentPersona: ContentPersona
   primaryLanguage: PrimaryLanguage
   marketPositioning: MarketPositioning
+  industryCategory: string
+  primaryRegion: string
+  primaryCity: string
 }
 
 type AnalysisPreviewState = {
@@ -63,6 +68,9 @@ const emptyManualProfile: ManualProfile = {
   contentPersona: '',
   primaryLanguage: '繁體中文',
   marketPositioning: '',
+  industryCategory: '',
+  primaryRegion: '香港',
+  primaryCity: '',
 }
 
 function ContentEngineContent() {
@@ -104,6 +112,9 @@ function ContentEngineContent() {
       contentPersona: '產品',
       primaryLanguage: data?.language === 'English (US)' || data?.language === 'English (UK)' ? 'English' : '繁體中文',
       marketPositioning: '中價優質',
+      industryCategory: data?.brandProfile?.type || '',
+      primaryRegion: data?.audience?.locations?.[0] || '香港',
+      primaryCity: data?.audience?.locations?.[1] || '',
     }
   }
 
@@ -181,7 +192,7 @@ function ContentEngineContent() {
         ageMin: '',
         ageMax: '',
         gender: '所有性別',
-        locations: ['香港'],
+        locations: [manualProfile.primaryRegion, manualProfile.primaryCity].filter(Boolean),
         summary: targetAudience,
       },
       contentPeople: {
@@ -195,7 +206,7 @@ function ContentEngineContent() {
         tertiary: `內容語言：${primaryLanguage}`,
       },
       brandProfile: {
-        type: businessTypeLabels[businessType],
+        type: manualProfile.industryCategory || businessTypeLabels[businessType],
         audience: targetAudience,
         position: marketPositioning,
         tone: primaryLanguage,
@@ -207,6 +218,9 @@ function ContentEngineContent() {
       content_persona: contentPersona,
       primary_language: primaryLanguage,
       market_positioning: marketPositioning,
+      industry_category: manualProfile.industryCategory,
+      primary_region: manualProfile.primaryRegion,
+      primary_city: manualProfile.primaryCity,
       website_url: hasWebsite ? website.trim() : '',
       has_website: hasWebsite,
     }
@@ -240,10 +254,12 @@ function ContentEngineContent() {
   const canContinueManual = Boolean(
     manualProfile.businessName.trim() &&
     manualProfile.businessType &&
+    manualProfile.industryCategory &&
     manualProfile.elevatorPitch.trim() &&
     manualProfile.targetAudience.trim() &&
     manualProfile.contentPersona &&
     manualProfile.primaryLanguage &&
+    manualProfile.primaryRegion &&
     manualProfile.marketPositioning
   )
 
@@ -269,7 +285,7 @@ function ContentEngineContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data?.error || '暫時未能分析網站')
+        throw new Error(data?.error || '暫時未能分析連結')
       }
 
       sessionStorage.setItem('soon-website-analysis-v1', JSON.stringify({
@@ -283,7 +299,17 @@ function ContentEngineContent() {
       setMode('manual')
       setLoading(false)
     } catch (error: any) {
-      setError(error.message || '暫時未能分析網站，請稍後再試。')
+      const instagramHandle = website.trim().match(/instagram\.com\/([^/?#]+)/i)?.[1]
+      if (instagramHandle) {
+        setManualProfile((current) => ({
+          ...current,
+          businessName: current.businessName || `@${instagramHandle}`,
+        }))
+        setMode('manual')
+        setError('Instagram 暫時未能提供完整公開資料，已保留帳號連結；請補充以下品牌資料。')
+      } else {
+        setError(error.message || '暫時未能分析連結，請稍後再試。')
+      }
       setLoading(false)
     }
   }
@@ -625,7 +651,7 @@ function ContentEngineContent() {
       <section className="engine-shell">
         <form className={`engine-form mode-${mode}`} onSubmit={mode === 'website' ? handleWebsiteSubmit : (event) => { event.preventDefault(); continueToNext() }}>
           <h1>建立你的內容引擎</h1>
-          <p>{mode === 'website' ? '輸入你的網站，SOON 會根據品牌資料整理下一步宣傳方向。' : '沒有網站也可以開始。直接描述你的品牌，SOON 會建立第一份內容策略。'}</p>
+          <p>{mode === 'website' ? '輸入網站或 Instagram 專頁，SOON 會整理品牌資料及下一步內容方向。' : '沒有網站也可以開始。直接描述你的品牌，SOON 會建立第一份內容策略。'}</p>
 
           {mode === 'website' ? (
             <div className="path-panel website-path">
@@ -636,14 +662,14 @@ function ContentEngineContent() {
                   inputMode="url"
                   value={website}
                   onChange={(event) => setWebsite(event.target.value)}
-                  placeholder="yourbusiness.com"
+                  placeholder="yourbusiness.com 或 instagram.com/你的帳號"
                 />
                 <button type="submit" disabled={loading || !website.trim()}>
-                  {loading ? '分析中...' : '分析我的品牌'}
+                  {loading ? '分析中...' : '分析品牌資料'}
                 </button>
               </div>
               <button className="switch-link" type="button" onClick={() => { setMode('manual'); setError('') }}>
-                沒有網站？直接描述你的品牌 →
+                沒有網站或 Instagram？直接描述你的品牌 →
               </button>
             </div>
           ) : (
@@ -673,6 +699,18 @@ function ContentEngineContent() {
                   ))}
                 </div>
               </fieldset>
+
+              <label className="manual-field">
+                <span>品牌／內容分類</span>
+                <select
+                  required
+                  value={manualProfile.industryCategory}
+                  onChange={(event) => updateManualProfile('industryCategory', event.target.value)}
+                >
+                  <option value="">選擇最接近的分類</option>
+                  {industryOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+                </select>
+              </label>
 
               <label className="manual-field">
                 <span>品牌簡介</span>
@@ -710,6 +748,27 @@ function ContentEngineContent() {
                   placeholder="例如：25-35歲香港女性，注重生活品味"
                 />
               </label>
+
+              <div className="location-grid">
+                <label className="manual-field">
+                  <span>主要市場／地區</span>
+                  <select
+                    required
+                    value={manualProfile.primaryRegion}
+                    onChange={(event) => updateManualProfile('primaryRegion', event.target.value)}
+                  >
+                    {regionOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+                  </select>
+                </label>
+                <label className="manual-field">
+                  <span>主要城市（選填）</span>
+                  <input
+                    value={manualProfile.primaryCity}
+                    onChange={(event) => updateManualProfile('primaryCity', event.target.value)}
+                    placeholder="例如：台南、東京"
+                  />
+                </label>
+              </div>
 
               <fieldset className="toggle-field">
                 <legend>內容主角</legend>
@@ -763,7 +822,7 @@ function ContentEngineContent() {
                 繼續
               </button>
               <button className="switch-link" type="button" onClick={() => { setMode('website'); setError('') }}>
-                返回輸入網址 ←
+                返回輸入網站／Instagram ←
               </button>
             </div>
           )}
@@ -908,14 +967,30 @@ function ContentEngineContent() {
         }
 
         .manual-field input,
-        .manual-field textarea {
+        .manual-field textarea,
+        .manual-field select {
           width: 100%;
           border-color: #dedede;
           font-size: 1rem;
         }
 
-        .manual-field input {
+        .manual-field input,
+        .manual-field select {
           min-height: 52px;
+        }
+
+        .manual-field select {
+          border: 1px solid #dedede;
+          border-radius: 8px;
+          background: #ffffff;
+          padding: 0 16px;
+          color: #1b1c1f;
+        }
+
+        .location-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
         }
 
         .manual-field textarea {
@@ -1061,6 +1136,10 @@ function ContentEngineContent() {
 
           .toggle-grid.three,
           .toggle-grid.four {
+            grid-template-columns: 1fr;
+          }
+
+          .location-grid {
             grid-template-columns: 1fr;
           }
 
