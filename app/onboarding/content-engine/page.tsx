@@ -40,6 +40,46 @@ const businessTypeLabels: Record<Exclude<ManualBusinessType, ''>, string> = {
   products: '產品品牌',
 }
 
+function inferIndustryCategory(data: any): string {
+  const text = [
+    data?.businessName,
+    data?.elevatorPitch,
+    data?.brandProfile?.type,
+    data?.brandProfile?.offer,
+    data?.sourceSummary?.title,
+    data?.sourceSummary?.description,
+    ...(Array.isArray(data?.sourceSummary?.headings) ? data.sourceSummary.headings : []),
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  const rules: Array<[string, RegExp]> = [
+    ['健康健身', /物理治療|復康|痛症|運動治療|健身|健康|physio|physiotherapy|rehab|fitness|wellness/],
+    ['餐飲', /餐廳|咖啡|食品|美食|飲品|restaurant|cafe|food|beverage/],
+    ['旅遊與體驗', /旅遊|旅行|酒店|住宿|體驗|tour|travel|hotel|resort/],
+    ['美妝護膚', /美容|護膚|彩妝|醫美|美甲|beauty|skincare|cosmetic/],
+    ['時尚穿搭', /時尚|服裝|穿搭|飾物|珠寶|fashion|apparel|jewellery|jewelry/],
+    ['親子家庭', /親子|育兒|嬰兒|兒童|家庭|parenting|baby|kids/],
+    ['寵物', /寵物|貓|狗|獸醫|pet|veterinary/],
+    ['教育', /教育|課程|學校|補習|培訓|education|school|course|academy/],
+    ['專業服務', /顧問|會計|法律|設計|代理|專業服務|consulting|agency|legal|accounting/],
+    ['零售電商', /網店|零售|電商|購物|產品品牌|ecommerce|e-commerce|retail|shop/],
+    ['生活風格', /生活|家居|文化|藝術|lifestyle|home|culture|art/],
+  ]
+
+  return rules.find(([, pattern]) => pattern.test(text))?.[0] || '其他'
+}
+
+function inferContentPersona(data: any): ContentPersona {
+  const text = [data?.elevatorPitch, data?.brandProfile?.type, data?.brandProfile?.offer]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  if (/團隊|治療師|教練|醫生|專家|顧問|team|therapist|coach|doctor|expert/.test(text)) return '團隊'
+  if (data?.businessType === 'products') return '產品'
+  if (data?.businessType === 'services' || data?.businessType === 'local') return '團隊'
+  return '無特定'
+}
+
 type ManualProfile = {
   businessName: string
   businessType: ManualBusinessType
@@ -109,10 +149,10 @@ function ContentEngineContent() {
       elevatorPitch: data?.elevatorPitch || '',
       logoUrl: data?.logoUrl || '',
       targetAudience: data?.audience?.summary || data?.brandProfile?.audience || '',
-      contentPersona: '產品',
+      contentPersona: inferContentPersona(data),
       primaryLanguage: data?.language === 'English (US)' || data?.language === 'English (UK)' ? 'English' : '繁體中文',
       marketPositioning: '中價優質',
-      industryCategory: data?.brandProfile?.type || '',
+      industryCategory: inferIndustryCategory(data),
       primaryRegion: data?.audience?.locations?.[0] || '香港',
       primaryCity: data?.audience?.locations?.[1] || '',
     }
