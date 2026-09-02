@@ -203,8 +203,9 @@ function ContentMixContent() {
 
     const recommendedMood = recommendContentMoods({ profile, strategy, distribution, contentMix: payload })
     sessionStorage.setItem('soon-content-mood-v1', JSON.stringify(recommendedMood))
+    sessionStorage.setItem('soon-content-modification-v1', 'balanced')
 
-    const url = new URL('/onboarding/content-modification', window.location.origin)
+    const url = new URL('/onboarding/photo-control', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
@@ -212,6 +213,7 @@ function ContentMixContent() {
     url.searchParams.set('visualStyle', recommendedStyle.id)
     if (recommendedTypeface) url.searchParams.set('typeface', recommendedTypeface.id)
     url.searchParams.set('contentMood', recommendedMood.selectedMoods.map((mood) => mood.id).join(','))
+    url.searchParams.set('contentModification', 'balanced')
     url.searchParams.set('autoAnalyze', '1')
     url.searchParams.set('generatePreview', '1')
     window.location.href = `${url.pathname}${url.search}`

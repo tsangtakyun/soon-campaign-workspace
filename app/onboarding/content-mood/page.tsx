@@ -51,10 +51,12 @@ function ContentMoodContent() {
     if (selectedMoods.length === 0) return
 
     window.sessionStorage.setItem('soon-content-mood-v1', JSON.stringify({ selectedMoods }))
+    window.sessionStorage.setItem('soon-content-modification-v1', 'balanced')
 
-    const url = new URL('/onboarding/content-modification', window.location.origin)
+    const url = new URL('/onboarding/photo-control', window.location.origin)
     preserveParams(url)
     url.searchParams.set('contentMood', selectedMoods.map((mood) => mood.id).join(','))
+    url.searchParams.set('contentModification', 'balanced')
     window.location.href = `${url.pathname}${url.search}`
   }
 

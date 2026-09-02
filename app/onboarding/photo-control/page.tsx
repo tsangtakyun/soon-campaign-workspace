@@ -59,7 +59,7 @@ const photoControlOptions: PhotoControlOption[] = [
 function PhotoControlContent() {
   const searchParams = useSearchParams()
   const shouldGeneratePreview = searchParams.get('generatePreview') !== '0'
-  const [selectedId, setSelectedId] = useState<PhotoControlOption['id']>('full')
+  const [selectedId, setSelectedId] = useState<PhotoControlOption['id']>('balanced')
   const [generatedImages, setGeneratedImages] = useState<Partial<Record<PhotoControlOption['id'], string>>>({})
   const [generatingId, setGeneratingId] = useState<PhotoControlOption['id'] | null>(null)
   const [generationAttempts, setGenerationAttempts] = useState<Partial<Record<PhotoControlOption['id'], true>>>({})
