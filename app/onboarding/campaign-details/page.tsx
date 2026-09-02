@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 
 import type { CampaignTheme } from '@/lib/campaign-theme'
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 const emptyCampaign: CampaignTheme = {
   campaignName: '',
@@ -129,7 +130,7 @@ function CampaignDetailsContent() {
     setCampaign((current) => ({ ...current, [key]: value }))
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     const payload = {
       ...campaign,
       theme: buildStructuredTheme(campaign),
@@ -137,6 +138,7 @@ function CampaignDetailsContent() {
       profile,
     }
     sessionStorage.setItem('soon-campaign-details-v1', JSON.stringify(payload))
+    await persistOnboardingDraft({ 'soon-campaign-details-v1': payload })
 
     const url = new URL('/onboarding/distribution', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName'].forEach((key) => {

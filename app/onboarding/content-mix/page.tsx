@@ -17,6 +17,7 @@ import { recommendVisualStyles } from '@/lib/recommend-styles'
 import { recommendTypefaceDirection, recommendTypefacesInDirection } from '@/lib/recommend-typeface'
 import { recommendContentMoods } from '@/lib/recommend-content-mood'
 import { visualStylePresets } from '@/lib/visual-styles'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type DistributionPreferences = {
   channels?: string[]
@@ -153,7 +154,7 @@ function ContentMixContent() {
     })
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     const payload = {
       items,
       totalCredits,
@@ -186,8 +187,9 @@ function ContentMixContent() {
       ? recommendTypefacesInDirection(recommendedDirection.id, typefaceInput)[0]
       : undefined
 
+    let typefacePayload: Record<string, unknown> | null = null
     if (recommendedDirection && recommendedTypeface) {
-      sessionStorage.setItem('soon-typeface-v1', JSON.stringify({
+      typefacePayload = {
         directionId: recommendedDirection.id,
         directionLabel: recommendedDirection.label,
         directionEmoji: recommendedDirection.emoji,
@@ -198,12 +200,20 @@ function ContentMixContent() {
         cdnUrl: recommendedTypeface.cdnUrl,
         weight: recommendedTypeface.weight,
         isGoogleFont: recommendedTypeface.isGoogleFont || false,
-      }))
+      }
+      sessionStorage.setItem('soon-typeface-v1', JSON.stringify(typefacePayload))
     }
 
     const recommendedMood = recommendContentMoods({ profile, strategy, distribution, contentMix: payload })
     sessionStorage.setItem('soon-content-mood-v1', JSON.stringify(recommendedMood))
     sessionStorage.setItem('soon-content-modification-v1', 'balanced')
+    await persistOnboardingDraft({
+      'soon-content-mix-v1': payload,
+      'soon-visual-style-v1': recommendedStyle,
+      ...(typefacePayload ? { 'soon-typeface-v1': typefacePayload } : {}),
+      'soon-content-mood-v1': recommendedMood,
+      'soon-content-modification-v1': 'balanced',
+    })
 
     const url = new URL('/onboarding/photo-control', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {

@@ -3,6 +3,7 @@
 import type { ChangeEvent, FormEvent } from 'react'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type ManualBusinessType = 'services' | 'local' | 'products' | ''
 type ContentPersona = '老闆本人' | '產品' | '團隊' | '無特定' | ''
@@ -283,11 +284,10 @@ function ContentEngineContent() {
     }
   }
 
-  function continueToNext() {
+  async function continueToNext() {
     clearDownstreamOnboardingDraft()
     const profile = buildBusinessProfile()
-    sessionStorage.setItem('soon-business-profile-v1', JSON.stringify(profile))
-    sessionStorage.setItem('soon-brand-profile-v1', JSON.stringify({
+    const brandProfile = {
       business_name: profile.business_name,
       business_type: profile.business_type,
       elevator_pitch: profile.elevatorPitch,
@@ -298,7 +298,16 @@ function ContentEngineContent() {
       market_positioning: profile.market_positioning,
       website_url: profile.website_url,
       has_website: profile.has_website,
-    }))
+    }
+    sessionStorage.setItem('soon-business-profile-v1', JSON.stringify(profile))
+    sessionStorage.setItem('soon-brand-profile-v1', JSON.stringify(brandProfile))
+    await persistOnboardingDraft(
+      {
+        'soon-business-profile-v1': profile,
+        'soon-brand-profile-v1': brandProfile,
+      },
+      DOWNSTREAM_ONBOARDING_KEYS
+    )
 
     const url = new URL('/onboarding/content-strategy', window.location.origin)
     Object.entries(passthroughParams()).forEach(([key, value]) => url.searchParams.set(key, value))
@@ -349,6 +358,9 @@ function ContentEngineContent() {
         analysis: data,
         onboarding: passthrough,
       }))
+      void persistOnboardingDraft({
+        'soon-website-analysis-v1': { analysis: data, onboarding: passthrough },
+      })
 
       await revealAnalysis(data)
       clearDownstreamOnboardingDraft()

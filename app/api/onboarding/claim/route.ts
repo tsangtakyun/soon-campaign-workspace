@@ -11,6 +11,7 @@ const CLAIM_TABLES = [
   'campaign_posts',
   'designs',
   'social_connections',
+  'onboarding_drafts',
 ]
 
 export async function POST(req: Request) {
@@ -140,6 +141,11 @@ export async function POST(req: Request) {
         .is('user_id', null),
       supabase
         .from('social_connections')
+        .update(claimedUserFields)
+        .eq('onboarding_session_id', sessionId)
+        .is('user_id', null),
+      supabase
+        .from('onboarding_drafts')
         .update(claimedUserFields)
         .eq('onboarding_session_id', sessionId)
         .is('user_id', null),

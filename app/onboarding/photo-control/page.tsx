@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type PhotoControlOption = {
   id: 'minimal' | 'balanced' | 'full'
@@ -111,14 +112,16 @@ function PhotoControlContent() {
     }
   }
 
-  function handleContinue() {
-    sessionStorage.setItem(PHOTO_CONTROL_STORAGE_KEY, JSON.stringify({
+  async function handleContinue() {
+    const payload = {
       id: selectedOption.id,
       title: selectedOption.title,
       titleEn: selectedOption.titleEn,
       previewImage,
       generationPrompt: selectedOption.generationPrompt,
-    }))
+    }
+    sessionStorage.setItem(PHOTO_CONTROL_STORAGE_KEY, JSON.stringify(payload))
+    await persistOnboardingDraft({ [PHOTO_CONTROL_STORAGE_KEY]: payload })
 
     const url = new URL('/onboarding/topic-review', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign', 'visualStyle', 'typeface', 'contentMood', 'contentModification'].forEach((key) => {

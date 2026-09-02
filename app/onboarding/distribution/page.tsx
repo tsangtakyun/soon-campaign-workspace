@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
 import { createClient } from '@/lib/supabase'
 import { resolveActiveWorkspace } from '@/lib/workspace-client'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type Channel = {
   id: string
@@ -129,7 +130,7 @@ function DistributionContent() {
     })
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     const payload = {
       channels: selectedLabels,
       channelIds: Array.from(selectedChannels),
@@ -138,6 +139,7 @@ function DistributionContent() {
       crossPosting: false,
     }
     sessionStorage.setItem('soon-distribution-preferences-v1', JSON.stringify(payload))
+    await persistOnboardingDraft({ 'soon-distribution-preferences-v1': payload })
 
     const url = new URL('/onboarding/content-mix', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {

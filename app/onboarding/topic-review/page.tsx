@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { persistOnboardingDraft, restoreOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type ContentMixItem = {
   id: string
@@ -277,6 +278,7 @@ function TopicReviewContent() {
   const [topics, setTopics] = useState<TopicReference[]>(() => buildTopicShells())
   const [regeneratingTopicId, setRegeneratingTopicId] = useState<string | null>(null)
   const [topicActionError, setTopicActionError] = useState<string | null>(null)
+  const [draftReady, setDraftReady] = useState(false)
   const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
   const requestGeneratedTopics = useCallback(async (requestedPieces?: string[]) => {
@@ -385,8 +387,16 @@ function TopicReviewContent() {
   }, [requestGeneratedTopics])
 
   useEffect(() => {
-    generateTopics()
-  }, [generateTopics])
+    let active = true
+    void restoreOnboardingDraft().finally(() => {
+      if (active) setDraftReady(true)
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (draftReady) void generateTopics()
+  }, [draftReady, generateTopics])
 
   function preserveParams(url: URL) {
     ;[
@@ -425,6 +435,7 @@ function TopicReviewContent() {
   function persistTopics(nextTopics: TopicReference[]) {
     if (typeof window === 'undefined') return
     window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(nextTopics))
+    void persistOnboardingDraft({ 'soon-topic-review-v1': nextTopics })
   }
 
   function handleConfirmTopicAssets(topicId: string, selection: TopicAssetSelection) {

@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { defaultContentStrategyLibrary } from '@/lib/content-strategy-library'
+import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
 
 type StrategyOption = {
   id: string
@@ -100,10 +101,11 @@ function ContentStrategyContent() {
     }
   }, [searchParams])
 
-  function handleContinue() {
+  async function handleContinue() {
     const serializedSelection = JSON.stringify(selected)
     sessionStorage.setItem(STRATEGY_STORAGE_KEY, serializedSelection)
     localStorage.setItem(STRATEGY_STORAGE_KEY, serializedSelection)
+    await persistOnboardingDraft({ [STRATEGY_STORAGE_KEY]: selected })
 
     const url = new URL('/onboarding/campaign-details', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName'].forEach((key) => {
