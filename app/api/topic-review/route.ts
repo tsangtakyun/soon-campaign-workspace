@@ -27,6 +27,7 @@ type TopicRequestBody = {
       generationMood?: string
     }>
   }
+  websiteAnalysis?: any
   language?: string
   requestedPieces?: string[]
 }
@@ -116,6 +117,10 @@ function collectStringSummary(value: unknown, fallback = '未提供') {
   return [...new Set(values)].slice(0, 10).join('、') || fallback
 }
 
+function compactSummary(values: unknown[], fallback = '未提供') {
+  return collectStringSummary(values, fallback)
+}
+
 export async function POST(req: Request) {
   const auth = await requirePlatformUser()
   if (auth.error) return auth.error
@@ -147,7 +152,7 @@ export async function POST(req: Request) {
     )
 
     const systemPrompt =
-      'You are a witty, natural-sounding social media content writer for Asian markets. You write topics that sound like they were written by a real human — casual, punchy, and relatable. Never use the city name or brand name more than once per topic. Avoid formal or repetitive phrasing. Topics should feel like something a friend would post, not a press release. Keep topics short — ideally under 20 words.'
+      'You are a senior social content strategist for Asian local and service businesses. Turn verified brand facts into concrete, executable topics. Every topic must make sense for this specific business and campaign, even if the brand name is removed. Use natural, concise social language rather than generic lifestyle copy or slogans. Never invent services, facilities, prices, results, qualifications, offers, or locations.'
 
     const contentMoodPreference =
       input.contentMood?.selectedMoods
@@ -155,18 +160,65 @@ export async function POST(req: Request) {
         .filter((mood): mood is string => typeof mood === 'string' && mood.trim().length > 0)
         .join(', ') || '未提供'
 
-    const location = collectStringSummary(
-      input.profile?.location || input.profile?.market || input.profile?.primaryMarket || input.profile?.primary_market || input.profile?.city || input.profile?.region
-    )
-    const services = collectStringSummary(
-      input.profile?.services || input.profile?.offers || input.profile?.products || input.profile?.brandProfile?.services
-    )
-    const painPoints = collectStringSummary(
-      input.profile?.painPoints || input.profile?.pain_points || input.profile?.audience?.painPoints || input.profile?.brandProfile?.painPoints
-    )
-    const desiredOutcomes = collectStringSummary(
-      input.profile?.outcomes || input.profile?.desiredOutcomes || input.profile?.desired_outcomes || input.profile?.goals || input.profile?.brandProfile?.outcomes
-    )
+    const websiteAnalysis = input.websiteAnalysis?.analysis || input.websiteAnalysis
+    const location = compactSummary([
+      input.profile?.audience?.locations,
+      input.profile?.primary_region,
+      input.profile?.primary_city,
+      input.profile?.location,
+      input.profile?.market,
+      input.profile?.primaryMarket,
+      input.profile?.primary_market,
+      input.profile?.city,
+      input.profile?.region,
+      websiteAnalysis?.audience?.locations,
+    ])
+    const services = compactSummary([
+      input.profile?.services,
+      input.profile?.offers,
+      input.profile?.products,
+      input.profile?.brandProfile?.services,
+      input.profile?.brandProfile?.offer,
+      input.profile?.elevatorPitch,
+      input.profile?.elevator_pitch,
+      websiteAnalysis?.services,
+      websiteAnalysis?.products,
+      websiteAnalysis?.brandProfile?.offer,
+    ])
+    const audience = compactSummary([
+      input.profile?.target_audience,
+      input.profile?.audience?.summary,
+      input.profile?.brandProfile?.audience,
+      input.profile?.contentPeople,
+      websiteAnalysis?.audience,
+      websiteAnalysis?.brandProfile?.audience,
+    ])
+    const painPoints = compactSummary([
+      input.profile?.painPoints,
+      input.profile?.pain_points,
+      input.profile?.audience?.painPoints,
+      input.profile?.brandProfile?.painPoints,
+      input.strategy?.examples,
+      input.strategy?.description,
+      websiteAnalysis?.painPoints,
+    ])
+    const desiredOutcomes = compactSummary([
+      input.profile?.outcomes,
+      input.profile?.desiredOutcomes,
+      input.profile?.desired_outcomes,
+      input.profile?.goals,
+      input.profile?.brandProfile?.outcomes,
+      input.campaign?.primaryGoal,
+      input.campaign?.audienceAction,
+    ])
+    const campaignDirection = compactSummary([
+      input.campaign?.campaignName,
+      input.campaign?.theme,
+      input.campaign?.contentFocus,
+      input.campaign?.contentFormats,
+      input.campaign?.audienceAction,
+      input.campaign?.callToAction,
+    ])
 
     const userPrompt = [
       'Generate content topics for the following brand:',
@@ -174,14 +226,14 @@ export async function POST(req: Request) {
       `Brand: ${stringValue(input.profile?.businessName || input.profile?.business_name)}`,
       `Industry: ${stringValue(input.profile?.businessType || input.profile?.business_type)}`,
       `Brand description: ${stringValue(input.profile?.elevatorPitch || input.profile?.elevator_pitch)}`,
-      `Target audience: ${stringValue(input.profile?.target_audience || input.profile?.audience?.summary || input.profile?.brandProfile?.audience)}`,
+      `Target audience: ${audience}`,
       `Market and location: ${location}`,
       `Services or offers: ${services}`,
       `Audience pain points: ${painPoints}`,
       `Desired outcomes: ${desiredOutcomes}`,
       `Brand tone: ${stringValue(input.profile?.brandProfile?.tone)}`,
       `Content strategy: ${stringValue(input.strategy?.titleZh || input.strategy?.title)} — ${stringValue(input.strategy?.reason)}`,
-      `Campaign theme: ${stringValue(input.campaign?.theme)}`,
+      `Campaign direction: ${campaignDirection}`,
       `Call to action: ${stringValue(input.campaign?.callToAction || input.campaign?.call_to_action)}`,
       `Content mood and style preference: ${contentMoodPreference}. The topics should reflect this mood in their tone, angle and language.`,
       '',
@@ -189,17 +241,20 @@ export async function POST(req: Request) {
       contentPieces.join('\n'),
       '',
       'Rules:',
-      '- Each topic must feel specific to THIS brand, not generic',
-      "- Reference the brand's industry, location, or audience when relevant",
-      `- Topics should reflect the campaign theme: ${stringValue(input.campaign?.theme)}`,
+      '- Each topic must be anchored in at least TWO supplied facts: (1) a real service/offer and (2) the audience, location, pain point, desired outcome, or campaign direction',
+      '- Across the full set, cover the actual service/offer, target audience, operating location, and campaign direction; do not leave any of these four dimensions implicit',
+      '- A topic that could be posted unchanged by a cafe, fashion label, or unrelated business is too generic and must be rewritten',
+      '- Prefer a concrete customer question, service scenario, decision, misconception, exercise, facility, process, or local use case supported by the supplied facts',
+      '- If a required fact is marked 未提供, do not guess it; anchor the topic in other supplied facts',
+      `- Topics must advance this campaign direction: ${campaignDirection}`,
       `- Write in ${language} (Traditional Chinese if zh-TW, English if en)`,
       '- Never repeat the city name in the same topic',
-      '- Never repeat the brand name more than once across all topics',
+      '- Use the brand name sparingly; specificity must come from genuine business facts, not repeated naming',
       '- Topics should be casual and conversational, like real social media posts',
       '- Avoid starting topics with the brand name or city name',
       '- Use first-person or second-person perspective where possible (我們、你、你們)',
       '- Emojis are allowed and encouraged for funny/lifestyle topics',
-      '- Keep each topic under 20 words',
+      '- Keep each topic concise, normally under 30 Chinese characters or 20 English words, but never remove the concrete service anchor just to shorten it',
       '- Each topic is ONE sentence',
       '- Topics should vary in angle — some educational, some emotional, some curiosity-driven, some community-focused',
       '- Do NOT number the topics in your response',

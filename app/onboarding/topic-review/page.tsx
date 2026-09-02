@@ -288,6 +288,7 @@ function TopicReviewContent() {
     const visualStyle = readStorage<any>(STORAGE_KEYS.visualStyle)
     const photoControl = readStorage<any>(STORAGE_KEYS.photoControl)
     const contentMood = readStorage<any>(STORAGE_KEYS.contentMood)
+    const websiteAnalysis = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
     const language =
       profile?.primaryLanguage ||
       profile?.primary_language ||
@@ -307,6 +308,7 @@ function TopicReviewContent() {
         visualStyle,
         photoControl,
         contentMood,
+        websiteAnalysis,
         language,
         requestedPieces,
       }),
