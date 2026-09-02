@@ -1,10 +1,13 @@
 'use client'
 
-import { Suspense, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+
+import { createClient } from '@/lib/supabase'
 
 const STORAGE_KEYS = {
   websiteAnalysis: 'soon-website-analysis-v1',
+  selectedWebsiteImages: 'soon-selected-website-images-v1',
 }
 
 const PLACEHOLDER_IMAGE =
@@ -81,7 +84,11 @@ function SourceMaterialsContent() {
   const searchParams = useSearchParams()
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const [isAdjusting, setIsAdjusting] = useState(false)
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [uploadedNames, setUploadedNames] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [assetError, setAssetError] = useState('')
 
   const websiteImages = useMemo(() => {
     const websiteStored = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
@@ -93,9 +100,75 @@ function SourceMaterialsContent() {
     ]
       .map(normalizeWebsiteReferenceImage)
       .filter(isUsableWebsiteReferenceImage)
-      .map(displayImageUrl)
     return Array.from(new Set(images))
   }, [])
+
+  useEffect(() => {
+    const stored = readStorage<string[]>(STORAGE_KEYS.selectedWebsiteImages)
+    setSelectedImages(stored?.filter((image) => websiteImages.includes(image)) ?? websiteImages)
+  }, [websiteImages])
+
+  useEffect(() => {
+    const sessionId = window.localStorage.getItem('soon-onboarding-session-id')
+    if (!sessionId) return
+    const supabase = createClient()
+    void supabase
+      .from('brand_assets')
+      .select('filename')
+      .eq('onboarding_session_id', sessionId)
+      .eq('asset_type', 'upload')
+      .then(({ data, error }) => {
+        if (!error) setUploadedNames((data || []).map((asset) => asset.filename).filter(Boolean) as string[])
+      })
+  }, [])
+
+  function ensureSessionId() {
+    let sessionId = window.localStorage.getItem('soon-onboarding-session-id')
+    if (!sessionId) {
+      sessionId = crypto.randomUUID()
+      window.localStorage.setItem('soon-onboarding-session-id', sessionId)
+    }
+    return sessionId
+  }
+
+  async function saveWebsiteAssets() {
+    const supabase = createClient()
+    const sessionId = ensureSessionId()
+    const { data: { user } } = await supabase.auth.getUser()
+    const existingQuery = supabase
+      .from('brand_assets')
+      .select('id,url')
+      .eq('onboarding_session_id', sessionId)
+      .eq('asset_type', 'website_image')
+    const { data: existing, error: readError } = await existingQuery
+    if (readError) throw readError
+
+    const selected = new Set(selectedImages)
+    const removeIds = (existing || []).filter((asset) => !selected.has(asset.url)).map((asset) => asset.id)
+    if (removeIds.length) {
+      const { error } = await supabase.from('brand_assets').delete().in('id', removeIds)
+      if (error) throw error
+    }
+
+    const existingUrls = new Set((existing || []).map((asset) => asset.url))
+    const additions = selectedImages
+      .filter((url) => !existingUrls.has(url))
+      .map((url) => ({
+        asset_type: 'website_image',
+        filename: decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'website-image'),
+        is_used: true,
+        onboarding_session_id: sessionId,
+        source_url: searchParams.get('website'),
+        url,
+        user_id: user?.id || null,
+      }))
+    if (additions.length) {
+      const { error } = await supabase.from('brand_assets').insert(additions)
+      if (error) throw error
+    }
+
+    window.sessionStorage.setItem(STORAGE_KEYS.selectedWebsiteImages, JSON.stringify(selectedImages))
+  }
 
   function preserveParams(url: URL) {
     ;[
@@ -118,19 +191,69 @@ function SourceMaterialsContent() {
     })
   }
 
-  function handleContinue() {
-    const url = new URL('/onboarding/campaigns-ready', window.location.origin)
-    preserveParams(url)
-    window.location.href = `${url.pathname}${url.search}`
+  async function handleContinue() {
+    setIsSaving(true)
+    setAssetError('')
+    try {
+      await saveWebsiteAssets()
+      const url = new URL('/onboarding/campaigns-ready', window.location.origin)
+      preserveParams(url)
+      window.location.href = `${url.pathname}${url.search}`
+    } catch (error) {
+      console.warn('[source-materials] unable to save assets', error)
+      setAssetError('素材未能儲存，請稍後再試。')
+      setIsSaving(false)
+    }
   }
 
   function handleBack() {
     window.history.back()
   }
 
-  function handleUpload(files: FileList | null) {
+  async function handleUpload(files: FileList | null) {
     if (!files?.length) return
-    setUploadedNames(Array.from(files).map((file) => file.name))
+    const images = Array.from(files)
+    if (images.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+      setAssetError('請上載 JPG、PNG 或 WebP 圖片。品牌文件可在完成設定後加入品牌資料庫。')
+      return
+    }
+
+    setIsUploading(true)
+    setAssetError('')
+    try {
+      const supabase = createClient()
+      const sessionId = ensureSessionId()
+      const { data: { user } } = await supabase.auth.getUser()
+      const ownerId = user?.id || sessionId
+      const savedNames: string[] = []
+      for (const file of images) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
+        const storagePath = `${ownerId}/source-materials/${Date.now()}-${crypto.randomUUID()}-${safeName}`
+        const { error: uploadError } = await supabase.storage
+          .from('brand-assets')
+          .upload(storagePath, file, { cacheControl: '3600', upsert: false })
+        if (uploadError) throw uploadError
+        const { data } = supabase.storage.from('brand-assets').getPublicUrl(storagePath)
+        const { error: insertError } = await supabase.from('brand_assets').insert({
+          asset_type: 'upload',
+          filename: file.name,
+          is_used: true,
+          onboarding_session_id: sessionId,
+          source_url: null,
+          url: data.publicUrl,
+          user_id: user?.id || null,
+        })
+        if (insertError) throw insertError
+        savedNames.push(file.name)
+      }
+      setUploadedNames((current) => [...current, ...savedNames])
+    } catch (error) {
+      console.warn('[source-materials] upload failed', error)
+      setAssetError('圖片上載未完成，請稍後再試。')
+    } finally {
+      setIsUploading(false)
+      if (uploadInputRef.current) uploadInputRef.current.value = ''
+    }
   }
 
   return (
@@ -157,13 +280,13 @@ function SourceMaterialsContent() {
             <p>分析網站時擷取到的圖片和影片。SOON 會用這些素材作為視覺內容的基礎。</p>
             <div className="source-card-divider" />
             <div className="source-card-row">
-              <strong>{websiteImages.length} 張圖片</strong>
+              <strong>已選 {selectedImages.length}／{websiteImages.length} 張圖片</strong>
               <button type="button" onClick={() => setIsAdjusting(true)}>調整</button>
             </div>
             <div className="website-thumbs">
-              {websiteImages.length ? (
-                websiteImages.slice(0, 4).map((image) => (
-                  <img src={image} alt="" key={image} />
+              {selectedImages.length ? (
+                selectedImages.slice(0, 4).map((image) => (
+                  <img src={displayImageUrl(image)} alt="" key={image} />
                 ))
               ) : (
                 <span className="empty-website-assets">未找到可用網站圖片</span>
@@ -174,24 +297,32 @@ function SourceMaterialsContent() {
           <article className="source-card">
             <div className="source-icon blue">⇧</div>
             <h2>加入更多來源素材</h2>
-            <p>品牌指引、參考文件和其他背景資料，可以幫助 SOON 理解你的語氣，生成更聰明的內容。</p>
+            <p>上載產品、服務、團隊或場景圖片，讓 SOON 在生成視覺內容時使用更準確的品牌素材。</p>
             <div className="source-card-divider" />
             <button
               type="button"
               className="upload-dropzone"
+              disabled={isUploading}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault()
+                void handleUpload(event.dataTransfer.files)
+              }}
               onClick={() => uploadInputRef.current?.click()}
             >
-              <span>{uploadedNames.length ? uploadedNames.join('、') : '將檔案拖放到這裡，或點擊上載'}</span>
-              <strong>上載</strong>
+              <span>{uploadedNames.length ? `已上載：${uploadedNames.join('、')}` : '將 JPG、PNG 或 WebP 拖放到這裡，或點擊上載'}</span>
+              <strong>{isUploading ? '上載中…' : '上載'}</strong>
             </button>
             <input
               ref={uploadInputRef}
               type="file"
+              accept="image/jpeg,image/png,image/webp"
               multiple
-              onChange={(event) => handleUpload(event.target.files)}
+              onChange={(event) => void handleUpload(event.target.files)}
             />
           </article>
         </div>
+        {assetError ? <p className="asset-error" role="alert">{assetError}</p> : null}
       </section>
 
       {isAdjusting ? (
@@ -199,10 +330,25 @@ function SourceMaterialsContent() {
           <section className="adjust-modal" role="dialog" aria-modal="true" aria-labelledby="adjust-title" onMouseDown={(event) => event.stopPropagation()}>
             <button type="button" className="adjust-close" onClick={() => setIsAdjusting(false)} aria-label="關閉">×</button>
             <h2 id="adjust-title">網站素材</h2>
-            <p>這些圖片會用作之後生成內容的視覺參考。</p>
+            <p>只選擇與品牌、服務和實際環境有關的圖片。已選圖片會保存到品牌素材庫。</p>
+            {websiteImages.length ? <div className="adjust-actions">
+              <button type="button" onClick={() => setSelectedImages(websiteImages)}>全部選取</button>
+              <button type="button" onClick={() => setSelectedImages([])}>全部取消</button>
+            </div> : null}
             <div className="adjust-grid">
               {websiteImages.length ? websiteImages.map((image) => (
-                <img src={image} alt="" key={image} />
+                <button
+                  type="button"
+                  className={selectedImages.includes(image) ? 'selected' : ''}
+                  aria-pressed={selectedImages.includes(image)}
+                  onClick={() => setSelectedImages((current) => current.includes(image)
+                    ? current.filter((value) => value !== image)
+                    : [...current, image])}
+                  key={image}
+                >
+                  <img src={displayImageUrl(image)} alt="" />
+                  <span>{selectedImages.includes(image) ? '✓ 已選' : '選取'}</span>
+                </button>
               )) : <p>暫時未找到可用網站圖片。你可以返回上一頁重新分析，或在右邊上載素材。</p>}
             </div>
           </section>
@@ -211,7 +357,9 @@ function SourceMaterialsContent() {
 
       <footer className="source-footer">
         <button type="button" onClick={handleBack}>返回</button>
-        <button type="button" onClick={handleContinue}>繼續</button>
+        <button type="button" onClick={() => void handleContinue()} disabled={isSaving || isUploading}>
+          {isSaving ? '儲存中…' : '繼續'}
+        </button>
       </footer>
 
       <style dangerouslySetInnerHTML={{ __html: styles }} />
@@ -396,6 +544,18 @@ const styles = `
     cursor: pointer;
   }
 
+  .upload-dropzone:disabled,
+  .source-footer button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .asset-error {
+    margin: 14px 0 0;
+    color: #a8322b;
+    font-size: 12px;
+  }
+
   .source-card input[type="file"] {
     position: absolute;
     width: 1px;
@@ -452,6 +612,8 @@ const styles = `
     background: #ffffff;
     box-shadow: 0 26px 90px rgba(23, 24, 28, 0.14);
     padding: 28px;
+    max-height: min(720px, calc(100vh - 48px));
+    overflow: auto;
   }
 
   .adjust-close {
@@ -487,14 +649,55 @@ const styles = `
     gap: 10px;
   }
 
+  .adjust-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .adjust-actions button {
+    border: 1px solid #dedfe3;
+    border-radius: 7px;
+    background: #ffffff;
+    padding: 6px 9px;
+    color: #34363d;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .adjust-grid > button {
+    position: relative;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .adjust-grid > button.selected {
+    border-color: #1f6feb;
+  }
+
   .adjust-grid img {
     width: 100%;
     aspect-ratio: 1 / 1;
     object-fit: contain;
-    border-radius: 8px;
-    border: 1px solid #eeeeee;
     background: #ffffff;
     padding: 8px;
+    display: block;
+  }
+
+  .adjust-grid > button span {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    border-radius: 999px;
+    background: rgba(24, 26, 31, 0.82);
+    color: #ffffff;
+    padding: 3px 6px;
+    font-size: 9px;
   }
 
   @media (max-width: 760px) {

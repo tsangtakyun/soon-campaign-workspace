@@ -277,7 +277,6 @@ export async function POST(req: Request) {
         supabase.from('campaign_posts').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
         supabase.from('marketing_campaigns').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
         supabase.from('content_preferences').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
-        supabase.from('brand_assets').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
         supabase.from('brand_kits').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
       ])
     }
@@ -446,6 +445,19 @@ export async function POST(req: Request) {
         'id'
       )
     }
+
+    const existingAssetOwnerFields: JsonRecord = {
+      brand_kit_id: brandKit.id,
+      onboarding_session_id: sessionId,
+    }
+    if (userId) existingAssetOwnerFields.user_id = userId
+    if (workspaceId) existingAssetOwnerFields.workspace_id = workspaceId
+
+    const { error: existingAssetError } = await supabase
+      .from('brand_assets')
+      .update(existingAssetOwnerFields)
+      .eq('onboarding_session_id', sessionId)
+    if (existingAssetError) throw existingAssetError
 
     if (logoUrl && !logoUrl.startsWith('blob:')) {
       const { error: assetError } = await supabase.from('brand_assets').upsert(
