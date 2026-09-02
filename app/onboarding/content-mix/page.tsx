@@ -13,6 +13,8 @@ import {
 } from '@/lib/content-mix'
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
 import { getPricingPlan } from '@/lib/pricing'
+import { recommendVisualStyles } from '@/lib/recommend-styles'
+import { visualStylePresets } from '@/lib/visual-styles'
 
 type DistributionPreferences = {
   channels?: string[]
@@ -160,11 +162,23 @@ function ContentMixContent() {
     }
     sessionStorage.setItem('soon-content-mix-v1', JSON.stringify(payload))
 
-    const url = new URL('/onboarding/visual-style', window.location.origin)
+    const profile = readSession<ContentStrategyProfile>('soon-business-profile-v1') || {}
+    const strategy = readSession<ContentStrategyOption>('soon-content-strategy-v1') || undefined
+    const recommendedStyle = recommendVisualStyles({
+      profile,
+      strategy,
+      distribution,
+      contentMix: payload,
+    })[0] || visualStylePresets[0]
+
+    sessionStorage.setItem('soon-visual-style-v1', JSON.stringify(recommendedStyle))
+
+    const url = new URL('/onboarding/typeface', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
     })
+    url.searchParams.set('visualStyle', recommendedStyle.id)
     url.searchParams.set('autoAnalyze', '1')
     window.location.href = `${url.pathname}${url.search}`
   }
