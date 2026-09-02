@@ -144,11 +144,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ topics: [] })
     }
 
+    const websiteAnalysis = input.websiteAnalysis?.analysis || input.websiteAnalysis || {}
+    const campaignProfile = input.campaign?.profile || {}
+    const suppliedProfile = input.profile || {}
+    const profile = {
+      ...websiteAnalysis,
+      ...campaignProfile,
+      ...suppliedProfile,
+      audience: {
+        ...(websiteAnalysis?.audience || {}),
+        ...(campaignProfile?.audience || {}),
+        ...(suppliedProfile?.audience || {}),
+      },
+      brandProfile: {
+        ...(websiteAnalysis?.brandProfile || {}),
+        ...(campaignProfile?.brandProfile || {}),
+        ...(suppliedProfile?.brandProfile || {}),
+      },
+    }
+
     const language = normalizeLanguage(
       input.language ||
-        input.profile?.primaryLanguage ||
-        input.profile?.primary_language ||
-        input.profile?.language
+        profile?.primaryLanguage ||
+        profile?.primary_language ||
+        profile?.language
     )
 
     const systemPrompt =
@@ -160,54 +179,53 @@ export async function POST(req: Request) {
         .filter((mood): mood is string => typeof mood === 'string' && mood.trim().length > 0)
         .join(', ') || '未提供'
 
-    const websiteAnalysis = input.websiteAnalysis?.analysis || input.websiteAnalysis
     const location = compactSummary([
-      input.profile?.audience?.locations,
-      input.profile?.primary_region,
-      input.profile?.primary_city,
-      input.profile?.location,
-      input.profile?.market,
-      input.profile?.primaryMarket,
-      input.profile?.primary_market,
-      input.profile?.city,
-      input.profile?.region,
+      profile?.audience?.locations,
+      profile?.primary_region,
+      profile?.primary_city,
+      profile?.location,
+      profile?.market,
+      profile?.primaryMarket,
+      profile?.primary_market,
+      profile?.city,
+      profile?.region,
       websiteAnalysis?.audience?.locations,
     ])
     const services = compactSummary([
-      input.profile?.services,
-      input.profile?.offers,
-      input.profile?.products,
-      input.profile?.brandProfile?.services,
-      input.profile?.brandProfile?.offer,
-      input.profile?.elevatorPitch,
-      input.profile?.elevator_pitch,
+      profile?.services,
+      profile?.offers,
+      profile?.products,
+      profile?.brandProfile?.services,
+      profile?.brandProfile?.offer,
+      profile?.elevatorPitch,
+      profile?.elevator_pitch,
       websiteAnalysis?.services,
       websiteAnalysis?.products,
       websiteAnalysis?.brandProfile?.offer,
     ])
     const audience = compactSummary([
-      input.profile?.target_audience,
-      input.profile?.audience?.summary,
-      input.profile?.brandProfile?.audience,
-      input.profile?.contentPeople,
+      profile?.target_audience,
+      profile?.audience?.summary,
+      profile?.brandProfile?.audience,
+      profile?.contentPeople,
       websiteAnalysis?.audience,
       websiteAnalysis?.brandProfile?.audience,
     ])
     const painPoints = compactSummary([
-      input.profile?.painPoints,
-      input.profile?.pain_points,
-      input.profile?.audience?.painPoints,
-      input.profile?.brandProfile?.painPoints,
+      profile?.painPoints,
+      profile?.pain_points,
+      profile?.audience?.painPoints,
+      profile?.brandProfile?.painPoints,
       input.strategy?.examples,
       input.strategy?.description,
       websiteAnalysis?.painPoints,
     ])
     const desiredOutcomes = compactSummary([
-      input.profile?.outcomes,
-      input.profile?.desiredOutcomes,
-      input.profile?.desired_outcomes,
-      input.profile?.goals,
-      input.profile?.brandProfile?.outcomes,
+      profile?.outcomes,
+      profile?.desiredOutcomes,
+      profile?.desired_outcomes,
+      profile?.goals,
+      profile?.brandProfile?.outcomes,
       input.campaign?.primaryGoal,
       input.campaign?.audienceAction,
     ])
@@ -219,19 +237,32 @@ export async function POST(req: Request) {
       input.campaign?.audienceAction,
       input.campaign?.callToAction,
     ])
+    const brandName = stringValue(profile?.businessName || profile?.business_name, '')
+
+    if (!brandName || services === '未提供' || audience === '未提供') {
+      console.warn('[topic-review] missing required brand context', {
+        hasBrandName: Boolean(brandName),
+        hasServices: services !== '未提供',
+        hasAudience: audience !== '未提供',
+      })
+      return NextResponse.json(
+        { error: '品牌、服務或受眾資料不完整，請返回上一步確認後再試。' },
+        { status: 422 }
+      )
+    }
 
     const userPrompt = [
       'Generate content topics for the following brand:',
       '',
-      `Brand: ${stringValue(input.profile?.businessName || input.profile?.business_name)}`,
-      `Industry: ${stringValue(input.profile?.businessType || input.profile?.business_type)}`,
-      `Brand description: ${stringValue(input.profile?.elevatorPitch || input.profile?.elevator_pitch)}`,
+      `Brand: ${brandName}`,
+      `Industry: ${stringValue(profile?.businessType || profile?.business_type)}`,
+      `Brand description: ${stringValue(profile?.elevatorPitch || profile?.elevator_pitch)}`,
       `Target audience: ${audience}`,
       `Market and location: ${location}`,
       `Services or offers: ${services}`,
       `Audience pain points: ${painPoints}`,
       `Desired outcomes: ${desiredOutcomes}`,
-      `Brand tone: ${stringValue(input.profile?.brandProfile?.tone)}`,
+      `Brand tone: ${stringValue(profile?.brandProfile?.tone)}`,
       `Content strategy: ${stringValue(input.strategy?.titleZh || input.strategy?.title)} — ${stringValue(input.strategy?.reason)}`,
       `Campaign direction: ${campaignDirection}`,
       `Call to action: ${stringValue(input.campaign?.callToAction || input.campaign?.call_to_action)}`,
