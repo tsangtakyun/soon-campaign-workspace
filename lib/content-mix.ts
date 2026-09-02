@@ -34,6 +34,13 @@ export type ContentMixRecommendation = {
   provider: 'anthropic' | 'fallback'
 }
 
+export type ContentMixFrequencyBounds = {
+  min: number
+  max: number
+  target: number
+  label: string
+}
+
 export const contentMixCatalog: Omit<ContentMixItem, 'quantity' | 'enabled'>[] = [
   {
     id: 'still-images',
@@ -85,6 +92,8 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
   const selectedPlan = getPricingPlan(input.plan)
   const weeklyCreditLimit = selectedPlan.weeklyPlanningCredits
   const fallback = fallbackContentMix(input)
+  const frequency = getContentMixFrequencyBounds(input.distribution?.schedule)
+  const allowedTypes = getAllowedContentMixTypes(input.distribution)
 
   if (!apiKey) return fallback
 
@@ -95,7 +104,9 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
     'Use only the fixed content types provided. Do not add, remove, or rename items.',
     "Only recommend content types that match the user's selected distribution channels. If a channel was not selected, set its quantity to 0 and do not include it in the primary recommendation.",
     `The mix should be realistic for one first week. Keep total credits at or below ${weeklyCreditLimit}.`,
-    'For most first-week campaigns, recommend 3-6 total deliverables, unless the channel mix clearly requires more.',
+    `The selected publishing frequency requires ${frequency.min}-${frequency.max} total deliverables. Never exceed ${frequency.max}.`,
+    `Only these content type IDs are allowed: ${allowedTypes.join(', ')}. Set every other type to 0.`,
+    'When Instagram Reels is selected, prioritize one short-form-video. For feed channels, prioritize one carousel and then still-images.',
     'All human-facing strings must use the requested language.',
   ].join(' ')
 
@@ -160,10 +171,8 @@ export async function recommendContentMix(input: ContentMixInput): Promise<Conte
       : ''
     const parsed = parseJsonObject(text)
     const quantities = typeof parsed.quantities === 'object' && parsed.quantities ? parsed.quantities : {}
-    const items = buildItems(quantities)
+    const items = normalizeContentMixItems(buildItems(quantities), input, weeklyCreditLimit)
     const totalCredits = calculateTotal(items)
-
-    if (totalCredits > weeklyCreditLimit) return fallback
 
     return {
       items,
@@ -195,7 +204,7 @@ export function fallbackContentMix(input: ContentMixInput): ContentMixRecommenda
     stories: hasStories ? (isDaily ? 2 : 1) : 0,
     emails: hasEmail ? 1 : 0,
   }
-  const items = fitItemsWithinLimit(buildItems(quantities), weeklyCreditLimit)
+  const items = normalizeContentMixItems(buildItems(quantities), input, weeklyCreditLimit)
 
   return {
     items,
@@ -204,6 +213,97 @@ export function fallbackContentMix(input: ContentMixInput): ContentMixRecommenda
     reason: '這個組合先用貼文和輪播圖建立第一週基礎，再按你選擇的平台加入短片、限時動態或電子報。',
     provider: 'fallback',
   }
+}
+
+export function getContentMixFrequencyBounds(schedule?: string): ContentMixFrequencyBounds {
+  if (schedule === 'daily' || schedule === 'everyday') {
+    return { min: 5, max: 7, target: 6, label: '每週 5–7 篇' }
+  }
+  if (schedule === '3-5-weekly' || schedule === 'weekdays') {
+    return { min: 3, max: 5, target: 4, label: '每週 3–5 篇' }
+  }
+  if (schedule === 'later') {
+    return { min: 1, max: 3, target: 2, label: '稍後再決定' }
+  }
+  return { min: 2, max: 3, target: 3, label: '每週 2–3 篇' }
+}
+
+export function getAllowedContentMixTypes(distribution?: ContentMixInput['distribution']) {
+  const channels = [...(distribution?.channels || []), ...(distribution?.channelIds || [])]
+    .map((channel) => channel.toLowerCase())
+  const allowed = new Set<string>()
+  const hasFeed = channels.some((channel) => (
+    ['instagram', 'facebook', 'threads', 'xiaohongshu', 'wechat'].includes(channel)
+    || channel.includes('instagram-feed')
+    || channel.includes('facebook-feed')
+    || channel.includes('threads-feed')
+    || channel.includes('rednote')
+    || channel.includes('小紅書')
+    || channel.includes('wechat-feed')
+  ))
+  const hasShortVideo = channels.some((channel) => (
+    ['reels', 'tiktok', 'youtube', 'instagram-reels', 'short-form-video'].includes(channel)
+    || channel.includes('youtube-shorts')
+  ))
+
+  if (hasFeed) {
+    allowed.add('still-images')
+    allowed.add('carousels')
+    if (!hasShortVideo) allowed.add('feed-videos')
+  }
+  if (hasShortVideo) allowed.add('short-form-video')
+  if (channels.some((channel) => channel.includes('stories'))) allowed.add('stories')
+  if (channels.some((channel) => ['newsletter', 'email', 'emails'].includes(channel))) allowed.add('emails')
+
+  if (allowed.size === 0) {
+    allowed.add('still-images')
+    allowed.add('carousels')
+  }
+  return Array.from(allowed)
+}
+
+export function normalizeContentMixItems(items: ContentMixItem[], input: ContentMixInput, creditLimit = Number.POSITIVE_INFINITY) {
+  const allowed = new Set(getAllowedContentMixTypes(input.distribution))
+  const bounds = getContentMixFrequencyBounds(input.distribution?.schedule)
+  const nextItems = contentMixCatalog.map((base) => {
+    const current = items.find((item) => item.id === base.id)
+    const quantity = allowed.has(base.id) ? numberValue(current?.quantity, 0) : 0
+    return { ...base, quantity, enabled: quantity > 0 }
+  })
+
+  const quantityFor = (id: string) => nextItems.find((item) => item.id === id)
+  const totalQuantity = () => nextItems.reduce((sum, item) => sum + item.quantity, 0)
+  const hasShortVideo = allowed.has('short-form-video')
+
+  if (hasShortVideo) {
+    const shortVideo = quantityFor('short-form-video')
+    if (shortVideo && shortVideo.quantity === 0) shortVideo.quantity = 1
+  }
+
+  const reduceOrder = ['emails', 'stories', 'feed-videos', 'still-images', 'carousels', 'short-form-video']
+  while (totalQuantity() > bounds.max) {
+    const target = reduceOrder
+      .map(quantityFor)
+      .find((item) => item && item.quantity > (item.id === 'short-form-video' && hasShortVideo ? 1 : 0))
+    if (!target) break
+    target.quantity -= 1
+  }
+
+  const addOrder = ['short-form-video', 'carousels', 'still-images', 'stories', 'feed-videos', 'emails']
+  while (totalQuantity() < bounds.target) {
+    const candidates = addOrder
+      .map(quantityFor)
+      .filter((item): item is ContentMixItem => Boolean(item && allowed.has(item.id)))
+    const target = candidates.sort((a, b) => a.quantity - b.quantity)[0]
+    if (!target) break
+    target.quantity += 1
+  }
+
+  const fitted = fitItemsWithinLimit(nextItems, creditLimit)
+  fitted.forEach((item) => {
+    item.enabled = item.quantity > 0
+  })
+  return fitted
 }
 
 function buildItems(quantities: Record<string, unknown>) {

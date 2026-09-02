@@ -5,7 +5,12 @@ import { useSearchParams } from 'next/navigation'
 
 import type { CampaignTheme } from '@/lib/campaign-theme'
 import type { ContentMixItem, ContentMixRecommendation } from '@/lib/content-mix'
-import { contentMixCatalog, fallbackContentMix } from '@/lib/content-mix'
+import {
+  contentMixCatalog,
+  fallbackContentMix,
+  getAllowedContentMixTypes,
+  getContentMixFrequencyBounds,
+} from '@/lib/content-mix'
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
 import { getPricingPlan } from '@/lib/pricing'
 
@@ -16,7 +21,16 @@ type DistributionPreferences = {
 }
 
 const fallbackMix = fallbackContentMix({})
-const defaultVisibleContentTypes = ['still-images', 'carousels', 'feed-videos', 'stories', 'short-form-video', 'emails']
+const defaultVisibleContentTypes = ['still-images', 'carousels']
+
+const contentTypeDescriptions: Record<string, string> = {
+  'still-images': '單張圖片貼文',
+  carousels: '多頁輪播教學或故事',
+  'feed-videos': '較完整的動態影片',
+  'short-form-video': 'Instagram Reels、TikTok 或 Shorts 短片',
+  stories: '限時動態內容',
+  emails: '電子報內容',
+}
 
 function ContentMixContent() {
   const searchParams = useSearchParams()
@@ -25,6 +39,8 @@ function ContentMixContent() {
   const [visibleContentTypes, setVisibleContentTypes] = useState<string[]>(defaultVisibleContentTypes)
   const [weeklyCreditLimit, setWeeklyCreditLimit] = useState(selectedPlan.weeklyPlanningCredits)
   const [reason, setReason] = useState(fallbackMix.reason)
+  const [distribution, setDistribution] = useState<DistributionPreferences>({})
+  const [distributionSignature, setDistributionSignature] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -37,6 +53,10 @@ function ContentMixContent() {
   }, [visibleItems])
 
   const activeItems = visibleItems.filter((item) => item.quantity > 0)
+  const inactiveItems = visibleItems.filter((item) => item.quantity === 0)
+  const totalItems = activeItems.reduce((sum, item) => sum + item.quantity, 0)
+  const frequency = getContentMixFrequencyBounds(distribution.schedule)
+  const platformLabels = getPlatformLabels(distribution)
 
   useEffect(() => {
     let isActive = true
@@ -52,10 +72,30 @@ function ContentMixContent() {
       ]
       const language = profile.language || searchParams.get('language') || '繁體中文'
       const plan = searchParams.get('plan') || undefined
+      const signature = JSON.stringify({
+        channels: selectedChannels.map((channel) => channel.toLowerCase()).sort(),
+        schedule: distribution.schedule || '',
+      })
 
-      setVisibleContentTypes(getVisibleContentTypes(selectedChannels))
+      setDistribution(distribution)
+      setDistributionSignature(signature)
+      setVisibleContentTypes(getVisibleContentTypes(selectedChannels, distribution))
       setLoading(true)
       setError('')
+
+      const savedDraft = readSession<{
+        items?: ContentMixItem[]
+        weeklyCreditLimit?: number
+        reason?: string
+        distributionSignature?: string
+      }>('soon-content-mix-v1')
+      if (savedDraft?.distributionSignature === signature && savedDraft.items?.length) {
+        setItems(normalizeItems(savedDraft.items))
+        setWeeklyCreditLimit(savedDraft.weeklyCreditLimit || selectedPlan.weeklyPlanningCredits)
+        setReason(savedDraft.reason || fallbackMix.reason)
+        setLoading(false)
+        return
+      }
 
       try {
         const response = await fetch('/api/content-mix', {
@@ -91,6 +131,24 @@ function ContentMixContent() {
     }
   }, [searchParams, selectedPlan.weeklyPlanningCredits])
 
+  useEffect(() => {
+    if (loading) return
+    const payload = { items, totalCredits, weeklyCreditLimit, reason, plan: selectedPlan, distributionSignature }
+    sessionStorage.setItem('soon-content-mix-v1', JSON.stringify(payload))
+  }, [distributionSignature, items, loading, reason, selectedPlan, totalCredits, weeklyCreditLimit])
+
+  function updateQuantity(id: string, delta: number) {
+    setItems((current) => {
+      const currentTotal = current.reduce((sum, item) => sum + item.quantity, 0)
+      return current.map((item) => {
+        if (item.id !== id) return item
+        const nextQuantity = Math.max(0, item.quantity + delta)
+        if (delta > 0 && currentTotal >= frequency.max) return item
+        return { ...item, quantity: nextQuantity, enabled: nextQuantity > 0 }
+      })
+    })
+  }
+
   function handleContinue() {
     const payload = {
       items,
@@ -98,6 +156,7 @@ function ContentMixContent() {
       weeklyCreditLimit,
       reason,
       plan: selectedPlan,
+      distributionSignature,
     }
     sessionStorage.setItem('soon-content-mix-v1', JSON.stringify(payload))
 
@@ -118,16 +177,16 @@ function ContentMixContent() {
       <section className="mix-layout">
         <div className="mix-main">
           <header>
-            <h1>這是我們建議你第一週製作的內容組合</h1>
-            <p>根據你的策略和渠道，這是一個適合第一週開始測試的組合。你可以隨時加減。</p>
+            <h1>你的第一週內容計劃</h1>
+            <p>{frequency.label}｜{platformLabels.join(' + ') || '已選平台'}。SOON 已按你的策略和發佈渠道整理，可在下方微調。</p>
           </header>
 
           {loading ? <p className="notice">AI 正在計算第一週內容組合...</p> : null}
           {error ? <p className="notice">{error} 已先使用預設組合，你可以自行加減。</p> : null}
 
           <div className="item-grid">
-            {visibleItems.map((item) => (
-              <article className={`mix-card ${item.quantity === 0 ? 'muted' : ''}`} key={item.id}>
+            {activeItems.map((item) => (
+              <article className="mix-card" key={item.id}>
                 <div className={`preview preview-${item.id}`}>
                   <img
                     src={getContentMixImage(item.id)}
@@ -138,57 +197,66 @@ function ContentMixContent() {
                   />
                   {['feed-videos', 'short-form-video'].includes(item.id) ? <span className="play">▶</span> : null}
                 </div>
-                <h2>{item.titleZh} / {item.title}</h2>
-                <p>{item.description}</p>
-                <small>✦ {item.creditsEach} credits each</small>
+                <h2>{item.titleZh}</h2>
+                <p>{contentTypeDescriptions[item.id] || item.description}</p>
                 <div className="quantity-row">
-                  <span>{item.quantity}</span>
-                  <em>/ week</em>
+                  <div className="stepper">
+                    <button type="button" onClick={() => updateQuantity(item.id, -1)} aria-label={`減少${item.titleZh}`}>−</button>
+                    <strong>{item.quantity}</strong>
+                    <button type="button" onClick={() => updateQuantity(item.id, 1)} disabled={totalItems >= frequency.max} aria-label={`增加${item.titleZh}`}>＋</button>
+                  </div>
+                  <em>每週</em>
                 </div>
               </article>
             ))}
           </div>
+
+          {inactiveItems.length ? (
+            <section className="add-formats">
+              <h2>加入其他格式</h2>
+              <div>
+                {inactiveItems.map((item) => (
+                  <button type="button" key={item.id} onClick={() => updateQuantity(item.id, 1)} disabled={totalItems >= frequency.max}>
+                    ＋ {item.titleZh}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
 
-        <aside className="credits-card">
-          <p>本週建議使用</p>
-          <div className="credit-total">
-            <strong>{totalCredits}</strong>
-            <span>credits / week</span>
+        <aside className="summary-card">
+          <p className="eyebrow">本週計劃摘要</p>
+          <div className="plan-total">
+            <strong>{totalItems}</strong>
+            <span>篇內容</span>
           </div>
-          <p>Credits 是 SOON 用來規劃內容成本的單位。每種內容格式所需 credit 不同。</p>
           <hr />
-          <h2>Credit 拆解</h2>
+          <div className="summary-list">
+            <div><span>發佈平台</span><strong>{platformLabels.join('、') || '稍後設定'}</strong></div>
+            <div><span>發佈頻率</span><strong>{frequency.label}</strong></div>
+            <div><span>內容格式</span><strong>{activeItems.length} 種</strong></div>
+          </div>
+          <hr />
+          <h2>內容分配</h2>
           <div className="breakdown">
             {activeItems.map((item) => (
               <div key={item.id}>
-                <span>{item.titleZh} / {item.title}</span>
-                <em>{item.quantity} x {item.creditsEach} credits</em>
-                <strong>{item.quantity * item.creditsEach}</strong>
+                <span>{item.titleZh}</span>
+                <strong>{item.quantity} 篇</strong>
               </div>
             ))}
           </div>
-          <div className="total-line">
-            <span>每週合計：</span>
-            <strong>{totalCredits}</strong>
-          </div>
           <hr />
-          <p className={totalCredits > weeklyCreditLimit ? 'over-limit' : ''}>
-            目前方案：{selectedPlan.name}<br />
-            本頁以每週 {weeklyCreditLimit} credits 作為規劃上限。
-          </p>
-          <p>
-            {selectedPlan.trialDays
-              ? `${selectedPlan.trialDays} 日試用包含 ${selectedPlan.trialCredits} credits；正式方案每月 ${selectedPlan.monthlyCredits} credits。`
-              : `每月 ${selectedPlan.monthlyCredits} credits 起，實際額度會按代營運範圍調整。`}
-          </p>
-          <small>{reason}</small>
+          <h2>SOON 建議原因</h2>
+          <p>{reason}</p>
+          {totalItems < frequency.min ? <p className="warning">目前少於建議頻率，請最少加入 {frequency.min} 篇內容。</p> : null}
         </aside>
       </section>
 
       <footer className="mix-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
-        <button type="button" onClick={handleContinue}>Continue</button>
+        <button type="button" onClick={handleContinue} disabled={totalItems < frequency.min}>繼續</button>
       </footer>
 
       <style jsx>{styles}</style>
@@ -218,46 +286,29 @@ function readSession<T>(key: string): T | null {
   }
 }
 
-function getVisibleContentTypes(channels: string[]) {
-  const visible = new Set<string>()
-  const ch = channels.map((channel) => channel.toLowerCase())
+function getVisibleContentTypes(_channels: string[], distribution: DistributionPreferences) {
+  return getAllowedContentMixTypes(distribution)
+}
 
-  if (ch.some((channel) => (
-    ['instagram', 'facebook', 'threads', 'xiaohongshu', 'wechat'].includes(channel)
-    || channel.includes('instagram-feed')
-    || channel.includes('facebook-feed')
-    || channel.includes('threads-feed')
-    || channel.includes('rednote')
-    || channel.includes('小紅書')
-    || channel.includes('wechat-feed')
-  ))) {
-    visible.add('still-images')
-    visible.add('carousels')
-    visible.add('feed-videos')
+function getPlatformLabels(distribution: DistributionPreferences) {
+  const ids = [...(distribution.channelIds || []), ...(distribution.channels || [])]
+  const labels: string[] = []
+  const add = (label: string) => {
+    if (!labels.includes(label)) labels.push(label)
   }
 
-  if (ch.some((channel) => (
-    channel.includes('stories')
-    || channel.includes('instagram-stories')
-    || channel.includes('facebook-stories')
-  ))) {
-    visible.add('stories')
-  }
-
-  if (ch.some((channel) => (
-    ['reels', 'tiktok', 'youtube', 'instagram-reels', 'short-form-video'].includes(channel)
-    || channel.includes('youtube-shorts')
-  ))) {
-    visible.add('short-form-video')
-  }
-
-  if (ch.some((channel) => ['newsletter', 'email', 'emails'].includes(channel))) {
-    visible.add('emails')
-  }
-
-  if (visible.size === 0) return defaultVisibleContentTypes
-
-  return Array.from(visible)
+  ids.forEach((rawId) => {
+    const id = rawId.toLowerCase()
+    if (id.includes('instagram')) add('Instagram')
+    else if (id.includes('facebook')) add('Facebook')
+    else if (id.includes('threads')) add('Threads')
+    else if (id.includes('tiktok')) add('TikTok')
+    else if (id.includes('youtube')) add('YouTube')
+    else if (id.includes('newsletter') || id.includes('email')) add('電子報')
+    else if (id.includes('rednote') || id.includes('xiaohongshu') || id.includes('小紅書')) add('小紅書')
+    else if (id.includes('wechat')) add('WeChat')
+  })
+  return labels
 }
 
 function normalizeItems(items: ContentMixItem[] | undefined) {
@@ -383,11 +434,6 @@ const styles = `
     gap: 4px;
   }
 
-  .mix-card.muted {
-    color: #9b9da2;
-    background: #fdfdfd;
-  }
-
   .preview {
     height: 180px;
     border-radius: 8px;
@@ -440,22 +486,11 @@ const styles = `
     line-height: 1.35;
   }
 
-  .mix-card small {
-    color: #9b9da2;
-    font-size: 0.78rem;
-    margin-top: 4px;
-  }
-
   .quantity-row {
     margin-top: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .quantity-row span {
-    font-size: 1.18rem;
-    font-weight: 620;
   }
 
   .quantity-row em {
@@ -464,50 +499,116 @@ const styles = `
     font-size: 0.82rem;
   }
 
-  .credits-card {
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #e3e3e5;
+    border-radius: 999px;
+    padding: 3px;
+  }
+
+  .stepper button {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 50%;
+    background: #f1f1f2;
+    color: #1b1c1f;
+    font: inherit;
+    font-size: 1.05rem;
+    cursor: pointer;
+  }
+
+  .stepper button:disabled,
+  .add-formats button:disabled,
+  .mix-footer button:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  .stepper strong {
+    min-width: 18px;
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  .add-formats {
+    margin-top: 20px;
+    border-top: 1px solid #ececef;
+    padding-top: 16px;
+  }
+
+  .add-formats h2 {
+    margin: 0 0 10px;
+    font-size: 0.92rem;
+  }
+
+  .add-formats div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .add-formats button {
+    min-height: 36px;
+    border: 1px solid #dedee1;
+    border-radius: 999px;
+    background: #fff;
+    color: #2b2d31;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 0.84rem;
+    cursor: pointer;
+  }
+
+  .summary-card {
     border: 1px solid #ececef;
     border-radius: 16px;
     padding: 26px 24px;
     display: grid;
     gap: 14px;
+    position: sticky;
+    top: 18px;
   }
 
-  .credits-card p,
-  .credits-card small {
+  .summary-card p,
+  .summary-card small {
     margin: 0;
     color: #565a61;
     font-size: 0.9rem;
     line-height: 1.45;
   }
 
-  .credits-card .over-limit {
-    color: #b63a2c;
+  .summary-card .eyebrow {
+    color: #25272b;
+    font-weight: 650;
   }
 
-  .credit-total {
+  .plan-total {
     display: flex;
     align-items: baseline;
     gap: 12px;
   }
 
-  .credit-total strong {
+  .plan-total strong {
     font-size: 3.1rem;
     line-height: 1;
     font-weight: 420;
   }
 
-  .credit-total span {
+  .plan-total span {
     font-size: 0.92rem;
   }
 
-  .credits-card hr {
+  .summary-card hr {
     width: 100%;
     border: 0;
     border-top: 1px solid #ededed;
     margin: 2px 0;
   }
 
-  .credits-card h2 {
+  .summary-card h2 {
     margin: 0;
     font-size: 0.94rem;
     font-weight: 560;
@@ -518,29 +619,41 @@ const styles = `
     gap: 9px;
   }
 
-  .breakdown div,
-  .total-line {
+  .breakdown div {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr auto;
     gap: 10px;
     align-items: baseline;
     font-size: 0.86rem;
   }
 
-  .breakdown em,
-  .total-line span {
-    color: #999;
-    font-style: normal;
+  .summary-list {
+    display: grid;
+    gap: 12px;
   }
 
-  .breakdown strong,
-  .total-line strong {
-    font-weight: 500;
+  .summary-list div {
+    display: grid;
+    gap: 3px;
   }
 
-  .total-line {
-    grid-template-columns: 1fr auto;
-    padding-top: 4px;
+  .summary-list span {
+    color: #8b8e94;
+    font-size: 0.78rem;
+  }
+
+  .summary-list strong,
+  .breakdown strong {
+    color: #25272b;
+    font-size: 0.9rem;
+    font-weight: 570;
+  }
+
+  .summary-card .warning {
+    color: #a33a2d;
+    background: #fff3f0;
+    border-radius: 8px;
+    padding: 9px 10px;
   }
 
   .mix-footer {
