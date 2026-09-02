@@ -148,7 +148,10 @@ export async function recommendContentStrategy(
 
     const parsed = parseJsonObject(text)
     const recommendedId = normalizeStrategyId(parsed.recommendedId, catalog)
-    const reason = stringValue(parsed.reason, catalog.find((item) => item.id === recommendedId)?.reason || '')
+    const reason = removeInternalStrategyTerms(
+      stringValue(parsed.reason, catalog.find((item) => item.id === recommendedId)?.reason || ''),
+      catalog
+    )
     const tailoredOptions = normalizeTailoredOptions(parsed.options, catalog)
 
     return buildRecommendation(recommendedId, catalog, reason, 'anthropic', model, tailoredOptions)
@@ -359,6 +362,22 @@ function fallbackReason(profile: ContentStrategyProfile, recommendedId: string) 
 function normalizeStrategyId(value: unknown, catalog: ReturnType<typeof strategyCatalog>) {
   const id = stringValue(value, 'lifestyle-content').toLowerCase()
   return catalog.some((item) => item.id === id) ? id : catalog[0]?.id || 'lifestyle-content'
+}
+
+function removeInternalStrategyTerms(
+  value: string,
+  catalog: ReturnType<typeof strategyCatalog>
+) {
+  const terms = catalog
+    .flatMap((item) => [item.title, item.titleZh])
+    .filter((item): item is string => Boolean(item))
+    .sort((a, b) => b.length - a.length)
+    .map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+
+  if (!terms.length) return value
+  return value
+    .replace(new RegExp(`(?:${terms.join('|')})(?:\\s*策略)?`, 'gi'), '這個內容方向')
+    .replace(/這個內容方向\s*這個內容方向/g, '這個內容方向')
 }
 
 function summarizeLibrary(library: StrategyLibraryState) {
