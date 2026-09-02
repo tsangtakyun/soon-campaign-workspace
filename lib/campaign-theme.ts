@@ -10,6 +10,10 @@ export type CampaignThemeInput = {
 export type CampaignTheme = {
   campaignName: string
   theme: string
+  primaryGoal: string
+  contentFocus: string
+  contentFormats: string
+  audienceAction: string
   callToAction: string
   targetLink: string
 }
@@ -47,6 +51,11 @@ THEME RULES:
 - Include the emotional benefit, the content format, and the audience behavior you want to trigger
 - Reference the season, location, or current moment when relevant
 
+COMMERCIAL ACCURACY RULES:
+- Never invent free trials, free assessments, discounts, guarantees, limited-time offers, prices, or booking benefits.
+- Only mention a commercial offer when it is explicitly present in the supplied brand profile.
+- If no verified offer is supplied, use a neutral CTA such as learning more, contacting the team, or booking an assessment without claiming it is free.
+
 The campaign should be practical enough to direct social, video, newsletter, and ad content.`
 
   const userPrompt = [
@@ -78,6 +87,10 @@ The campaign should be practical enough to direct social, video, newsletter, and
     JSON.stringify({
       campaignName: 'specific working campaign or content series name',
       theme: '2-4 sentence campaign theme and direction',
+      primaryGoal: 'one of: 建立信任, 增加查詢, 推動預約',
+      contentFocus: 'one concise sentence describing what the series will cover',
+      contentFormats: 'a concise list of practical formats such as 治療師短片、圖文拆解、問答',
+      audienceAction: 'one concise sentence describing what the audience should understand, feel, or do next',
       callToAction: 'optional CTA sentence, empty string if not useful',
       targetLink: 'target URL if obvious from website, otherwise empty string',
     }),
@@ -115,7 +128,11 @@ The campaign should be practical enough to direct social, video, newsletter, and
     return {
       campaignName: stringValue(parsed.campaignName, fallback.campaignName),
       theme: stringValue(parsed.theme, fallback.theme),
-      callToAction: stringValue(parsed.callToAction, fallback.callToAction),
+      primaryGoal: normalizePrimaryGoal(parsed.primaryGoal, fallback.primaryGoal),
+      contentFocus: stringValue(parsed.contentFocus, fallback.contentFocus),
+      contentFormats: stringValue(parsed.contentFormats, fallback.contentFormats),
+      audienceAction: stringValue(parsed.audienceAction, fallback.audienceAction),
+      callToAction: sanitizeCallToAction(stringValue(parsed.callToAction, fallback.callToAction)),
       targetLink: stringValue(parsed.targetLink, fallback.targetLink),
     }
   } catch {
@@ -131,9 +148,24 @@ function fallbackCampaignTheme(input: CampaignThemeInput): CampaignTheme {
   return {
     campaignName: `${brandName}｜${strategyName}內容企劃`,
     theme: `${brandName} 可以用「${strategyName}」作為第一個內容方向，將品牌定位、受眾痛點與實際使用情境連接起來。這個 campaign 會先建立清晰理解，再用具體場景推動受眾採取下一步行動。`,
-    callToAction: '了解更多，開始與我們建立更清晰的品牌內容方向。',
+    primaryGoal: '建立信任',
+    contentFocus: `圍繞受眾最常遇到的問題，運用「${strategyName}」提供清晰而實用的解答。`,
+    contentFormats: '專業短片、圖文拆解、常見問題問答',
+    audienceAction: '令受眾理解品牌的專業價值，並願意進一步了解或查詢。',
+    callToAction: '了解更多或聯絡團隊查詢。',
     targetLink: website,
   }
+}
+
+function normalizePrimaryGoal(value: unknown, fallback: string) {
+  const goal = typeof value === 'string' ? value.trim() : ''
+  return ['建立信任', '增加查詢', '推動預約'].includes(goal) ? goal : fallback
+}
+
+function sanitizeCallToAction(value: string) {
+  const unverifiedOffer = /(免費|折扣|優惠|保證|限時|贈送|零風險)/
+  if (!unverifiedOffer.test(value)) return value
+  return '立即了解更多或聯絡團隊查詢。'
 }
 
 function parseJsonObject(text: string): any {

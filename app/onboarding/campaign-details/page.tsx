@@ -9,15 +9,21 @@ import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/conten
 const emptyCampaign: CampaignTheme = {
   campaignName: '',
   theme: '',
+  primaryGoal: '建立信任',
+  contentFocus: '',
+  contentFormats: '',
+  audienceAction: '',
   callToAction: '',
   targetLink: '',
 }
 
+const campaignGoals = ['建立信任', '增加查詢', '推動預約']
+
 const loadingMessages = [
-  '正在建立第一個宣傳主題',
-  '正在整理 Campaign Name',
-  '正在撰寫 Theme',
-  '正在準備 CTA 與目標連結',
+  '正在建立第一個內容系列',
+  '正在整理系列名稱',
+  '正在拆解內容重點',
+  '正在準備行動提示與連結',
 ]
 
 function CampaignDetailsContent() {
@@ -83,6 +89,10 @@ function CampaignDetailsContent() {
         setCampaign({
           campaignName: data.campaignName || '',
           theme: data.theme || '',
+          primaryGoal: data.primaryGoal || '建立信任',
+          contentFocus: data.contentFocus || data.theme || '',
+          contentFormats: data.contentFormats || '專業短片、圖文拆解、常見問題問答',
+          audienceAction: data.audienceAction || '',
           callToAction: data.callToAction || '',
           targetLink: data.targetLink || website,
         })
@@ -92,7 +102,11 @@ function CampaignDetailsContent() {
         setCampaign({
           campaignName: `${mergedProfile.businessName || '你的品牌'}｜${localStrategyName}`,
           theme: `${mergedProfile.businessName || '你的品牌'} 可以用「${localStrategyName}」作為第一個 Campaign 方向，將品牌定位、受眾痛點與實際使用情境連接起來，讓之後的內容更集中和更容易轉化。`,
-          callToAction: '立即了解更多。',
+          primaryGoal: '建立信任',
+          contentFocus: `圍繞受眾最常遇到的問題，以「${localStrategyName}」提供實用解答。`,
+          contentFormats: '專業短片、圖文拆解、常見問題問答',
+          audienceAction: '令受眾理解品牌的專業價值，並願意進一步了解或查詢。',
+          callToAction: '立即了解更多或聯絡團隊查詢。',
           targetLink: website,
         })
       } finally {
@@ -108,7 +122,7 @@ function CampaignDetailsContent() {
   }, [searchParams])
 
   const campaignPreview = useMemo(() => {
-    return campaign.campaignName || '正在建立 Campaign Name'
+    return campaign.campaignName || '正在建立系列名稱'
   }, [campaign.campaignName])
 
   function updateCampaign<K extends keyof CampaignTheme>(key: K, value: CampaignTheme[K]) {
@@ -118,6 +132,7 @@ function CampaignDetailsContent() {
   function handleContinue() {
     const payload = {
       ...campaign,
+      theme: buildStructuredTheme(campaign),
       selectedStrategy: strategy,
       profile,
     }
@@ -134,6 +149,8 @@ function CampaignDetailsContent() {
     window.location.href = `${url.pathname}${url.search}`
   }
 
+  const targetLinkWarning = shouldWarnAboutTargetLink(campaign.callToAction, campaign.targetLink)
+
   if (loading) {
     return (
       <main className="campaign-page loading-page">
@@ -143,17 +160,17 @@ function CampaignDetailsContent() {
         <section className="loading-shell">
           <p>進行中...</p>
           <h1>{loadingMessages[loadingIndex]}</h1>
-          <span>每個 Campaign 會決定下一輪內容的主題、目標與行動方向。</span>
+          <span>每個內容系列會決定下一輪內容的主題、目標與行動方向。</span>
 
           <div className="loading-preview">
             <article className="strategy-mini">
-              <small>Content strategy</small>
+              <small>已選內容方向</small>
               <strong>{strategy?.emoji} {strategyName}</strong>
               <span>{strategyDescription}</span>
             </article>
             <b className="arrow">→</b>
             <article className="campaign-mini">
-              <small>Campaign details</small>
+              <small>第一個內容系列</small>
               <strong>{campaignPreview}</strong>
               <span className="typing" />
             </article>
@@ -171,38 +188,75 @@ function CampaignDetailsContent() {
 
       <section className="form-shell">
         <header>
-          <h1>你的第一個 Campaign 方向</h1>
-          <p>這些資料會決定之後內容的主題、目標與行動方向，你可以直接修改。</p>
+          <span className="eyebrow">第一個內容系列</span>
+          <h1>設定第一個內容系列</h1>
+          <p>SOON 已將你選擇的內容方向整理成可直接開始製作的系列，你可以逐項修改。</p>
         </header>
 
         {error ? <p className="notice">{error} 已先使用預設方向，你仍然可以修改後繼續。</p> : null}
 
         <div className="divider" />
 
+        <aside className="strategy-summary">
+          <small>你剛才選擇的方向</small>
+          <strong>{strategy?.emoji} {strategyName}</strong>
+          <span>{strategyDescription}</span>
+        </aside>
+
         <label className="field">
-          <span>Campaign Name</span>
+          <span>系列名稱</span>
           <input value={campaign.campaignName} onChange={(event) => updateCampaign('campaignName', event.target.value)} />
         </label>
 
-        <label className="field">
-          <span>Theme</span>
-          <textarea value={campaign.theme} onChange={(event) => updateCampaign('theme', event.target.value)} />
-        </label>
+        <fieldset className="goal-field">
+          <legend>主要目標</legend>
+          <div className="goal-options">
+            {campaignGoals.map((goal) => (
+              <button
+                className={campaign.primaryGoal === goal ? 'selected' : ''}
+                key={goal}
+                onClick={() => updateCampaign('primaryGoal', goal)}
+                type="button"
+              >
+                {goal}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <section className="direction-card">
+          <h2>這個系列會點樣做</h2>
+          <label className="field compact">
+            <span>內容重點</span>
+            <textarea value={campaign.contentFocus} onChange={(event) => updateCampaign('contentFocus', event.target.value)} />
+          </label>
+          <label className="field compact">
+            <span>表達形式</span>
+            <input value={campaign.contentFormats} onChange={(event) => updateCampaign('contentFormats', event.target.value)} />
+          </label>
+          <label className="field compact">
+            <span>希望觀眾之後點做</span>
+            <textarea value={campaign.audienceAction} onChange={(event) => updateCampaign('audienceAction', event.target.value)} />
+          </label>
+        </section>
 
         <label className="field">
-          <span>Call-to-Action <em>(optional)</em></span>
+          <span>行動提示 <em>（選填）</em></span>
           <input value={campaign.callToAction} onChange={(event) => updateCampaign('callToAction', event.target.value)} />
+          <small>SOON 不會自行加入未經確認的免費服務、折扣或成效保證。</small>
         </label>
 
         <label className="field">
-          <span>Target Link <em>(optional)</em></span>
+          <span>行動連結 <em>（選填）</em></span>
           <input value={campaign.targetLink} onChange={(event) => updateCampaign('targetLink', event.target.value)} />
+          <small>如希望觀眾預約或查詢，建議使用直接預約、WhatsApp 或聯絡頁。</small>
+          {targetLinkWarning ? <b className="field-warning">目前似乎係網站首頁，請確認係咪有更直接嘅預約或聯絡連結。</b> : null}
         </label>
       </section>
 
       <footer className="campaign-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
-        <button type="button" onClick={handleContinue}>Continue</button>
+        <button type="button" onClick={handleContinue}>確認並繼續</button>
       </footer>
 
       <style jsx>{styles}</style>
@@ -229,6 +283,25 @@ function readSession<T>(key: string): T | null {
     return value ? JSON.parse(value) as T : null
   } catch {
     return null
+  }
+}
+
+function buildStructuredTheme(campaign: CampaignTheme) {
+  const parts = [
+    campaign.contentFocus,
+    campaign.contentFormats ? `內容會以${campaign.contentFormats}呈現。` : '',
+    campaign.audienceAction,
+  ].filter(Boolean)
+  return parts.join(' ')
+}
+
+function shouldWarnAboutTargetLink(callToAction: string, targetLink: string) {
+  if (!/(預約|查詢|聯絡|WhatsApp)/i.test(callToAction) || !targetLink) return false
+  try {
+    const url = new URL(targetLink)
+    return url.pathname === '/' || url.pathname === ''
+  } catch {
+    return false
   }
 }
 
@@ -289,6 +362,18 @@ const styles = `
     margin-bottom: 26px;
   }
 
+  .eyebrow {
+    display: inline-flex;
+    margin-bottom: 12px;
+    border-radius: 999px;
+    background: #f1f8f2;
+    color: #287540;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
   h1 {
     margin: 0 0 10px;
     font-size: clamp(2rem, 4vw, 2.7rem);
@@ -320,12 +405,114 @@ const styles = `
     font-weight: 650;
   }
 
+  .strategy-summary {
+    display: grid;
+    gap: 7px;
+    margin: 0 0 28px;
+    border: 1px solid #e5e8e6;
+    border-radius: 12px;
+    background: #f8faf8;
+    padding: 18px 20px;
+  }
+
+  .strategy-summary small {
+    color: #6f7771;
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .strategy-summary strong {
+    font-size: 1.05rem;
+  }
+
+  .strategy-summary span {
+    color: #626a64;
+    line-height: 1.55;
+  }
+
   .field {
     display: grid;
     gap: 10px;
     margin-bottom: 24px;
     font-weight: 700;
     color: #1e1f23;
+  }
+
+  .field.compact {
+    margin-bottom: 18px;
+  }
+
+  .field.compact:last-child {
+    margin-bottom: 0;
+  }
+
+  .field small {
+    color: #757982;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .goal-field {
+    margin: 0 0 28px;
+    border: 0;
+    padding: 0;
+  }
+
+  .goal-field legend {
+    margin-bottom: 10px;
+    color: #1e1f23;
+    font-weight: 700;
+  }
+
+  .goal-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .goal-options button {
+    min-height: 48px;
+    border: 1px solid #dedfe3;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #25272d;
+    font: inherit;
+    font-weight: 750;
+    cursor: pointer;
+  }
+
+  .goal-options button.selected {
+    border-color: #202124;
+    background: #202124;
+    color: #ffffff;
+  }
+
+  .direction-card {
+    margin: 0 0 28px;
+    border: 1px solid #e2e4e7;
+    border-radius: 14px;
+    background: #fafafa;
+    padding: 22px;
+  }
+
+  .direction-card h2 {
+    margin: 0 0 20px;
+    color: #17181b;
+    font-size: 1.05rem;
+  }
+
+  .direction-card textarea {
+    min-height: 108px;
+  }
+
+  .field-warning {
+    border-radius: 8px;
+    background: #fff5dc;
+    color: #795300;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+    line-height: 1.45;
   }
 
   .field em {
@@ -505,6 +692,14 @@ const styles = `
 
     .arrow {
       display: none;
+    }
+
+    .goal-options {
+      grid-template-columns: 1fr;
+    }
+
+    .direction-card {
+      padding: 18px;
     }
 
     .campaign-footer {
