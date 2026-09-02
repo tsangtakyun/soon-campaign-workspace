@@ -155,7 +155,7 @@ function ContentModificationContent() {
   }
 
   function handleBack() {
-    const url = new URL('/onboarding/content-mood', window.location.origin)
+    const url = new URL('/onboarding/content-mix', window.location.origin)
     preserveParams(url)
     window.location.href = `${url.pathname}${url.search}`
   }

@@ -10,6 +10,11 @@ import {
   markOnboardingPersisted,
 } from '@/lib/onboarding-session'
 import { createClient } from '@/lib/supabase'
+import {
+  contentMoodOptions,
+  normalizeContentMoodSelection,
+  type ContentMoodSelection,
+} from '@/lib/recommend-content-mood'
 import { typefaces } from '@/lib/typefaces'
 import { visualStylePresets } from '@/lib/visual-styles'
 import {
@@ -492,6 +497,10 @@ export default function BrandKitPage() {
   const [addingVoiceTag, setAddingVoiceTag] = useState<BrandVoiceTagField | null>(null)
   const [voiceTagDraft, setVoiceTagDraft] = useState('')
   const [savingBrandVoice, setSavingBrandVoice] = useState(false)
+  const [contentMood, setContentMood] = useState<ContentMoodSelection | null>(null)
+  const [editingContentMood, setEditingContentMood] = useState(false)
+  const [contentMoodDraft, setContentMoodDraft] = useState<string[]>([])
+  const [savingContentMood, setSavingContentMood] = useState(false)
 
   const filteredAssets = useMemo(() => {
     if (mediaFilter === 'website') return assets.filter((asset) => asset.asset_type === 'website_image')
@@ -553,6 +562,7 @@ export default function BrandKitPage() {
     setBrandProfile((payload.brandProfile || null) as BrandProfile | null)
     setBrandVoice((payload.brandVoice || null) as BrandVoice | null)
     setAssets((payload.assets || []) as BrandAsset[])
+    setContentMood(payload.contentMood ? normalizeContentMoodSelection(payload.contentMood) : null)
   }
 
   async function openGeneratedTab(tab: Extract<BrandTab, '品牌資料' | '品牌聲音'>) {
@@ -708,6 +718,51 @@ export default function BrandKitPage() {
   function openTypefacePicker() {
     setTypefaceDraft(workspaceStyle?.font_style || '')
     setEditingTypeface(true)
+  }
+
+  function openContentMoodPicker() {
+    setContentMoodDraft(contentMood?.selectedMoods.map((mood) => mood.id) || [])
+    setEditingContentMood(true)
+  }
+
+  function toggleContentMoodDraft(id: string) {
+    setContentMoodDraft((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id)
+      if (current.length >= 2) return current
+      return [...current, id]
+    })
+  }
+
+  async function saveContentMood() {
+    if (!workspaceId || !contentMoodDraft.length) return
+    setSavingContentMood(true)
+    setAnalysisError('')
+
+    try {
+      const selectedMoods = contentMoodOptions
+        .filter((option) => contentMoodDraft.includes(option.id))
+        .map(({ id, label, generationMood }) => ({ id, label, generationMood }))
+      const labels = selectedMoods.map((mood) => `「${mood.label}」`).join('與')
+      const value: ContentMoodSelection = {
+        recommendationReason: `你已在 Brand Kit 選擇${labels}；SOON 會以此調整封面取景、文案語氣及題材呈現。`,
+        selectedMoods,
+      }
+      const response = await fetch('/api/brand-kit-data', {
+        body: JSON.stringify({ field: 'content_mood', value, workspace_id: workspaceId }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || '儲存失敗')
+      setContentMood(normalizeContentMoodSelection(payload.contentMood || value))
+      setEditingContentMood(false)
+      setSaveNotice('已儲存 ✓')
+      window.setTimeout(() => setSaveNotice(''), 2200)
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : '儲存失敗')
+    } finally {
+      setSavingContentMood(false)
+    }
   }
 
   async function addBrandColor(value: string) {
@@ -1373,6 +1428,56 @@ export default function BrandKitPage() {
                       <p style={{ fontFamily: workspaceStyle?.font_style || brand.typeface_family || 'inherit' }}>
                         {typefaceDisplayName(workspaceStyle?.font_style, brand)}
                       </p>
+                    )}
+                  </div>
+                  <div className="brand-style-card wide content-mood-card">
+                    <div className="brand-style-title-row">
+                      <label>內容感覺</label>
+                      <button type="button" onClick={openContentMoodPicker}>更改</button>
+                    </div>
+                    {editingContentMood ? (
+                      <div className="brand-picker-panel">
+                        <div className="content-mood-picker-grid">
+                          {contentMoodOptions.map((mood) => (
+                            <button
+                              key={mood.id}
+                              type="button"
+                              className={contentMoodDraft.includes(mood.id) ? 'selected' : ''}
+                              onClick={() => toggleContentMoodDraft(mood.id)}
+                              aria-pressed={contentMoodDraft.includes(mood.id)}
+                            >
+                              <img src={mood.image} alt="" />
+                              <span>{mood.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p className="content-mood-limit">最多選擇兩種，作為封面、文案及題材呈現嘅主要方向。</p>
+                        <div className="picker-actions">
+                          <button
+                            type="button"
+                            onClick={() => void saveContentMood()}
+                            disabled={!contentMoodDraft.length || savingContentMood}
+                          >
+                            {savingContentMood ? '儲存中...' : '確認'}
+                          </button>
+                          <button type="button" onClick={() => setEditingContentMood(false)} disabled={savingContentMood}>取消</button>
+                        </div>
+                      </div>
+                    ) : contentMood?.selectedMoods.length ? (
+                      <div className="content-mood-summary">
+                        <div className="content-mood-chip-list">
+                          {contentMood.selectedMoods.map((mood) => (
+                            <span className="content-mood-chip" key={mood.id}>{mood.label}</span>
+                          ))}
+                        </div>
+                        {contentMood.recommendationReason ? <p className="content-mood-reason">{contentMood.recommendationReason}</p> : null}
+                        <p className="content-mood-impact">影響：封面取景、圖片質感、文案語氣及題材呈現。</p>
+                      </div>
+                    ) : (
+                      <div className="content-mood-summary">
+                        <p>尚未設定。SOON 會在建立內容策略時自動推薦兩種內容感覺。</p>
+                        <p className="content-mood-impact">你亦可以現在自行設定。</p>
+                      </div>
                     )}
                   </div>
                   <div className="brand-style-card">
@@ -2700,7 +2805,8 @@ const brandKitStyles = `
   }
 
   .visual-style-picker-grid button,
-  .typeface-picker-grid button {
+  .typeface-picker-grid button,
+  .content-mood-picker-grid button {
     background: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
@@ -2713,7 +2819,8 @@ const brandKitStyles = `
   }
 
   .visual-style-picker-grid button.selected,
-  .typeface-picker-grid button.selected {
+  .typeface-picker-grid button.selected,
+  .content-mood-picker-grid button.selected {
     border-color: #111827;
     box-shadow: 0 0 0 2px #111827;
   }
@@ -2745,6 +2852,60 @@ const brandKitStyles = `
     color: #111827;
     font-size: 20px;
     font-weight: 600;
+  }
+
+  .content-mood-picker-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .content-mood-picker-grid img {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: block;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .content-mood-picker-grid span {
+    color: #374151;
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .content-mood-limit,
+  .content-mood-impact {
+    color: #7a7f89 !important;
+    font-size: 12px !important;
+    line-height: 1.55;
+  }
+
+  .content-mood-summary {
+    display: grid;
+    gap: 10px;
+  }
+
+  .content-mood-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .content-mood-chip {
+    background: #f6eee9;
+    border: 1px solid #ead8cf;
+    border-radius: 999px;
+    color: #6f3328;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 7px 11px;
+  }
+
+  .content-mood-reason {
+    color: #30343b !important;
+    line-height: 1.65;
+    max-width: 880px;
   }
 
   .picker-actions {

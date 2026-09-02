@@ -2,52 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-
-type MoodOption = {
-  id: string
-  label: string
-  image: string
-  generationMood: string
-}
-
-const moodOptions: MoodOption[] = [
-  {
-    id: 'funny',
-    label: '搞笑有趣',
-    image: '/mood/mood-funny.jpg',
-    generationMood: 'humorous, meme-style, playful, unexpected, makes people laugh and share',
-  },
-  {
-    id: 'lifestyle',
-    label: '真實日常',
-    image: '/mood/mood-lifestyle.jpg',
-    generationMood: 'authentic, candid, real moments, natural light, relatable, everyday life',
-  },
-  {
-    id: 'cinematic',
-    label: '廣告大片',
-    image: '/mood/mood-cinematic.jpg',
-    generationMood: 'high production value, cinematic lighting, dramatic, premium, editorial quality',
-  },
-  {
-    id: 'educational',
-    label: '教育資訊',
-    image: '/mood/mood-educational.jpg',
-    generationMood: 'informative, clean layout, infographic style, trustworthy, clear messaging',
-  },
-  {
-    id: 'warm',
-    label: '溫暖親切',
-    image: '/mood/mood-warm.jpg',
-    generationMood: 'warm tones, soft light, cozy, intimate, emotional connection, human touch',
-  },
-  {
-    id: 'street',
-    label: '潮流街頭',
-    image: '/mood/mood-street.jpg',
-    generationMood: 'urban, edgy, youth culture, bold, street photography style, high contrast',
-  },
-]
+import { contentMoodOptions as moodOptions } from '@/lib/recommend-content-mood'
 
 function ContentMoodContent() {
   const searchParams = useSearchParams()

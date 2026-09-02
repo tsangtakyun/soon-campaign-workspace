@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { normalizeContentMoodSelection } from '@/lib/recommend-content-mood'
 
 export async function GET(req: Request) {
   try {
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
     console.log('[brand-data-api] fetched workspace:', JSON.stringify(workspace))
     console.log('[brand-data-api] querying brand_profiles for workspace_id:', workspaceId)
 
-    const [sourcesResult, profileResult, voiceResult, assetsResult] = await Promise.all([
+    const [sourcesResult, profileResult, voiceResult, assetsResult, contentMoodResult] = await Promise.all([
       supabase
         .from('brand_sources')
         .select('id,url,type,status,last_scanned_at,created_at')
@@ -61,16 +62,23 @@ export async function GET(req: Request) {
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('content_preferences')
+        .select('content_mood,updated_at')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
     ])
 
     const result = {
       assets: assetsResult.data || [],
       brandProfile: profileResult.data || null,
       brandVoice: voiceResult.data || null,
+      contentMood: contentMoodResult.data?.content_mood || null,
       errors: {
         assets: assetsResult.error,
         brandProfile: profileResult.error,
         brandVoice: voiceResult.error,
+        contentMood: contentMoodResult.error,
         sources: sourcesResult.error,
       },
       sources: sourcesResult.data || [],
@@ -123,6 +131,7 @@ export async function PATCH(req: Request) {
       'character',
       'syntax',
       'language',
+      'content_mood',
     ])
     if (!allowedFields.has(field)) {
       return NextResponse.json({ error: 'Unsupported brand profile field' }, { status: 400 })
@@ -155,6 +164,29 @@ export async function PATCH(req: Request) {
 
     if (!workspace || (workspace.owner_id !== user.id && !membership)) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
+    }
+
+    if (field === 'content_mood') {
+      const normalizedMood = normalizeContentMoodSelection(value)
+      if (!normalizedMood.selectedMoods.length) {
+        return NextResponse.json({ error: '請至少選擇一種內容感覺' }, { status: 400 })
+      }
+
+      const { data: contentPreference, error: contentMoodError } = await supabase
+        .from('content_preferences')
+        .upsert(
+          {
+            content_mood: normalizedMood,
+            updated_at: new Date().toISOString(),
+            workspace_id: workspaceId,
+          },
+          { onConflict: 'workspace_id' }
+        )
+        .select('content_mood')
+        .single()
+
+      if (contentMoodError) throw contentMoodError
+      return NextResponse.json({ contentMood: contentPreference.content_mood, success: true })
     }
 
     if (field === 'visual_identity_description') {

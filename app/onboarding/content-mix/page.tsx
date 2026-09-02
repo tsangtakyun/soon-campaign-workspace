@@ -15,6 +15,7 @@ import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/conten
 import { getPricingPlan } from '@/lib/pricing'
 import { recommendVisualStyles } from '@/lib/recommend-styles'
 import { recommendTypefaceDirection, recommendTypefacesInDirection } from '@/lib/recommend-typeface'
+import { recommendContentMoods } from '@/lib/recommend-content-mood'
 import { visualStylePresets } from '@/lib/visual-styles'
 
 type DistributionPreferences = {
@@ -200,13 +201,17 @@ function ContentMixContent() {
       }))
     }
 
-    const url = new URL('/onboarding/content-mood', window.location.origin)
+    const recommendedMood = recommendContentMoods({ profile, strategy, distribution, contentMix: payload })
+    sessionStorage.setItem('soon-content-mood-v1', JSON.stringify(recommendedMood))
+
+    const url = new URL('/onboarding/content-modification', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
     })
     url.searchParams.set('visualStyle', recommendedStyle.id)
     if (recommendedTypeface) url.searchParams.set('typeface', recommendedTypeface.id)
+    url.searchParams.set('contentMood', recommendedMood.selectedMoods.map((mood) => mood.id).join(','))
     url.searchParams.set('autoAnalyze', '1')
     url.searchParams.set('generatePreview', '1')
     window.location.href = `${url.pathname}${url.search}`
