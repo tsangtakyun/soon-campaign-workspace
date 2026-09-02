@@ -14,6 +14,7 @@ import {
 import type { ContentStrategyOption, ContentStrategyProfile } from '@/lib/content-strategy'
 import { getPricingPlan } from '@/lib/pricing'
 import { recommendVisualStyles } from '@/lib/recommend-styles'
+import { recommendTypefaceDirection, recommendTypefacesInDirection } from '@/lib/recommend-typeface'
 import { visualStylePresets } from '@/lib/visual-styles'
 
 type DistributionPreferences = {
@@ -173,13 +174,41 @@ function ContentMixContent() {
 
     sessionStorage.setItem('soon-visual-style-v1', JSON.stringify(recommendedStyle))
 
-    const url = new URL('/onboarding/typeface', window.location.origin)
+    const typefaceInput = {
+      profile,
+      strategy,
+      distribution,
+      visualStyle: recommendedStyle,
+    }
+    const recommendedDirection = recommendTypefaceDirection(typefaceInput)[0]
+    const recommendedTypeface = recommendedDirection
+      ? recommendTypefacesInDirection(recommendedDirection.id, typefaceInput)[0]
+      : undefined
+
+    if (recommendedDirection && recommendedTypeface) {
+      sessionStorage.setItem('soon-typeface-v1', JSON.stringify({
+        directionId: recommendedDirection.id,
+        directionLabel: recommendedDirection.label,
+        directionEmoji: recommendedDirection.emoji,
+        typefaceId: recommendedTypeface.id,
+        typefaceName: recommendedTypeface.name,
+        typefaceNameEn: recommendedTypeface.nameEn,
+        fontFamily: recommendedTypeface.fontFamily,
+        cdnUrl: recommendedTypeface.cdnUrl,
+        weight: recommendedTypeface.weight,
+        isGoogleFont: recommendedTypeface.isGoogleFont || false,
+      }))
+    }
+
+    const url = new URL('/onboarding/content-mood', window.location.origin)
     ;['plan', 'name', 'budget', 'category', 'website', 'language', 'brandName', 'strategy', 'campaign'].forEach((key) => {
       const value = searchParams.get(key)
       if (value) url.searchParams.set(key, value)
     })
     url.searchParams.set('visualStyle', recommendedStyle.id)
+    if (recommendedTypeface) url.searchParams.set('typeface', recommendedTypeface.id)
     url.searchParams.set('autoAnalyze', '1')
+    url.searchParams.set('generatePreview', '1')
     window.location.href = `${url.pathname}${url.search}`
   }
 

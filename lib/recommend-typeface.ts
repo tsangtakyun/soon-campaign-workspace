@@ -2,16 +2,22 @@ import { typefaceDirections, typefaces, type TypefaceDirection, type Typeface } 
 
 export type TypefaceRecommendationInput = {
   profile?: {
+    businessName?: string
     businessType?: string
+    budget?: string
     elevatorPitch?: string
+    websiteUrl?: string
     target_audience?: string
     content_persona?: string
     market_positioning?: string
-    brandProfile?: { tone?: string; type?: string; audience?: string; position?: string }
-    audience?: { summary?: string; ageRange?: string }
+    brandProfile?: { tone?: string; type?: string; audience?: string; position?: string; offer?: string }
+    audience?: { summary?: string; ageRange?: string; locations?: string[] }
+    contentPeople?: { ageRange?: string; gender?: string; ethnicity?: string }
+    marketPositioning?: { primary?: string; secondary?: string; tertiary?: string }
   }
-  strategy?: { id?: string; funnelStage?: string }
-  distribution?: { channels?: string[] }
+  strategy?: { id?: string; title?: string; titleZh?: string; description?: string; directionTitle?: string; reason?: string; funnelStage?: string; examples?: string[] }
+  distribution?: { channels?: string[]; channelIds?: string[] }
+  visualStyle?: { id?: string; name?: string; chineseName?: string; mood?: string; description?: string }
 }
 
 export type RankedDirection = TypefaceDirection & { score: number; recommended: boolean }
@@ -21,9 +27,12 @@ function includesAny(text: string, keywords: string[]): boolean {
   return keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()))
 }
 
-export function recommendTypefaceDirection(input: TypefaceRecommendationInput): RankedDirection[] {
-  const profileText = [
+function recommendationText(input: TypefaceRecommendationInput): string {
+  return [
+    input.profile?.businessName,
     input.profile?.businessType,
+    input.profile?.budget,
+    input.profile?.websiteUrl,
     input.profile?.elevatorPitch,
     input.profile?.target_audience,
     input.profile?.content_persona,
@@ -32,12 +41,36 @@ export function recommendTypefaceDirection(input: TypefaceRecommendationInput): 
     input.profile?.brandProfile?.type,
     input.profile?.brandProfile?.audience,
     input.profile?.brandProfile?.position,
+    input.profile?.brandProfile?.offer,
     input.profile?.audience?.summary,
     input.profile?.audience?.ageRange,
+    ...(input.profile?.audience?.locations ?? []),
+    input.profile?.contentPeople?.ageRange,
+    input.profile?.contentPeople?.gender,
+    input.profile?.contentPeople?.ethnicity,
+    input.profile?.marketPositioning?.primary,
+    input.profile?.marketPositioning?.secondary,
+    input.profile?.marketPositioning?.tertiary,
     input.strategy?.id,
+    input.strategy?.title,
+    input.strategy?.titleZh,
+    input.strategy?.description,
+    input.strategy?.directionTitle,
+    input.strategy?.reason,
     input.strategy?.funnelStage,
+    ...(input.strategy?.examples ?? []),
     ...(input.distribution?.channels ?? []),
+    ...(input.distribution?.channelIds ?? []),
+    input.visualStyle?.id,
+    input.visualStyle?.name,
+    input.visualStyle?.chineseName,
+    input.visualStyle?.mood,
+    input.visualStyle?.description,
   ].filter(Boolean).join(' ')
+}
+
+export function recommendTypefaceDirection(input: TypefaceRecommendationInput): RankedDirection[] {
+  const profileText = recommendationText(input)
 
   const scores = new Map<string, number>()
   typefaceDirections.forEach((d) => scores.set(d.id, 0))
@@ -50,9 +83,6 @@ export function recommendTypefaceDirection(input: TypefaceRecommendationInput): 
     })
   })
 
-  // Additional rules based on visual style already chosen
-  // (read from sessionStorage inside the component, pass as optional field if needed)
-
   // Hard boosts for specific brand signals
   if (includesAny(profileText, ['youtube', 'thumbnail', '短片封面', 'viral', '爆款'])) {
     scores.set('impact', (scores.get('impact') ?? 0) + 20)
@@ -63,8 +93,8 @@ export function recommendTypefaceDirection(input: TypefaceRecommendationInput): 
   if (includesAny(profileText, ['luxury', 'premium', '高端', '精品', '奢華'])) {
     scores.set('editorial', (scores.get('editorial') ?? 0) + 20)
   }
-  if (includesAny(profileText, ['tech', 'saas', 'b2b', '科技', '專業'])) {
-    scores.set('gothic', (scores.get('gothic') ?? 0) + 20)
+  if (includesAny(profileText, ['tech', 'saas', 'b2b', '科技', '專業', '醫療', '健康', '復康', '物理治療', '運動治療', '診所', 'clinical', 'health', 'rehab', 'physio'])) {
+    scores.set('gothic', (scores.get('gothic') ?? 0) + 30)
   }
   if (includesAny(profileText, ['餐飲', 'cafe', 'food', '親子', '可愛'])) {
     scores.set('rounded', (scores.get('rounded') ?? 0) + 20)
@@ -87,20 +117,7 @@ export function recommendTypefacesInDirection(
   directionId: string,
   input: TypefaceRecommendationInput
 ): RankedTypeface[] {
-  const profileText = [
-    input.profile?.businessType,
-    input.profile?.elevatorPitch,
-    input.profile?.target_audience,
-    input.profile?.content_persona,
-    input.profile?.market_positioning,
-    input.profile?.brandProfile?.tone,
-    input.profile?.brandProfile?.type,
-    input.profile?.brandProfile?.audience,
-    input.profile?.brandProfile?.position,
-    input.profile?.audience?.summary,
-    input.strategy?.id,
-    ...(input.distribution?.channels ?? []),
-  ].filter(Boolean).join(' ')
+  const profileText = recommendationText(input)
 
   const directionTypefaces = typefaces.filter((t) => t.directionId === directionId)
   const scores = new Map<string, number>()
