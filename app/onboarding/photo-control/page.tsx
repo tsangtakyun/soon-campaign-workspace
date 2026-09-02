@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 type PhotoControlOption = {
-  id: 'minimal' | 'balanced' | 'full' | 'strict'
+  id: 'minimal' | 'balanced' | 'full'
   title: string
   titleEn: string
   icon: string
@@ -19,57 +19,47 @@ const ORIGINAL_PRODUCT_IMAGE = '/photo-control/photo-control-origin.jpg'
 
 const photoControlOptions: PhotoControlOption[] = [
   {
-    id: 'full',
-    title: '完整創作自由',
-    titleEn: 'Full Freedom',
-    description: 'AI 可以大幅重塑畫面，加入人物、場景和情緒，令內容更有廣告感。',
-    icon: '✨',
-    previewImage: '/photo-control/photo-control-full.jpg',
-    generationPrompt: 'Use the uploaded image as creative inspiration only. Feel free to completely reimagine the scene — add people, change the environment, introduce lifestyle elements, create an editorial or advertising quality image. The result can look significantly different from the original as long as it captures the brand and product essence.',
-  },
-  {
-    id: 'balanced',
-    title: '平衡改動',
-    titleEn: 'Balanced',
-    description: 'AI 會保留產品辨識度，只調整背景、光線和構圖，令畫面更完整。',
-    icon: '⚖️',
-    previewImage: '/photo-control/photo-control-balanced.jpg',
-    generationPrompt: 'Keep the main product recognizable but make moderate creative improvements. Enhance the background environment, improve lighting quality, add complementary props if needed. The product should remain the clear focal point but the overall image should feel more polished and brand-ready.',
-  },
-  {
     id: 'minimal',
-    title: '最少改動',
-    titleEn: 'Minimal Changes',
-    description: 'AI 只會微調光線、色調和小細節，角度和產品外觀會盡量保持原樣。',
+    title: '保留原貌',
+    titleEn: 'Preserve Original',
+    description: '只微調光線、色調與清晰度，保留原有構圖和主體。',
     icon: '🔍',
     previewImage: '/photo-control/photo-control-minimal.jpg',
     generationPrompt: 'Keep the original product fully recognizable. Only make minimal adjustments: slightly improve lighting, refine color tone, sharpen details. Do not change the composition, background, or add any new elements. The result should look like a professionally edited version of the original photo.',
   },
   {
-    id: 'strict',
-    title: '嚴格品牌控制',
-    titleEn: 'Strict Brand Control',
-    description: '只使用你上傳的品牌素材，AI 不會對原圖作任何改動。',
-    icon: '🔒',
-    previewImage: '/photo-control/photo-control-origin.jpg',
-    generationPrompt: 'Use only the exact uploaded brand assets without any AI modification. Do not alter the composition, lighting, or any element of the original image.',
+    id: 'balanced',
+    title: '平衡改動',
+    titleEn: 'Balanced',
+    description: '保留品牌及產品辨識度，適度改善背景、光線和構圖。',
+    icon: '⚖️',
+    previewImage: '/photo-control/photo-control-balanced.jpg',
+    generationPrompt: 'Keep the main product recognizable but make moderate creative improvements. Enhance the background environment, improve lighting quality, add complementary props if needed. The product should remain the clear focal point but the overall image should feel more polished and brand-ready.',
+  },
+  {
+    id: 'full',
+    title: '自由創作',
+    titleEn: 'Creative Freedom',
+    description: '容許 AI 重塑場景、人物及情緒，適合需要全新廣告畫面。',
+    icon: '✨',
+    previewImage: '/photo-control/photo-control-full.jpg',
+    generationPrompt: 'Use the uploaded image as creative inspiration only. Feel free to completely reimagine the scene — add people, change the environment, introduce lifestyle elements, create an editorial or advertising quality image. The result can look significantly different from the original as long as it captures the brand and product essence.',
   },
 ]
 
 function PhotoControlContent() {
   const searchParams = useSearchParams()
-  const shouldGeneratePreview = searchParams.get('generatePreview') !== '0'
   const [selectedId, setSelectedId] = useState<PhotoControlOption['id']>('balanced')
   const [generatedImages, setGeneratedImages] = useState<Partial<Record<PhotoControlOption['id'], string>>>({})
   const [generatingId, setGeneratingId] = useState<PhotoControlOption['id'] | null>(null)
-  const [generationAttempts, setGenerationAttempts] = useState<Partial<Record<PhotoControlOption['id'], true>>>({})
-  const [creditWarning, setCreditWarning] = useState<{ balance: number; required: number } | null>(null)
+  const [previewError, setPreviewError] = useState('')
+  const [referenceImage, setReferenceImage] = useState(ORIGINAL_PRODUCT_IMAGE)
+  const [hasBrandReference, setHasBrandReference] = useState(false)
 
   const selectedOption = useMemo(
     () => photoControlOptions.find((option) => option.id === selectedId) || photoControlOptions[0],
     [selectedId]
   )
-  const originalImage = ORIGINAL_PRODUCT_IMAGE
   const generatedImage = generatedImages[selectedOption.id]
   const previewImage = generatedImage || selectedOption.previewImage
 
@@ -81,63 +71,45 @@ function PhotoControlContent() {
       PHOTO_CONTROL_GENERATED_STORAGE_KEY,
     )
     if (storedGenerated) setGeneratedImages(storedGenerated)
+
+    const businessProfile = readSession<{ logoUrl?: string }>('soon-business-profile-v1')
+    const brandProfile = readSession<{ logo_url?: string }>('soon-brand-profile-v1')
+    const savedReference = businessProfile?.logoUrl || brandProfile?.logo_url
+    if (savedReference) {
+      setReferenceImage(savedReference)
+      setHasBrandReference(true)
+    }
   }, [])
 
-  useEffect(() => {
-    if (
-      !shouldGeneratePreview ||
-      selectedId === 'strict' ||
-      generatedImages[selectedId] ||
-      generationAttempts[selectedId] ||
-      generatingId
-    ) return
-
-    const controller = new AbortController()
-    setGenerationAttempts((current) => ({ ...current, [selectedId]: true }))
+  async function handleGeneratePreview() {
+    if (generatingId) return
+    setPreviewError('')
     setGeneratingId(selectedId)
-
-    fetch('/api/photo-control/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: selectedId,
-        originalImageUrl: originalImage,
-        prompt: selectedOption.generationPrompt,
-      }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (response.status === 402) {
-          const data = await response.json().catch(() => null)
-          setCreditWarning({
-            balance: Number(data?.balance || 0),
-            required: Number(data?.required || 5),
-          })
-          return null
-        }
-        if (!response.ok) return null
-        return response.json() as Promise<{ imageDataUrl?: string }>
+    try {
+      const sourceImage = referenceImage.startsWith('blob:') ? ORIGINAL_PRODUCT_IMAGE : referenceImage
+      const response = await fetch('/api/photo-control/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: selectedId,
+          originalImageUrl: sourceImage,
+          prompt: selectedOption.generationPrompt,
+        }),
       })
-      .then((result) => {
-        if (result?.imageDataUrl) {
-          setGeneratedImages((current) => {
-            const next = { ...current, [selectedId]: result.imageDataUrl }
-            if (typeof window !== 'undefined') {
-              window.sessionStorage.setItem(PHOTO_CONTROL_GENERATED_STORAGE_KEY, JSON.stringify(next))
-            }
-            return next
-          })
-        }
+      if (!response.ok) throw new Error('preview_failed')
+      const result = await response.json() as { imageDataUrl?: string }
+      if (!result.imageDataUrl) throw new Error('missing_preview')
+      setGeneratedImages((current) => {
+        const next = { ...current, [selectedId]: result.imageDataUrl }
+        window.sessionStorage.setItem(PHOTO_CONTROL_GENERATED_STORAGE_KEY, JSON.stringify(next))
+        return next
       })
-      .catch(() => {
-        // If the API key is not configured or generation fails, keep the curated static preview.
-      })
-      .finally(() => {
-        setGeneratingId((current) => (current === selectedId ? null : current))
-      })
-
-    return () => controller.abort()
-  }, [generatedImages, generatingId, generationAttempts, originalImage, selectedId, selectedOption.generationPrompt, shouldGeneratePreview])
+    } catch {
+      setPreviewError('暫時未能產生預覽；你仍可儲存設定並繼續。')
+    } finally {
+      setGeneratingId(null)
+    }
+  }
 
   function handleContinue() {
     sessionStorage.setItem(PHOTO_CONTROL_STORAGE_KEY, JSON.stringify({
@@ -190,7 +162,10 @@ function PhotoControlContent() {
                     <span className="option-icon" aria-hidden="true">{option.icon}</span>
                     <span className="option-copy">
                       <span className="option-heading">
-                        <strong>{option.title}</strong>
+                        <span className="option-title-line">
+                          <strong>{option.title}</strong>
+                          {option.id === 'balanced' ? <span className="recommended-label">建議</span> : null}
+                        </span>
                         <em>{option.titleEn}</em>
                       </span>
                       <small>{option.description}</small>
@@ -208,27 +183,21 @@ function PhotoControlContent() {
             <img key={previewImage} src={previewImage} alt={`${selectedOption.title} preview`} />
             {selectedOption.id === 'full' ? <div className="preview-gradient" /> : null}
             <span className="selection-badge">{selectedOption.title}</span>
-            {generatingId === selectedOption.id ? <span className="generate-badge">ChatGPT API 生成中</span> : null}
+            <span className="preview-kind">{generatedImage ? '個人化預覽' : '示範預覽'}</span>
             <div className="original-card">
-              <img src={originalImage} alt="Original uploaded product reference" />
-              <span>原圖</span>
+              <img src={referenceImage} alt="Brand reference" />
+              <span>{hasBrandReference ? '你的品牌素材' : '示範素材'}</span>
             </div>
+          </div>
+          <div className="preview-actions">
+            <button disabled={Boolean(generatingId)} onClick={handleGeneratePreview} type="button">
+              {generatingId ? '正在產生預覽…' : generatedImage ? '重新產生預覽' : '產生個人化預覽'}
+            </button>
+            <small>只會喺你按下按鈕後產生，不會因切換選項自動生成。</small>
+            {previewError ? <p role="alert">{previewError}</p> : null}
           </div>
         </aside>
       </section>
-
-      {creditWarning ? (
-        <div className="credit-modal-backdrop" role="presentation" onClick={() => setCreditWarning(null)}>
-          <div className="credit-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <h2>你的積分不足以生成此內容。</h2>
-            <p>剩餘：{creditWarning.balance} 積分，需要：{creditWarning.required} 積分。</p>
-            <div>
-              <button type="button" onClick={() => setCreditWarning(null)}>稍後再試</button>
-              <button type="button" onClick={() => { window.location.href = '/pricing' }}>升級方案</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <footer className="photo-control-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
@@ -402,6 +371,23 @@ const styles = `
     gap: 2px;
   }
 
+  .option-title-line {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+
+  .recommended-label {
+    border-radius: 999px;
+    background: #eef8f0;
+    color: #287b43;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1.35;
+  }
+
   .control-option strong,
   .control-option em,
   .control-option small {
@@ -449,7 +435,9 @@ const styles = `
   .image-preview {
     min-height: 0;
     display: grid;
-    place-items: start center;
+    justify-items: center;
+    align-content: start;
+    gap: 16px;
     padding: 0;
   }
 
@@ -497,7 +485,7 @@ const styles = `
     backdrop-filter: blur(8px);
   }
 
-  .generate-badge {
+  .preview-kind {
     position: absolute;
     top: 14px;
     left: 14px;
@@ -508,6 +496,44 @@ const styles = `
     font-size: 0.66rem;
     font-weight: 600;
     backdrop-filter: blur(8px);
+  }
+
+  .preview-actions {
+    width: min(100%, calc((100vh - 120px) * 0.75), 615px);
+    display: grid;
+    justify-items: center;
+    gap: 7px;
+    text-align: center;
+  }
+
+  .preview-actions button {
+    min-height: 40px;
+    border: 1px solid #202124;
+    border-radius: 9px;
+    background: #202124;
+    color: #ffffff;
+    padding: 9px 18px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .preview-actions button:disabled {
+    cursor: wait;
+    opacity: 0.58;
+  }
+
+  .preview-actions small,
+  .preview-actions p {
+    margin: 0;
+    color: #7a7e87;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .preview-actions p {
+    color: #a23a3a;
   }
 
   .original-card {
@@ -537,65 +563,6 @@ const styles = `
   .original-card span {
     font-size: 0.68rem;
     font-weight: 650;
-  }
-
-  .credit-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: rgba(0,0,0,0.46);
-    display: grid;
-    place-items: center;
-    padding: 20px;
-  }
-
-  .credit-modal {
-    width: min(100%, 420px);
-    border-radius: 16px;
-    background: #ffffff;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.22);
-    padding: 24px;
-    display: grid;
-    gap: 12px;
-  }
-
-  .credit-modal h2 {
-    margin: 0;
-    font-size: 1.15rem;
-    font-weight: 650;
-    color: #17181c;
-  }
-
-  .credit-modal p {
-    margin: 0;
-    color: #666b75;
-    font-size: 0.92rem;
-    line-height: 1.5;
-  }
-
-  .credit-modal div {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .credit-modal button {
-    border: 1px solid #dedfe3;
-    border-radius: 9px;
-    background: #ffffff;
-    color: #17181c;
-    font: inherit;
-    font-size: 0.88rem;
-    font-weight: 600;
-    padding: 9px 14px;
-    cursor: pointer;
-  }
-
-  .credit-modal button:last-child {
-    border-color: #ef4444;
-    background: #ef4444;
-    color: #ffffff;
   }
 
   .photo-control-footer {
@@ -651,6 +618,10 @@ const styles = `
     .generated-frame {
       width: min(100%, 520px);
       aspect-ratio: 3 / 4;
+    }
+
+    .preview-actions {
+      width: min(100%, 520px);
     }
   }
 
