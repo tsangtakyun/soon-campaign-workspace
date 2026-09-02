@@ -182,14 +182,18 @@ export function fallbackContentMix(input: ContentMixInput): ContentMixRecommenda
   const weeklyCreditLimit = selectedPlan.weeklyPlanningCredits
   const hasShortVideo = input.distribution?.channelIds?.some((id) => ['instagram-reels', 'tiktok', 'youtube-shorts'].includes(id))
   const hasStories = input.distribution?.channelIds?.some((id) => ['instagram-stories', 'facebook-stories'].includes(id))
+  const hasEmail = input.distribution?.channelIds?.includes('newsletter')
+  const frequency = input.distribution?.schedule || '2-3-weekly'
+  const isDaily = frequency === 'daily' || frequency === 'everyday'
+  const isFrequent = isDaily || frequency === '3-5-weekly' || frequency === 'weekdays'
 
   const quantities: Record<string, number> = {
-    'still-images': 3,
+    'still-images': isDaily ? 3 : isFrequent ? 2 : 1,
     carousels: 1,
     'feed-videos': hasShortVideo ? 0 : 1,
     'short-form-video': hasShortVideo ? 1 : 0,
-    stories: hasStories ? 2 : 0,
-    emails: 1,
+    stories: hasStories ? (isDaily ? 2 : 1) : 0,
+    emails: hasEmail ? 1 : 0,
   }
   const items = fitItemsWithinLimit(buildItems(quantities), weeklyCreditLimit)
 
@@ -197,7 +201,7 @@ export function fallbackContentMix(input: ContentMixInput): ContentMixRecommenda
     items,
     totalCredits: calculateTotal(items),
     weeklyCreditLimit,
-    reason: '這個組合先用 feed、長內容和 email 建立第一週基礎，再按你選擇的渠道加入短片或限時動態。',
+    reason: '這個組合先用貼文和輪播圖建立第一週基礎，再按你選擇的平台加入短片、限時動態或電子報。',
     provider: 'fallback',
   }
 }

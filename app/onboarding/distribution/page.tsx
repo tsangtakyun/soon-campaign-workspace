@@ -1,7 +1,11 @@
 'use client'
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+
+import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
+import { createClient } from '@/lib/supabase'
+import { resolveActiveWorkspace } from '@/lib/workspace-client'
 
 type Channel = {
   id: string
@@ -9,6 +13,7 @@ type Channel = {
   icon: 'instagram' | 'facebook' | 'threads' | 'rednote' | 'wechat' | 'tiktok' | 'youtube' | 'newsletter'
   badge?: string
   disabled?: boolean
+  requiresConnection?: 'instagram' | 'facebook'
 }
 
 type ChannelGroup = {
@@ -19,52 +24,90 @@ type ChannelGroup = {
 
 const channelGroups: ChannelGroup[] = [
   {
-    id: 'social-feed',
-    title: '社交 Feed Posts',
+    id: 'automatic',
+    title: '已連接及可自動發佈',
     channels: [
-      { id: 'instagram-feed', label: 'Instagram', icon: 'instagram' },
-      { id: 'facebook-feed', label: 'Facebook', icon: 'facebook' },
-      { id: 'threads-feed', label: 'Threads', icon: 'threads', badge: '即將推出' },
-      { id: 'rednote-feed', label: '小紅書', icon: 'rednote', badge: '手動發佈' },
-      { id: 'wechat-feed', label: 'WeChat', icon: 'wechat', badge: '手動發佈' },
+      { id: 'instagram-feed', label: 'Instagram 貼文', icon: 'instagram', requiresConnection: 'instagram' },
+      { id: 'instagram-reels', label: 'Instagram Reels', icon: 'instagram', requiresConnection: 'instagram' },
+      { id: 'facebook-feed', label: 'Facebook 貼文', icon: 'facebook', requiresConnection: 'facebook' },
     ],
   },
   {
-    id: 'stories',
-    title: 'Stories',
+    id: 'formats',
+    title: '內容格式偏好',
     channels: [
-      { id: 'instagram-stories', label: 'Instagram', icon: 'instagram' },
-      { id: 'facebook-stories', label: 'Facebook', icon: 'facebook' },
+      { id: 'instagram-stories', label: '限時動態', icon: 'instagram', requiresConnection: 'instagram' },
     ],
   },
   {
-    id: 'short-video',
-    title: 'Short-form Video',
+    id: 'unavailable',
+    title: '暫未支援自動發佈',
     channels: [
-      { id: 'instagram-reels', label: 'Instagram Reels', icon: 'instagram' },
-      { id: 'tiktok', label: 'TikTok', icon: 'tiktok' },
-      { id: 'youtube-shorts', label: 'YouTube', icon: 'youtube' },
-    ],
-  },
-  {
-    id: 'long-email',
-    title: 'Long-form & Email',
-    channels: [
-      { id: 'newsletter', label: 'Newsletter', icon: 'newsletter' },
+      { id: 'threads-feed', label: 'Threads', icon: 'threads', badge: '暫未開放', disabled: true },
+      { id: 'tiktok', label: 'TikTok', icon: 'tiktok', badge: '暫未開放', disabled: true },
+      { id: 'youtube-shorts', label: 'YouTube', icon: 'youtube', badge: '暫未開放', disabled: true },
+      { id: 'rednote-feed', label: '小紅書', icon: 'rednote', badge: '需手動發佈', disabled: true },
+      { id: 'wechat-feed', label: 'WeChat', icon: 'wechat', badge: '需手動發佈', disabled: true },
+      { id: 'newsletter', label: '電子報', icon: 'newsletter', badge: '暫未開放', disabled: true },
     ],
   },
 ]
 
-const defaultSelected = new Set([
-  'instagram-feed',
-  'facebook-feed',
-  'newsletter',
-])
+const scheduleOptions = [
+  { id: '2-3-weekly', label: '每週 2–3 篇' },
+  { id: '3-5-weekly', label: '每週 3–5 篇' },
+  { id: 'daily', label: '每日更新' },
+  { id: 'later', label: '稍後決定' },
+]
 
 function DistributionContent() {
   const searchParams = useSearchParams()
-  const [selectedChannels, setSelectedChannels] = useState(defaultSelected)
-  const [schedule, setSchedule] = useState('weekdays')
+  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set())
+  const [schedule, setSchedule] = useState('2-3-weekly')
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set())
+  const [connectionsLoading, setConnectionsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadConnections() {
+      try {
+        const supabase = createClient()
+        const { workspaceId } = await resolveActiveWorkspace()
+        const sessionId = getStoredOnboardingSessionId()
+        const { data: { user } } = await supabase.auth.getUser()
+        let query = supabase.from('social_connections').select('platform')
+
+        if (workspaceId) query = query.eq('workspace_id', workspaceId)
+        else if (user?.id) query = query.eq('user_id', user.id).is('workspace_id', null)
+        else if (sessionId) query = query.eq('onboarding_session_id', sessionId)
+        else return
+
+        const { data } = await query
+        const platforms = new Set((data || []).map((item) => item.platform))
+        if (cancelled) return
+
+        setConnectedPlatforms(platforms)
+        setSelectedChannels((current) => {
+          if (current.size) return current
+          const initial = new Set<string>()
+          if (platforms.has('instagram')) {
+            initial.add('instagram-feed')
+            initial.add('instagram-reels')
+          }
+          if (platforms.has('facebook')) initial.add('facebook-feed')
+          return initial
+        })
+      } catch (error) {
+        console.warn('[distribution] failed to load connections', error)
+      } finally {
+        if (!cancelled) setConnectionsLoading(false)
+      }
+    }
+
+    void loadConnections()
+    return () => { cancelled = true }
+  }, [])
 
   const selectedLabels = useMemo(() => {
     return channelGroups
@@ -74,7 +117,7 @@ function DistributionContent() {
   }, [selectedChannels])
 
   function toggleChannel(channel: Channel) {
-    if (channel.disabled) return
+    if (channel.disabled || (channel.requiresConnection && !connectedPlatforms.has(channel.requiresConnection))) return
     setSelectedChannels((current) => {
       const next = new Set(current)
       if (next.has(channel.id)) {
@@ -91,7 +134,8 @@ function DistributionContent() {
       channels: selectedLabels,
       channelIds: Array.from(selectedChannels),
       schedule,
-      crossPosting: true,
+      frequency: schedule,
+      crossPosting: false,
     }
     sessionStorage.setItem('soon-distribution-preferences-v1', JSON.stringify(payload))
 
@@ -112,8 +156,8 @@ function DistributionContent() {
       <section className="distribution-layout">
         <div className="distribution-main">
           <header>
-            <h1>你的內容應該在哪裡和何時發佈？</h1>
-            <p>選擇發佈渠道和排程偏好。之後可以隨時修改。</p>
+            <h1>你主要想在哪些平台發佈？</h1>
+            <p>SOON 會根據你已連接的平台和內容偏好，規劃第一批內容格式。</p>
           </header>
 
           <div className="channel-sections">
@@ -123,17 +167,21 @@ function DistributionContent() {
                 <div className="channel-grid">
                   {group.channels.map((channel) => {
                     const selected = selectedChannels.has(channel.id)
+                    const missingConnection = Boolean(
+                      channel.requiresConnection && !connectedPlatforms.has(channel.requiresConnection)
+                    )
+                    const disabled = Boolean(channel.disabled || missingConnection || connectionsLoading)
                     return (
                       <button
                         className={`channel-pill ${selected ? 'selected' : ''}`}
-                        disabled={channel.disabled}
+                        disabled={disabled}
                         key={channel.id}
                         onClick={() => toggleChannel(channel)}
                         type="button"
                       >
                         <span className="channel-icon"><ChannelIcon icon={channel.icon} /></span>
                         <span>{channel.label}</span>
-                        {channel.badge ? <em>{channel.badge}</em> : null}
+                        {missingConnection ? <em>尚未連接</em> : channel.badge ? <em>{channel.badge}</em> : null}
                         {selected ? <b>✓</b> : null}
                       </button>
                     )
@@ -144,13 +192,10 @@ function DistributionContent() {
           </div>
 
           <section className="schedule-section">
-            <h2>發佈排程設定</h2>
+            <h2>每週內容頻率</h2>
+            <p>這項設定只用作規劃內容數量；實際日期和時間稍後在「已排程內容」設定。</p>
             <div className="schedule-options">
-              {[
-                { id: 'everyday', label: '每日' },
-                { id: 'weekdays', label: '只限平日' },
-                { id: 'custom', label: '讓我選擇日子 ▾' },
-              ].map((option) => (
+              {scheduleOptions.map((option) => (
                 <button
                   className={schedule === option.id ? 'selected' : ''}
                   key={option.id}
@@ -165,17 +210,17 @@ function DistributionContent() {
         </div>
 
         <aside className="info-card">
-          <p>分發方式</p>
-          <h2>預設會開啟 Cross-posting。</h2>
-          <span>同一組內容會同步發佈到已選擇的渠道，讓第一輪 Campaign 更快覆蓋不同觸點。</span>
+          <p>目前用途</p>
+          <h2>先規劃內容，再確認發佈。</h2>
+          <span>SOON 會根據你選擇的平台，建議合適的貼文、輪播圖、短片及限時動態比例。</span>
           <hr />
-          <span>之後可以按 campaign 關閉 cross-posting，為每個渠道做更細緻的內容調整。</span>
+          <span>這一頁不會立即發佈或啟用跨平台同步。實際日期、時間及內容會在「已排程內容」再次確認。</span>
         </aside>
       </section>
 
       <footer className="distribution-footer">
         <button type="button" onClick={() => window.history.back()}>返回</button>
-        <button type="button" onClick={handleContinue}>Continue</button>
+        <button type="button" onClick={handleContinue}>繼續</button>
       </footer>
 
       <style jsx>{styles}</style>
@@ -466,6 +511,13 @@ const styles = `
 
   .schedule-section {
     margin-top: 30px;
+  }
+
+  .schedule-section > p {
+    margin: -3px 0 2px;
+    color: #72757b;
+    font-size: 0.82rem;
+    line-height: 1.5;
   }
 
   .schedule-options button {
