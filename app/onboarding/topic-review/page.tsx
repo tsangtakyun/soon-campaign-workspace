@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
@@ -20,7 +20,8 @@ type TopicReference = {
   label: string
   type: 'image' | 'post'
   topic: string
-  image: string
+  purpose: string
+  image: string | null
   productImage?: string | null
   productImageOptOut?: boolean
   referenceImage?: string | null
@@ -54,8 +55,12 @@ const STORAGE_KEYS = {
   websiteAnalysis: 'soon-website-analysis-v1',
 }
 
-const PLACEHOLDER_IMAGE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'%3E%3Crect width='320' height='220' rx='18' fill='%23f3f4f6'/%3E%3Cpath d='M92 142l44-47 34 36 18-21 40 32H92z' fill='%23d9dde4'/%3E%3Ccircle cx='220' cy='76' r='18' fill='%23c8ced8'/%3E%3Crect x='88' y='58' width='144' height='104' rx='12' fill='none' stroke='%23c5cbd5' stroke-width='4'/%3E%3Ctext x='160' y='190' text-anchor='middle' font-family='Arial, sans-serif' font-size='18' fill='%238b929e'%3E參考圖片%3C/text%3E%3C/svg%3E"
+const DEFAULT_TOPIC_PURPOSE = '幫助目標受眾理解內容重點，並引導下一步。'
+
+type GeneratedTopic = {
+  topic: string
+  purpose: string
+}
 
 const FALLBACK_TOPICS: TopicReference[] = [
   {
@@ -63,14 +68,16 @@ const FALLBACK_TOPICS: TopicReference[] = [
     label: '靜態圖片 1',
     type: 'image',
     topic: '',
-    image: PLACEHOLDER_IMAGE,
+    purpose: DEFAULT_TOPIC_PURPOSE,
+    image: null,
   },
   {
     id: 'carousel-1',
     label: '輪播貼文 1',
     type: 'post',
     topic: '',
-    image: PLACEHOLDER_IMAGE,
+    purpose: DEFAULT_TOPIC_PURPOSE,
+    image: null,
   },
 ]
 
@@ -158,7 +165,7 @@ function collectImageStrings(value: unknown): string[] {
 }
 
 function isUsableWebsiteReferenceImage(image: string) {
-  if (!image || image === PLACEHOLDER_IMAGE) return false
+  if (!image) return false
   return !/(logo|icon|favicon|sprite|placeholder|blank|pixel|tracking|facebook\.com\/tr|monogram|gencode|qrcode|qr[-_]?code|award|badge|singleline|title|bar|social|payment|visa|mastercard|blur_|\.(svg|ico|gif)(?:\?|$))/i.test(image)
 }
 
@@ -208,7 +215,7 @@ function readWebsiteReferenceImages(): string[] {
 }
 
 function pickWebsiteImage(websiteImages: string[], index: number) {
-  if (!websiteImages.length) return PLACEHOLDER_IMAGE
+  if (!websiteImages.length) return null
   if (websiteImages.length <= 3) return websiteImages[index % websiteImages.length]
 
   const candidate = websiteImages[index % websiteImages.length]
@@ -235,6 +242,7 @@ function buildTopicShells(websiteImages: string[] = readWebsiteReferenceImages()
         label: `${typeConfig.label} ${sequence}`,
         type: typeConfig.type,
         topic: '',
+        purpose: DEFAULT_TOPIC_PURPOSE,
         image: pickWebsiteImage(websiteImages, topics.length),
       })
     }
@@ -247,6 +255,17 @@ function buildTopicShells(websiteImages: string[] = readWebsiteReferenceImages()
   }))
 }
 
+function normalizeGeneratedTopic(value: unknown): GeneratedTopic | null {
+  if (typeof value === 'string' && value.trim()) {
+    return { topic: value.trim(), purpose: DEFAULT_TOPIC_PURPOSE }
+  }
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  const topic = typeof item.topic === 'string' ? item.topic.trim() : ''
+  const purpose = typeof item.purpose === 'string' ? item.purpose.trim() : ''
+  return topic ? { topic, purpose: purpose || DEFAULT_TOPIC_PURPOSE } : null
+}
+
 function TopicReviewContent() {
   const searchParams = useSearchParams()
   const [isAnalyzing, setIsAnalyzing] = useState(true)
@@ -254,17 +273,13 @@ function TopicReviewContent() {
   const [activeReferenceId, setActiveReferenceId] = useState<string | null>(null)
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null)
   const [editingTopicText, setEditingTopicText] = useState('')
+  const [editingPurposeText, setEditingPurposeText] = useState('')
   const [topics, setTopics] = useState<TopicReference[]>(() => buildTopicShells())
-  const cancelEditRef = useRef(false)
+  const [regeneratingTopicId, setRegeneratingTopicId] = useState<string | null>(null)
+  const [topicActionError, setTopicActionError] = useState<string | null>(null)
   const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
-  const generateTopics = useCallback(async () => {
-    const websiteImages = readWebsiteReferenceImages()
-    const topicShells = buildTopicShells(websiteImages)
-    setTopics(topicShells)
-    setIsAnalyzing(true)
-    setError(null)
-
+  const requestGeneratedTopics = useCallback(async (requestedPieces?: string[]) => {
     const profile = readStorage<any>(STORAGE_KEYS.profile)
     const strategy = readStorage<any>(STORAGE_KEYS.strategy)
     const campaign = readStorage<any>(STORAGE_KEYS.campaign)
@@ -280,42 +295,52 @@ function TopicReviewContent() {
       searchParams.get('language') ||
       'zh-TW'
 
+    const response = await fetch('/api/topic-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile,
+        strategy,
+        campaign,
+        distribution,
+        contentMix,
+        visualStyle,
+        photoControl,
+        contentMood,
+        language,
+        requestedPieces,
+      }),
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !Array.isArray(data?.topics)) {
+      throw new Error(data?.detail || data?.error || 'Failed to generate topics')
+    }
+    return data.topics
+      .map(normalizeGeneratedTopic)
+      .filter((topic: GeneratedTopic | null): topic is GeneratedTopic => Boolean(topic))
+  }, [searchParams])
+
+  const generateTopics = useCallback(async () => {
+    const topicShells = buildTopicShells(readWebsiteReferenceImages())
+    setTopics(topicShells)
+    setIsAnalyzing(true)
+    setError(null)
+    setTopicActionError(null)
     try {
-      const response = await fetch('/api/topic-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile,
-          strategy,
-          campaign,
-          distribution,
-          contentMix,
-          visualStyle,
-          photoControl,
-          contentMood,
-          language,
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok || !Array.isArray(data.topics)) {
-        throw new Error(data?.detail || data?.error || 'Failed to generate topics')
-      }
-
+      const generated = await requestGeneratedTopics()
       const updatedTopics = topicShells.map((topic, index) => ({
         ...topic,
-        topic: data.topics[index] || topic.topic,
+        ...(generated[index] || {}),
       }))
-
       setTopics(updatedTopics)
-      window.sessionStorage.setItem('soon-topic-review-v1', JSON.stringify(updatedTopics))
-      setIsAnalyzing(false)
+      persistTopics(updatedTopics)
     } catch (err) {
       console.warn('[topic-review] failed:', err)
-      setError('內容主題生成失敗，請稍後再試。')
+      setError('暫時未能整理內容題材，請稍後再試。')
+    } finally {
       setIsAnalyzing(false)
     }
-  }, [searchParams])
+  }, [requestGeneratedTopics])
 
   useEffect(() => {
     generateTopics()
@@ -367,7 +392,7 @@ function TopicReviewContent() {
           ? {
               ...topic,
               ...selection,
-              image: selection.productImage || PLACEHOLDER_IMAGE,
+              image: selection.productImage || topic.image,
               reference: undefined,
             }
           : topic
@@ -379,28 +404,57 @@ function TopicReviewContent() {
   }
 
   function startEditingTopic(topic: TopicReference) {
-    cancelEditRef.current = false
     setEditingTopicId(topic.id)
     setEditingTopicText(topic.topic)
+    setEditingPurposeText(topic.purpose)
   }
 
-  function saveEditedTopic(topicId: string, nextText: string) {
-    const trimmedText = nextText.trim()
+  function saveEditedTopic(topicId: string) {
+    const trimmedText = editingTopicText.trim()
+    const trimmedPurpose = editingPurposeText.trim()
     setTopics((currentTopics) => {
       const updatedTopics = currentTopics.map((topic) =>
-        topic.id === topicId ? { ...topic, topic: trimmedText || topic.topic } : topic
+        topic.id === topicId
+          ? {
+              ...topic,
+              topic: trimmedText || topic.topic,
+              purpose: trimmedPurpose || DEFAULT_TOPIC_PURPOSE,
+            }
+          : topic
       )
       persistTopics(updatedTopics)
       return updatedTopics
     })
     setEditingTopicId(null)
     setEditingTopicText('')
+    setEditingPurposeText('')
   }
 
   function cancelEditingTopic() {
-    cancelEditRef.current = true
     setEditingTopicId(null)
     setEditingTopicText('')
+    setEditingPurposeText('')
+  }
+
+  async function regenerateTopic(topic: TopicReference) {
+    setRegeneratingTopicId(topic.id)
+    setTopicActionError(null)
+    try {
+      const generated = await requestGeneratedTopics([topic.label])
+      if (!generated[0]) throw new Error('No topic returned')
+      setTopics((currentTopics) => {
+        const updatedTopics = currentTopics.map((item) =>
+          item.id === topic.id ? { ...item, ...generated[0] } : item
+        )
+        persistTopics(updatedTopics)
+        return updatedTopics
+      })
+    } catch (err) {
+      console.warn('[topic-review] regeneration failed:', err)
+      setTopicActionError('暫時未能重新整理這個題材，請稍後再試。')
+    } finally {
+      setRegeneratingTopicId(null)
+    }
   }
 
   function resizeTopicTextarea(textarea: HTMLTextAreaElement) {
@@ -412,7 +466,7 @@ function TopicReviewContent() {
     <main className="topic-review-page">
       <div className="topic-review-steps" aria-label="設定進度">
         {['開始設定', '策略', '宣傳活動', '內容', '完成設定'].map((step, index) => (
-          <span className={index === 2 ? 'active' : ''} key={step}>
+          <span className={index === 3 ? 'active' : ''} key={step}>
             {step}
             {index < 4 ? <b>›</b> : null}
           </span>
@@ -421,9 +475,9 @@ function TopicReviewContent() {
 
       {isAnalyzing ? (
         <section className="topic-loading" aria-live="polite">
-          <p>分析中...</p>
-          <h1>正在為你的品牌生成內容主題...</h1>
-          <h2>每一條內容都從品牌洞察出發，為你量身訂製。</h2>
+          <p>內容準備中</p>
+          <h1>正在整理第一週內容題材…</h1>
+          <h2>SOON 正按你的品牌、受眾和渠道整理可直接使用的內容方向。</h2>
           <div className="topic-loading-dots" aria-hidden="true">
             <span />
             <span />
@@ -435,26 +489,36 @@ function TopicReviewContent() {
           <p>生成未完成</p>
           <h1>{error}</h1>
           <h2>我們未能成功取得 AI 內容主題。你可以重新嘗試，系統會保留目前的內容組合和設定。</h2>
-          <button type="button" onClick={generateTopics}>重新生成</button>
+          <button type="button" onClick={generateTopics}>再試一次</button>
         </section>
       ) : (
         <section className="topic-review-content">
-          <header>
-            <h1>檢查你的內容主題與參考圖片。</h1>
-            <p>你可以將這些視為之後 SOON 生成內容時，用來決定主體、方向和視覺目標的基礎。</p>
+          <header className="topic-review-header-row">
+            <div>
+              <h1>確認第一週內容題材</h1>
+              <p>SOON 已按你的品牌、受眾及渠道整理第一週內容，你可以直接修改或重新生成。</p>
+            </div>
+            <button
+              type="button"
+              className="topic-regenerate-all"
+              onClick={generateTopics}
+              disabled={Boolean(regeneratingTopicId)}
+            >
+              全部重新生成
+            </button>
           </header>
 
+          {topicActionError ? <p className="topic-action-error">{topicActionError}</p> : null}
+
           <div className="topic-list">
-            {topics.map((topic) => (
-              <article className="topic-row" key={topic.id}>
+            {topics.map((topic) => {
+              const primaryImage = topic.productImage || topic.image
+              return <article className="topic-row" key={topic.id}>
                 <div className="topic-image-stack">
-                  <button
-                    type="button"
-                    className="topic-image topic-image-button"
-                    onClick={() => setActiveReferenceId(topic.id)}
-                    aria-label={`更換${topic.label}參考圖片`}
-                  >
-                    <img src={topic.productImage || topic.image || PLACEHOLDER_IMAGE} alt={`${topic.label} reference`} />
+                  <div className={`topic-image${primaryImage ? '' : ' topic-image-empty'}`}>
+                    {primaryImage ? <img src={primaryImage} alt={`${topic.label}參考圖片`} /> : (
+                      <span><b>暫未有參考圖片</b><small>不影響繼續</small></span>
+                    )}
                     {topic.productImage ? (
                       <span className="topic-image-badge product">產品圖</span>
                     ) : null}
@@ -466,10 +530,10 @@ function TopicReviewContent() {
                         </span>
                       </span>
                     ) : null}
+                  </div>
+                  <button type="button" className="topic-image-action" onClick={() => setActiveReferenceId(topic.id)}>
+                    {primaryImage || topic.referenceImage ? '更換參考圖' : '加入參考圖'}
                   </button>
-                  {!topic.productImage && !topic.referenceImage && topic.image !== PLACEHOLDER_IMAGE ? (
-                    <span className="topic-website-image-label">參考圖片</span>
-                  ) : null}
                 </div>
                 <div className="topic-copy">
                   <h2>
@@ -478,64 +542,45 @@ function TopicReviewContent() {
                     </span>
                     {topic.label}
                   </h2>
-                  <p className="topic-label">主題：</p>
                   {editingTopicId === topic.id ? (
-                    <textarea
-                      className="topic-text-editor"
-                      value={editingTopicText}
-                      autoFocus
-                      rows={1}
-                      onBlur={() => {
-                        if (cancelEditRef.current) {
-                          cancelEditRef.current = false
-                          return
-                        }
-                        saveEditedTopic(topic.id, editingTopicText)
-                      }}
-                      onChange={(event) => {
-                        setEditingTopicText(event.target.value)
-                        resizeTopicTextarea(event.currentTarget)
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          event.preventDefault()
-                          cancelEditingTopic()
-                          return
-                        }
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault()
-                          saveEditedTopic(topic.id, editingTopicText)
-                        }
-                      }}
-                      ref={(node) => {
-                        if (!node) return
-                        resizeTopicTextarea(node)
-                        node.focus()
-                        node.selectionStart = node.value.length
-                        node.selectionEnd = node.value.length
-                      }}
-                    />
+                    <div className="topic-editor">
+                      <label className="topic-editor-field">題材
+                        <textarea className="topic-text-editor" value={editingTopicText} autoFocus rows={2}
+                          onChange={(event) => { setEditingTopicText(event.target.value); resizeTopicTextarea(event.currentTarget) }} />
+                      </label>
+                      <label className="topic-editor-field">內容目的
+                        <textarea className="topic-text-editor" value={editingPurposeText} rows={2}
+                          onChange={(event) => { setEditingPurposeText(event.target.value); resizeTopicTextarea(event.currentTarget) }} />
+                      </label>
+                      <div className="topic-editor-actions">
+                        <button type="button" onClick={cancelEditingTopic}>取消</button>
+                        <button type="button" onClick={() => saveEditedTopic(topic.id)}>儲存</button>
+                      </div>
+                    </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="topic-text editable-topic-text"
-                      onClick={() => startEditingTopic(topic)}
-                      aria-label={`編輯${topic.label}主題`}
-                    >
-                      <span>{topic.topic}</span>
-                      <span className="topic-edit-icon" aria-hidden="true">✎</span>
-                    </button>
+                    <>
+                      <p className="topic-label">題材</p>
+                      <p className="topic-text">{topic.topic}</p>
+                      <p className="topic-purpose-label">內容目的</p>
+                      <p className="topic-purpose">{topic.purpose}</p>
+                      <div className="topic-card-actions">
+                        <button type="button" onClick={() => startEditingTopic(topic)}>編輯</button>
+                        <button type="button" onClick={() => regenerateTopic(topic)} disabled={Boolean(regeneratingTopicId)}>
+                          {regeneratingTopicId === topic.id ? '重新整理中…' : '重新生成'}
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </article>
-            ))}
+            })}
           </div>
         </section>
       )}
 
       <footer className="topic-review-footer">
         <button type="button" onClick={handleBack}>返回</button>
-        {!isAnalyzing && !error ? <button type="button" onClick={handleContinue}>繼續</button> : null}
+        {!isAnalyzing && !error ? <button type="button" onClick={handleContinue}>確認並建立第一週內容</button> : null}
       </footer>
 
       {activeTopic ? (
@@ -1064,7 +1109,61 @@ const styles = `
   }
 
   .topic-review-content header {
-    max-width: 574px;
+    max-width: none;
+  }
+
+  .topic-review-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+  }
+
+  .topic-review-header-row > div {
+    max-width: 650px;
+  }
+
+  .topic-regenerate-all,
+  .topic-image-action,
+  .topic-card-actions button,
+  .topic-editor-actions button {
+    border: 1px solid #dedfe3;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #25262b;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease, opacity 150ms ease;
+  }
+
+  .topic-regenerate-all {
+    flex: 0 0 auto;
+    padding: 9px 13px;
+  }
+
+  .topic-regenerate-all:hover,
+  .topic-image-action:hover,
+  .topic-card-actions button:hover,
+  .topic-editor-actions button:hover {
+    border-color: #aaaeb6;
+    background: #f8f8f8;
+  }
+
+  .topic-regenerate-all:disabled,
+  .topic-card-actions button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+  }
+
+  .topic-action-error {
+    margin: 20px 0 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fff3f2;
+    color: #a8322b;
+    font-size: 13px;
   }
 
   .topic-list {
@@ -1096,6 +1195,37 @@ const styles = `
     place-items: center;
     overflow: hidden;
     background: #ffffff;
+    border-radius: 8px;
+  }
+
+  .topic-image-empty {
+    border: 1px dashed #d5d7dc;
+    background: #f8f8f8;
+    color: #737780;
+    text-align: center;
+  }
+
+  .topic-image-empty > span {
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .topic-image-empty b {
+    color: #555962;
+    font-size: 10px;
+    font-weight: 650;
+  }
+
+  .topic-image-empty small {
+    font-size: 9px;
+  }
+
+  .topic-image-action {
+    width: 100%;
+    padding: 5px 7px;
+    color: #5c6068;
+    font-size: 10px;
   }
 
   .topic-image-button {
@@ -1209,10 +1339,55 @@ const styles = `
   }
 
   .topic-text {
-    margin: 13px 0 0;
+    margin: 4px 0 0;
     color: #202126;
     font-size: 14px;
     line-height: 1.45;
+  }
+
+  .topic-purpose-label {
+    margin: 14px 0 0;
+    color: #666970;
+    font-size: 10px;
+  }
+
+  .topic-purpose {
+    margin: 4px 0 0;
+    color: #555962;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .topic-card-actions,
+  .topic-editor-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+  }
+
+  .topic-card-actions button,
+  .topic-editor-actions button {
+    padding: 6px 10px;
+  }
+
+  .topic-card-actions button:last-child,
+  .topic-editor-actions button:last-child {
+    border-color: #1f2024;
+    background: #1f2024;
+    color: #ffffff;
+  }
+
+  .topic-editor {
+    margin-top: 13px;
+  }
+
+  .topic-editor-field {
+    display: block;
+    margin-top: 10px;
+    color: #666970;
+    font-size: 10px;
+    font-weight: 550;
   }
 
   .editable-topic-text {
@@ -1985,6 +2160,10 @@ const styles = `
       gap: 17px;
     }
 
+    .topic-image-stack {
+      width: 84px;
+    }
+
     .topic-image {
       width: 84px;
       height: 64px;
@@ -2030,6 +2209,19 @@ const styles = `
     .topic-row {
       grid-template-columns: 1fr;
       gap: 11px;
+    }
+
+    .topic-review-header-row {
+      display: grid;
+      gap: 16px;
+    }
+
+    .topic-regenerate-all {
+      width: fit-content;
+    }
+
+    .topic-image-stack {
+      width: 112px;
     }
 
     .topic-image {
