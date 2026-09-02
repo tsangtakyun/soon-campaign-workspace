@@ -555,12 +555,11 @@ function TopicReviewContent() {
           <div className="topic-list">
             {topics.map((topic) => {
               const primaryImage = topic.productImage || topic.image
-              return <article className="topic-row" key={topic.id}>
-                <div className="topic-image-stack">
-                  <div className={`topic-image${primaryImage ? '' : ' topic-image-empty'}`}>
-                    {primaryImage ? <img src={primaryImage} alt={`${topic.label}參考圖片`} /> : (
-                      <span><b>暫未有參考圖片</b><small>不影響繼續</small></span>
-                    )}
+              const hasTopicImage = Boolean(primaryImage || topic.referenceImage)
+              return <article className={`topic-row${hasTopicImage ? '' : ' topic-row-no-image'}`} key={topic.id}>
+                {hasTopicImage ? <div className="topic-image-stack">
+                  <div className="topic-image">
+                    {primaryImage ? <img src={primaryImage} alt={`${topic.label}參考圖片`} /> : null}
                     {topic.productImage ? (
                       <span className="topic-image-badge product">產品圖</span>
                     ) : null}
@@ -574,9 +573,9 @@ function TopicReviewContent() {
                     ) : null}
                   </div>
                   <button type="button" className="topic-image-action" onClick={() => setActiveReferenceId(topic.id)}>
-                    {primaryImage || topic.referenceImage ? '更換參考圖' : '加入參考圖'}
+                    更換參考圖
                   </button>
-                </div>
+                </div> : null}
                 <div className="topic-copy">
                   <h2>
                     <span className={topic.type === 'image' ? 'topic-icon image' : 'topic-icon post'} aria-hidden="true">
@@ -1219,6 +1218,10 @@ const styles = `
     grid-template-columns: 112px minmax(0, 1fr);
     align-items: center;
     gap: 28px;
+  }
+
+  .topic-row-no-image {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .topic-image-stack {
