@@ -280,21 +280,61 @@ function TopicReviewContent() {
   const activeTopic = topics.find((topic) => topic.id === activeReferenceId) || null
 
   const requestGeneratedTopics = useCallback(async (requestedPieces?: string[]) => {
-    const profile = readStorage<any>(STORAGE_KEYS.profile)
-    const strategy = readStorage<any>(STORAGE_KEYS.strategy)
-    const campaign = readStorage<any>(STORAGE_KEYS.campaign)
+    let profile = readStorage<any>(STORAGE_KEYS.profile)
+    const storedStrategy = readStorage<any>(STORAGE_KEYS.strategy)
+    const storedCampaign = readStorage<any>(STORAGE_KEYS.campaign)
     const distribution = readStorage<any>(STORAGE_KEYS.distribution)
     const contentMix = readStorage<any>(STORAGE_KEYS.contentMix)
     const visualStyle = readStorage<any>(STORAGE_KEYS.visualStyle)
     const photoControl = readStorage<any>(STORAGE_KEYS.photoControl)
     const contentMood = readStorage<any>(STORAGE_KEYS.contentMood)
-    const websiteAnalysis = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
+    let websiteAnalysis = readStorage<any>(STORAGE_KEYS.websiteAnalysis)
     const language =
       profile?.primaryLanguage ||
       profile?.primary_language ||
       profile?.language ||
       searchParams.get('language') ||
       'zh-TW'
+
+    const website = profile?.websiteUrl || profile?.website_url || searchParams.get('website') || ''
+    const hasProfileContext = Boolean(
+      profile?.businessName &&
+      (profile?.elevatorPitch || profile?.brandProfile?.offer) &&
+      (profile?.target_audience || profile?.audience?.summary || profile?.brandProfile?.audience)
+    )
+
+    if (!hasProfileContext && website) {
+      const analysisResponse = await fetch('/api/analyze-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          website,
+          language,
+          name: searchParams.get('brandName') || searchParams.get('name') || undefined,
+          budget: searchParams.get('budget') || undefined,
+          category: searchParams.get('category') || undefined,
+          plan: searchParams.get('plan') || undefined,
+        }),
+      })
+      const recoveredAnalysis = await analysisResponse.json().catch(() => null)
+      if (analysisResponse.ok && recoveredAnalysis?.businessName) {
+        profile = recoveredAnalysis
+        websiteAnalysis = { analysis: recoveredAnalysis }
+        window.sessionStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(recoveredAnalysis))
+        window.sessionStorage.setItem(STORAGE_KEYS.websiteAnalysis, JSON.stringify(websiteAnalysis))
+      }
+    }
+
+    const strategy = storedStrategy || {
+      title: searchParams.get('strategy') || '',
+      titleZh: searchParams.get('strategy') || '',
+    }
+    const campaign = storedCampaign || {
+      campaignName: searchParams.get('campaign') || '',
+      theme: searchParams.get('campaign') || '',
+      contentFocus: searchParams.get('campaign') || '',
+      profile,
+    }
 
     const response = await fetch('/api/topic-review', {
       method: 'POST',
