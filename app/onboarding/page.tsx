@@ -675,6 +675,17 @@ function ApprovalBoard({
                   </div>
                   <div className="approval-head-actions">
                     <small>{post.goal}</small>
+                    {post.id && post.recordType === 'campaign_post' && week.permissions?.canEdit !== false ? (
+                      <button
+                        type="button"
+                        className="approval-design-btn"
+                        onClick={() => {
+                          window.location.href = `/onboarding/scheduled-posts?postId=${encodeURIComponent(post.id)}&design=1`
+                        }}
+                      >
+                        編輯設計
+                      </button>
+                    ) : null}
                     {post.id && week.workspaceId && week.permissions?.canApprove !== false ? (
                       <button
                         type="button"
@@ -2106,6 +2117,23 @@ const homeStyles = `
     align-items: center;
     gap: 10px;
     flex: 0 0 auto;
+  }
+
+  .approval-design-btn {
+    border: 1px solid #d8d8d8;
+    border-radius: 999px;
+    background: #fff;
+    color: #171717;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 12px;
+    white-space: nowrap;
+  }
+
+  .approval-design-btn:hover {
+    border-color: #171717;
   }
 
   .approval-media-icon {

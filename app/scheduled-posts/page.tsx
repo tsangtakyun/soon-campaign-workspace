@@ -1132,6 +1132,7 @@ function ScheduledPostsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const autoPostId = searchParams.get("postId");
+  const autoOpenDesign = searchParams.get("design") === "1";
   const externalEditImage = searchParams.get("editImage");
   const externalEditTitle = searchParams.get("editTitle") || "Carousel 圖片";
   const externalEditPage = searchParams.get("editPage") || "P.1";
@@ -1152,10 +1153,16 @@ function ScheduledPostsPageContent() {
   const clientReadyPosts = persistedScheduledPosts.filter((post) =>
     ["已批准", "已確認", "已排程"].includes(post.status),
   );
+  const requestedDraftPost = autoPostId
+    ? persistedScheduledPosts.find((post) => post.id === autoPostId)
+    : null;
   const [isBechillActive, setIsBechillActive] = useState(false);
   const scheduledPosts =
-    clientReadyPosts.length > 0
-      ? clientReadyPosts
+    requestedDraftPost &&
+    !clientReadyPosts.some((post) => post.id === requestedDraftPost.id)
+      ? [requestedDraftPost, ...clientReadyPosts]
+      : clientReadyPosts.length > 0
+        ? clientReadyPosts
       : isBechillActive
         ? bechillConfirmedSchedulePosts
         : [];
@@ -1318,9 +1325,9 @@ function ScheduledPostsPageContent() {
   }, [brandKit.fontFamily]);
 
   useEffect(() => {
-    if (!autoPostId) return;
+    if (!autoPostId || !designMode) return;
     router.replace("/onboarding/scheduled-posts", { scroll: false });
-  }, [autoPostId, router]);
+  }, [autoPostId, designMode, router]);
 
   useEffect(() => {
     if (!autoPostId || selectedPost) return;
@@ -1340,6 +1347,11 @@ function ScheduledPostsPageContent() {
     }
     setDesignMode(true);
   };
+
+  useEffect(() => {
+    if (!autoOpenDesign || !selectedPost || designMode || brandKitLoading) return;
+    openDesignEditor(selectedPost);
+  }, [autoOpenDesign, brandKitLoading, designMode, selectedPost]);
 
   useEffect(() => {
     if (!externalEditImage || selectedPost) return;
