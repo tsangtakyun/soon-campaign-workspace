@@ -26,7 +26,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/contact' ||
     pathname === '/pricing' ||
     pathname === '/signup' ||
-    pathname === '/dashboard' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
     pathname === '/submit-brief' ||
     pathname.startsWith('/paid-analysis') ||
     pathname.startsWith('/creator-matching') ||
