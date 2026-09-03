@@ -36,16 +36,21 @@ async function requireWorkspace(workspaceId: string) {
 }
 
 function toIdea(row: any) {
+  const generated = row.source === 'SOON 專屬題材'
+  const [summary = '', generatedDetails = ''] = String(row.note || '').split('\n\n點解值得做：')
+  const [whyNow = '', hook = ''] = generatedDetails.split('\n開場 Hook：')
   return {
     id: row.id,
     title: row.title,
     source: row.source,
-    url: row.source_url,
+    url: generated ? undefined : row.source_url,
     image: row.image_url || '',
     height: row.height,
     category: row.category,
     tags: Array.isArray(row.tags) ? row.tags : [],
-    note: row.note,
+    note: generated ? summary : row.note,
+    whyNow: generated ? whyNow : undefined,
+    hook: generated ? hook : undefined,
   }
 }
 

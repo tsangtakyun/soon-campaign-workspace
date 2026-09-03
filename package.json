@@ -9,15 +9,18 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.116",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
+    "ai": "^6.0.276",
     "fabric": "7.4.0",
     "next": "15.5.25",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sharp": "0.35.4",
     "stripe": "^18.3.0",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "zod": "^4.5.4"
   },
   "overrides": {
     "nanoid": "3.3.18",

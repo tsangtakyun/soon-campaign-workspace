@@ -227,6 +227,7 @@ export default function CampaignsPage() {
   const [centralIdeas, setCentralIdeas] = useState<ReferenceIdea[]>([])
   const [centralFeedStatus, setCentralFeedStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [contentDirections, setContentDirections] = useState<string[]>([])
+  const [generatingTopics, setGeneratingTopics] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -469,6 +470,48 @@ export default function CampaignsPage() {
     }
   }
 
+  async function generateWorkspaceTopics() {
+    if (!activeWorkspaceId || generatingTopics) return
+    setGeneratingTopics(true)
+    setImportMessage('正在按品牌、受眾、地區及 Campaign 生成專屬題材…')
+    try {
+      const response = await fetch('/api/workspace-topic-ideas/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !Array.isArray(payload?.ideas)) {
+        throw new Error(payload?.error || '未能生成專屬題材')
+      }
+      const generatedIdeas = payload.ideas.map((idea: any): ReferenceIdea => ({
+        id: idea.id,
+        title: idea.title,
+        source: idea.source || 'SOON 專屬題材',
+        image: idea.image_url || '',
+        height: idea.height || 'medium',
+        category: idea.category || '專屬內容方向',
+        tags: Array.isArray(idea.tags) ? idea.tags : [],
+        note: idea.note || '',
+        hook: idea.hook || undefined,
+        whyNow: idea.whyNow || undefined,
+      }))
+      setUserIdeas((current) => [
+        ...generatedIdeas,
+        ...current.filter((idea) => !generatedIdeas.some((generated) => generated.id === idea.id)),
+      ])
+      if (Array.isArray(payload.directions)) setContentDirections(normalizeContentDirections(payload.directions))
+      setActiveFilter('全部')
+      setActiveLocation('全部地區')
+      setQuery('')
+      setImportMessage(`已生成 ${generatedIdeas.length} 個 Workspace 專屬題材`)
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : '未能生成專屬題材')
+    } finally {
+      setGeneratingTopics(false)
+    }
+  }
+
   async function confirmDeleteIdea() {
     if (!pendingDelete || !activeWorkspaceId || deletingIdea) return
     setDeletingIdea(true)
@@ -510,24 +553,34 @@ export default function CampaignsPage() {
                   : 'SOON 每日整理新題材，並按目前工作台的內容方向優先排列'}
             </span>
           </div>
-          <form className="idea-importer" onSubmit={importIdea}>
-            <label htmlFor="idea-url">加入新題材</label>
-            <div>
-              <input
-                id="idea-url"
-                type="url"
-                inputMode="url"
-                value={ideaUrl}
-                onChange={(event) => setIdeaUrl(event.target.value)}
-                placeholder="貼上 Instagram 或文章連結"
-                required
-              />
-              <button type="submit" disabled={importingIdea}>
-                {importingIdea ? '讀取中…' : '加入'}
-              </button>
-            </div>
-            {importMessage ? <span className="idea-import-message">{importMessage}</span> : null}
-          </form>
+          <div className="topic-actions">
+            <button
+              type="button"
+              className="generate-topics-button"
+              disabled={!canStartContent || !activeWorkspaceId || generatingTopics}
+              onClick={() => void generateWorkspaceTopics()}
+            >
+              {generatingTopics ? '生成中…' : '✦ 生成專屬題材'}
+            </button>
+            <form className="idea-importer" onSubmit={importIdea}>
+              <label htmlFor="idea-url">加入新題材</label>
+              <div>
+                <input
+                  id="idea-url"
+                  type="url"
+                  inputMode="url"
+                  value={ideaUrl}
+                  onChange={(event) => setIdeaUrl(event.target.value)}
+                  placeholder="貼上 Instagram 或文章連結"
+                  required
+                />
+                <button type="submit" disabled={importingIdea}>
+                  {importingIdea ? '讀取中…' : '加入'}
+                </button>
+              </div>
+              {importMessage ? <span className="idea-import-message">{importMessage}</span> : null}
+            </form>
+          </div>
         </header>
 
         <section className="library-body">
@@ -736,6 +789,31 @@ const libraryStyles = `
   .idea-importer {
     position: relative;
     width: min(460px, 46vw);
+  }
+
+  .topic-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .generate-topics-button {
+    height: 36px;
+    border: 1px solid #202126;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202126;
+    cursor: pointer;
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    padding: 0 14px;
+  }
+
+  .generate-topics-button:disabled {
+    cursor: wait;
+    opacity: 0.52;
   }
 
   .idea-importer > label {
@@ -1305,6 +1383,12 @@ const libraryStyles = `
     }
 
     .idea-importer {
+      width: 100%;
+    }
+
+    .topic-actions {
+      align-items: stretch;
+      flex-direction: column;
       width: 100%;
     }
 
