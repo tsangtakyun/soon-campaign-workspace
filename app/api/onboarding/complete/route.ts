@@ -154,9 +154,10 @@ async function saveScopedSingle(
   payload: JsonRecord,
   scopeColumn: string,
   scopeValue: string,
-  selectColumns = 'id'
+  selectColumns = 'id',
+  fallbackScope?: { column: string; value: string }
 ) {
-  const { data: existing, error: existingError } = await supabase
+  let { data: existing, error: existingError } = await supabase
     .from(table)
     .select('id')
     .eq(scopeColumn, scopeValue)
@@ -165,6 +166,18 @@ async function saveScopedSingle(
     .maybeSingle()
 
   if (existingError) throw existingError
+
+  if (!existing?.id && fallbackScope) {
+    const fallbackResult = await supabase
+      .from(table)
+      .select('id')
+      .eq(fallbackScope.column, fallbackScope.value)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (fallbackResult.error) throw fallbackResult.error
+    existing = fallbackResult.data
+  }
 
   if (existing?.id) {
     const { data, error } = await supabase
@@ -271,6 +284,14 @@ export async function POST(req: Request) {
 
     const userId = user?.id ?? null
     const supabase = createAdminSupabase()
+    const { data: existingSessionBrandKit } = userId
+      ? await supabase
+          .from('brand_kits')
+          .select('workspace_id')
+          .eq('onboarding_session_id', sessionId)
+          .eq('user_id', userId)
+          .maybeSingle()
+      : { data: null }
 
     if (userId) {
       await Promise.all([
@@ -315,6 +336,17 @@ export async function POST(req: Request) {
     let workspaceId: string | null = null
 
     if (userId) {
+      const priorWorkspaceId = asString(existingSessionBrandKit?.workspace_id)
+      if (!requestedWorkspaceId && priorWorkspaceId) {
+        const { data: priorWorkspace } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('id', priorWorkspaceId)
+          .eq('owner_id', userId)
+          .maybeSingle()
+        if (priorWorkspace?.id) workspaceId = priorWorkspace.id
+      }
+
       if (requestedWorkspaceId) {
         const { data: membership } = await supabase
           .from('workspace_members')
@@ -425,7 +457,8 @@ export async function POST(req: Request) {
         brandKitPayload,
         ownerScope.column,
         ownerScope.value,
-        'id'
+        'id',
+        { column: 'onboarding_session_id', value: sessionId }
       )
     } catch (brandKitError: any) {
       const missingVisualKeywordsColumn =
@@ -442,7 +475,8 @@ export async function POST(req: Request) {
         fallbackBrandKitPayload,
         ownerScope.column,
         ownerScope.value,
-        'id'
+        'id',
+        { column: 'onboarding_session_id', value: sessionId }
       )
     }
 
@@ -508,7 +542,9 @@ export async function POST(req: Request) {
         'content_preferences',
         contentPreferencesPayload,
         ownerScope.column,
-        ownerScope.value
+        ownerScope.value,
+        'id',
+        { column: 'onboarding_session_id', value: sessionId }
       )
     } catch (prefError: any) {
       const missingContentMoodColumn =
@@ -524,7 +560,9 @@ export async function POST(req: Request) {
         'content_preferences',
         fallbackPayload,
         ownerScope.column,
-        ownerScope.value
+        ownerScope.value,
+        'id',
+        { column: 'onboarding_session_id', value: sessionId }
       )
     }
 
