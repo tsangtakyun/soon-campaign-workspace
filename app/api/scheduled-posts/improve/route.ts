@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { anthropicModel } from '@/lib/anthropic-models'
-import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { requirePlatformUser } from '@/lib/platform-access'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 export const maxDuration = 60
 
@@ -31,27 +31,6 @@ function parseJsonArray(text: string): Array<Record<string, unknown>> {
   const parsed = JSON.parse(candidate.slice(start, end + 1))
   if (!Array.isArray(parsed)) throw new Error('Claude response was not an array')
   return parsed.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
-}
-
-async function userCanAccessWorkspace(workspaceId: string, userId: string) {
-  const supabase = createAdminSupabase()
-  const [{ data: membership }, { data: ownedWorkspace }] = await Promise.all([
-    supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .maybeSingle(),
-    supabase
-      .from('workspaces')
-      .select('id')
-      .eq('id', workspaceId)
-      .eq('owner_id', userId)
-      .maybeSingle(),
-  ])
-
-  return Boolean(membership?.workspace_id || ownedWorkspace?.id)
 }
 
 async function improveWithClaude(input: {
@@ -111,6 +90,9 @@ async function improveWithClaude(input: {
 
 export async function POST(request: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const body = (await request.json().catch(() => ({}))) as ImproveRequest
     const workspaceId = asString(body.workspaceId)
     const mode = body.mode === 'image-prompt' ? 'image-prompt' : body.mode === 'copy' ? 'copy' : null
@@ -122,17 +104,16 @@ export async function POST(request: Request) {
     if (!mode) return NextResponse.json({ error: 'Missing improvement mode' }, { status: 400 })
     if (!postIds.length) return NextResponse.json({ error: 'Missing postIds' }, { status: 400 })
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const {
-      data: { user },
-    } = await serverSupabase.auth.getUser()
-
-    if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!(await userCanAccessWorkspace(workspaceId, user.id))) {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 403 })
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess?.canEdit) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const supabase = createAdminSupabase()
+    const supabase = workspaceAccess.admin
     const { data: posts, error: postsError } = await supabase
       .from('campaign_posts')
       .select('id,title,body,post_type,captions')

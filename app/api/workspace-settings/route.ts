@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 import { normalizeContentDirections } from '@/lib/content-directions'
+import { requirePlatformUser } from '@/lib/platform-access'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 const ALLOWED_WORKSPACE_FIELDS = new Set([
   'logo_url',
@@ -20,35 +20,29 @@ const ALLOWED_WORKSPACE_FIELDS = new Set([
 
 export async function GET(req: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const workspaceId = new URL(req.url).searchParams.get('workspace_id')?.trim()
     if (!workspaceId) return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 })
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const {
-      data: { user },
-      error: userError,
-    } = await serverSupabase.auth.getUser()
-
-    if (userError || !user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const supabase = createAdminSupabase()
+    const supabase = workspaceAccess.admin
     const { data: workspace } = await supabase
       .from('workspaces')
       .select('id, owner_id, logo_url, visual_style, font_style, visual_identity_description, brand_colors, avoided_keywords, market_locations, audience_gender, content_persona_age, content_persona_gender, content_persona_ethnicity, content_directions')
       .eq('id', workspaceId)
       .single()
 
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('workspace_id,role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!workspace || (workspace.owner_id !== user.id && !membership)) {
+    if (!workspace) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
     }
 
@@ -80,6 +74,9 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const body = await req.json().catch(() => ({}))
     const workspaceId = typeof body?.workspace_id === 'string' ? body.workspace_id.trim() : ''
     const updates = body?.updates && typeof body.updates === 'object' && !Array.isArray(body.updates)
@@ -100,40 +97,20 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'No supported workspace fields' }, { status: 400 })
     }
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const {
-      data: { user },
-      error: userError,
-    } = await serverSupabase.auth.getUser()
-
-    if (userError || !user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess?.canEdit) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const supabase = createAdminSupabase()
-    const { data: workspace } = await supabase
-      .from('workspaces')
-      .select('id,owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle()
-
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('workspace_id,role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!workspace || (workspace.owner_id !== user.id && !membership)) {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-    }
+    const supabase = workspaceAccess.admin
 
     if (
       Object.prototype.hasOwnProperty.call(updatePayload, 'content_directions') &&
-      workspace.owner_id !== user.id &&
-      membership?.role !== 'owner' &&
-      membership?.role !== 'admin'
+      !workspaceAccess.canManageWorkspace
     ) {
       return NextResponse.json({ error: '只有擁有者或管理員可以修改內容方向' }, { status: 403 })
     }

@@ -1,40 +1,34 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { requirePlatformUser } from '@/lib/platform-access'
 import { normalizeContentMoodSelection } from '@/lib/recommend-content-mood'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 export async function GET(req: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const workspaceId = new URL(req.url).searchParams.get('workspace_id')?.trim()
     if (!workspaceId) return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 })
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const {
-      data: { user },
-      error: userError,
-    } = await serverSupabase.auth.getUser()
-
-    if (userError || !user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const supabase = createAdminSupabase()
+    const supabase = workspaceAccess.admin
     const { data: workspace } = await supabase
       .from('workspaces')
       .select('id,owner_id,logo_url,visual_style,font_style,visual_identity_description,brand_colors')
       .eq('id', workspaceId)
       .maybeSingle()
 
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!workspace || (workspace.owner_id !== user.id && !membership)) {
+    if (!workspace) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
     }
 
@@ -108,6 +102,9 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const body = await req.json().catch(() => ({}))
     const workspaceId = typeof body?.workspace_id === 'string' ? body.workspace_id.trim() : ''
     const field = typeof body?.field === 'string' ? body.field.trim() : ''
@@ -137,34 +134,16 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Unsupported brand profile field' }, { status: 400 })
     }
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const {
-      data: { user },
-      error: userError,
-    } = await serverSupabase.auth.getUser()
-
-    if (userError || !user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess?.canEdit) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const supabase = createAdminSupabase()
-    const { data: workspace } = await supabase
-      .from('workspaces')
-      .select('id,owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle()
-
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle()
-
-    if (!workspace || (workspace.owner_id !== user.id && !membership)) {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-    }
+    const supabase = workspaceAccess.admin
 
     if (field === 'content_mood') {
       const normalizedMood = normalizeContentMoodSelection(value)

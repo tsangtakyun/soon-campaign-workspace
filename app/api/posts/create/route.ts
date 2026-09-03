@@ -1,11 +1,14 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { isUuid } from '@/lib/oauth-connections'
-import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { requirePlatformUser } from '@/lib/platform-access'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 export async function POST(req: Request) {
   try {
+    const platform = await requirePlatformUser()
+    if (platform.error) return platform.error
+
     const body = await req.json().catch(() => ({}))
     const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : ''
     const title = typeof body.title === 'string' ? body.title.trim() : ''
@@ -21,35 +24,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid schedule' }, { status: 400 })
     }
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const admin = createAdminSupabase()
-    const { data: workspace } = await admin
-      .from('workspaces')
-      .select('id,owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle()
-
-    const { data: membership } = await admin
-      .from('workspace_members')
-      .select('role,status')
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'active')
-      .or(`user_id.eq.${user.id}${user.email ? `,email.ilike.${user.email.toLowerCase()}` : ''}`)
-      .limit(1)
-      .maybeSingle()
-
-    const role = workspace?.owner_id === user.id ? 'owner' : membership?.role
-    if (!workspace?.id || !role || role === 'viewer') {
+    const workspaceAccess = await getWorkspaceAccess({
+      email: platform.access.user.email,
+      userId: platform.access.user.id,
+      workspaceId,
+    })
+    if (!workspaceAccess?.canEdit) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { data: post, error } = await admin
+    const { data: post, error } = await workspaceAccess.admin
       .from('campaign_posts')
       .insert({
-        user_id: user.id,
+        user_id: platform.access.user.id,
         workspace_id: workspaceId,
         source_key: `manual-${crypto.randomUUID()}`,
         title: title.slice(0, 200),
