@@ -38,6 +38,7 @@ import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
 } from "@/lib/workspace-client";
+import { typefaces } from "@/lib/typefaces";
 import type {
   CanvasSize,
   DesignElement,
@@ -202,10 +203,15 @@ function readBrandKit() {
         businessName?: string;
         logoUrl?: string;
       };
+      const storedTypeface = readSessionJson("soon-typeface-v1") as
+        | { fontFamily?: string; typefaceId?: string; id?: string }
+        | null;
       return {
         businessName: profile.businessName || "品牌",
         logoUrl: resolveLogoSrc(profile.logoUrl || ""),
-        fontFamily: "SweiGothicCJKtc-Regular",
+        fontFamily: resolveWorkspaceFontFamily(
+          storedTypeface?.fontFamily || storedTypeface?.typefaceId || storedTypeface?.id,
+        ),
         brandColors: extractBrandColors(
           (profile as { brandColors?: unknown; brand_colors?: unknown }).brandColors ??
             (profile as { brand_colors?: unknown }).brand_colors,
@@ -224,10 +230,15 @@ function readBrandKit() {
       const parsed = JSON.parse(rawAnalysis) as {
         analysis?: { businessName?: string; logoUrl?: string };
       };
+      const storedTypeface = readSessionJson("soon-typeface-v1") as
+        | { fontFamily?: string; typefaceId?: string; id?: string }
+        | null;
       return {
         businessName: parsed.analysis?.businessName || "品牌",
         logoUrl: resolveLogoSrc(parsed.analysis?.logoUrl || ""),
-        fontFamily: "SweiGothicCJKtc-Regular",
+        fontFamily: resolveWorkspaceFontFamily(
+          storedTypeface?.fontFamily || storedTypeface?.typefaceId || storedTypeface?.id,
+        ),
         brandColors: extractBrandColors(
           (parsed.analysis as { brandColors?: unknown; brand_colors?: unknown } | undefined)?.brandColors ??
             (parsed.analysis as { brand_colors?: unknown } | undefined)?.brand_colors,
@@ -321,7 +332,9 @@ async function loadPersistedBrandKit(fallback: {
     } = await supabase.auth.getUser();
     const sessionId = getStoredOnboardingSessionId();
 
-    let query = supabase.from("brand_kits").select("business_name,logo_url");
+    let query = supabase
+      .from("brand_kits")
+      .select("business_name,logo_url,typeface_family,typeface_id");
     if (user?.id) {
       const { activeWorkspace, workspaceId } = await resolveActiveWorkspace();
       if (workspaceId) {
@@ -363,7 +376,7 @@ async function loadPersistedBrandKit(fallback: {
           if (!workspaceLogo) {
             const { data: storedKit } = await supabase
               .from("brand_kits")
-              .select("business_name,logo_url")
+              .select("business_name,logo_url,typeface_family,typeface_id")
               .eq("workspace_id", workspaceId)
               .maybeSingle();
             return {
@@ -374,7 +387,12 @@ async function loadPersistedBrandKit(fallback: {
               logoUrl: storedKit?.logo_url
                 ? resolveLogoSrc(storedKit.logo_url)
                 : workspaceFallbackLogo,
-              fontFamily: workspaceFont,
+              fontFamily: resolveWorkspaceFontFamily(
+                workspaceSettings?.font_style ||
+                  storedKit?.typeface_family ||
+                  storedKit?.typeface_id,
+                workspaceFont,
+              ),
               brandColors: workspaceBrandColors,
             };
           }
@@ -405,7 +423,10 @@ async function loadPersistedBrandKit(fallback: {
     return {
       businessName: data.business_name || fallback.businessName,
       logoUrl: nextLogo,
-      fontFamily: fallback.fontFamily,
+      fontFamily: resolveWorkspaceFontFamily(
+        data.typeface_family || data.typeface_id,
+        fallback.fontFamily,
+      ),
       brandColors: fallback.brandColors,
     };
   } catch {
@@ -418,6 +439,12 @@ function resolveWorkspaceFontFamily(value?: string | null, fallback = "SweiGothi
   if (normalized.includes("gensenrounded") || normalized.includes("系統圓體")) {
     return "GenSenRounded2";
   }
+  const matchedTypeface = typefaces.find(
+    (typeface) =>
+      typeface.id.toLowerCase() === normalized ||
+      typeface.fontFamily.toLowerCase() === normalized,
+  );
+  if (matchedTypeface) return matchedTypeface.fontFamily;
   return value?.trim() || fallback;
 }
 
@@ -946,8 +973,24 @@ function isInCurrentWeek(post: ScheduledPost) {
   return scheduled >= start && scheduled < end;
 }
 
-function createPostDesignElements(post: ScheduledPost): DesignElement[] {
-  return [
+type EditorBrandKit = {
+  businessName: string;
+  logoUrl: string;
+  fontFamily: string;
+  brandColors: string[];
+};
+
+function createPostDesignElements(
+  post: ScheduledPost,
+  brandKit: EditorBrandKit,
+): DesignElement[] {
+  const fontFamily = brandKit.fontFamily || "SweiGothicCJKtc-Regular";
+  const accentColor = brandKit.brandColors[0] || "#E8573F";
+  const supportingCopy = post.body
+    .replace(/\s+/g, " ")
+    .split(/[。！？!?]/)[0]
+    .trim();
+  const elements: DesignElement[] = [
     {
       id: `image-background-${post.id}`,
       kind: "image",
@@ -965,72 +1008,124 @@ function createPostDesignElements(post: ScheduledPost): DesignElement[] {
       imageUrl: post.image,
     },
     {
+      id: `shape-overlay-${post.id}`,
+      kind: "shape",
+      item: "rectangle",
+      label: "標題遮罩",
+      x: 50,
+      y: 76,
+      size: 430,
+      width: 430,
+      height: 265,
+      rotation: 0,
+      opacity: 72,
+      color: "#111111",
+      zIndex: 5,
+    },
+    {
+      id: `shape-accent-${post.id}`,
+      kind: "shape",
+      item: "rectangle",
+      label: "品牌色標記",
+      x: 10,
+      y: 58,
+      size: 48,
+      width: 48,
+      height: 5,
+      rotation: 0,
+      opacity: 100,
+      color: accentColor,
+      zIndex: 9,
+    },
+    {
       id: `text-title-${post.id}`,
       kind: "text",
       item: "headline",
       label: "標題文字",
-      x: 34,
-      y: 13,
-      size: 36,
+      x: 50,
+      y: 69,
+      size: 34,
       rotation: 0,
       opacity: 100,
       color: "#ffffff",
       zIndex: 10,
       textContent: post.title,
-      fontFamily: "Georgia, serif",
-      fontSize: 36,
+      fontFamily,
+      fontSize: 34,
       fontWeight: "bold",
       fontStyle: "normal",
       textDecoration: "none",
       textAlign: "left",
-      width: 330,
-      lineHeight: 0.96,
+      width: 350,
+      lineHeight: 1.08,
     },
     {
       id: `text-subtitle-${post.id}`,
       kind: "text",
       item: "subtitle",
       label: "副標題文字",
-      x: 33,
-      y: 25,
-      size: 21,
+      x: 50,
+      y: 82,
+      size: 16,
       rotation: 0,
       opacity: 100,
       color: "#ffffff",
       zIndex: 11,
-      textContent: "is the one friends replay most.",
-      fontFamily: "inherit",
-      fontSize: 21,
+      textContent: supportingCopy || "專業運動復康資訊，陪你安心重拾活動能力。",
+      fontFamily,
+      fontSize: 16,
       fontWeight: "normal",
       fontStyle: "normal",
       textDecoration: "none",
       textAlign: "left",
-      width: 310,
-      lineHeight: 1.08,
+      width: 350,
+      lineHeight: 1.25,
     },
-    {
-      id: `text-logo-${post.id}`,
-      kind: "text",
+  ];
+
+  if (brandKit.logoUrl) {
+    elements.push({
+      id: `image-logo-${post.id}`,
+      kind: "image",
       item: "logo",
       label: "品牌 Logo",
-      x: 18,
-      y: 91,
-      size: 21,
-      rotation: -4,
+      x: 11,
+      y: 93,
+      size: 38,
+      width: 38,
+      height: 38,
+      rotation: 0,
       opacity: 100,
       color: "#ffffff",
       zIndex: 12,
-      textContent: "SOON\nLOG",
-      fontFamily: "inherit",
-      fontSize: 21,
-      fontWeight: "bold",
-      fontStyle: "normal",
-      textDecoration: "none",
-      textAlign: "center",
-      width: 86,
-      lineHeight: 0.8,
-    },
-  ];
+      imageUrl: brandKit.logoUrl,
+    });
+  }
+
+  elements.push({
+    id: `text-brand-${post.id}`,
+    kind: "text",
+    item: "caption",
+    label: "品牌名稱",
+    x: brandKit.logoUrl ? 30 : 24,
+    y: 93,
+    size: 12,
+    rotation: 0,
+    opacity: 100,
+    color: "#ffffff",
+    zIndex: 12,
+    textContent: brandKit.businessName || "品牌",
+    fontFamily,
+    fontSize: 12,
+    fontWeight: "bold",
+    fontStyle: "normal",
+    textDecoration: "none",
+    textAlign: "left",
+    width: 150,
+    lineHeight: 1,
+  });
+
+  return elements;
 }
 
 function ScheduledPostsPageContent() {
@@ -1190,6 +1285,39 @@ function ScheduledPostsPageContent() {
   }, []);
 
   useEffect(() => {
+    const selectedTypeface = typefaces.find(
+      (typeface) => typeface.fontFamily === brandKit.fontFamily,
+    );
+    if (!selectedTypeface || typeof FontFace === "undefined") return;
+    if (document.fonts.check(`16px "${selectedTypeface.fontFamily}"`)) return;
+
+    let cancelled = false;
+    const fontFace = new FontFace(
+      selectedTypeface.fontFamily,
+      `url(${selectedTypeface.cdnUrl}) format("woff2")`,
+    );
+    void fontFace
+      .load()
+      .then((loadedFont) => {
+        if (cancelled) return;
+        document.fonts.add(loadedFont);
+        void document.fonts.ready.then(() => {
+          if (!cancelled) fabricControlsRef.current?.fabricRef.current?.requestRenderAll();
+        });
+      })
+      .catch((error) => {
+        console.warn("[scheduled-posts] unable to load brand typeface", {
+          error,
+          fontFamily: selectedTypeface.fontFamily,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandKit.fontFamily]);
+
+  useEffect(() => {
     if (!autoPostId) return;
     router.replace("/onboarding/scheduled-posts", { scroll: false });
   }, [autoPostId, router]);
@@ -1202,7 +1330,7 @@ function ScheduledPostsPageContent() {
 
   const openDesignEditor = (post: ScheduledPost) => {
     if (designElementsPostId !== post.id) {
-      const nextElements = createPostDesignElements(post);
+      const nextElements = createPostDesignElements(post, brandKit);
       designHistoryRef.current = [JSON.stringify(nextElements)];
       designHistoryIndexRef.current = 0;
       setDesignElements(nextElements);
@@ -1238,7 +1366,7 @@ function ScheduledPostsPageContent() {
       : null;
     const nextElements = payload
       ? createCarouselLayerElements(payload, externalEditImage)
-      : createPostDesignElements(externalPost).filter(
+      : createPostDesignElements(externalPost, brandKit).filter(
           (element) => element.kind === "image",
         );
     designHistoryRef.current = [JSON.stringify(nextElements)];
