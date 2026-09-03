@@ -7,18 +7,18 @@ import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 export async function POST(req: Request) {
   try {
+    const serverSupabase = createServerSupabase(await cookies())
+    const { data: { user } } = await serverSupabase.auth.getUser()
+    if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await req.json().catch(() => ({}))
     const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : ''
     if (!isUuid(workspaceId)) {
       return NextResponse.json({ error: 'Invalid workspace' }, { status: 400 })
     }
 
-    const serverSupabase = createServerSupabase(await cookies())
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const access = await getWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
-    if (!access) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!access?.canApprove) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { data: projects, error: projectsError } = await access.admin
       .from('content_projects')

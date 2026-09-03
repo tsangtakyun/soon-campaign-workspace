@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { isUuid } from '@/lib/oauth-connections'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
 
 const CLAIM_TABLES = [
@@ -16,12 +17,6 @@ const CLAIM_TABLES = [
 
 export async function POST(req: Request) {
   try {
-    const { sessionId } = (await req.json()) as { sessionId?: string }
-
-    if (!sessionId) {
-      return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
-    }
-
     const serverSupabase = createServerSupabase(await cookies())
     const {
       data: { user },
@@ -31,52 +26,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = createAdminSupabase()
-    const now = new Date().toISOString()
-    const { data: brandKitForWorkspace } = await supabase
-      .from('brand_kits')
-      .select('business_name,elevator_pitch')
-      .eq('onboarding_session_id', sessionId)
-      .limit(1)
-      .maybeSingle()
-
-    let workspaceId: string | null = null
-    if (brandKitForWorkspace?.business_name) {
-      const { data: workspace, error: workspaceError } = await supabase
-        .from('workspaces')
-        .insert({
-          name: brandKitForWorkspace.business_name,
-          type: 'brand',
-          owner: user.email ?? null,
-          owner_id: user.id,
-          description: brandKitForWorkspace.elevator_pitch ?? null,
-        })
-        .select('id')
-        .single()
-
-      if (workspaceError) throw workspaceError
-      workspaceId = workspace.id
-
-      const { error: memberError } = await supabase.from('workspace_members').upsert(
-        {
-          workspace_id: workspaceId,
-          user_id: user.id,
-          email: user.email ?? user.id,
-          display_name: user.user_metadata?.full_name ?? user.email ?? brandKitForWorkspace.business_name,
-          role: 'owner',
-          status: 'active',
-        },
-        { onConflict: 'workspace_id,user_id' }
-      )
-
-      if (memberError) throw memberError
+    const { sessionId } = (await req.json().catch(() => ({}))) as { sessionId?: string }
+    if (!isUuid(sessionId || '')) {
+      return NextResponse.json({ error: 'Invalid sessionId' }, { status: 400 })
     }
 
-    const claimedOwnerFields = workspaceId
-      ? { claimed_at: now, user_id: user.id, workspace_id: workspaceId }
-      : { claimed_at: now, user_id: user.id }
-    const claimedUserFields = workspaceId ? { user_id: user.id, workspace_id: workspaceId } : { user_id: user.id }
-
+    const supabase = createAdminSupabase()
+    const now = new Date().toISOString()
     const ownershipChecks = await Promise.all(
       CLAIM_TABLES.map((table) =>
         supabase
@@ -104,6 +60,52 @@ export async function POST(req: Request) {
         { status: 409 }
       )
     }
+
+    const { data: brandKitForWorkspace, error: brandKitError } = await supabase
+      .from('brand_kits')
+      .select('business_name,elevator_pitch,user_id,workspace_id')
+      .eq('onboarding_session_id', sessionId)
+      .limit(1)
+      .maybeSingle()
+    if (brandKitError) throw brandKitError
+
+    let workspaceId = brandKitForWorkspace?.workspace_id || null
+    if (!workspaceId && brandKitForWorkspace?.business_name) {
+      const { data: workspace, error: workspaceError } = await supabase
+        .from('workspaces')
+        .insert({
+          name: brandKitForWorkspace.business_name,
+          type: 'brand',
+          owner: user.email ?? null,
+          owner_id: user.id,
+          description: brandKitForWorkspace.elevator_pitch ?? null,
+        })
+        .select('id')
+        .single()
+
+      if (workspaceError) throw workspaceError
+      workspaceId = workspace.id
+    }
+
+    if (workspaceId) {
+      const { error: memberError } = await supabase.from('workspace_members').upsert(
+        {
+          workspace_id: workspaceId,
+          user_id: user.id,
+          email: user.email ?? user.id,
+          display_name: user.user_metadata?.full_name ?? user.email ?? brandKitForWorkspace?.business_name,
+          role: 'owner',
+          status: 'active',
+        },
+        { onConflict: 'workspace_id,user_id' }
+      )
+      if (memberError) throw memberError
+    }
+
+    const claimedOwnerFields = workspaceId
+      ? { claimed_at: now, user_id: user.id, workspace_id: workspaceId }
+      : { claimed_at: now, user_id: user.id }
+    const claimedUserFields = workspaceId ? { user_id: user.id, workspace_id: workspaceId } : { user_id: user.id }
 
     const results = await Promise.all([
       supabase
@@ -154,7 +156,7 @@ export async function POST(req: Request) {
     const error = results.find((result) => result.error)?.error
     if (error) throw error
 
-    return NextResponse.json({ success: true, userId: user.id })
+    return NextResponse.json({ success: true, userId: user.id, workspaceId })
   } catch (error) {
     console.error('[onboarding/claim]', error)
     return NextResponse.json(

@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import { assertWorkspaceAccess, isUuid } from '@/lib/oauth-connections'
+import { isUuid } from '@/lib/oauth-connections'
 import { createAdminSupabase, createServerSupabase } from '@/lib/server-supabase'
+import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 function readGraphError(value: unknown) {
   if (!value || typeof value !== 'object' || !('error' in value)) return JSON.stringify(value)
@@ -63,8 +64,10 @@ export async function POST(req: Request) {
         .in('status', ['posted', 'published'])
       if ((publishCount || 0) >= 3) return NextResponse.json({ error: 'Onboarding publish limit reached' }, { status: 429 })
       connectionQuery = connectionQuery.eq('onboarding_session_id', sessionId).is('user_id', null)
-    } else if (user?.id && workspaceId) {
-      await assertWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
+    } else if (workspaceId) {
+      if (!user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      const access = await getWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
+      if (!access?.canPublish) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       connectionQuery = connectionQuery.eq('workspace_id', workspaceId)
     } else {
       return NextResponse.json({ error: 'Missing onboarding session' }, { status: 400 })
@@ -148,12 +151,14 @@ export async function POST(req: Request) {
 
     if (postId) {
       const publishedAt = new Date().toISOString()
-      const { data: existingPost } = await supabase
+      let postQuery = supabase
         .from('campaign_posts')
         .select('captions')
         .eq('id', postId)
-        .eq('workspace_id', workspaceId)
-        .maybeSingle()
+      postQuery = sessionId
+        ? postQuery.eq('onboarding_session_id', sessionId).is('user_id', null)
+        : postQuery.eq('workspace_id', workspaceId)
+      const { data: existingPost } = await postQuery.maybeSingle()
       const captions =
         existingPost?.captions && typeof existingPost.captions === 'object' && !Array.isArray(existingPost.captions)
           ? (existingPost.captions as Record<string, unknown>)
@@ -163,7 +168,7 @@ export async function POST(req: Request) {
           ? (captions.publish_status as Record<string, unknown>)
           : {}
 
-      await supabase
+      let updateQuery = supabase
         .from('campaign_posts')
         .update({
           captions: {
@@ -181,7 +186,11 @@ export async function POST(req: Request) {
           status: 'posted',
         })
         .eq('id', postId)
-        .eq('workspace_id', workspaceId)
+      updateQuery = sessionId
+        ? updateQuery.eq('onboarding_session_id', sessionId).is('user_id', null)
+        : updateQuery.eq('workspace_id', workspaceId)
+      const { error: updateError } = await updateQuery
+      if (updateError) throw updateError
     }
 
     return NextResponse.json({
