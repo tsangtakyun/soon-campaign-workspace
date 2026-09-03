@@ -11,16 +11,20 @@
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
-    "fabric": "^6.9.1",
+    "fabric": "7.4.0",
     "next": "15.5.25",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "sharp": "^0.34.5",
+    "sharp": "0.35.4",
     "stripe": "^18.3.0",
     "ws": "^8.21.3"
   },
+  "overrides": {
+    "nanoid": "3.3.18",
+    "postcss": "8.5.28",
+    "qs": "6.16.0"
+  },
   "devDependencies": {
-    "@types/fabric": "^5.3.11",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
