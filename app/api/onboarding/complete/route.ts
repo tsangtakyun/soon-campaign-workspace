@@ -205,7 +205,8 @@ async function saveScopedCampaigns(
   supabase: ReturnType<typeof createAdminSupabase>,
   payloads: JsonRecord[],
   scopeColumn: string,
-  scopeValue: string
+  scopeValue: string,
+  sessionId: string
 ) {
   const sourceKeys = payloads
     .map((payload) => asString(payload.source_key))
@@ -221,9 +222,22 @@ async function saveScopedCampaigns(
 
   if (existingError) throw existingError
 
-  const existingBySource = new Map(
+  const existingBySource = new Map<string, string>(
     (existingCampaigns || []).map((campaign: any) => [String(campaign.source_key || ''), campaign.id])
   )
+
+  const missingSourceKeys = sourceKeys.filter((sourceKey) => !existingBySource.has(sourceKey))
+  if (missingSourceKeys.length && scopeColumn !== 'onboarding_session_id') {
+    const { data: sessionCampaigns, error: sessionError } = await supabase
+      .from('marketing_campaigns')
+      .select('id,source_key')
+      .eq('onboarding_session_id', sessionId)
+      .in('source_key', missingSourceKeys)
+    if (sessionError) throw sessionError
+    ;(sessionCampaigns || []).forEach((campaign: any) => {
+      existingBySource.set(String(campaign.source_key || ''), campaign.id)
+    })
+  }
 
   return Promise.all(
     payloads.map(async (payload) => {
@@ -269,6 +283,7 @@ async function clearScopedGeneratedPosts(
 }
 
 export async function POST(req: Request) {
+  let stage = 'parse-request'
   try {
     const body = (await req.json()) as JsonRecord
     const sessionId = asString(body.sessionId)
@@ -277,6 +292,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
     }
 
+    stage = 'authenticate'
     const serverSupabase = createServerSupabase(await cookies())
     const {
       data: { user },
@@ -293,6 +309,7 @@ export async function POST(req: Request) {
           .maybeSingle()
       : { data: null }
 
+    stage = 'cleanup-anonymous-records'
     if (userId) {
       await Promise.all([
         supabase.from('campaign_posts').delete().eq('onboarding_session_id', sessionId).is('user_id', null),
@@ -335,6 +352,7 @@ export async function POST(req: Request) {
     const requestedWorkspaceId = firstString(body.workspaceId)
     let workspaceId: string | null = null
 
+    stage = 'resolve-workspace'
     if (userId) {
       const priorWorkspaceId = asString(existingSessionBrandKit?.workspace_id)
       if (!requestedWorkspaceId && priorWorkspaceId) {
@@ -450,6 +468,7 @@ export async function POST(req: Request) {
 
     let brandKit: any
 
+    stage = 'save-brand-kit'
     try {
       brandKit = await saveScopedSingle(
         supabase,
@@ -480,6 +499,7 @@ export async function POST(req: Request) {
       )
     }
 
+    stage = 'attach-brand-assets'
     const existingAssetOwnerFields: JsonRecord = {
       brand_kit_id: brandKit.id,
       onboarding_session_id: sessionId,
@@ -536,6 +556,7 @@ export async function POST(req: Request) {
       updated_at: new Date().toISOString(),
     }
 
+    stage = 'save-content-preferences'
     try {
       await saveScopedSingle(
         supabase,
@@ -566,7 +587,11 @@ export async function POST(req: Request) {
       )
     }
 
+    stage = 'clear-generated-posts'
     await clearScopedGeneratedPosts(supabase, ownerScope.column, ownerScope.value)
+    if (ownerScope.column !== 'onboarding_session_id') {
+      await clearScopedGeneratedPosts(supabase, 'onboarding_session_id', sessionId)
+    }
 
     const fallbackCampaignName =
       firstString(campaignDetails.campaignName, campaignDetails.name, contentStrategy.titleZh, contentStrategy.title) ||
@@ -605,11 +630,13 @@ export async function POST(req: Request) {
       }
     })
 
+    stage = 'save-campaigns'
     const campaigns = await saveScopedCampaigns(
       supabase,
       campaignPayloads,
       ownerScope.column,
-      ownerScope.value
+      ownerScope.value,
+      sessionId
     )
 
     const campaignsBySource = new Map((campaigns || []).map((campaign) => [campaign.source_key, campaign]))
@@ -672,6 +699,7 @@ export async function POST(req: Request) {
     const createdPostIds: string[] = []
     const allCreatedPostIds: string[] = []
 
+    stage = 'save-campaign-posts'
     if (posts.length) {
       const { data: savedPosts, error: postsError } = await supabase
         .from('campaign_posts')
@@ -710,7 +738,7 @@ export async function POST(req: Request) {
       createdPostIds,
     })
   } catch (error) {
-    console.error('onboarding/complete error:', error)
+    console.error('onboarding/complete error:', { stage, error })
     return NextResponse.json(
       { error: 'Failed to save onboarding data', detail: String(error) },
       { status: 500 }
