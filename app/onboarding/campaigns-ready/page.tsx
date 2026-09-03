@@ -29,6 +29,7 @@ const SESSION_KEYS = {
   typeface: 'soon-typeface-v1',
   photoControl: 'soon-photo-control-v2',
   topicReview: 'soon-topic-review-v1',
+  campaignThemes: 'soon-campaign-themes-v1',
 }
 
 function readSession<T>(key: string): T | null {
@@ -75,6 +76,42 @@ function withIdsAndDates(themes: Array<{ title: string; body: string }>): Campai
   }))
 }
 
+async function requestCampaignThemes(payload: Record<string, unknown>) {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 75_000)
+    try {
+      const response = await fetch('/api/campaign-themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !Array.isArray(data.themes)) {
+        const error = new Error(data?.detail || data?.error || `HTTP ${response.status}`) as Error & {
+          retryable?: boolean
+        }
+        error.retryable = response.status >= 500
+        throw error
+      } else {
+        return data.themes as Array<{ title: string; body: string }>
+      }
+    } catch (error) {
+      lastError = error
+      if ((error as Error & { retryable?: boolean }).retryable === false || attempt === 1) throw error
+    } finally {
+      window.clearTimeout(timeout)
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 900))
+  }
+
+  throw lastError || new Error('Failed to generate campaign themes')
+}
+
 function CampaignsReadyContent() {
   const searchParams = useSearchParams()
   const [isGenerating, setIsGenerating] = useState(true)
@@ -110,35 +147,30 @@ function CampaignsReadyContent() {
     setError('')
 
     try {
-      const response = await fetch('/api/campaign-themes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile,
-          strategy,
-          campaign,
-          contentMood,
-          language,
-          regenerateIndex,
-          existingThemes: regenerateIndex ? themesRef.current : undefined,
-        }),
+      const generatedThemes = await requestCampaignThemes({
+        profile,
+        strategy,
+        campaign,
+        contentMood,
+        language,
+        regenerateIndex,
+        existingThemes: regenerateIndex ? themesRef.current : undefined,
       })
-
-      const data = await response.json()
-      if (!response.ok || !Array.isArray(data.themes)) {
-        throw new Error(data?.detail || data?.error || 'Failed to generate campaign themes')
-      }
-
-      const nextThemes = withIdsAndDates(data.themes)
+      const nextThemes = withIdsAndDates(generatedThemes)
       setThemes((currentThemes) => {
-        if (!regenerateIndex) return nextThemes
+        if (!regenerateIndex) {
+          window.sessionStorage.setItem(SESSION_KEYS.campaignThemes, JSON.stringify(nextThemes))
+          return nextThemes
+        }
         const replacement = nextThemes[regenerateIndex - 1]
         if (!replacement) return currentThemes
-        return currentThemes.map((theme) =>
+        const updatedThemes = currentThemes.map((theme) =>
           theme.id === regenerateIndex
             ? { ...replacement, id: theme.id, dateRange: theme.dateRange }
             : theme
         )
+        window.sessionStorage.setItem(SESSION_KEYS.campaignThemes, JSON.stringify(updatedThemes))
+        return updatedThemes
       })
     } catch (err) {
       console.warn('[campaign-themes] failed:', err)
@@ -150,6 +182,12 @@ function CampaignsReadyContent() {
   }, [searchParams])
 
   useEffect(() => {
+    const savedThemes = readSession<CampaignTheme[]>(SESSION_KEYS.campaignThemes)
+    if (savedThemes?.length === 4 && savedThemes.every((theme) => theme.title && theme.body)) {
+      setThemes(savedThemes)
+      setIsGenerating(false)
+      return
+    }
     void generateThemes()
   }, [generateThemes])
 
@@ -180,7 +218,7 @@ function CampaignsReadyContent() {
 
   async function handleContinue() {
     if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('soon-campaign-themes-v1', JSON.stringify(themes))
+      window.sessionStorage.setItem(SESSION_KEYS.campaignThemes, JSON.stringify(themes))
     }
 
     setIsCompleting(true)

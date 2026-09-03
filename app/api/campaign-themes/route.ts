@@ -69,6 +69,7 @@ function moodPreference(contentMood: CampaignThemesRequestBody['contentMood']) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now()
   const auth = await requirePlatformUser()
   if (auth.error) return auth.error
   if (!(await consumeApiQuota(auth.access.user.id, 'campaign-themes', 30))) {
@@ -167,6 +168,10 @@ export async function POST(request: Request) {
 
     const data = await response.json()
     if (!response.ok) {
+      console.error('[campaign-themes] anthropic request failed', {
+        durationMs: Date.now() - startedAt,
+        status: response.status,
+      })
       throw new Error(data?.error?.message || 'Anthropic API request failed')
     }
 
@@ -179,9 +184,17 @@ export async function POST(request: Request) {
       : ''
 
     const themes = parseThemeArray(text)
+    console.info('[campaign-themes] generated', {
+      durationMs: Date.now() - startedAt,
+      themeCount: themes.length,
+    })
     return NextResponse.json({ themes })
   } catch (error) {
-    console.error('[campaign-themes]', error)
+    console.error('[campaign-themes] failed', {
+      durationMs: Date.now() - startedAt,
+      error: String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return NextResponse.json(
       { error: 'Failed to generate campaign themes', detail: String(error) },
       { status: 500 }
