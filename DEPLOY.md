@@ -1,8 +1,18 @@
 # Deployment checklist
 
-## Temporary production branch freeze
+## Canonical production branch
 
-`main` and the source snapshot currently serving production are not aligned. Do **not** push `main` or trigger a Git production deployment until T35 has been resolved and the approved production source has been committed in full. A push to `main` before that reconciliation can remove features that currently exist only in the production working-tree snapshot.
+Vercel project `prj_1zl1QCAlpRJ1g3JKqUVeVCBiHelP` is linked to GitHub with
+`codex/recover-campaign-workspace-work` as its production branch. The deployment
+serving `sooncreator.network` on 2026-09-03 was built from this line. Treat this
+branch as the canonical production source and deploy through the Vercel Git
+integration by pushing reviewed commits to it. Do not use local `vercel --prod`.
+
+`main` is a divergent legacy product line containing older editor, KOL matching,
+PR project, and public marketing work. Do not merge it wholesale into the
+production branch and do not change Vercel's production branch back to `main`.
+Port individual legacy features only after a file-level review and regression
+test against the current onboarding and workspace architecture.
 
 ## Scheduled publishing
 
@@ -45,7 +55,7 @@ New functions are also private by default. Any RPC intended for direct client us
 
 ## Known debt
 
-- `origin/main` and `codex/recover-campaign-workspace-work` are divergent from merge base `4f12449`: main has 157 unique commits and the codex line has 47 including T29. They overlap on 13 paths and have at least six direct conflicts: `app/onboarding/campaigns/page.tsx`, `app/onboarding/seo/page.tsx`, `app/onboarding/team/page.tsx`, `app/page.tsx`, `app/scheduled-posts/page.tsx`, and `components/dashboard/DashboardSidebar.tsx`. Do not push `main` until this is reconciled.
+- `origin/main` and `codex/recover-campaign-workspace-work` are divergent from merge base `4f12449`. As verified on 2026-09-04, `main` has 157 unique commits and the remote production branch has 131. Preserve `main` as a legacy feature source; inventory and port wanted features individually rather than attempting a wholesale merge.
 - The `supabase_admin` default ACL still mentions `anon` and `authenticated`. Both projects currently have zero tables owned by `supabase_admin`, so this is a theoretical residual rather than a current exposure.
 - `defacl_postgres_f` is `{postgres=X}`. Every new client-callable function must explicitly grant the minimum required `EXECUTE` privilege.
 - `withWorkspaceAuth()` is not mechanically enforced. Approximately 26 routes using `createAdminSupabase()` remain to be migrated.
