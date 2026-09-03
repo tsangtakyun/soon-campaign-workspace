@@ -698,6 +698,8 @@ export async function POST(req: Request) {
     })
     const createdPostIds: string[] = []
     const allCreatedPostIds: string[] = []
+    const postTypeBySourceKey = new Map(posts.map((post) => [post.source_key, post.post_type]))
+    const createdPostQueue: Array<{ id: string; postType: string }> = []
 
     stage = 'save-campaign-posts'
     if (posts.length) {
@@ -712,6 +714,10 @@ export async function POST(req: Request) {
         allCreatedPostIds.push(savedPost.id)
         if (String(savedPost.source_key || '').startsWith('campaign-1-')) {
           createdPostIds.push(savedPost.id)
+          createdPostQueue.push({
+            id: savedPost.id,
+            postType: postTypeBySourceKey.get(savedPost.source_key) || 'still-images',
+          })
         }
         console.log('[onboarding/complete] prepared campaign post image generation:', {
           postId: savedPost.id,
@@ -736,6 +742,7 @@ export async function POST(req: Request) {
       postsCreated: posts.length,
       allCreatedPostIds,
       createdPostIds,
+      createdPostQueue,
     })
   } catch (error) {
     console.error('onboarding/complete error:', { stage, error })

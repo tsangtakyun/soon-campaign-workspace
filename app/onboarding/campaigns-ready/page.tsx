@@ -121,7 +121,7 @@ function CampaignsReadyContent() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null)
-  const [imageProgress, setImageProgress] = useState({ current: 0, total: 0 })
+  const [imageProgress, setImageProgress] = useState({ current: 0, total: 0, label: '內容圖片' })
 
   useEffect(() => {
     themesRef.current = themes
@@ -263,7 +263,7 @@ function CampaignsReadyContent() {
         count: Array.isArray(result?.createdPostIds) ? result.createdPostIds.length : 0,
         totalCreated: Array.isArray(result?.allCreatedPostIds) ? result.allCreatedPostIds.length : undefined,
       })
-      await generatePostImagesFromClient(result?.createdPostIds)
+      await generatePostImagesFromClient(result?.createdPostQueue || result?.createdPostIds)
     } catch (err) {
       console.warn('[onboarding/complete] failed from campaigns-ready:', err)
       setIsCompleting(false)
@@ -276,14 +276,20 @@ function CampaignsReadyContent() {
     window.location.href = `${url.pathname}${url.search}`
   }
 
-  async function generatePostImagesFromClient(postIds: unknown) {
-    if (!Array.isArray(postIds) || postIds.length === 0) return
-    setImageProgress({ current: 0, total: postIds.length })
+  async function generatePostImagesFromClient(postQueue: unknown) {
+    if (!Array.isArray(postQueue) || postQueue.length === 0) return
+    setImageProgress({ current: 0, total: postQueue.length, label: '內容圖片' })
 
-    for (let index = 0; index < postIds.length; index += 1) {
-      const postId = postIds[index]
+    for (let index = 0; index < postQueue.length; index += 1) {
+      const queueItem = postQueue[index]
+      const postId = typeof queueItem === 'string' ? queueItem : queueItem?.id
+      const postType = typeof queueItem === 'object' ? queueItem?.postType : ''
       if (typeof postId !== 'string') continue
-      setImageProgress({ current: index + 1, total: postIds.length })
+      setImageProgress({
+        current: index + 1,
+        total: postQueue.length,
+        label: postType === 'carousels' ? '輪播貼文底圖' : '內容圖片',
+      })
       try {
         console.log('[campaigns-ready] generating post image:', { postId })
         const response = await fetch('/api/generate-post-image', {
@@ -297,6 +303,24 @@ function CampaignsReadyContent() {
           console.warn('[campaigns-ready] post image generation failed:', result)
         } else {
           console.log('[campaigns-ready] post image generated:', result)
+          if (postType === 'carousels') {
+            setImageProgress({
+              current: index + 1,
+              total: postQueue.length,
+              label: '輪播貼文逐頁內容及排版',
+            })
+            const carouselResponse = await fetch('/api/generate-post-carousel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ postId }),
+            })
+            const carouselResult = await carouselResponse.json().catch(() => ({}))
+            if (!carouselResponse.ok) {
+              console.warn('[campaigns-ready] carousel generation failed:', carouselResult)
+            } else {
+              console.log('[campaigns-ready] carousel generated:', carouselResult)
+            }
+          }
         }
       } catch (error) {
         console.warn('[campaigns-ready] post image generation error:', error)
@@ -340,7 +364,7 @@ function CampaignsReadyContent() {
         <section className="campaign-loading" aria-live="polite">
           <div className="campaign-spinner" aria-hidden="true" />
           <h1>
-            正在為你創作內容圖片...
+            正在為你創作{imageProgress.label}...
             {imageProgress.total > 0 ? ` (${imageProgress.current}/${imageProgress.total})` : ''}
           </h1>
         </section>

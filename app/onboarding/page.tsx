@@ -1182,6 +1182,11 @@ export default function OnboardingHomePage() {
               )
             })
             .slice(0, 10)
+          const carouselsMissingPages = displayPosts.filter((post: any) =>
+            post.post_type === 'carousels' &&
+            !isPlaceholderImage(post.image_url || null) &&
+            readPostMedia(post).length <= 1
+          )
 
           hasGeneratingImagesRef.current = firstWeekMissingImages.length > 0
           setDashboardPosts([
@@ -1236,6 +1241,44 @@ export default function OnboardingHomePage() {
                   }
                 } catch (error) {
                   console.warn('[dashboard] post image generation error:', {
+                    postId: post.id,
+                    error,
+                  })
+                } finally {
+                  generatingPostIdsRef.current.delete(post.id)
+                }
+              }
+
+              if (!cancelled) void loadDashboard()
+            })()
+          }
+
+          if (carouselsMissingPages.length) {
+            void (async () => {
+              for (const post of carouselsMissingPages) {
+                if (cancelled || typeof post.id !== 'string') return
+                if (generatingPostIdsRef.current.has(post.id)) continue
+
+                generatingPostIdsRef.current.add(post.id)
+                try {
+                  console.log('[dashboard] generating missing carousel pages:', {
+                    postId: post.id,
+                    sourceKey: post.source_key,
+                  })
+                  const response = await fetch('/api/generate-post-carousel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ postId: post.id }),
+                  })
+                  const result = await response.json().catch(() => ({}))
+                  if (!response.ok) {
+                    console.warn('[dashboard] carousel generation failed:', {
+                      postId: post.id,
+                      result,
+                    })
+                  }
+                } catch (error) {
+                  console.warn('[dashboard] carousel generation error:', {
                     postId: post.id,
                     error,
                   })
