@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { normalizeContentDirections } from '@/lib/content-directions'
+import { normalizeContentDirections, resolveContentDirections } from '@/lib/content-directions'
 import { requirePlatformUser } from '@/lib/platform-access'
 import { getWorkspaceAccess } from '@/lib/workspace-access'
 
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     const supabase = workspaceAccess.admin
     const { data: workspace } = await supabase
       .from('workspaces')
-      .select('id, owner_id, logo_url, visual_style, font_style, visual_identity_description, brand_colors, avoided_keywords, market_locations, audience_gender, content_persona_age, content_persona_gender, content_persona_ethnicity, content_directions')
+      .select('id, name, description, owner_id, logo_url, visual_style, font_style, visual_identity_description, brand_colors, avoided_keywords, market_locations, audience_gender, content_persona_age, content_persona_gender, content_persona_ethnicity, content_directions')
       .eq('id', workspaceId)
       .single()
 
@@ -51,7 +51,13 @@ export async function GET(req: Request) {
       avoided_keywords: normalizeStringArray(workspace.avoided_keywords),
       brand_colors: normalizeBrandColorsForResponse(workspace.brand_colors),
       market_locations: normalizeStringArray(workspace.market_locations),
-      content_directions: normalizeContentDirections(workspace.content_directions),
+      content_directions: resolveContentDirections(
+        workspace.content_directions,
+        workspace.name,
+        workspace.description,
+        workspace.visual_identity_description,
+        workspace.market_locations,
+      ),
       visual_identity_description: workspace.visual_identity_description || '',
     }
 

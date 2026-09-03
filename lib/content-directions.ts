@@ -1,4 +1,10 @@
 export const CONTENT_DIRECTION_RULES = [
+  { label: '運動復康', keywords: ['運動復康', '運動康復', 'sports rehabilitation', 'sports rehab'] },
+  { label: '物理治療與痛症', keywords: ['物理治療', '痛症', '手法治療', 'physiotherapy', 'physical therapy', 'pain management'] },
+  { label: '器械普拉提', keywords: ['器械普拉提', '普拉提', 'reformer pilates', 'pilates'] },
+  { label: '運動表現與訓練', keywords: ['運動表現', '個人化訓練', '體能提升', 'sports performance', 'personal training'] },
+  { label: '術後與產前產後修復', keywords: ['術後復康', '術後康復', '產前產後', '產後修復', 'post-operative', 'postpartum'] },
+  { label: '企業員工健康', keywords: ['企業員工健康', '企業健康', 'corporate wellness', 'employee wellness'] },
   { label: '美食', keywords: ['美食', '餐廳', '飲食', '咖啡', '甜品', '食物', '料理', 'food'] },
   { label: '寵物', keywords: ['寵物', '狗', '貓', '毛孩', 'pet'] },
   { label: '旅遊', keywords: ['旅遊', '旅行', '酒店', '景點', '行程', 'travel'] },
@@ -13,6 +19,8 @@ export const CONTENT_DIRECTION_RULES = [
   { label: '生活日常', keywords: ['生活', '日常', '陪伴', '幽默', '可愛', 'lifestyle'] },
 ] as const
 
+const SPECIALIST_DIRECTION_LABELS = new Set<string>(CONTENT_DIRECTION_RULES.slice(0, 6).map((rule) => rule.label))
+
 export function normalizeContentDirections(value: unknown): string[] {
   const values = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : []
   return Array.from(new Set(values.map((item) => String(item).trim()).filter(Boolean))).slice(0, 12)
@@ -24,6 +32,25 @@ export function inferContentDirections(...values: unknown[]): string[] {
     .filter((rule) => rule.keywords.some((keyword) => text.includes(keyword.toLowerCase())))
     .map((rule) => rule.label)
   return matched.length ? matched.slice(0, 8) : ['生活日常']
+}
+
+export function resolveContentDirections(stored: unknown, ...brandContext: unknown[]): string[] {
+  const normalized = normalizeContentDirections(stored)
+  const inferred = inferContentDirections(...brandContext)
+  const specialist = inferred.filter((direction) => SPECIALIST_DIRECTION_LABELS.has(direction))
+
+  // Older onboarding runs often stored broad categories extracted from AI copy
+  // rather than the actual service. Prefer concrete service directions whenever
+  // the workspace profile supports them, while retaining genuinely specific
+  // custom directions entered by an owner.
+  if (specialist.length) {
+    const custom = normalized.filter((direction) =>
+      !CONTENT_DIRECTION_RULES.some((rule) => rule.label === direction)
+    )
+    return Array.from(new Set([...specialist, ...custom])).slice(0, 8)
+  }
+
+  return normalized.length ? normalized : inferred
 }
 
 export function topicRelevanceScore(
