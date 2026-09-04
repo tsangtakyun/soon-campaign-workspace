@@ -1460,8 +1460,9 @@ export default function ContentStudioPage() {
                                         <strong>{asset.filename}</strong>
                                         <small>
                                           {asset.width} × {asset.height}
-                                          {asset.width < 1080 ||
-                                          asset.height < 1080
+                                          {asset.sourceType !== "ai_generated" &&
+                                          (asset.width < 1080 ||
+                                          asset.height < 1080)
                                             ? " · 解像度偏低"
                                             : ""}
                                         </small>
