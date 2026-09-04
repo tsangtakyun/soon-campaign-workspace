@@ -109,6 +109,8 @@ export async function POST(req: Request) {
       '  "pages": [{"page":"P.1","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
       '}',
       'pages 必須由 P.1 開始連續編號；Carousel 一般 5–9 頁，按資料量決定。不要把未核實內容寫成事實。',
+      'confirmedFacts 只可包含來源內容或來源連結明確支持的事實；品牌自述必須放入 selfReportedClaims。',
+      '如沒有外部來源連結，confirmedFacts 必須是空陣列。不得以一般常識補充解剖、生物力學、醫療或訓練原理；這些內容只能列為待核實，亦不得寫入 pages。',
     ].join('\n')
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -132,8 +134,21 @@ export async function POST(req: Request) {
       ? data.content.filter((item: any) => item.type === 'text').map((item: any) => item.text || '').join('\n')
       : ''
     const generated = parseJsonObject(text)
+    const hasExternalSource = Boolean(project.source_url?.trim())
+    const unsupportedConfirmedFacts = hasExternalSource
+      ? []
+      : Array.isArray(generated.confirmedFacts)
+        ? generated.confirmedFacts
+        : []
     const production = {
       ...generated,
+      confirmedFacts: hasExternalSource && Array.isArray(generated.confirmedFacts)
+        ? generated.confirmedFacts
+        : [],
+      unverifiedClaims: [
+        ...(Array.isArray(generated.unverifiedClaims) ? generated.unverifiedClaims : []),
+        ...unsupportedConfirmedFacts.map((fact: unknown) => `未有外部來源支持：${String(fact)}`),
+      ],
       status: 'structure_ready',
       generatedAt: new Date().toISOString(),
       promptVersion: prompt.version,
