@@ -2,6 +2,7 @@
 
 import type { FormEvent } from 'react'
 import { useState } from 'react'
+import Link from 'next/link'
 
 type ContactForm = {
   name: string
@@ -180,7 +181,7 @@ export default function ContactPage() {
 
           {message && <p className="form-message">{message}</p>}
           <p className="privacy-note">
-            提交即表示你同意 SOON 使用以上資料回覆查詢。我們不會將聯絡資料出售予第三方。
+            提交即表示你同意 SOON 按<Link href="/privacy">私隱政策</Link>使用以上資料回覆查詢。我們不會將聯絡資料出售予第三方。
           </p>
         </form>
       </section>
@@ -390,6 +391,7 @@ export default function ContactPage() {
           font-size: 0.78rem;
           line-height: 1.5;
         }
+        .privacy-note a { color: inherit; text-underline-offset: 3px; }
 
         @media (max-width: 980px) {
           .contact-page {

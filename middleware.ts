@@ -17,10 +17,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/onboarding', request.url))
   }
 
-  if (pathname === '/onboarding/new-workspace') {
-    return NextResponse.redirect(new URL('/select-workspace', request.url))
-  }
-
   const isPublicPage =
     pathname === '/' ||
     pathname === '/contact' ||
@@ -28,6 +24,8 @@ export async function middleware(request: NextRequest) {
     pathname === '/signup' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
     pathname === '/submit-brief' ||
     pathname.startsWith('/paid-analysis') ||
     pathname.startsWith('/creator-matching') ||
@@ -61,8 +59,18 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  const isProtectedPage =
+    pathname === '/dashboard' ||
+    pathname === '/select-workspace' ||
+    pathname === '/scheduled-posts' ||
+    pathname === '/my-workspace' ||
+    pathname.startsWith('/my-workspace/') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/workspace') ||
+    pathname.startsWith('/ops')
+
   if (!user) {
-    if (!isPublicPage) {
+    if (isProtectedPage && !isPublicPage) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('next', pathname)
       return NextResponse.redirect(loginUrl)

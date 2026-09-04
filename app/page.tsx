@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 
 import { pricingPlans } from '@/lib/pricing'
+import { SiteFooter } from '@/components/SiteFooter'
 
 const primaryButtonStyle = {
   display: 'inline-flex',
@@ -242,6 +243,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      <SiteFooter />
       <style
         dangerouslySetInnerHTML={{
           __html: `

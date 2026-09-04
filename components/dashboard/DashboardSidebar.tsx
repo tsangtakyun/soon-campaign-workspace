@@ -208,6 +208,16 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
               )}
             </div>
             <div className="workspace-menu-actions">
+              <button
+                type="button"
+                className="create-workspace"
+                onClick={() => {
+                  setWorkspaceMenuOpen(false)
+                  router.push('/onboarding/new-workspace')
+                }}
+              >
+                ＋ 建立新工作台
+              </button>
               <button type="button" className="logout" onClick={handleSignOut}>
                 登出
               </button>
@@ -440,6 +450,11 @@ export const dashboardSidebarStyles = `
 
   .workspace-menu-actions button.logout {
     color: #991b1b;
+  }
+
+  .workspace-menu-actions button.create-workspace {
+    color: #202126;
+    font-weight: 700;
   }
 
   .sidebar-nav,

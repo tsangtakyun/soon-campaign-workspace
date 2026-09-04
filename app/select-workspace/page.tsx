@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase'
@@ -130,6 +131,15 @@ function WorkspaceSelector() {
                   <p>建立第一個品牌工作空間，開始設定內容策略。</p>
                 </div>
               ) : null}
+
+              <Link className="create-workspace-link" href="/onboarding/new-workspace">
+                <span aria-hidden="true">＋</span>
+                <span>
+                  <strong>建立新工作台</strong>
+                  <small>為另一個品牌重新開始設定</small>
+                </span>
+                <span aria-hidden="true">→</span>
+              </Link>
             </div>
           ) : null}
 
@@ -208,6 +218,23 @@ function WorkspaceSelector() {
         .workspace-copy small { color: rgba(255,255,255,0.5); font-size: 0.8rem; }
         .workspace-role { border-radius: 999px; background: rgba(255,255,255,0.08); padding: 5px 9px; color: rgba(255,255,255,0.7); font-size: 0.72rem; white-space: nowrap; }
         .workspace-arrow { min-width: 24px; color: #ffd337; font-size: 1rem; text-align: right; white-space: nowrap; }
+        .create-workspace-link {
+          min-height: 68px;
+          display: grid;
+          grid-template-columns: 46px minmax(0, 1fr) auto;
+          gap: 14px;
+          align-items: center;
+          border: 1px dashed rgba(255,211,55,0.48);
+          border-radius: 14px;
+          color: #ffffff;
+          padding: 12px 14px;
+          text-decoration: none;
+        }
+        .create-workspace-link > span:first-child { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: rgba(255,211,55,0.12); color: #ffd337; font-size: 1.45rem; }
+        .create-workspace-link strong, .create-workspace-link small { display: block; }
+        .create-workspace-link small { margin-top: 4px; color: rgba(255,255,255,0.5); }
+        .create-workspace-link > span:last-child { color: #ffd337; }
+        .create-workspace-link:hover { border-color: #ffd337; background: rgba(255,211,55,0.06); }
         .status, .empty-state { border-radius: 14px; background: rgba(255,255,255,0.05); padding: 22px; color: rgba(255,255,255,0.7); text-align: center; }
         .status.error { color: #ffb7b0; }
         .empty-state p { margin: 7px 0 0; color: rgba(255,255,255,0.52); font-size: 0.9rem; }

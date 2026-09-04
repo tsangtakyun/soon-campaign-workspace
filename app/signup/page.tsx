@@ -138,7 +138,7 @@ function SignupContent() {
               {message && <p className="message">{message}</p>}
 
               <p className="terms">
-                建立帳戶即表示你同意 SOON 根據提交資料跟進你的試用與宣傳需求。
+                建立帳戶即表示你同意 SOON 的 <Link href="/terms">服務條款</Link>及<Link href="/privacy">私隱政策</Link>。
               </p>
             </>
           </div>
@@ -324,6 +324,7 @@ function SignupContent() {
           line-height: 1.55;
           font-size: 0.75rem;
         }
+        .terms a { color: inherit; text-underline-offset: 3px; }
 
         .sign-out-link {
           position: fixed;

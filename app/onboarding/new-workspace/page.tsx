@@ -77,7 +77,7 @@ export default function NewWorkspacePage() {
     <main className="new-workspace-page">
       <div className="workspace-card">
         <div className="workspace-card-top">
-          <Link href="/onboarding">切換工作台</Link>
+          <Link href="/select-workspace">切換工作台</Link>
           <button type="button" onClick={handleSignOut}>
             登出
           </button>
