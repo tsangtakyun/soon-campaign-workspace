@@ -136,7 +136,7 @@ export async function POST(req: Request) {
 
     let output: GeneratedTopic[] | undefined
     let correction = ''
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const result = await generateText({
         model: anthropic(anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL)),
         output: Output.array({ element: topicSchema }),
