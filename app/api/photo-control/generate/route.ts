@@ -163,6 +163,18 @@ export async function POST(request: NextRequest) {
       } : null,
     })
   } catch (error: any) {
+    if (error?.message === 'INSUFFICIENT_CREDITS') {
+      return NextResponse.json({
+        error: 'INSUFFICIENT_CREDITS',
+        message: 'INSUFFICIENT_CREDITS',
+      }, { status: 402 })
+    }
+    if (error?.message === 'CREDIT_BALANCE_BUSY') {
+      return NextResponse.json({
+        error: 'CREDIT_BALANCE_BUSY',
+        message: 'Credits 正在更新，請稍後再試。',
+      }, { status: 409 })
+    }
     return NextResponse.json({ error: error?.message || 'Unable to generate image' }, { status: 500 })
   }
 }

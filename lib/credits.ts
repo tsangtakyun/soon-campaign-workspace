@@ -93,26 +93,44 @@ export async function spendCredits(
   if (!Number.isFinite(amount) || amount <= 0) throw new Error('INVALID_CREDIT_AMOUNT')
 
   const supabase = createAdminSupabase()
-  const { data: credits, error: creditsError } = await supabase
-    .from('user_credits')
-    .select('balance,total_spent')
-    .eq('user_id', userId)
-    .single()
+  let nextBalance: number | null = null
 
-  if (creditsError || !credits) throw new Error('INSUFFICIENT_CREDITS')
-  if (credits.balance < amount) throw new Error('INSUFFICIENT_CREDITS')
+  // Compare-and-set prevents two concurrent generation requests from spending
+  // the same balance. A database RPC can replace this retry loop once the
+  // production migration history is fully reconciled.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { data: credits, error: creditsError } = await supabase
+      .from('user_credits')
+      .select('balance,total_spent')
+      .eq('user_id', userId)
+      .single()
 
-  const nextBalance = credits.balance - amount
-  const { error: updateError } = await supabase
-    .from('user_credits')
-    .update({
-      balance: nextBalance,
-      total_spent: (credits.total_spent || 0) + amount,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
+    if (creditsError || !credits || credits.balance < amount) {
+      throw new Error('INSUFFICIENT_CREDITS')
+    }
 
-  if (updateError) throw updateError
+    const candidateBalance = credits.balance - amount
+    const { data: updated, error: updateError } = await supabase
+      .from('user_credits')
+      .update({
+        balance: candidateBalance,
+        total_spent: (credits.total_spent || 0) + amount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('balance', credits.balance)
+      .eq('total_spent', credits.total_spent || 0)
+      .select('balance')
+      .maybeSingle()
+
+    if (updateError) throw updateError
+    if (updated) {
+      nextBalance = updated.balance
+      break
+    }
+  }
+
+  if (nextBalance === null) throw new Error('CREDIT_BALANCE_BUSY')
 
   const { error: transactionError } = await supabase.from('credit_transactions').insert({
     user_id: userId,
@@ -123,7 +141,18 @@ export async function spendCredits(
     campaign_id: campaignId,
   })
 
-  if (transactionError) throw transactionError
+  // The balance is authoritative. Do not turn a successful paid generation
+  // into a client-visible failure (and invite a second charge on retry) only
+  // because the audit row failed to write.
+  if (transactionError) {
+    console.error('[credits] balance spent but transaction log failed', {
+      amount,
+      campaignId,
+      contentType,
+      error: transactionError.message,
+      userId,
+    })
+  }
   return nextBalance
 }
 
