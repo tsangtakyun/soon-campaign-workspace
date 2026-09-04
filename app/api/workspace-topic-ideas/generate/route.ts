@@ -29,6 +29,7 @@ const unsupportedClaimPatterns = [
   /(?:市場選擇|需求|關注度|個案).*(?:增多|增加|上升|急升)/i,
   /(?:興趣|需求|關注|市場|趨勢).*(?:持續)?(?:上升|增加|增長|升溫)/i,
   /結構性原因|真正的問題|根本原因|從根源(?:介入|處理|改善)/i,
+  /不少(?:香港)?(?:市民|人|成年人|上班族)|常見困擾/i,
 ]
 
 function findUnsupportedClaims(topics: GeneratedTopic[]) {
@@ -38,6 +39,27 @@ function findUnsupportedClaims(topics: GeneratedTopic[]) {
       ? [`題材 ${index + 1} 包含未有來源支持的醫療、成效或數據式斷言`]
       : []
   })
+}
+
+function resolveTopicCategory(topic: GeneratedTopic, directions: string[], index: number) {
+  const text = [topic.title, topic.note, ...topic.tags].join(' ')
+  const priorities = [
+    { pattern: /企業|員工|HR|管理層/i, direction: /企業|員工/ },
+    { pattern: /產前|產後|術後/i, direction: /術後|產前|產後/ },
+    { pattern: /普拉提/i, direction: /普拉提/ },
+    { pattern: /手法|物理治療|痛症/i, direction: /物理治療|痛症/ },
+    { pattern: /運動表現|體能|訓練表現/i, direction: /運動表現|訓練/ },
+    { pattern: /復康/i, direction: /運動復康/ },
+  ]
+  for (const rule of priorities) {
+    if (rule.pattern.test(text)) {
+      const match = directions.find((direction) => rule.direction.test(direction))
+      if (match) return match
+    }
+  }
+  return directions.includes(topic.category.trim())
+    ? topic.category.trim()
+    : directions[index % directions.length] || '專屬內容方向'
 }
 
 function compact(value: unknown, maxLength = 6000) {
@@ -128,6 +150,7 @@ export async function POST(req: Request) {
       'Never suggest self-diagnosis or a self-test, a guaranteed result, a cure, a golden treatment period, absolute prohibitions, or that a condition will worsen.',
       'Do not assert an underlying, structural, true or root cause for symptoms; present possible contributing factors only.',
       'Do not claim that interest, demand, concern or a market is rising unless that trend is explicitly supported in workspace_data.',
+      'Do not make unsupported prevalence claims such as saying that many Hong Kong people have a belief or condition.',
       'Do not use numbered clinical warning signs, contraindications or treatment rules unless they are explicitly supplied in workspace_data.',
       'Frame health topics as general education and, where relevant, say that individual circumstances should be assessed by a qualified professional.',
       'Avoid generic lifestyle inspiration, unrelated trends and vague branding slogans.',
@@ -171,9 +194,7 @@ export async function POST(req: Request) {
       source_url: `https://sooncreator.network/onboarding/topic-library#workspace-ai-${generatedAt}-${index + 1}`,
       image_url: null,
       height: 'medium',
-      category: directions.includes(topic.category.trim())
-        ? topic.category.trim()
-        : directions[index % directions.length] || '專屬內容方向',
+      category: resolveTopicCategory(topic, directions, index),
       tags: topic.tags.map((tag) => tag.trim()).filter(Boolean),
       note: `${topic.note.trim()}\n\n點解值得做：${topic.whyNow.trim()}\n開場 Hook：${topic.hook.trim()}`.slice(0, 1000),
       created_by: platform.access.user.id,
