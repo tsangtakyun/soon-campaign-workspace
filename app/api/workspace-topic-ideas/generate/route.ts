@@ -27,6 +27,8 @@ const unsupportedClaimPatterns = [
   /香港(?:職場|市場|企業|市民).*(?:數據|調查|研究|增長|上升|下降|成本)/i,
   /(?:數據|研究|調查)(?:顯示|指出|證明|告訴你)/i,
   /(?:市場選擇|需求|關注度|個案).*(?:增多|增加|上升|急升)/i,
+  /(?:興趣|需求|關注|市場|趨勢).*(?:持續)?(?:上升|增加|增長|升溫)/i,
+  /結構性原因|真正的問題|根本原因|從根源(?:介入|處理|改善)/i,
 ]
 
 function findUnsupportedClaims(topics: GeneratedTopic[]) {
@@ -124,6 +126,8 @@ export async function POST(req: Request) {
       'Set each category to exactly one value from contentDirections and include concrete service keywords in tags.',
       'Do not invent qualifications, outcomes, prices, offers, facilities, medical claims, trends, statistics, research or locations.',
       'Never suggest self-diagnosis or a self-test, a guaranteed result, a cure, a golden treatment period, absolute prohibitions, or that a condition will worsen.',
+      'Do not assert an underlying, structural, true or root cause for symptoms; present possible contributing factors only.',
+      'Do not claim that interest, demand, concern or a market is rising unless that trend is explicitly supported in workspace_data.',
       'Do not use numbered clinical warning signs, contraindications or treatment rules unless they are explicitly supplied in workspace_data.',
       'Frame health topics as general education and, where relevant, say that individual circumstances should be assessed by a qualified professional.',
       'Avoid generic lifestyle inspiration, unrelated trends and vague branding slogans.',
