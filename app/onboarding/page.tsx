@@ -3240,5 +3240,89 @@ const homeStyles = `
       max-width: 100%;
       min-width: 0;
     }
+
+    .approval-post-head {
+      padding: 14px;
+    }
+
+    .approval-tagrow {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px 12px;
+      margin-bottom: 12px;
+    }
+
+    .approval-media-icon {
+      width: 48px;
+      min-width: 48px;
+      height: 48px;
+      border-radius: 14px;
+    }
+
+    .approval-tagrow > div:not(.approval-head-actions) {
+      min-width: 0;
+    }
+
+    .approval-tagrow strong {
+      font-size: 14px;
+      line-height: 1.35;
+      word-break: keep-all;
+    }
+
+    .approval-meta {
+      margin-top: 2px;
+      font-size: 13px;
+      line-height: 1.45;
+      word-break: keep-all;
+      overflow-wrap: normal;
+    }
+
+    .approval-head-actions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto 44px;
+      gap: 8px;
+      width: 100%;
+      margin-left: 0;
+    }
+
+    .approval-tagrow small {
+      width: auto;
+      min-width: 0;
+      height: 44px;
+      padding: 0 12px;
+      font-size: 14px;
+    }
+
+    .approval-design-btn {
+      min-height: 44px;
+      padding: 0 14px;
+      font-size: 14px;
+    }
+
+    .approval-delete-btn {
+      width: 44px;
+      height: 44px;
+    }
+
+    .approval-post h3 {
+      font-size: 20px;
+      line-height: 1.35;
+    }
+
+    .approval-post-body {
+      padding: 14px 14px 2px;
+    }
+
+    .approval-caption {
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .approval-segment button {
+      min-height: 46px;
+      font-size: 14px;
+    }
   }
 `
