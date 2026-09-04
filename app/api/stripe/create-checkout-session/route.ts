@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
-import Stripe from 'stripe'
+import { cookies } from 'next/headers'
+
+import { createServerSupabase } from '@/lib/server-supabase'
+import { getStripe } from '@/lib/stripe-billing'
 
 type CreateCheckoutPayload = {
   campaignIntakeId?: string
@@ -30,7 +33,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+    const cookieStore = await cookies()
+    const supabase = createServerSupabase(cookieStore)
+    const { data: { user } } = await supabase.auth.getUser()
+    const stripe = getStripe()
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'https://soon-campaign-workspace.vercel.app'
     const safeCancelPath =
       typeof body.cancelPath === 'string' && body.cancelPath.startsWith('/') ? body.cancelPath : '/onboarding'
@@ -48,14 +54,19 @@ export async function POST(request: Request) {
         metadata: {
           campaign_intake_id: body.campaignIntakeId,
           plan: body.plan || 'ai-strategy',
+          ...(user?.id ? {
+            soon_plan_type: 'strategy-workspace',
+            soon_user_id: user.id,
+          } : {}),
         },
       },
-      customer_email: body.email || undefined,
+      customer_email: user?.email || body.email || undefined,
       success_url: `${origin}/onboarding?session_id={CHECKOUT_SESSION_ID}&campaign_intake_id=${encodeURIComponent(body.campaignIntakeId)}`,
       cancel_url: `${origin}${safeCancelPath}`,
       metadata: {
         campaign_intake_id: body.campaignIntakeId,
         plan: body.plan || 'ai-strategy',
+        ...(user?.id ? { soon_user_id: user.id } : {}),
       },
     })
 
