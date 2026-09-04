@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -23,6 +23,28 @@ type ProjectAsset = {
   height: number;
   assignedPage: string;
   isCover: boolean;
+  sourceType?: "upload" | "brand_library" | "ai_generated" | "licensed_search";
+  sourceLabel?: string;
+  sourceUrl?: string | null;
+  creator?: string;
+  creatorUrl?: string | null;
+  license?: string;
+  licenseUrl?: string | null;
+};
+
+type LicensedImageResult = {
+  id: string;
+  title: string;
+  creator: string;
+  creatorUrl: string | null;
+  license: string;
+  licenseUrl: string | null;
+  sourceUrl: string | null;
+  url: string;
+  thumbnail: string;
+  width: number;
+  height: number;
+  provider: string;
 };
 
 type Project = {
@@ -51,6 +73,17 @@ type Permissions = {
   canManageWorkspace: boolean;
   role: string;
 };
+
+type StudioStep = "brief" | "format" | "structure" | "assets" | "drafts" | "carousel";
+
+const studioSteps: { id: StudioStep; label: string }[] = [
+  { id: "brief", label: "Brief" },
+  { id: "format", label: "格式" },
+  { id: "structure", label: "故事結構" },
+  { id: "assets", label: "圖片素材" },
+  { id: "drafts", label: "逐頁草稿" },
+  { id: "carousel", label: "Carousel" },
+];
 
 const formats = [
   { id: "carousel", label: "Carousel", note: "多頁 editorial／故事結構" },
@@ -120,6 +153,12 @@ export default function ContentStudioPage() {
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editingDraft, setEditingDraft] = useState<number | null>(null);
   const [uploadingAssets, setUploadingAssets] = useState(false);
+  const [assetSourceMode, setAssetSourceMode] = useState<"upload" | "generate" | "search">("upload");
+  const [assetTargetPage, setAssetTargetPage] = useState("P.1");
+  const [imageSearchQuery, setImageSearchQuery] = useState("");
+  const [licensedResults, setLicensedResults] = useState<LicensedImageResult[]>([]);
+  const [searchingImages, setSearchingImages] = useState(false);
+  const [generatingAssetPage, setGeneratingAssetPage] = useState<string | null>(null);
   const [removingAssetId, setRemovingAssetId] = useState<string | null>(null);
   const [brandLibraryAssets, setBrandLibraryAssets] = useState<ProjectAsset[]>(
     [],
@@ -131,6 +170,8 @@ export default function ContentStudioPage() {
     productionPrompt: "",
   });
   const [promptVersion, setPromptVersion] = useState<number | null>(null);
+  const [activeStep, setActiveStep] = useState<StudioStep>("brief");
+  const studioLoadedRef = useRef(false);
 
   const selected = useMemo(
     () =>
@@ -144,9 +185,31 @@ export default function ContentStudioPage() {
     [workspace],
   );
 
+  function latestAvailableStep(project: Project): StudioStep {
+    if (project.stage === "brief") return "brief";
+    if (project.stage === "format") return "format";
+    const production = project.production;
+    if (!production?.status || production.status === "structure_ready") return "structure";
+    if (production.status !== "structure_confirmed") return "structure";
+    if (production.assetStatus !== "confirmed" || !production.productionStatus) return "assets";
+    if (production.productionStatus === "drafts_ready") return "drafts";
+    return "carousel";
+  }
+
+  function goToStep(step: StudioStep) {
+    setActiveStep(step);
+    const url = new URL(window.location.href);
+    url.searchParams.set("step", step);
+    window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function loadStudio() {
-    setLoading(true);
-    setMessage("");
+    const isInitialLoad = !studioLoadedRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+      setMessage("");
+    }
     try {
       const resolved = await resolveActiveWorkspace();
       setWorkspace(resolved.activeWorkspace);
@@ -168,7 +231,20 @@ export default function ContentStudioPage() {
         throw new Error(
           payload?.detail || payload?.error || "未能載入內容製作",
         );
-      setProjects(payload.projects || []);
+      const incomingProjects = Array.isArray(payload.projects)
+        ? (payload.projects as Project[])
+        : [];
+      setProjects((current) => {
+        if (isInitialLoad) return incomingProjects;
+        const currentById = new Map(current.map((project) => [project.id, project]));
+        return incomingProjects.map((incoming) => {
+          const existing = currentById.get(incoming.id);
+          if (!existing) return incoming;
+          const incomingUpdatedAt = Date.parse(incoming.updated_at || "") || 0;
+          const existingUpdatedAt = Date.parse(existing.updated_at || "") || 0;
+          return existingUpdatedAt > incomingUpdatedAt ? existing : incoming;
+        });
+      });
       setPermissions(payload.permissions || null);
       const brandResponse = await fetch(
         `/api/brand-kit-data?workspace_id=${encodeURIComponent(resolved.workspaceId)}`,
@@ -203,6 +279,7 @@ export default function ContentStudioPage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能載入內容製作");
     } finally {
+      studioLoadedRef.current = true;
       setLoading(false);
     }
   }
@@ -221,11 +298,17 @@ export default function ContentStudioPage() {
       summary: selected.brief?.summary || selected.source_note || "",
     });
     setSelectedFormat(selected.selected_format || "");
+    const requested = new URLSearchParams(window.location.search).get("step") as StudioStep | null;
+    const latest = latestAvailableStep(selected);
+    const latestIndex = studioSteps.findIndex((step) => step.id === latest);
+    const requestedIndex = studioSteps.findIndex((step) => step.id === requested);
+    goToStep(requestedIndex >= 0 && requestedIndex <= latestIndex ? requested! : latest);
   }, [selected?.id]);
 
   async function saveProject(
     updates: Record<string, unknown>,
     successMessage: string,
+    nextStep?: StudioStep,
   ) {
     if (!workspaceId || !selected || !permissions?.canEdit) return;
     setSaving(true);
@@ -249,6 +332,7 @@ export default function ContentStudioPage() {
         ),
       );
       setMessage(successMessage);
+      if (nextStep) goToStep(nextStep);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能儲存");
     } finally {
@@ -365,6 +449,7 @@ export default function ContentStudioPage() {
         },
       },
       "故事結構已確認，下一步可以接駁全套圖片生成",
+      "assets",
     );
   }
 
@@ -474,6 +559,8 @@ export default function ContentStudioPage() {
           ...dimensions,
           assignedPage: "auto",
           isCover: existing.length === 0 && uploaded.length === 0,
+          sourceType: "upload",
+          sourceLabel: "自行上載",
         });
       }
       await saveProject(
@@ -492,6 +579,100 @@ export default function ContentStudioPage() {
       setUploadingAssets(false);
       event.target.value = "";
     }
+  }
+
+  async function generateProjectAsset(page: string) {
+    if (!workspaceId || !selected) return;
+    const activeWorkspaceId = workspaceId;
+    const projectId = selected.id;
+    setGeneratingAssetPage(page);
+    setMessage(`AI 正在生成 ${page} 圖片…`);
+    try {
+      const response = await fetch("/api/content-projects/generate-asset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId, page }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.detail || payload?.error || "未能生成圖片");
+      setProjects((current) =>
+        current.map((item) => item.id === projectId
+          ? {
+              ...item,
+              ...payload.project,
+              production: payload.project.production,
+              updated_at: payload.project.updated_at || item.updated_at,
+            }
+          : item),
+      );
+      setMessage(payload?.promptAdjusted
+        ? `${page} 原畫面涉及敏感表達，AI 已自動調整成合規視覺並完成生成`
+        : `${page} AI 圖片已生成並加入素材`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "未能生成圖片");
+    } finally {
+      setGeneratingAssetPage(null);
+    }
+  }
+
+  async function searchLicensedImages() {
+    const pages = Array.isArray(selected?.production?.pages) ? selected.production.pages : [];
+    const targetIndex = Math.max(0, pages.findIndex((page: any, index: number) => (page?.page || `P.${index + 1}`) === assetTargetPage));
+    const targetPage: any = pages[targetIndex] || {};
+    const query = imageSearchQuery.trim() || [targetPage.visualDirection, targetPage.headline, selected?.title].filter(Boolean).join(" ");
+    if (query.length < 2) return setMessage("請輸入至少兩個字嘅搜尋內容");
+    setSearchingImages(true);
+    setMessage("AI 正在搜尋可商用授權圖片…");
+    try {
+      const response = await fetch(`/api/content-projects/search-images?q=${encodeURIComponent(query)}`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "暫時未能搜尋圖片");
+      setLicensedResults(payload.results || []);
+      if (!imageSearchQuery.trim() && payload.optimizedQuery) setImageSearchQuery(payload.optimizedQuery);
+      setMessage(payload.results?.length ? `搵到 ${payload.results.length} 張候選圖片` : "未搵到合適圖片，請試另一組關鍵字");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "暫時未能搜尋圖片");
+    } finally {
+      setSearchingImages(false);
+    }
+  }
+
+  async function addLicensedImage(result: LicensedImageResult) {
+    if (!selected?.production) return;
+    const existing = Array.isArray(selected.production.assets)
+      ? (selected.production.assets as ProjectAsset[])
+      : [];
+    if (existing.some((asset) => asset.url === result.url)) {
+      setMessage("呢張圖片已經加入素材");
+      return;
+    }
+    const isCover = existing.length === 0 && assetTargetPage === "P.1";
+    const asset: ProjectAsset = {
+      id: crypto.randomUUID(),
+      url: result.url,
+      filename: result.title,
+      width: result.width,
+      height: result.height,
+      assignedPage: assetTargetPage,
+      isCover,
+      sourceType: "licensed_search",
+      sourceLabel: result.provider,
+      sourceUrl: result.sourceUrl,
+      creator: result.creator,
+      creatorUrl: result.creatorUrl,
+      license: result.license,
+      licenseUrl: result.licenseUrl,
+    };
+    await saveProject(
+      {
+        production: {
+          ...selected.production,
+          assets: [...existing, asset],
+          assetStatus: "pending",
+        },
+      },
+      `已加入 ${assetTargetPage} 授權圖片；發佈前請核對授權及署名要求`,
+    );
   }
 
   async function updateAsset(assetId: string, updates: Partial<ProjectAsset>) {
@@ -571,7 +752,7 @@ export default function ContentStudioPage() {
     if (!selected?.production || !Array.isArray(selected.production.assets))
       return;
     if (!selected.production.assets.length) {
-      setMessage("請先上載至少一張圖片素材");
+      setMessage("請先加入至少一張圖片素材");
       return;
     }
     await saveProject(
@@ -583,6 +764,7 @@ export default function ContentStudioPage() {
         },
       },
       "圖片素材已確認，下一步進入逐頁文案及版面製作",
+      "assets",
     );
   }
 
@@ -607,6 +789,7 @@ export default function ContentStudioPage() {
         ),
       );
       setMessage("逐頁文案及版面草稿已完成");
+      goToStep("drafts");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能生成逐頁草稿");
     } finally {
@@ -690,11 +873,15 @@ export default function ContentStudioPage() {
         },
       },
       "逐頁文案及版面草稿已確認，已進入全套圖片生成階段",
+      "carousel",
     );
   }
 
   async function generateCarouselImages() {
     if (!workspaceId || !selected) return;
+    const activeWorkspaceId = workspaceId;
+    const projectId = selected.id;
+    const generationStartedAt = Date.now();
     setGeneratingCarousel(true);
     setSaving(true);
     setMessage("正在生成全套 Carousel 圖片，請勿關閉頁面…");
@@ -702,18 +889,48 @@ export default function ContentStudioPage() {
       const response = await fetch("/api/content-projects/generate-carousel", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId, projectId: selected.id }),
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(payload?.detail || payload?.error || "未能生成圖片");
       setProjects((current) =>
         current.map((item) =>
-          item.id === selected.id ? { ...item, ...payload.project } : item,
+          item.id === projectId ? { ...item, ...payload.project } : item,
         ),
       );
       setMessage("全套 Carousel 圖片已生成");
     } catch (error) {
+      if (error instanceof TypeError) {
+        try {
+          const recoveryResponse = await fetch(
+            `/api/content-projects?workspaceId=${encodeURIComponent(activeWorkspaceId)}`,
+            { cache: "no-store" },
+          );
+          const recoveryPayload = await recoveryResponse.json().catch(() => null);
+          const recoveredProject = recoveryPayload?.projects?.find(
+            (project: Project) => project.id === projectId,
+          );
+          const generatedAt = Date.parse(
+            String(recoveredProject?.production?.imagesGeneratedAt || ""),
+          );
+          if (
+            recoveryResponse.ok &&
+            recoveredProject?.production?.productionStatus === "images_ready" &&
+            generatedAt >= generationStartedAt
+          ) {
+            setProjects((current) =>
+              current.map((item) =>
+                item.id === projectId ? { ...item, ...recoveredProject } : item,
+              ),
+            );
+            setMessage("全套 Carousel 圖片已生成");
+            return;
+          }
+        } catch {
+          // Preserve the original network error when server reconciliation fails.
+        }
+      }
       setMessage(error instanceof Error ? error.message : "未能生成圖片");
     } finally {
       setGeneratingCarousel(false);
@@ -821,28 +1038,30 @@ export default function ContentStudioPage() {
                       </a>
                     ) : null}
                   </div>
-                  <div className="stage-track">
-                    <b className="done">1 Brief</b>
-                    <i />
-                    <b className={selected.stage !== "brief" ? "done" : ""}>
-                      2 格式
-                    </b>
-                    <i />
-                    <b
-                      className={
-                        selected.stage === "production" ||
-                        selected.stage === "approval" ||
-                        selected.stage === "scheduled"
-                          ? "done"
-                          : ""
-                      }
-                    >
-                      3 製作
-                    </b>
-                  </div>
                 </div>
 
-                {selected.stage === "brief" ? (
+                <nav className="studio-step-nav" aria-label="內容製作步驟">
+                  {studioSteps.map((step, index) => {
+                    const latestIndex = studioSteps.findIndex(
+                      (item) => item.id === latestAvailableStep(selected),
+                    );
+                    const disabled = index > latestIndex;
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        className={`${activeStep === step.id ? "active" : ""} ${index < latestIndex ? "done" : ""}`}
+                        disabled={disabled}
+                        onClick={() => goToStep(step.id)}
+                      >
+                        <span>{index < latestIndex ? "✓" : index + 1}</span>
+                        {step.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {activeStep === "brief" ? (
                   <div className="editor-card">
                     <div className="section-title">
                       <div>
@@ -900,6 +1119,7 @@ export default function ContentStudioPage() {
                           saveProject(
                             { brief, stage: "format" },
                             "Brief 已確認，進入格式判斷",
+                            "format",
                           )
                         }
                       >
@@ -907,7 +1127,7 @@ export default function ContentStudioPage() {
                       </button>
                     </div>
                   </div>
-                ) : selected.stage === "format" ? (
+                ) : activeStep === "format" ? (
                   <div className="editor-card">
                     <div className="section-title">
                       <div>
@@ -954,9 +1174,7 @@ export default function ContentStudioPage() {
                     <div className="actions">
                       <button
                         className="secondary"
-                        onClick={() =>
-                          saveProject({ stage: "brief" }, "已返回 Brief")
-                        }
+                        onClick={() => goToStep("brief")}
                       >
                         ← 返回 Brief
                       </button>
@@ -972,6 +1190,7 @@ export default function ContentStudioPage() {
                               stage: "production",
                             },
                             "格式已確認，進入製作",
+                            "structure",
                           )
                         }
                       >
@@ -980,11 +1199,11 @@ export default function ContentStudioPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="editor-card production-card">
+                  <div className="editor-card production-card" data-step={activeStep}>
                     <div className="section-title">
                       <div>
-                        <span>STEP 3</span>
-                        <h3>{selected.selected_format || "內容"} 製作</h3>
+                        <span>STEP {studioSteps.findIndex((step) => step.id === activeStep) + 1}</span>
+                        <h3>{studioSteps.find((step) => step.id === activeStep)?.label}</h3>
                       </div>
                       <em>按 Project 鎖定嘅 Workspace Prompt 執行</em>
                     </div>
@@ -1159,33 +1378,43 @@ export default function ContentStudioPage() {
                               <div className="asset-upload-head">
                                 <div>
                                   <b>圖片素材</b>
-                                  <p>一次過上載原圖，再指定封面或分配頁面</p>
-                                </div>
-                                <div className="asset-upload-actions">
-                                  {brandLibraryAssets.length ? (
-                                    <button
-                                      type="button"
-                                      className="asset-library-button"
-                                      disabled={saving}
-                                      onClick={() =>
-                                        void addBrandLibraryAssets()
-                                      }
-                                    >
-                                      從品牌素材庫加入
-                                    </button>
-                                  ) : null}
-                                  <label className="asset-upload-button">
-                                    {uploadingAssets ? "上載中…" : "+ 上載圖片"}
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      multiple
-                                      disabled={uploadingAssets}
-                                      onChange={uploadProjectAssets}
-                                    />
-                                  </label>
+                                  <p>上載現有圖片、由 AI 生成，或者搜尋有授權資料嘅網上圖片</p>
                                 </div>
                               </div>
+                              <div className="asset-source-tabs" role="tablist" aria-label="圖片素材來源">
+                                <button className={assetSourceMode === "upload" ? "active" : ""} onClick={() => setAssetSourceMode("upload")}>↑ 上載圖片</button>
+                                <button className={assetSourceMode === "generate" ? "active" : ""} onClick={() => setAssetSourceMode("generate")}>✦ AI 生成圖片</button>
+                                <button className={assetSourceMode === "search" ? "active" : ""} onClick={() => setAssetSourceMode("search")}>⌕ AI 搜尋授權圖片</button>
+                              </div>
+                              {assetSourceMode === "upload" ? (
+                                <div className="asset-source-panel">
+                                  <div><b>使用你已有嘅圖片</b><p>適合品牌相、產品相、活動相或已獲授權素材。</p></div>
+                                  <div className="asset-upload-actions">
+                                    {brandLibraryAssets.length ? <button type="button" className="asset-library-button" disabled={saving} onClick={() => void addBrandLibraryAssets()}>從品牌素材庫加入</button> : null}
+                                    <label className="asset-upload-button">{uploadingAssets ? "上載中…" : "+ 上載圖片"}<input type="file" accept="image/*" multiple disabled={uploadingAssets} onChange={uploadProjectAssets} /></label>
+                                  </div>
+                                </div>
+                              ) : assetSourceMode === "generate" ? (
+                                <div className="asset-source-panel asset-ai-panel">
+                                  <div><b>按每頁 AI 畫面建議生成</b><p>圖片會直接加入指定頁面；AI 生成內容仍建議由你最後檢查。</p></div>
+                                  <div className="asset-page-actions">
+                                    {(Array.isArray(selected.production.pages) ? selected.production.pages : []).map((page: any, index: number) => {
+                                      const pageName = page?.page || `P.${index + 1}`;
+                                      return <button key={pageName} disabled={Boolean(generatingAssetPage)} onClick={() => void generateProjectAsset(pageName)}>{generatingAssetPage === pageName ? `${pageName} 生成中…` : `生成 ${pageName}`}</button>;
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="asset-search-panel">
+                                  <div className="asset-license-note"><b>搜尋可商用 Creative Commons／公眾領域圖片</b><p>搜尋結果嘅授權資料由原來源提供，可能有誤差。發佈前請開啟原頁核對授權、署名及人物／商標權利；SOON 不會將一般網頁圖片當作可自由使用。</p></div>
+                                  <div className="asset-search-controls">
+                                    <select value={assetTargetPage} onChange={(event) => setAssetTargetPage(event.target.value)}>{(Array.isArray(selected.production.pages) ? selected.production.pages : []).map((page: any, index: number) => { const pageName = page?.page || `P.${index + 1}`; return <option key={pageName} value={pageName}>{pageName}</option>; })}</select>
+                                    <input value={imageSearchQuery} onChange={(event) => setImageSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchLicensedImages(); }} placeholder="留空會按該頁 AI 畫面建議搜尋" />
+                                    <button disabled={searchingImages} onClick={() => void searchLicensedImages()}>{searchingImages ? "AI 搜尋中…" : "按 AI 建議搜尋"}</button>
+                                  </div>
+                                  {licensedResults.length ? <div className="licensed-result-grid">{licensedResults.map((result) => <article key={result.id}><img src={result.thumbnail} alt={result.title} /><div><strong>{result.title}</strong><small>{result.creator} · {result.license}</small><div><a href={result.sourceUrl || result.licenseUrl || "#"} target="_blank" rel="noreferrer">查看來源／授權 ↗</a><button onClick={() => void addLicensedImage(result)}>加入 {assetTargetPage}</button></div></div></article>)}</div> : null}
+                                </div>
+                              )}
                               <div className="asset-visual-guidance">
                                 <b>AI 建議畫面</b>
                                 {Array.isArray(selected.production.pages) &&
@@ -1236,6 +1465,12 @@ export default function ContentStudioPage() {
                                             ? " · 解像度偏低"
                                             : ""}
                                         </small>
+                                        {asset.sourceType ? (
+                                          <small className="asset-source-meta">
+                                            {asset.sourceType === "ai_generated" ? "✦ AI 生成" : asset.sourceType === "licensed_search" ? `⌕ ${asset.sourceLabel || "授權圖片"}${asset.creator ? ` · ${asset.creator}` : ""}${asset.license ? ` · ${asset.license}` : ""}` : asset.sourceLabel || "自行上載"}
+                                            {asset.sourceUrl ? <a href={asset.sourceUrl} target="_blank" rel="noreferrer"> 核對來源 ↗</a> : null}
+                                          </small>
+                                        ) : null}
                                         <select
                                           value={asset.assignedPage || "auto"}
                                           onChange={(event) =>
@@ -1598,11 +1833,15 @@ export default function ContentStudioPage() {
                                   "drafts_confirmed" ? (
                                   <div className="generation-next-step">
                                     <div>
-                                      <b>下一步｜生成全套 Carousel 圖</b>
+                                      <b>
+                                        {generatingCarousel
+                                          ? "正在生成全套 Carousel 圖"
+                                          : "下一步｜生成全套 Carousel 圖"}
+                                      </b>
                                       <p>
-                                        系統會按已確認文案、圖片配對及 Workspace
-                                        Production Prompt，輸出 1080 × 1350 px
-                                        圖片
+                                        {generatingCarousel
+                                          ? "正在並行處理每一頁，完成後圖片會直接出現，請勿關閉頁面…"
+                                          : "系統會按已確認文案、圖片配對及 Workspace Production Prompt，輸出 1080 × 1350 px 圖片"}
                                       </p>
                                     </div>
                                     <button
@@ -1612,12 +1851,13 @@ export default function ContentStudioPage() {
                                         void generateCarouselImages()
                                       }
                                     >
-                                      {saving
+                                      {generatingCarousel
                                         ? "生成中…"
                                         : "開始生成全套 Carousel 圖 →"}
                                     </button>
                                   </div>
-                                ) : (
+                                ) : selected.production.productionStatus ===
+                                  "images_ready" ? (
                                   <div className="generated-carousel">
                                     <div className="generated-carousel-head">
                                       <div>
@@ -1794,7 +2034,7 @@ export default function ContentStudioPage() {
                                       </div>
                                     ) : null}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
                             ) : null}
                           </>
@@ -1847,6 +2087,36 @@ export default function ContentStudioPage() {
                     </div>
                   </div>
                 )}
+                <div className="studio-step-footer">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={studioSteps.findIndex((step) => step.id === activeStep) === 0}
+                    onClick={() => {
+                      const index = studioSteps.findIndex((step) => step.id === activeStep);
+                      if (index > 0) goToStep(studioSteps[index - 1].id);
+                    }}
+                  >
+                    ← 上一步
+                  </button>
+                  <span>
+                    {studioSteps.findIndex((step) => step.id === activeStep) + 1} / {studioSteps.length}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={
+                      studioSteps.findIndex((step) => step.id === activeStep) >=
+                      studioSteps.findIndex((step) => step.id === latestAvailableStep(selected))
+                    }
+                    onClick={() => {
+                      const index = studioSteps.findIndex((step) => step.id === activeStep);
+                      const latestIndex = studioSteps.findIndex((step) => step.id === latestAvailableStep(selected));
+                      if (index < latestIndex) goToStep(studioSteps[index + 1].id);
+                    }}
+                  >
+                    下一步 →
+                  </button>
+                </div>
                 {message ? <p className="studio-message">{message}</p> : null}
               </>
             ) : (
@@ -1965,6 +2235,12 @@ const editingStyles = `
   .studio-loading-skeleton i:nth-child(2){width:82%}.studio-loading-skeleton i:nth-child(3){width:64%}
   @keyframes studio-loading-spin{to{transform:rotate(360deg)}}
   @keyframes studio-loading-shimmer{to{background-position:-220% 0}}
+  .studio-step-nav{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:7px;margin:0 0 18px;padding:10px;background:rgba(255,255,255,.96);border:1px solid #e5e6e9;border-radius:13px;backdrop-filter:blur(10px)}
+  .studio-step-nav button{display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:9px;background:#f2f3f5;color:#696d75;padding:10px 7px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}.studio-step-nav button span{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#fff;font-size:9px}.studio-step-nav button.done{color:#23723b;background:#edf8f0}.studio-step-nav button.active{background:#111;color:#fff}.studio-step-nav button.active span{color:#111}.studio-step-nav button:disabled{opacity:.42;cursor:not-allowed}
+  .production-card:not([data-step="structure"]) .structure-status,.production-card:not([data-step="structure"]) .fact-grid,.production-card:not([data-step="structure"]) .story-pages,.production-card:not([data-step="structure"]) .structure-sources,.production-card:not([data-step="structure"])>.actions,.production-card:not([data-step="structure"]) .production-ready{display:none}
+  .production-card:not([data-step="assets"]) .next-production{display:none}.production-card:not([data-step="drafts"]):not([data-step="carousel"]) .page-drafts{display:none}.production-card[data-step="drafts"] .generated-carousel,.production-card[data-step="drafts"] .page-drafts>.generation-next-step{display:none}.production-card[data-step="carousel"] .page-drafts-heading,.production-card[data-step="carousel"] .page-drafts>article,.production-card[data-step="carousel"] .draft-confirm-step{display:none}
+  .studio-step-footer{position:sticky;bottom:12px;z-index:11;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;margin-top:18px;padding:10px 12px;border:1px solid #e1e3e6;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 8px 28px rgba(20,22,26,.1);backdrop-filter:blur(10px)}.studio-step-footer span{text-align:center;color:#7b7f87;font-size:11px;font-weight:750}.studio-step-footer button{border:0;border-radius:9px;background:#111;color:#fff;padding:10px 14px;font-size:11px;font-weight:800;cursor:pointer}.studio-step-footer button:disabled{opacity:.35;cursor:not-allowed}
+  @media(max-width:900px){.studio-step-nav{display:flex;overflow-x:auto;justify-content:flex-start}.studio-step-nav button{min-width:118px}.studio-step-footer{bottom:8px}}
   .generated-carousel-head button:disabled{opacity:.45;cursor:not-allowed}
   .carousel-generation-status{display:flex;align-items:center;gap:8px;border-radius:9px;background:#e8f3eb;color:#24653a;padding:10px 12px;font-size:11px;font-weight:800}
   .carousel-generation-status span{width:14px;height:14px;border:2px solid #9bc4a7;border-top-color:#24653a;border-radius:50%;animation:carousel-generation-spin .8s linear infinite}
@@ -1983,5 +2259,7 @@ const editingStyles = `
   .page-editor-actions button:last-child{background:#111;color:#fff}
   .asset-upload-head{display:flex;justify-content:space-between;gap:18px;align-items:center}.asset-upload-head p{margin:5px 0 0!important}.asset-upload-actions{display:flex;align-items:center;gap:7px}.asset-upload-button,.asset-library-button{display:block!important;margin:0!important;border:0;background:#111;color:#fff;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:750;cursor:pointer}.asset-library-button{background:#eceef1;color:#222}.asset-upload-button input{display:none}.asset-empty{text-align:center;color:#92969e;background:#f7f7f8;border-radius:10px;padding:28px;margin-top:15px;font-size:12px}.asset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:16px}.asset-grid article{border:1px solid #e1e3e6;border-radius:11px;overflow:hidden;background:#fff}.asset-grid img{width:100%;height:150px;object-fit:contain;background:#f2f2f3;display:block}.asset-grid article>div{padding:10px;display:grid;gap:7px}.asset-grid strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asset-grid small{font-size:10px;color:#898d95}.asset-grid select{width:100%;border:1px solid #dedfe3;border-radius:7px;background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important;color-scheme:light;padding:7px;font-size:10px}.asset-grid select option{background:#fff!important;color:#111!important}.asset-actions{display:flex;gap:5px}.asset-actions button{flex:1;border:0;border-radius:7px;padding:7px;background:#f0f1f3;font-size:10px;font-weight:700;cursor:pointer}.asset-actions button.active{background:#e4f5e9;color:#1c7837}.asset-confirm-row{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:17px;padding-top:15px;border-top:1px solid #e6e7ea}.asset-confirm-row span{font-size:11px;color:#686d75}.asset-confirm-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:10px 14px;font-size:11px;font-weight:750;cursor:pointer}.asset-confirm-row button:disabled{opacity:.5}@media(max-width:900px){.asset-grid{grid-template-columns:1fr 1fr}.asset-upload-head{align-items:flex-start}.asset-upload-actions{align-items:stretch;flex-direction:column}.asset-confirm-row{align-items:flex-start;flex-direction:column}}
   .asset-visual-guidance{margin-top:15px;padding:14px 15px;border:1px solid #e2ded0;border-radius:11px;background:#faf8f1}.asset-visual-guidance>b{display:block;font-size:12px;margin-bottom:8px}.asset-visual-guidance ul{display:grid;gap:7px;margin:0;padding:0;list-style:none}.asset-visual-guidance li{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:start;font-size:11px;line-height:1.5;color:#555961}.asset-visual-guidance li strong{color:#222}.asset-visual-guidance p{margin:0!important;font-size:11px;color:#737780;line-height:1.55}
+  .asset-source-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}.asset-source-tabs button{border:1px solid #dfe1e5;background:#fff;border-radius:10px;padding:11px 9px;font-size:11px;font-weight:750;cursor:pointer}.asset-source-tabs button.active{background:#111;color:#fff;border-color:#111}.asset-source-panel,.asset-search-panel{margin-top:9px;border:1px solid #e2e3e6;border-radius:11px;padding:14px;background:#fafafa}.asset-source-panel{display:flex;align-items:center;justify-content:space-between;gap:15px}.asset-source-panel b,.asset-license-note b{font-size:12px}.asset-page-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.asset-page-actions button,.asset-search-controls button,.licensed-result-grid button{border:0;background:#111;color:#fff;border-radius:8px;padding:9px 11px;font-size:10px;font-weight:750;cursor:pointer}.asset-page-actions button:disabled{opacity:.5}.asset-license-note{background:#fff7df;border:1px solid #ecdca9;border-radius:9px;padding:11px}.asset-license-note p{line-height:1.55!important;color:#655c43!important}.asset-search-controls{display:grid;grid-template-columns:92px 1fr auto;gap:7px;margin-top:10px}.asset-search-controls select,.asset-search-controls input{border:1px solid #dfe1e5;border-radius:8px;background:#fff!important;color:#111!important;padding:9px;font-size:11px}.licensed-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}.licensed-result-grid article{border:1px solid #e1e3e6;border-radius:9px;overflow:hidden;background:#fff}.licensed-result-grid img{width:100%;height:130px;object-fit:cover;background:#eee;display:block}.licensed-result-grid article>div{padding:9px;display:grid;gap:6px}.licensed-result-grid strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.licensed-result-grid small{font-size:9px;color:#747880}.licensed-result-grid article>div>div{display:flex;align-items:center;justify-content:space-between;gap:5px}.licensed-result-grid a,.asset-source-meta a{font-size:9px;color:#555;text-decoration:underline}.asset-source-meta{white-space:normal!important;line-height:1.4}.asset-source-meta a{display:inline}.licensed-result-grid button{padding:7px 8px}@media(max-width:900px){.asset-source-tabs,.licensed-result-grid{grid-template-columns:1fr}.asset-source-panel{align-items:flex-start;flex-direction:column}.asset-search-controls{grid-template-columns:1fr}.asset-page-actions{justify-content:flex-start}}
+  .asset-source-tabs button{border-color:#111;background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:.72;transition:opacity .15s ease,box-shadow .15s ease}.asset-source-tabs button:hover{opacity:.88}.asset-source-tabs button.active{background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#111;opacity:1;box-shadow:0 0 0 2px #fff,0 0 0 4px #111}
   .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.page-drafts img,.draft-no-image{width:180px;height:220px;object-fit:contain;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;color:#999;font-size:11px}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.page-drafts img,.draft-no-image{width:100%;height:250px}}
 `;

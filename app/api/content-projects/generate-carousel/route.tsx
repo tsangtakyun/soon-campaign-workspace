@@ -400,20 +400,17 @@ export async function POST(req: Request) {
       bold: await loadRoundedBoldFont(font),
       family: resolveCarouselFontFamily(workspace?.font_style),
     };
-    const outputs = [];
-    const preparedImageUrls = new Map<string, string>();
-    for (let index = 0; index < drafts.length; index += 1) {
-      const draft = drafts[index];
+    const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
+    const preparedImageUrls = new Map(
+      await Promise.all(
+        uniqueAssetUrls.map(async (url) => [url, await prepareImageSource(url)] as const),
+      ),
+    );
+    const outputs = await Promise.all(drafts.map(async (draft, index) => {
       const asset = assets.find((item) => item.id === draft.assetId);
-      let preparedAsset = asset;
-      if (asset?.url) {
-        let preparedUrl = preparedImageUrls.get(asset.url);
-        if (!preparedUrl) {
-          preparedUrl = await prepareImageSource(asset.url);
-          preparedImageUrls.set(asset.url, preparedUrl);
-        }
-        preparedAsset = { ...asset, url: preparedUrl };
-      }
+      const preparedAsset = asset?.url
+        ? { ...asset, url: preparedImageUrls.get(asset.url) || asset.url }
+        : asset;
       const response = await renderPage(
         draft,
         preparedAsset,
@@ -430,13 +427,13 @@ export async function POST(req: Request) {
       const { data: publicUrl } = access.admin.storage
         .from("brand-assets")
         .getPublicUrl(storagePath);
-      outputs.push({
+      return {
         page: `P.${index + 1}`,
         url: publicUrl.publicUrl,
         width: 1080,
         height: 1350,
-      });
-    }
+      };
+    }));
     const production = {
       ...project.production,
       generatedPages: outputs,
