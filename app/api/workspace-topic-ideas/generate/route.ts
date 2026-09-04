@@ -51,10 +51,12 @@ function resolveTopicCategory(topic: GeneratedTopic, directions: string[], index
     { pattern: /運動表現|體能|訓練表現/i, direction: /運動表現|訓練/ },
     { pattern: /復康/i, direction: /運動復康/ },
   ]
-  for (const rule of priorities) {
-    if (rule.pattern.test(text)) {
-      const match = directions.find((direction) => rule.direction.test(direction))
-      if (match) return match
+  for (const scope of [topic.title, text]) {
+    for (const rule of priorities) {
+      if (rule.pattern.test(scope)) {
+        const match = directions.find((direction) => rule.direction.test(direction))
+        if (match) return match
+      }
     }
   }
   return directions.includes(topic.category.trim())
