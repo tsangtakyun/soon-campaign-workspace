@@ -1386,7 +1386,7 @@ export default function OnboardingHomePage() {
       <section className="home-shell">
         <header className="home-topbar">
           <div className="home-topbar-left">
-            <h1>歡迎回來，{brandName || '你的工作台'}</h1>
+            <h1>{dashboardLoading ? '正在載入工作台…' : `歡迎回來，${brandName || '你的工作台'}`}</h1>
           </div>
           <div className="home-topbar-right">
             <button
@@ -1424,7 +1424,18 @@ export default function OnboardingHomePage() {
 
         <div className="home-body">
           <section className="home-main">
-            {dashboardPosts.length ? (
+            {dashboardLoading ? (
+              <section className="workspace-loading-panel" aria-live="polite" aria-busy="true">
+                <span>SOON WORKSPACE</span>
+                <h2>正在載入待處理內容…</h2>
+                <p>正在同步工作台、審批狀態及最新修改紀錄。</p>
+                <div className="workspace-loading-lines" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </section>
+            ) : dashboardPosts.length ? (
               <ImportedApprovalBoard
                 brandName={brandName || 'Egg.soon'}
                 posts={dashboardPosts}
@@ -1446,7 +1457,7 @@ export default function OnboardingHomePage() {
             )}
           </section>
 
-          <aside className="home-aside">
+          {!dashboardLoading ? <aside className="home-aside">
             <section className="home-aside-section">
               <h3>過去 7 天</h3>
               <div className="stats-grid">
@@ -1486,7 +1497,7 @@ export default function OnboardingHomePage() {
                 )}
               </div>
             </section>
-          </aside>
+          </aside> : null}
         </div>
       </section>
 
@@ -1612,7 +1623,8 @@ const homeStyles = `
     gap: 36px;
   }
 
-  .workspace-empty-panel {
+  .workspace-empty-panel,
+  .workspace-loading-panel {
     min-height: 260px;
     border: 1px dashed #d9dbe1;
     border-radius: 12px;
@@ -1624,26 +1636,58 @@ const homeStyles = `
     padding: 28px;
   }
 
-  .workspace-empty-panel span {
+  .workspace-empty-panel span,
+  .workspace-loading-panel > span {
     color: #8b8f99;
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.03em;
   }
 
-  .workspace-empty-panel h2 {
+  .workspace-empty-panel h2,
+  .workspace-loading-panel h2 {
     margin: 0;
     color: #202126;
     font-size: 22px;
     font-weight: 750;
   }
 
-  .workspace-empty-panel p {
+  .workspace-empty-panel p,
+  .workspace-loading-panel p {
     max-width: 540px;
     margin: 0;
     color: #6f737d;
     font-size: 14px;
     line-height: 1.6;
+  }
+
+  .workspace-loading-lines {
+    display: grid;
+    gap: 9px;
+    width: min(100%, 520px);
+    margin-top: 10px;
+  }
+
+  .workspace-loading-lines i {
+    display: block;
+    height: 11px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #eceef2 20%, #f8f8fa 50%, #eceef2 80%);
+    background-size: 220% 100%;
+    animation: workspace-loading-pulse 1.2s ease-in-out infinite;
+  }
+
+  .workspace-loading-lines i:nth-child(2) {
+    width: 82%;
+  }
+
+  .workspace-loading-lines i:nth-child(3) {
+    width: 58%;
+  }
+
+  @keyframes workspace-loading-pulse {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
   }
 
   .home-section {
@@ -3234,6 +3278,7 @@ const homeStyles = `
     }
 
     .workspace-empty-panel,
+    .workspace-loading-panel,
     .home-aside-section,
     .approval-board,
     .approval-post-card {
