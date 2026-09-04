@@ -1174,7 +1174,9 @@ export default function OnboardingHomePage() {
           const displayPosts = postsData
             .filter((post: any) => {
               const sourceKey = String(post.source_key || '')
-              if (['approved', 'scheduled', 'published', 'posted', 'rejected', 'withdrawn', 'publishing'].includes(post.status)) return false
+              // Rejected posts still need action and must remain visible as
+              // 「要修改」 after a reviewer leaves feedback.
+              if (['approved', 'scheduled', 'published', 'posted', 'withdrawn', 'publishing'].includes(post.status)) return false
               return (
                 sourceKey.startsWith('campaign-1-') ||
                 !isPlaceholderImage(post.image_url || null) ||
