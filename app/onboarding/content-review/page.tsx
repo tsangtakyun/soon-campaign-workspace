@@ -10,7 +10,7 @@ import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace
 type Campaign = {
   id: string; name: string; imageUrl?: string | null
   product?: { name?: string } | Array<{ name?: string }> | null
-  progress: { pendingApproval: number; changesRequested: number; weeks: Record<string, { total: number; ready: number; approved: number; changesRequested: number }> }
+  progress: { pendingApproval: number; changesRequested: number; weeks: Record<string, { total: number; ready: number; approved: number; pendingApproval: number; changesRequested: number }> }
 }
 
 function nameOf(campaign: Campaign) {
@@ -38,7 +38,7 @@ export default function ContentReviewPage() {
   useEffect(() => { void load(); const reload = () => void load(); window.addEventListener(WORKSPACE_CHANGED_EVENT, reload); return () => window.removeEventListener(WORKSPACE_CHANGED_EVENT, reload) }, [load])
 
   const queue = useMemo(() => campaigns.flatMap((campaign) => Object.entries(campaign.progress.weeks).flatMap(([week, progress]) => {
-    const pending = Math.max(0, progress.ready - progress.approved - progress.changesRequested)
+    const pending = progress.pendingApproval || 0
     if (!pending && !progress.changesRequested) return []
     return [{ campaign, week: Number(week), pending, changes: progress.changesRequested }]
   })).sort((a, b) => a.week - b.week), [campaigns])

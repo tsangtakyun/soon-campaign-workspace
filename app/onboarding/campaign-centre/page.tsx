@@ -7,7 +7,7 @@ import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard
 import { SoonIcon } from '@/components/ui/SoonIcon'
 import { resolveActiveWorkspace, WORKSPACE_CHANGED_EVENT } from '@/lib/workspace-client'
 
-type WeekProgress = { total: number; ready: number; approved: number; changesRequested: number; scheduled: number; published: number }
+type WeekProgress = { total: number; ready: number; approved: number; pendingApproval: number; changesRequested: number; scheduled: number; published: number }
 type Campaign = {
   id: string; name: string; status: string; generation_status?: string; created_at: string; updated_at?: string
   imageUrl?: string | null; product?: { name?: string; kind?: string } | Array<{ name?: string; kind?: string }> | null

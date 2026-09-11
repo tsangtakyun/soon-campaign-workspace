@@ -68,15 +68,16 @@ export async function GET(req: Request) {
       const campaignJobs = (jobs || []).filter((item: any) => item.campaign_id === campaign.id)
       const campaignPosts = (posts || []).filter((item: any) => item.campaign_id === campaign.id)
       const completedProjectIds = new Set(campaignJobs.filter((item: any) => item.status === 'completed').map((item: any) => item.content_project_id))
-      const weeks: Record<string, { total: number; ready: number; approved: number; changesRequested: number; scheduled: number; published: number }> = {}
+      const weeks: Record<string, { total: number; ready: number; approved: number; pendingApproval: number; changesRequested: number; scheduled: number; published: number }> = {}
       campaignProjects.forEach((project: any) => {
         const week = String(Math.max(1, Math.min(4, Number(project.brief?.campaignWeek) || 1)))
-        const current = weeks[week] || { total: 0, ready: 0, approved: 0, changesRequested: 0, scheduled: 0, published: 0 }
+        const current = weeks[week] || { total: 0, ready: 0, approved: 0, pendingApproval: 0, changesRequested: 0, scheduled: 0, published: 0 }
         const approval = project.production?.approval?.status
         const post = campaignPosts.find((item: any) => item.content_project_id === project.id)
         current.total += 1
         if (completedProjectIds.has(project.id)) current.ready += 1
         if (approval === 'approved') current.approved += 1
+        if (completedProjectIds.has(project.id) && !approval) current.pendingApproval += 1
         if (approval === 'changes_requested') current.changesRequested += 1
         if (post?.status === 'scheduled' || post?.scheduled_at) current.scheduled += 1
         if (post?.status === 'published' || post?.posted_at) current.published += 1
