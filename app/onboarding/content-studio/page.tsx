@@ -75,6 +75,14 @@ type Permissions = {
   role: string;
 };
 
+type PreferenceEvent = {
+  eventType: "selected" | "changed" | "rejected" | "edited" | "approved" | "published" | "performed";
+  dimension: "format" | "template" | "production_method" | "copy" | "design";
+  value: string;
+  previousValue?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
 type StudioStep = "brief" | "format" | "style" | "structure" | "assets" | "drafts" | "carousel";
 
 const studioSteps: { id: StudioStep; label: string }[] = [
@@ -373,6 +381,7 @@ export default function ContentStudioPage() {
     updates: Record<string, unknown>,
     successMessage: string,
     nextStep?: StudioStep,
+    preferenceEvents: PreferenceEvent[] = [],
   ) {
     if (!workspaceId || !selected || !permissions?.canEdit) return;
     setSaving(true);
@@ -395,6 +404,13 @@ export default function ContentStudioPage() {
           item.id === selected.id ? { ...item, ...payload.project } : item,
         ),
       );
+      if (preferenceEvents.length) {
+        await Promise.allSettled(preferenceEvents.map((event) => fetch("/api/content-preference-events", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ workspaceId, projectId: selected.id, ...event }),
+        })));
+      }
       setMessage(successMessage);
       if (nextStep) goToStep(nextStep);
     } catch (error) {
@@ -1278,6 +1294,22 @@ export default function ContentStudioPage() {
                             },
                             "格式已確認，請選擇內容風格",
                             "style",
+                            [
+                              {
+                                eventType: selected.selected_format && selected.selected_format !== selectedFormat ? "changed" : "selected",
+                                dimension: "format",
+                                value: selectedFormat,
+                                previousValue: selected.selected_format || null,
+                                metadata: { source: "content_studio" },
+                              },
+                              ...(selectedFormat === "short_video" ? [{
+                                eventType: selected.format_decision?.videoMethod && selected.format_decision.videoMethod !== videoMethod ? "changed" as const : "selected" as const,
+                                dimension: "production_method" as const,
+                                value: videoMethod,
+                                previousValue: typeof selected.format_decision?.videoMethod === "string" ? selected.format_decision.videoMethod : null,
+                                metadata: { source: "content_studio" },
+                              }] : []),
+                            ],
                           )
                         }
                       >
@@ -1329,7 +1361,13 @@ export default function ContentStudioPage() {
                             templateTone: template?.tone || "",
                             templateSelectedAt: new Date().toISOString(),
                           },
-                        }, "內容風格已儲存，下一步建立內容結構", "structure");
+                        }, "內容風格已儲存，下一步建立內容結構", "structure", [{
+                          eventType: selected.format_decision?.templateCode && selected.format_decision.templateCode !== selectedStyleCode ? "changed" : "selected",
+                          dimension: "template",
+                          value: selectedStyleCode,
+                          previousValue: typeof selected.format_decision?.templateCode === "string" ? selected.format_decision.templateCode : null,
+                          metadata: { templateVersion: template?.version || 1, templateSource: "soon_creator_v1", format: selected.selected_format },
+                        }]);
                       }}>{saving ? "儲存中…" : "使用這個風格 →"}</button>
                     </div>
                   </div>
