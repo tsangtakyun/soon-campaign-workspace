@@ -94,7 +94,7 @@ export async function GET(req: Request) {
         || (assets || []).find((asset: any) => asset.product_id === campaign.product_id)
       return { ...campaign, imageUrl: primaryAsset?.url || null, progress: { total, ready, approved, changesRequested, pendingApproval, scheduled, published, weeks } }
     })
-    return NextResponse.json({ campaigns: summaries, pendingApproval: summaries.reduce((sum: number, campaign: any) => sum + campaign.progress.pendingApproval, 0) })
+    return NextResponse.json({ campaigns: summaries, pendingApproval: summaries.reduce((sum: number, campaign: any) => campaign.status === 'archived' ? sum : sum + campaign.progress.pendingApproval, 0) })
   } catch (error) {
     console.error('[product-campaigns] list failed', error)
     return NextResponse.json({ error: '未能載入 Product Campaigns', detail: String(error) }, { status: 500 })
@@ -206,5 +206,67 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('[product-campaigns] create failed', { error, productId })
     return NextResponse.json({ error: '未能建立 Product Campaign', detail: String(error) }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}))
+    const workspaceId = text(body.workspaceId, 80)
+    const campaignId = text(body.campaignId, 80)
+    const action = body.action === 'restore' ? 'restore' : 'archive'
+    if (!isUuid(workspaceId) || !isUuid(campaignId)) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    const auth = await requestAccess(workspaceId)
+    if (auth.error) return auth.error
+    if (!auth.access.canEdit) return NextResponse.json({ error: '你沒有管理宣傳包的權限' }, { status: 403 })
+    const { data: campaign, error: campaignError } = await auth.access.admin
+      .from('marketing_campaigns')
+      .select('id,status,raw_campaign_details')
+      .eq('id', campaignId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+    if (campaignError) throw campaignError
+    if (!campaign) return NextResponse.json({ error: '找不到宣傳包' }, { status: 404 })
+    const details = campaign.raw_campaign_details && typeof campaign.raw_campaign_details === 'object' ? campaign.raw_campaign_details : {}
+    const previousStatus = typeof details.archivedPreviousStatus === 'string' ? details.archivedPreviousStatus : 'draft'
+    const nextStatus = action === 'restore' ? previousStatus : 'archived'
+    const nextDetails = action === 'restore'
+      ? { ...details, archivedPreviousStatus: undefined, restoredAt: new Date().toISOString() }
+      : { ...details, archivedPreviousStatus: campaign.status === 'archived' ? previousStatus : campaign.status, archivedAt: new Date().toISOString() }
+    const { error } = await auth.access.admin.from('marketing_campaigns').update({ status: nextStatus, raw_campaign_details: nextDetails, updated_at: new Date().toISOString() }).eq('id', campaignId).eq('workspace_id', workspaceId)
+    if (error) throw error
+    return NextResponse.json({ success: true, status: nextStatus })
+  } catch (error) {
+    return NextResponse.json({ error: '未能更新宣傳包', detail: String(error) }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const url = new URL(req.url)
+    const workspaceId = url.searchParams.get('workspaceId') || ''
+    const campaignId = url.searchParams.get('campaignId') || ''
+    if (!isUuid(workspaceId) || !isUuid(campaignId)) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    const auth = await requestAccess(workspaceId)
+    if (auth.error) return auth.error
+    if (!auth.access.canEdit) return NextResponse.json({ error: '你沒有刪除宣傳包的權限' }, { status: 403 })
+    const { data: campaign, error: campaignError } = await auth.access.admin.from('marketing_campaigns').select('id,product_id').eq('id', campaignId).eq('workspace_id', workspaceId).maybeSingle()
+    if (campaignError) throw campaignError
+    if (!campaign) return NextResponse.json({ error: '找不到宣傳包' }, { status: 404 })
+    const [{ count: projectCount, error: projectError }, { count: postCount, error: postError }] = await Promise.all([
+      auth.access.admin.from('content_projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
+      auth.access.admin.from('campaign_posts').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
+    ])
+    if (projectError || postError) throw projectError || postError
+    if ((projectCount || 0) > 0 || (postCount || 0) > 0) return NextResponse.json({ error: '這個宣傳包已有製作內容，請改用封存。' }, { status: 409 })
+    const { error: deleteError } = await auth.access.admin.from('marketing_campaigns').delete().eq('id', campaignId).eq('workspace_id', workspaceId)
+    if (deleteError) throw deleteError
+    if (campaign.product_id) {
+      const { count } = await auth.access.admin.from('marketing_campaigns').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('product_id', campaign.product_id)
+      if (!count) await auth.access.admin.from('products').delete().eq('id', campaign.product_id).eq('workspace_id', workspaceId)
+    }
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json({ error: '未能刪除宣傳包', detail: String(error) }, { status: 500 })
   }
 }
