@@ -253,12 +253,21 @@ export async function DELETE(req: Request) {
     const { data: campaign, error: campaignError } = await auth.access.admin.from('marketing_campaigns').select('id,product_id').eq('id', campaignId).eq('workspace_id', workspaceId).maybeSingle()
     if (campaignError) throw campaignError
     if (!campaign) return NextResponse.json({ error: '找不到宣傳包' }, { status: 404 })
-    const [{ count: projectCount, error: projectError }, { count: postCount, error: postError }] = await Promise.all([
-      auth.access.admin.from('content_projects').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
-      auth.access.admin.from('campaign_posts').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
+    const [{ data: projects, error: projectError }, { data: posts, error: postError }] = await Promise.all([
+      auth.access.admin.from('content_projects').select('id').eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
+      auth.access.admin.from('campaign_posts').select('id,status,scheduled_at,posted_at').eq('workspace_id', workspaceId).eq('campaign_id', campaignId),
     ])
     if (projectError || postError) throw projectError || postError
-    if ((projectCount || 0) > 0 || (postCount || 0) > 0) return NextResponse.json({ error: '這個宣傳包已有製作內容，請改用封存。' }, { status: 409 })
+    const protectedPosts = (posts || []).filter((post: any) => post.scheduled_at || post.posted_at || ['scheduled', 'published', 'publishing'].includes(post.status))
+    if (protectedPosts.length) return NextResponse.json({ error: '這個宣傳包已有排程或已發布內容，請先取消排程或改用封存。' }, { status: 409 })
+    if ((posts || []).length) {
+      const { error } = await auth.access.admin.from('campaign_posts').delete().eq('workspace_id', workspaceId).eq('campaign_id', campaignId)
+      if (error) throw error
+    }
+    if ((projects || []).length) {
+      const { error } = await auth.access.admin.from('content_projects').delete().eq('workspace_id', workspaceId).eq('campaign_id', campaignId)
+      if (error) throw error
+    }
     const { error: deleteError } = await auth.access.admin.from('marketing_campaigns').delete().eq('id', campaignId).eq('workspace_id', workspaceId)
     if (deleteError) throw deleteError
     if (campaign.product_id) {
