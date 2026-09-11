@@ -34,12 +34,18 @@ export async function POST(req: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from('content_projects')
-      .select('id,title,selected_format,production,created_by')
+      .select('id,campaign_id,campaign_angle_id,creative_role,title,selected_format,brief,production,created_by')
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
       .maybeSingle()
     if (projectError) throw projectError
     if (!project?.id) return NextResponse.json({ error: 'Content project not found' }, { status: 404 })
+    const { data: generationJob, error: generationJobError } = await access.admin
+      .from('creative_generation_jobs')
+      .select('id,status,output,prompt_snapshot')
+      .eq('content_project_id', projectId)
+      .maybeSingle()
+    if (generationJobError) throw generationJobError
 
     const now = new Date().toISOString()
     const production = project.production && typeof project.production === 'object'
@@ -48,6 +54,7 @@ export async function POST(req: Request) {
     const nextProduction = {
       ...production,
       approvalStatus: decision,
+      approval: { status: decision, note, reviewedAt: now, reviewedBy: user.id },
       reviewedAt: now,
     }
 
@@ -61,17 +68,26 @@ export async function POST(req: Request) {
           url: typeof page.url === 'string' ? page.url : '',
         }))
         .filter((asset) => asset.url)
-      const sourceKey = `content-project-${projectId}`
+      const jobOutput = generationJob?.output && typeof generationJob.output === 'object' ? generationJob.output as Record<string, any> : {}
+      const jobAssets = Array.isArray(jobOutput.assets)
+        ? jobOutput.assets.map((asset: Record<string, unknown>, index: number) => ({ page: `P.${index + 1}`, url: typeof asset.url === 'string' ? asset.url : '' })).filter((asset: { url: string }) => asset.url)
+        : typeof jobOutput.asset?.url === 'string' ? [{ page: 'P.1', url: jobOutput.asset.url }] : []
+      const savedAssets = jobAssets.length ? jobAssets : assets
+      if (!savedAssets.length || generationJob?.status !== 'completed') return NextResponse.json({ error: '素材尚未完成，不能批准' }, { status: 409 })
+      const sourceKey = project.campaign_id ? `campaign-creative-${projectId}` : `content-project-${projectId}`
       const postValues = {
         user_id: project.created_by || user.id,
         workspace_id: workspaceId,
+        campaign_id: project.campaign_id || null,
+        content_project_id: project.id,
+        campaign_angle_id: project.campaign_angle_id || null,
         source_key: sourceKey,
         title: String(project.title || '未命名 Carousel').slice(0, 200),
         body: typeof production.captionDraft === 'string' ? production.captionDraft : '',
-        post_type: project.selected_format === 'short_video' ? 'video' : 'carousel',
+        post_type: project.selected_format === 'short_video' ? 'video' : project.selected_format === 'carousel' ? 'carousel' : 'single_image',
         scheduled_at: validSchedule(production.scheduledAt),
-        image_url: assets[0]?.url || null,
-        captions: { assets, contentProjectId: projectId },
+        image_url: savedAssets[0]?.url || null,
+        captions: { assets: savedAssets, contentProjectId: projectId, campaignAngleId: project.campaign_angle_id, creativeRole: project.creative_role },
         status: 'approved',
         approved_at: now,
         updated_at: now,
@@ -94,7 +110,7 @@ export async function POST(req: Request) {
         .from('campaign_posts')
         .update({ approved_at: null, scheduled_at: null, status: 'withdrawn', updated_at: now })
         .eq('workspace_id', workspaceId)
-        .eq('source_key', `content-project-${projectId}`)
+        .in('source_key', [`content-project-${projectId}`, `campaign-creative-${projectId}`])
         .is('posted_at', null)
         .in('status', ['approved', 'scheduled', 'draft', 'ready', 'pending_approval', 'rejected', 'publishing'])
       if (withdrawError) throw withdrawError
@@ -102,7 +118,7 @@ export async function POST(req: Request) {
 
     const { error: updateError } = await access.admin
       .from('content_projects')
-      .update({ production: nextProduction, updated_at: now, updated_by: user.id })
+      .update({ production: nextProduction, stage: decision === 'approved' ? 'approval' : 'production', updated_at: now, updated_by: user.id })
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
     if (updateError) throw updateError

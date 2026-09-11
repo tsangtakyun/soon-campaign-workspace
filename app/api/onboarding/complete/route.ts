@@ -287,6 +287,7 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as JsonRecord
     const sessionId = asString(body.sessionId)
+    const completionMode = body.completionMode === 'brand_setup' ? 'brand_setup' : 'legacy_campaign_setup'
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 })
@@ -585,6 +586,25 @@ export async function POST(req: Request) {
         'id',
         { column: 'onboarding_session_id', value: sessionId }
       )
+    }
+
+    // New workspaces complete onboarding after the brand profile is saved.
+    // Campaigns and generated posts must be created from an explicit product,
+    // service, offer, or content brief instead of inferred website content.
+    if (completionMode === 'brand_setup') {
+      return NextResponse.json({
+        success: true,
+        completionMode,
+        sessionId,
+        userId,
+        workspaceId,
+        brandKitId: brandKit.id,
+        campaignIds: [],
+        postsCreated: 0,
+        allCreatedPostIds: [],
+        createdPostIds: [],
+        createdPostQueue: [],
+      })
     }
 
     stage = 'clear-generated-posts'

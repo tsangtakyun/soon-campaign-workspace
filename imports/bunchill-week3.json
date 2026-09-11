@@ -1,0 +1,69 @@
+[
+  {
+    "workspace": "Bechilltogether",
+    "source_key": "bunchill-week3-2026-08-25-daily-secret-mission",
+    "status": "approved",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "carousel",
+    "title": "每日秘密任務",
+    "caption": "🐾 你以為你去返工。\n\n我以為你去打大佬。\n\nYou think you're going to work.\nI think you're off to fight a boss.",
+    "scheduled_at_hkt": "2026-08-25 19:00",
+    "platforms": ["Instagram"],
+    "assets": [
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/01_cover.png", "slide_number": 1 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/02_gear.png", "slide_number": 2 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/03_three-levels.png", "slide_number": 3 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/04_guard-duty.png", "slide_number": 4 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/05_homecoming-loot.png", "slide_number": 5 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/06_best-reward.png", "slide_number": 6 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_daily-secret-mission-carousel/ig_1080x1350/07_sneaky-smile.png", "slide_number": 7 }
+    ]
+  },
+  {
+    "workspace": "Bechilltogether",
+    "source_key": "bunchill-week3-2026-08-26-toilet-refuge",
+    "status": "approved",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "single_image",
+    "title": "只有廁所門關上",
+    "caption": "🚪 講真，有冇人明 ？\n\n一日入去三次....\nThree visits a day. Zero emergencies.",
+    "scheduled_at_hkt": "2026-08-26 19:00",
+    "platforms": ["Instagram"],
+    "assets": [
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-22_office-toilet-refuge/p_v3_chill.png", "slide_number": 1 }
+    ]
+  },
+  {
+    "workspace": "Bechilltogether",
+    "source_key": "bunchill-week3-2026-08-27-whatsapp",
+    "status": "approved",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "carousel",
+    "title": "如果笨chill 識用 WhatsApp",
+    "caption": "如果佢識用 WhatsApp，你會想同佢講咩？",
+    "scheduled_at_hkt": "2026-08-27 19:00",
+    "platforms": ["Instagram"],
+    "assets": [
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/01_cover.png", "slide_number": 1 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/02_breakfast.png", "slide_number": 2 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/03_slipper.png", "slide_number": 3 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/04_sofa.png", "slide_number": 4 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/05_night.png", "slide_number": 5 },
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_if-bunchill-used-whatsapp/v5_revisions/ig_1080x1350/06_homecoming.png", "slide_number": 6 }
+    ]
+  },
+  {
+    "workspace": "Bechilltogether",
+    "source_key": "bunchill-week3-2026-08-28-pov-coax",
+    "status": "approved",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "short_video",
+    "title": "POV：其實好易氹",
+    "caption": "🐾 我好易氹架。",
+    "scheduled_at_hkt": "2026-08-28 19:00",
+    "platforms": ["Instagram"],
+    "assets": [
+      { "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-08-23_coax-bunchill-reel/0824_final02_IG.mp4", "slide_number": 1 }
+    ]
+  }
+]

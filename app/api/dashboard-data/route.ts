@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       canPublish: access.canPublish,
     }
 
-    const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult, contentProjectsResult, reviewNotesResult] = await Promise.all([
+    const [postsResult, campaignsResult, brandKitResult, connectionsResult, creditsResult, contentProjectsResult, generationJobsResult, reviewNotesResult] = await Promise.all([
       supabase
         .from('campaign_posts')
         .select('id,campaign_id,title,body,post_type,scheduled_at,posted_at,image_url,status,source_key,captions,marketing_campaigns(name,strategy_emoji)')
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
         .limit(30),
       supabase
         .from('marketing_campaigns')
-        .select('id,name,strategy_title,strategy_emoji,starts_on,status')
+        .select('id,name,strategy_title,strategy_emoji,starts_on,status,generation_status,delivery_manifest')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(5),
@@ -67,11 +67,18 @@ export async function GET(req: Request) {
         .maybeSingle(),
       supabase
         .from('content_projects')
-        .select('id,title,selected_format,production,updated_at')
+        .select('id,campaign_id,title,selected_format,creative_role,brief,production,stage,updated_at')
         .eq('workspace_id', workspaceId)
-        .eq('stage', 'approval')
+        .in('stage', ['production', 'approval'])
         .order('updated_at', { ascending: false })
         .limit(20),
+      supabase
+        .from('creative_generation_jobs')
+        .select('id,content_project_id,status,output,updated_at')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'completed')
+        .order('updated_at', { ascending: false })
+        .limit(30),
       supabase.from('review_notes').select('id,project_id,post_id,page_number,original_text,reviewer,created_at,resolved').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(30),
     ])
 
@@ -89,6 +96,7 @@ export async function GET(req: Request) {
         credits: creditsResult.error?.message || null,
         posts: postsResult.error?.message || null,
         contentProjects: contentProjectsResult.error?.message || null,
+        generationJobs: generationJobsResult.error?.message || null,
       },
     })
 
@@ -106,6 +114,7 @@ export async function GET(req: Request) {
       },
       posts: postsResult.data || [],
       contentProjects: contentProjectsResult.data || [],
+      generationJobs: generationJobsResult.data || [],
       reviewNotes: reviewNotesResult.data || [],
       permissions,
     })

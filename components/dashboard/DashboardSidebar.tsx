@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { SoonIcon, type SoonIconName } from '@/components/ui/SoonIcon'
 import {
   cacheActiveWorkspace,
   clearActiveWorkspaceId,
@@ -17,20 +18,22 @@ import {
 } from '@/lib/workspace-client'
 
 type SidebarItem = {
-  icon: string
+  icon: SoonIconName
   label: string
   href: string
 }
 
 const sidebarItems: SidebarItem[] = [
-  { icon: '⌂', label: '首頁', href: '/onboarding' },
-  { icon: '▣', label: '已排程內容', href: '/onboarding/scheduled-posts' },
-  { icon: '▱', label: '題材庫', href: '/onboarding/topic-library' },
-  { icon: '✦', label: '內容製作', href: '/onboarding/content-studio' },
-  { icon: '↯', label: '整合', href: '/onboarding/integrations' },
-  { icon: '✤', label: '品牌素材庫', href: '/onboarding/brand-kit' },
-  { icon: '☷', label: '內容偏好', href: '/onboarding/content-preferences' },
-  { icon: '▥', label: '洞察', href: '/onboarding/insights' },
+  { icon: 'home', label: '首頁', href: '/onboarding' },
+  { icon: 'check', label: '內容審批', href: '/onboarding/content-review' },
+  { icon: 'calendar', label: '已排程內容', href: '/onboarding/scheduled-posts' },
+  { icon: 'ideas', label: '題材庫', href: '/onboarding/topic-library' },
+  { icon: 'campaign', label: '宣傳包', href: '/onboarding/campaign-centre' },
+  { icon: 'create', label: '內容製作', href: '/onboarding/content-studio' },
+  { icon: 'integrations', label: '整合', href: '/onboarding/integrations' },
+  { icon: 'brand', label: '品牌素材庫', href: '/onboarding/brand-kit' },
+  { icon: 'preferences', label: '內容偏好', href: '/onboarding/content-preferences' },
+  { icon: 'insights', label: '洞察', href: '/onboarding/insights' },
 ]
 
 type DashboardSidebarProps = {
@@ -45,6 +48,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0)
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
@@ -67,6 +71,16 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     activeWorkspace?.role === 'owner' ||
     activeWorkspace?.role === 'admin' ||
     activeWorkspace?.role === 'member'
+
+  async function refreshPendingApproval(workspaceId: string) {
+    try {
+      const response = await fetch(`/api/product-campaigns?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: 'no-store' })
+      const payload = await response.json().catch(() => null)
+      if (response.ok) setPendingApprovalCount(Number(payload?.pendingApproval) || 0)
+    } catch {
+      // Keep navigation available when campaign summaries are temporarily unavailable.
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -111,6 +125,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           if (storedWorkspaceId !== nextActiveWorkspace.id) {
             setActiveWorkspaceId(nextActiveWorkspace.id)
           }
+          if (!cancelled) void refreshPendingApproval(nextActiveWorkspace.id)
         }
       } catch {
         // Keep the dashboard usable when credit tables are not migrated yet.
@@ -145,6 +160,8 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     const nextWorkspace = workspaces.find((workspace) => workspace.id === workspaceId)
     if (nextWorkspace) cacheActiveWorkspace(nextWorkspace)
     setActiveWorkspaceIdState(workspaceId)
+    setPendingApprovalCount(0)
+    void refreshPendingApproval(workspaceId)
     setWorkspaceMenuOpen(false)
     router.refresh()
   }
@@ -231,8 +248,9 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
           const isContentStudio = item.label === '內容製作'
           const itemDisabled = isContentStudio && !canUseContentStudio
           const content = <>
-            <span>{item.icon}</span>
+            <span><SoonIcon name={item.icon} size={17} /></span>
             <strong>{item.label}{itemDisabled ? <small>（暫時未公開）</small> : null}</strong>
+            {item.label === '內容審批' && pendingApprovalCount > 0 ? <b className="sidebar-alert-count" aria-label={`${pendingApprovalCount} 項待審批`}>{pendingApprovalCount > 99 ? '99+' : pendingApprovalCount}</b> : null}
           </>
 
           return itemDisabled ? (
@@ -272,8 +290,8 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
 export const dashboardSidebarStyles = `
   .sidebar {
     min-height: 100vh;
-    border-right: 1px solid #e6e7ea;
-    background: #f2f3f5;
+    border-right: 1px solid var(--soon-line, #ded5cd);
+    background: var(--soon-ivory, #f6f2eb);
     padding: 16px 10px;
     display: flex;
     flex-direction: column;
@@ -285,7 +303,7 @@ export const dashboardSidebarStyles = `
 
   .workspace-switcher-wrap {
     position: relative;
-    border-bottom: 1px solid #e2e3e6;
+    border-bottom: 1px solid var(--soon-line, #ded5cd);
     padding-bottom: 14px;
   }
 
@@ -307,8 +325,8 @@ export const dashboardSidebarStyles = `
     width: 24px;
     height: 24px;
     border-radius: 7px;
-    background: #ffd946;
-    color: #111111;
+    background: var(--soon-oxblood, #6b2c30);
+    color: #ffffff;
     display: grid;
     place-items: center;
     font-weight: 800;
@@ -488,8 +506,19 @@ export const dashboardSidebarStyles = `
   }
 
   .sidebar-nav a.active {
-    background: #e5e7eb;
-    color: #202126;
+    background: #eadfd8;
+    color: var(--soon-oxblood, #6b2c30);
+  }
+
+  .sidebar-nav a:hover:not(.active) {
+    background: rgba(107, 44, 48, .055);
+    color: var(--soon-ink, #1a1a1a);
+  }
+
+  .sidebar-nav a > span:first-child,
+  .sidebar-nav .sidebar-disabled > span:first-child {
+    display: grid;
+    place-items: center;
   }
 
   .sidebar-nav .sidebar-disabled {
@@ -509,6 +538,20 @@ export const dashboardSidebarStyles = `
   .sidebar-nav em {
     color: #9b9ea6;
     font-style: normal;
+  }
+
+  .sidebar-alert-count {
+    min-width: 19px;
+    height: 19px;
+    border-radius: 999px;
+    background: var(--soon-danger, #d94b4b);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 850;
+    line-height: 1;
   }
 
   .sidebar-credit-card {

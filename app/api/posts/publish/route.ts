@@ -43,13 +43,16 @@ export async function POST(req: Request) {
     const supabase = createAdminSupabase()
     const { data: post, error: postError } = await supabase
       .from('campaign_posts')
-      .select('id,user_id,title,body,image_url,scheduled_at,workspace_id,captions')
+      .select('id,user_id,title,body,post_type,image_url,scheduled_at,workspace_id,captions')
       .eq('id', postId)
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
     if (postError) throw postError
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
+    if (post.post_type === 'video' && post.captions?.finalVideoRendered !== true) {
+      return NextResponse.json({ error: '影片仍在Storyboard階段，請完成MP4 rendering後再發布' }, { status: 409 })
+    }
 
     const now = new Date().toISOString()
     const dueNow = publishNow || shouldPublishNow(post.scheduled_at)

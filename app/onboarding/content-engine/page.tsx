@@ -4,6 +4,8 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { persistOnboardingDraft } from '@/lib/onboarding-draft-client'
+import { getOrCreateOnboardingSessionId, markOnboardingPersisted } from '@/lib/onboarding-session'
+import { getActiveWorkspaceId, setActiveWorkspaceId } from '@/lib/workspace-client'
 
 type ManualBusinessType = 'services' | 'local' | 'products' | ''
 type ContentPersona = '老闆本人' | '產品' | '團隊' | '無特定' | ''
@@ -137,6 +139,7 @@ function ContentEngineContent() {
   const [website, setWebsite] = useState('')
   const [manualProfile, setManualProfile] = useState<ManualProfile>(emptyManualProfile)
   const [loading, setLoading] = useState(false)
+  const [savingBrand, setSavingBrand] = useState(false)
   const [error, setError] = useState('')
   const [progressIndex, setProgressIndex] = useState(0)
   const [analysisPreview, setAnalysisPreview] = useState<AnalysisPreviewState>({ data: null, revealStep: 0 })
@@ -285,6 +288,9 @@ function ContentEngineContent() {
   }
 
   async function continueToNext() {
+    if (savingBrand) return
+    setSavingBrand(true)
+    setError('')
     clearDownstreamOnboardingDraft()
     const profile = buildBusinessProfile()
     const brandProfile = {
@@ -301,20 +307,44 @@ function ContentEngineContent() {
     }
     sessionStorage.setItem('soon-business-profile-v1', JSON.stringify(profile))
     sessionStorage.setItem('soon-brand-profile-v1', JSON.stringify(brandProfile))
-    await persistOnboardingDraft(
-      {
-        'soon-business-profile-v1': profile,
-        'soon-brand-profile-v1': brandProfile,
-      },
-      DOWNSTREAM_ONBOARDING_KEYS
-    )
+    try {
+      await persistOnboardingDraft(
+        {
+          'soon-business-profile-v1': profile,
+          'soon-brand-profile-v1': brandProfile,
+        },
+        DOWNSTREAM_ONBOARDING_KEYS
+      )
 
-    const url = new URL('/onboarding/content-strategy', window.location.origin)
-    Object.entries(passthroughParams()).forEach(([key, value]) => url.searchParams.set(key, value))
-    if (profile.website_url) url.searchParams.set('website', profile.website_url)
-    url.searchParams.set('language', profile.primary_language)
-    url.searchParams.set('brandName', profile.business_name)
-    window.location.href = `${url.pathname}${url.search}`
+      const websiteAnalysis = (() => {
+        try {
+          const stored = sessionStorage.getItem('soon-website-analysis-v1')
+          return stored ? JSON.parse(stored) : null
+        } catch {
+          return null
+        }
+      })()
+      const response = await fetch('/api/onboarding/complete', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          completionMode: 'brand_setup',
+          sessionId: getOrCreateOnboardingSessionId(),
+          workspaceId: getActiveWorkspaceId(),
+          websiteAnalysis,
+          businessProfile: profile,
+        }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result?.detail || result?.error || '未能儲存品牌資料')
+
+      if (typeof result?.workspaceId === 'string') setActiveWorkspaceId(result.workspaceId)
+      markOnboardingPersisted()
+      window.location.href = '/dashboard?brand_setup=complete'
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : '未能儲存品牌資料，請再試一次。')
+      setSavingBrand(false)
+    }
   }
 
   const canContinueManual = Boolean(
@@ -387,10 +417,10 @@ function ContentEngineContent() {
     return (
       <main className="engine-page analyzing">
         <nav className="steps" aria-label="Onboarding progress">
-          {['開始設定', '策略', '宣傳活動', '內容', '完成設定'].map((step, index) => (
+          {['品牌資料', '開始使用 SOON'].map((step, index) => (
             <span className={index === 0 ? 'active' : ''} key={step}>
               {step}
-              {index < 4 ? <b>›</b> : null}
+              {index < 1 ? <b>›</b> : null}
             </span>
           ))}
         </nav>
@@ -705,10 +735,10 @@ function ContentEngineContent() {
   return (
     <main className="engine-page">
       <nav className="steps" aria-label="Onboarding progress">
-        {['開始設定', '策略', '宣傳活動', '內容', '完成設定'].map((step, index) => (
+        {['品牌資料', '開始使用 SOON'].map((step, index) => (
           <span className={index === 0 ? 'active' : ''} key={step}>
             {step}
-            {index < 4 ? <b>›</b> : null}
+            {index < 1 ? <b>›</b> : null}
           </span>
         ))}
       </nav>
@@ -719,8 +749,8 @@ function ContentEngineContent() {
 
       <section className="engine-shell">
         <form className={`engine-form mode-${mode}`} onSubmit={mode === 'website' ? handleWebsiteSubmit : (event) => { event.preventDefault(); continueToNext() }}>
-          <h1>建立你的內容引擎</h1>
-          <p>{mode === 'website' ? '輸入網站或 Instagram 專頁，SOON 會整理品牌資料及下一步內容方向。' : '沒有網站也可以開始。直接描述你的品牌，SOON 會建立第一份內容策略。'}</p>
+          <h1>建立你的品牌資料</h1>
+          <p>{mode === 'website' ? '輸入網站或 Instagram 專頁，SOON 會先整理品牌背景；你稍後再選擇今次要推廣的產品或服務。' : '沒有網站也可以開始。直接描述你的品牌，產品或服務 Campaign 會在完成設定後另外建立。'}</p>
 
           {mode === 'website' ? (
             <div className="path-panel website-path">
@@ -830,8 +860,8 @@ function ContentEngineContent() {
               </section>
 
               <div className="sticky-action">
-                <div><strong>品牌資料可以之後再修改</strong><span>繼續後，SOON 會根據這份資料建立內容策略。</span></div>
-                <button className="continue-button" type="submit" disabled={!canContinueManual}>繼續</button>
+                <div><strong>品牌資料可以之後再修改</strong><span>完成後，你可以選擇今次要推廣的產品、服務或內容題材。</span></div>
+                <button className="continue-button" type="submit" disabled={!canContinueManual || savingBrand}>{savingBrand ? '正在儲存…' : '完成品牌設定'}</button>
               </div>
             </div>
           )}

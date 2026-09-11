@@ -1,0 +1,28 @@
+[
+  {
+    "workspace": "Bechilltogether",
+    "source_key": "bunchill-2026-09-09-remember-but-forgot",
+    "status": "pending_approval",
+    "content_category": "Entertainment 娛樂資訊",
+    "post_type": "carousel",
+    "title": "我記得要記住，但唔記得要記住咩",
+    "caption": "有啲嘢唔係唔記得\n係記得自己要記住，但唔記得要記住咩 😂\n\nSome things aren’t forgotten\nI remember needing to remember—I just can’t remember what 😂\n\n你最近有冇試過？留言話俾我知，或者 Tag 個成日話「我記得㗎」嘅朋友！\nEver had this moment? Tell me below or tag that friend who always says “I remember!”",
+    "scheduled_at_hkt": "2026-09-09 19:00",
+    "platforms": ["Instagram"],
+    "assets": [
+      {
+        "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-09-09-remember-but-forgot/p01_final_v4.png",
+        "slide_number": 1
+      },
+      {
+        "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-09-09-remember-but-forgot/p02_final_v4.png",
+        "slide_number": 2
+      },
+      {
+        "filename": "/Users/tommytsang/Desktop/Prompt OS/03_Bunchill/_work/2026-09-09-remember-but-forgot/p03_final_v6.png",
+        "slide_number": 3
+      }
+    ],
+    "approval_note": "三頁 Carousel 已完成角色、文字、尺寸、口袋與 identity QC。建議出帖時間為 2026-09-09 19:00 HKT。只供 Elkie 審批；未確認前不可同步到 Scheduled Posts。"
+  }
+]

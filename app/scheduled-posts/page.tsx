@@ -24,6 +24,7 @@ import {
   PLACEHOLDER_IMAGE,
 } from "@/components/editor/editorData";
 import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
+import { SoonLoading } from "@/components/ui/SoonLoading";
 import {
   getOrCreateOnboardingSessionId,
   getStoredOnboardingSessionId,
@@ -3394,12 +3395,7 @@ function ScheduledPostsPageContent() {
             <span>目前工作台已確認的貼文</span>
           </div>
 
-          <div className="calendar-actions">
-            <span>✦ 0 credits 剩餘（暫時未公開）</span>
-            <button type="button" className="upgrade-button" disabled>
-              暫時未公開
-            </button>
-          </div>
+          <div className="calendar-actions" />
         </header>
 
         {platformConnectionsLoading ? (
@@ -3450,10 +3446,7 @@ function ScheduledPostsPageContent() {
 
         <section className="schedule-column" aria-label="已排程內容">
           {postsLoading ? (
-            <div className="schedule-empty-panel is-loading">
-              <strong>正在載入已排程內容</strong>
-              <span>SOON 正在同步目前工作台的貼文、審批狀態及圖片。</span>
-            </div>
+            <SoonLoading compact title="正在整理發布日程" description="SOON 正在同步已批准的內容、圖片及發布時間。" steps={["同步內容", "核對狀態", "整理日程"]} />
           ) : postsLoadError ? (
             <div className="schedule-empty-panel">
               <strong>未能載入已排程內容</strong>

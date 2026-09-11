@@ -1,10 +1,13 @@
 'use client'
 
+import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
+import { PlatformIcon } from '@/components/dashboard/PlatformIcon'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { SoonIcon } from '@/components/ui/SoonIcon'
 import { getStoredOnboardingSessionId } from '@/lib/onboarding-session'
 import { createClient } from '@/lib/supabase'
 import {
@@ -39,12 +42,21 @@ type HomeCampaign = {
   status: string
   statusKind: 'generating' | 'done'
   image: string | null
+  nextWeek?: number | null
 }
 
 type PublishedPostSummary = {
   count: number
   latestTitle: string
   latestTime: string
+}
+
+type SocialSummary = {
+  followers: number | null
+  engagementRate: number | null
+  platform: string
+  username: string
+  views: number | null
 }
 
 const fallbackUpcomingPosts: HomePost[] = [
@@ -957,10 +969,15 @@ export default function OnboardingHomePage() {
     latestTitle: '',
   })
   const [connectedSocialAccount, setConnectedSocialAccount] = useState<string | null>(null)
+  const [socialSummary, setSocialSummary] = useState<SocialSummary | null>(null)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string | null>(null)
   const [isBechillActive, setIsBechillActive] = useState(false)
   const [dashboardLoading, setDashboardLoading] = useState(true)
+  const [showApprovalBoard, setShowApprovalBoard] = useState(false)
+  const [campaignPrompt, setCampaignPrompt] = useState('')
+  const [campaignImage, setCampaignImage] = useState<{ file: File; preview: string } | null>(null)
+  const campaignImageInputRef = useRef<HTMLInputElement>(null)
   const hasGeneratingImagesRef = useRef(false)
   const generatingPostIdsRef = useRef<Set<string>>(new Set())
 
@@ -1031,6 +1048,7 @@ export default function OnboardingHomePage() {
         let connectionsData: any[] | null = null
         let creditsData: any = null
         let contentProjectsData: any[] = []
+        let generationJobsData: any[] = []
         let postsError: any = null
         let campaignsError: any = null
 
@@ -1050,6 +1068,7 @@ export default function OnboardingHomePage() {
           connectionsData = dashboardPayload?.connections || []
           creditsData = dashboardPayload?.credits || null
           contentProjectsData = dashboardPayload?.contentProjects || []
+          generationJobsData = dashboardPayload?.generationJobs || []
           setReviewNotes(Array.isArray(dashboardPayload?.reviewNotes) ? dashboardPayload.reviewNotes : [])
           setDashboardPermissions(dashboardPayload?.permissions || { canApprove: false, canEdit: false, canPublish: false })
         } else {
@@ -1115,8 +1134,30 @@ export default function OnboardingHomePage() {
               ? `${connection.platform === 'instagram' ? 'Instagram' : connection.platform}：@${connection.account_name}`
               : connection.platform
           )
+          const instagramConnection = connectionsData.find((item: any) => item.platform === 'instagram')
+          if (instagramConnection && workspaceId) {
+            void fetch(`/api/instagram/insights?workspace_id=${encodeURIComponent(workspaceId)}`, { cache: 'no-store' })
+              .then(async (response) => ({ ok: response.ok, payload: await response.json().catch(() => null) }))
+              .then(({ ok, payload }) => {
+                if (cancelled || !ok || !payload) return
+                const media = Array.isArray(payload.media) ? payload.media : []
+                const totalInteractions = media.reduce((sum: number, item: any) => sum + Number(item.likes || 0) + Number(item.comments || 0) + Number(item.saves || 0) + Number(item.shares || 0), 0)
+                const totalViews = media.reduce((sum: number, item: any) => sum + Number(item.views || 0), 0)
+                setSocialSummary({
+                  followers: typeof payload.account?.profile?.followers_count === 'number' ? payload.account.profile.followers_count : null,
+                  engagementRate: totalViews > 0 ? Number(((totalInteractions / totalViews) * 100).toFixed(2)) : null,
+                  platform: 'Instagram',
+                  username: payload.account?.profile?.username || instagramConnection.account_name || '',
+                  views: typeof payload.metrics?.views === 'number' ? payload.metrics.views : null,
+                })
+              })
+              .catch(() => undefined)
+          } else {
+            setSocialSummary(null)
+          }
         } else {
           setConnectedSocialAccount(null)
+          setSocialSummary(null)
         }
 
         if (typeof creditsData?.balance === 'number') {
@@ -1127,17 +1168,25 @@ export default function OnboardingHomePage() {
 
         setPublishedPostSummary(summarizePublishedPosts(postsData))
 
+        const generationJobByProject = new Map(generationJobsData.map((job: any) => [job.content_project_id, job]))
         const contentProjectPosts: HomePost[] = contentProjectsData
           .filter((project: any) => {
             const production = project?.production && typeof project.production === 'object' ? project.production : {}
-            return production.approvalStatus !== 'approved'
+            return production.approvalStatus !== 'approved' && production.approval?.status !== 'approved' && generationJobByProject.has(project.id)
           })
           .map((project: any) => {
             const production = project?.production && typeof project.production === 'object' ? project.production : {}
+            const normalizedProduction = { ...production, approvalStatus: production.approvalStatus || production.approval?.status }
+            const generationJob: any = generationJobByProject.get(project.id)
+            const output = generationJob?.output && typeof generationJob.output === 'object' ? generationJob.output : {}
             const generatedPages = Array.isArray(production.generatedPages) ? production.generatedPages : []
-            const media = generatedPages
+            const generatedMedia = generatedPages
               .map((page: any) => page?.url)
               .filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+            const outputMedia = Array.isArray(output.assets)
+              ? output.assets.map((asset: any) => asset?.url).filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+              : []
+            const media = outputMedia.length ? outputMedia : generatedMedia.length ? generatedMedia : typeof output.asset?.url === 'string' ? [output.asset.url] : []
             const isVideo =
               project.selected_format === 'short_video' ||
               generatedPages.some(
@@ -1146,9 +1195,9 @@ export default function OnboardingHomePage() {
             return {
               id: project.id,
               recordType: 'content_project' as const,
-              production,
+              production: normalizedProduction,
               sourceKey: `content-project-${project.id}`,
-              type: isVideo ? '短影片' : '輪播貼文',
+              type: isVideo ? '短影片' : project.selected_format === 'carousel' ? '輪播貼文' : '單張圖片',
               typeKind: isVideo ? ('video' as const) : ('image' as const),
               title: project.title || (isVideo ? '未命名短影片' : '未命名 Carousel'),
               body: typeof production.captionDraft === 'string' ? production.captionDraft : '',
@@ -1161,7 +1210,7 @@ export default function OnboardingHomePage() {
                   : null,
               image: media[0] || null,
               media,
-              status: production.approvalStatus === 'approved' ? '已確認' : production.approvalStatus === 'changes_requested' ? '要修改' : '待審批',
+              status: production.approvalStatus === 'approved' || production.approval?.status === 'approved' ? '已確認' : production.approvalStatus === 'changes_requested' || production.approval?.status === 'changes_requested' ? '要修改' : '待審批',
             }
           })
           .filter((post: HomePost) => post.media?.length)
@@ -1317,12 +1366,16 @@ export default function OnboardingHomePage() {
           setDashboardCampaigns(
             campaignsData.map((campaign: any, index: number) => {
               const status = mapCampaignStatus(campaign.status)
+              const weeks = campaign.delivery_manifest?.weeks || {}
+              const completedWeeks = [1, 2, 3, 4].filter((week) => Number(weeks[String(week)]?.total) > 0 && Number(weeks[String(week)]?.approved) >= Number(weeks[String(week)]?.total))
+              const nextWeek = campaign.generation_status && campaign.generation_status !== 'draft' ? Math.min(4, Math.max(1, (completedWeeks.length ? Math.max(...completedWeeks) + 1 : 1))) : null
               return {
                 id: campaign.id,
                 name: campaign.name || fallbackCampaigns[index % fallbackCampaigns.length].name,
                 type: campaign.strategy_title || '生活內容',
                 timing: formatDashboardDate(campaign.starts_on),
                 image: campaignImages.get(campaign.id) || null,
+                nextWeek: completedWeeks.includes(4) ? null : nextWeek,
                 ...status,
               }
             })
@@ -1366,8 +1419,6 @@ export default function OnboardingHomePage() {
     }
   }, [])
 
-  const displayedCredits = 0
-
   async function refreshReviewNotes() {
     if (!activeWorkspaceId) return
     const response = await fetch(`/api/dashboard-data?workspace_id=${encodeURIComponent(activeWorkspaceId)}`, {
@@ -1376,6 +1427,58 @@ export default function OnboardingHomePage() {
     const payload = await response.json().catch(() => null)
     if (!response.ok) throw new Error(payload?.detail || payload?.error || '未能更新客戶修改紀錄')
     setReviewNotes(Array.isArray(payload?.reviewNotes) ? payload.reviewNotes : [])
+  }
+
+  function openApprovalBoard() {
+    setShowApprovalBoard(true)
+    window.setTimeout(() => document.getElementById('home-approval-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
+
+  function selectCampaignImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setCampaignImage((current) => {
+      if (current?.preview.startsWith('blob:')) URL.revokeObjectURL(current.preview)
+      return { file, preview: URL.createObjectURL(file) }
+    })
+  }
+
+  function startCampaign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!campaignPrompt.trim() && !campaignImage) return
+
+    const prompt = campaignPrompt.trim()
+    const sourceUrl = /^https?:\/\/\S+$/i.test(prompt) ? prompt : ''
+    window.sessionStorage.setItem('soon-product-campaign-draft-v1', JSON.stringify({
+      kind: 'product',
+      name: sourceUrl ? '' : prompt.slice(0, 120),
+      sourceUrl,
+      sellingPoints: '',
+      price: '',
+      targetAudience: '',
+      objective: 'sales',
+      notes: sourceUrl ? '' : prompt,
+      workspaceId: getActiveWorkspaceId(),
+    }))
+
+    if (campaignImage) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          window.sessionStorage.setItem('soon-product-campaign-image-v1', JSON.stringify({
+            dataUrl: reader.result,
+            name: campaignImage.file.name,
+            type: campaignImage.file.type,
+          }))
+        } catch {
+          // Large images can exceed browser storage; the intake page will ask for it again.
+        }
+        router.push('/onboarding/product-campaign?from=assistant')
+      }
+      reader.readAsDataURL(campaignImage.file)
+      return
+    }
+    router.push('/onboarding/product-campaign?from=assistant')
   }
 
   return (
@@ -1388,41 +1491,37 @@ export default function OnboardingHomePage() {
           <div className="home-topbar-left">
             <h1>{dashboardLoading ? '正在載入工作台…' : `歡迎回來，${brandName || '你的工作台'}`}</h1>
           </div>
-          <div className="home-topbar-right">
-            <button
-              className={`credits-badge ${displayedCredits < 50 ? 'warning' : ''}`}
-              disabled
-              type="button"
-            >
-              ✦ {displayedCredits} credits 剩餘（暫時未公開）
-            </button>
-            <button type="button" className="upgrade-button" disabled>
-              暫時未公開
-            </button>
+          <div className="home-social-summary">
+            {connectedSocialAccount ? <button type="button" onClick={() => router.push('/onboarding/insights')}>
+              <span className="social-platform-icon"><PlatformIcon id={(socialSummary?.platform || 'instagram').toLowerCase()} size={18} /></span>
+              <strong>{socialSummary?.platform || 'Instagram'}</strong>
+              {socialSummary?.followers !== null && socialSummary?.followers !== undefined ? <><i>·</i><span>{socialSummary.followers.toLocaleString('en-US')} 粉絲</span></> : null}
+              {socialSummary?.engagementRate !== null && socialSummary?.engagementRate !== undefined ? <><i>·</i><span>{socialSummary.engagementRate}% 互動率</span></> : <><i>·</i><span>查看社交數據</span></>}
+            </button> : <button className="not-connected" type="button" onClick={() => router.push('/onboarding/integrations')}>＋ 連接社交帳戶</button>}
           </div>
         </header>
 
-        <div className={`connect-banner ${connectedSocialAccount ? 'connected' : ''}`}>
-          {dashboardLoading ? (
-            <span>正在載入你的工作台...</span>
-          ) : connectedSocialAccount ? (
-            <>
-              <span>✓ 已連接 {connectedSocialAccount}。SOON 可以在發布權限開通後按排程自動發布。</span>
-              <button type="button" onClick={() => router.push('/onboarding/integrations')}>
-                管理
-              </button>
-            </>
-          ) : (
-            <>
-              <span>⚡ 你的貼文尚未自動發布。連接帳戶後，SOON 可以按排程自動發布。</span>
-              <button type="button" onClick={() => router.push('/onboarding/integrations')}>
-                連接
-              </button>
-            </>
-          )}
+        <section className="growth-launcher" aria-labelledby="growth-launcher-title">
+          <div className="growth-launcher-copy"><div className="soon-logo-crop"><img src="/brand-assets/soon/soon-logo.png" alt="SOON" /></div><span>YOUR MARKETING WORKSPACE</span><h2 id="growth-launcher-title">今日想推廣甚麼？</h2></div>
+          <form className="campaign-command" onSubmit={startCampaign}>
+            {campaignImage ? <div className="campaign-photo-preview"><img src={campaignImage.preview} alt="準備分析的產品" /><span>{campaignImage.file.name}</span><button type="button" aria-label="移除圖片" onClick={() => { URL.revokeObjectURL(campaignImage.preview); setCampaignImage(null) }}>×</button></div> : null}
+            <textarea value={campaignPrompt} onChange={(event) => setCampaignPrompt(event.target.value)} rows={3} placeholder="影張產品相，或者輸入想推廣的產品、服務或網址…" aria-label="告訴 SOON 今日想推廣甚麼" />
+            <div className="campaign-command-actions">
+              <input ref={campaignImageInputRef} type="file" accept="image/*" capture="environment" onChange={selectCampaignImage} />
+              <button className="camera-action" type="button" onClick={() => campaignImageInputRef.current?.click()}><SoonIcon name="image" size={17} />影相／上載</button>
+              <small>{campaignImage ? 'SOON 會先理解圖片，再請你確認資料' : '相片、文字或網址都可以'}</small>
+              <button className="send-action" type="submit" disabled={!campaignPrompt.trim() && !campaignImage} aria-label="開始建立計劃"><SoonIcon name="arrow-right" size={19} /></button>
+            </div>
+          </form>
+        </section>
+
+        <div className="home-quick-actions" aria-label="常用操作">
+          <button type="button" onClick={openApprovalBoard}><span className="quick-icon"><SoonIcon name="check" size={18} /></span><strong>繼續審批內容</strong>{dashboardPosts.length ? <b>{dashboardPosts.length}</b> : null}</button>
+          {dashboardCampaigns.find((campaign) => campaign.nextWeek) ? <button type="button" onClick={() => { const campaign = dashboardCampaigns.find((item) => item.nextWeek); if (campaign) router.push(`/onboarding/product-campaign/${campaign.id}/creatives?week=${campaign.nextWeek}`) }}><span className="quick-icon"><SoonIcon name="arrow-right" size={18} /></span><strong>繼續製作 Week {dashboardCampaigns.find((campaign) => campaign.nextWeek)?.nextWeek}</strong></button> : <button type="button" onClick={() => router.push('/onboarding/product-campaign')}><span className="quick-icon"><SoonIcon name="campaign" size={18} /></span><strong>建立宣傳包</strong></button>}
+          <button type="button" onClick={() => router.push('/onboarding/insights')}><span className="quick-icon"><SoonIcon name="performance" size={18} /></span><strong>最近成效</strong></button>
         </div>
 
-        <div className="home-body">
+        {showApprovalBoard ? <div className="home-body" id="home-approval-board"><button className="close-approval" type="button" onClick={() => setShowApprovalBoard(false)}>收起審批內容 ×</button>
           <section className="home-main">
             {dashboardLoading ? (
               <section className="workspace-loading-panel" aria-live="polite" aria-busy="true">
@@ -1498,7 +1597,7 @@ export default function OnboardingHomePage() {
               </div>
             </section>
           </aside> : null}
-        </div>
+        </div> : null}
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${homeStyles}` }} />
@@ -1519,23 +1618,305 @@ const homeStyles = `
     grid-template-columns: 240px minmax(0, 1fr);
   }
 
+  .dashboard-page .sidebar-credit-card { display: none; }
+
   .home-shell {
     min-width: 0;
-    background: #ffffff;
+    background:
+      linear-gradient(rgba(107,44,48,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(107,44,48,.028) 1px, transparent 1px),
+      var(--soon-ivory);
+    background-size: 48px 48px;
     display: flex;
     flex-direction: column;
   }
 
+  .growth-launcher {
+    width: min(760px, calc(100% - 44px));
+    box-sizing: border-box;
+    margin: clamp(70px, 12vh, 130px) auto 0;
+    border: 0;
+    background: transparent;
+    color: #202126;
+    padding: 0;
+    text-align: center;
+  }
+
+  .soon-logo-crop { position: relative; width: 190px; height: 92px; overflow: hidden; margin: 0 auto 8px; animation: soonLogoFloat 5s ease-in-out infinite; }
+  .soon-logo-crop img { position: absolute; top: -74px; left: -29px; width: 248px; height: 248px; max-width: none; mix-blend-mode: multiply; object-fit: contain; }
+  .growth-launcher-copy>span { display:block; color:var(--soon-oxblood); font-size:.62rem; font-weight:850; letter-spacing:.16em; }
+
+  @keyframes soonLogoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  @keyframes soonBreathe {
+    0%, 100% { opacity: .92; filter: drop-shadow(0 0 0 rgba(213,185,68,0)); }
+    50% { opacity: 1; filter: drop-shadow(0 3px 8px rgba(213,185,68,.16)); }
+  }
+  @keyframes soonSpark {
+    0%, 28%, 100% { opacity: 0; transform: translate(0, 5px) scale(.5); }
+    45% { opacity: 1; transform: translate(5px, -4px) scale(1); }
+    65% { opacity: 0; transform: translate(10px, -11px) scale(.4); }
+  }
+
+  .growth-launcher-copy h2 {
+    margin: 14px 0 25px;
+    font-size: clamp(1.6rem, 3.2vw, 2.72rem);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .soon-logo-crop { animation: none; }
+  }
+
+  .campaign-command {
+    overflow: hidden;
+    border: 1px solid var(--soon-line);
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: var(--soon-shadow-md);
+    text-align: left;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+  .campaign-command:focus-within { border-color: var(--soon-oxblood); box-shadow: var(--soon-shadow-md), var(--soon-focus); }
+  .campaign-command textarea { width: 100%; min-height: 92px; box-sizing: border-box; resize: none; border: 0; background: transparent; color: var(--soon-ink); padding: 20px 22px 8px; font: inherit; font-size: 1rem; line-height: 1.55; outline: none; }
+  .campaign-command textarea::placeholder { color: #92959b; }
+  .campaign-command-actions { display: flex; align-items: center; gap: 10px; padding: 10px 12px 12px; }
+  .campaign-command-actions input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .camera-action { min-height: 39px; display:flex; align-items:center; gap:7px; border: 1px solid var(--soon-line); border-radius: 12px; background: var(--soon-ivory); color: var(--soon-oxblood); padding: 0 13px; font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
+  .campaign-command-actions small { flex: 1; color: #858991; font-size: .7rem; }
+  .send-action { width: 42px; height: 42px; display:grid; place-items:center; border: 0; border-radius: 13px; background: var(--soon-oxblood); color: #fff; font: inherit; font-size: 1.1rem; font-weight: 850; cursor: pointer; box-shadow:4px 4px 0 var(--soon-oxblood-dark); }
+  .send-action:disabled { background: #dedfe2; color: #9a9da3; cursor: default; }
+  .campaign-photo-preview { position: relative; display: grid; grid-template-columns: 58px minmax(0,1fr) auto; align-items: center; gap: 11px; margin: 14px 14px 0; border-radius: 14px; background: #f5f5f6; padding: 8px; }
+  .campaign-photo-preview img { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; }
+  .campaign-photo-preview span { overflow: hidden; color: #555960; font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
+  .campaign-photo-preview button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: #e7e7e9; color: #555960; font: inherit; cursor: pointer; }
+
+  .home-quick-actions { width: min(760px, calc(100% - 44px)); display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin: 18px auto 40px; }
+  .home-quick-actions button { position: relative; min-width: 0; min-height: 68px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--soon-line); border-radius: 15px; background: #fff; color: var(--soon-ink); padding: 12px 14px; font: inherit; cursor: pointer; transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+  .home-quick-actions button:hover { transform: translateY(-2px); border-color: var(--soon-oxblood); box-shadow: var(--soon-shadow-sm); }
+  .home-quick-actions .quick-icon { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #e6d9d1; border-radius: 11px; background: #f2e9e2; color: var(--soon-oxblood); }
+  .home-quick-actions .quick-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .home-quick-actions strong { min-width: 0; font-size: .78rem; text-align: left; }
+  .home-quick-actions b { min-width: 23px; height: 23px; display: grid; place-items: center; margin-left: auto; border-radius: 50%; background: #e5484d; color: #fff; font-size: .64rem; box-shadow: 0 0 0 3px rgba(229,72,77,.12); }
+
+  .growth-launcher-copy p {
+    max-width: 720px;
+    margin: 0;
+    color: #c7c9cf;
+    font-size: 0.94rem;
+    line-height: 1.55;
+  }
+
+  .growth-launcher-actions {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+    gap: 10px;
+    margin-top: 22px;
+  }
+
+  .growth-action {
+    min-width: 0;
+    min-height: 82px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.075);
+    color: #ffffff;
+    padding: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+
+  .growth-action:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .growth-action.primary {
+    border-color: #f6d260;
+    background: #f6d260;
+    color: #202126;
+  }
+
+  .growth-action-icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 1.1rem;
+    font-weight: 800;
+  }
+
+  .growth-action.primary .growth-action-icon {
+    background: rgba(32, 33, 38, 0.1);
+  }
+
+  .growth-action > span:nth-child(2) {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .growth-action strong {
+    font-size: 0.94rem;
+  }
+
+  .growth-action small {
+    overflow: hidden;
+    color: #aeb1b9;
+    font-size: 0.76rem;
+    font-weight: 550;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .growth-action.primary small {
+    color: #5e563e;
+  }
+
+  .growth-action > b {
+    font-size: 1.05rem;
+  }
+
+  .growth-outcome {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .growth-outcome strong {
+    margin-right: 5px;
+    color: #ffffff;
+    font-size: 0.78rem;
+  }
+
+  .growth-outcome span {
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 999px;
+    background: rgba(255,255,255,.07);
+    color: #cfd1d6;
+    padding: 7px 9px;
+    font-size: 0.68rem;
+    white-space: nowrap;
+  }
+
+  .growth-secondary {
+    display: flex;
+    gap: 18px;
+    margin-top: 17px;
+  }
+
+  .growth-secondary button {
+    border: 0;
+    background: transparent;
+    color: #b9bbc2;
+    padding: 0;
+    font: inherit;
+    font-size: 0.74rem;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+
+  .topbar-create {
+    min-height: 36px;
+    border: 0;
+    border-radius: 9px;
+    background: #202126;
+    color: #fff;
+    padding: 0 13px;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .workspace-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(250px, .8fr) minmax(230px, .65fr);
+    gap: 12px;
+    margin: 18px 22px 28px;
+  }
+
+  .overview-card {
+    min-width: 0;
+    border: 1px solid #e0e1e4;
+    border-radius: 17px;
+    background: #fff;
+    padding: 18px;
+  }
+
+  .overview-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 13px;
+  }
+
+  .overview-heading div { display: grid; gap: 3px; }
+  .overview-heading span { color: #8a7323; font-size: .59rem; font-weight: 900; letter-spacing: .13em; }
+  .overview-heading h2 { margin: 0; font-size: 1.05rem; }
+  .overview-heading button { border: 0; background: transparent; color: #70747b; padding: 0; font: inherit; font-size: .68rem; cursor: pointer; }
+
+  .campaign-mini-list { display: grid; gap: 7px; }
+  .campaign-mini-list>button { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; align-items: center; gap: 10px; border: 0; border-radius: 11px; background: #f5f5f6; padding: 8px; text-align: left; cursor: pointer; }
+  .campaign-mini-list i { width: 42px; height: 42px; border-radius: 8px; background: #dedfe2 center/cover; }
+  .campaign-mini-list span { min-width: 0; display: grid; gap: 3px; }
+  .campaign-mini-list strong { overflow: hidden; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+  .campaign-mini-list small { color: #82868d; font-size: .61rem; }
+  .campaign-mini-list em { color: #6d7178; font-size: .61rem; font-style: normal; }
+  .post-mini-list { display: grid; gap: 7px; }
+  .post-mini-list>button { display: grid; grid-template-columns: 50px minmax(0,1fr) auto auto; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 11px; background: #f5f5f6; color: #202126; padding: 8px; text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
+  .post-mini-list>button:hover { border-color: #d8c36e; background: #fffaf0; }
+  .post-mini-list>button:focus-visible { outline: 3px solid rgba(138, 115, 35, .25); outline-offset: 2px; }
+  .post-mini-list i { width: 50px; height: 50px; border-radius: 8px; background: #dedfe2 center/cover; }
+  .post-mini-list span { min-width: 0; display: grid; gap: 4px; }
+  .post-mini-list strong { overflow: hidden; color: #202126; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+  .post-mini-list small { color: #7d8188; font-size: .62rem; }
+  .post-mini-list em { border-radius: 999px; background: #eee; color: #666a71; padding: 5px 7px; font-size: .59rem; font-style: normal; white-space: nowrap; }
+  .post-mini-list>button>b { color: #8a7323; font-size: .65rem; white-space: nowrap; }
+  .overview-empty { display: grid; gap: 4px; border-radius: 11px; background: #f7f7f8; padding: 16px; }
+  .overview-empty strong { font-size: .78rem; }.overview-empty span { color: #7b7f86; font-size: .68rem; }
+
+  .attention-card { display: flex; flex-direction: column; }
+  .attention-row { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 9px; border: 0; border-top: 1px solid #ececef; background: transparent; color: #202126; padding: 12px 0; text-align: left; cursor: pointer; }
+  .attention-row>b { color: #202126; font-size: 1.45rem; }.attention-row span { display: grid; gap: 3px; }.attention-row strong { color: #202126; font-size: .72rem; }.attention-row small { color: #6f737b; font-size: .61rem; }.attention-row em { color: #8a7323; font-style: normal; }.attention-row:disabled { cursor: default; opacity: .68; }
+  .attention-row:focus-visible { outline: 3px solid rgba(138, 115, 35, .25); outline-offset: 2px; }
+  .performance-card>.published-number { display: block; margin-top: 20px; font-size: 2.5rem; line-height: 1; }.performance-card>span { color: #777b83; font-size: .68rem; }.performance-card>p { margin: 18px 0 0; color: #686c73; font-size: .68rem; line-height: 1.45; }
+  .close-approval { grid-column: 1/-1; justify-self: end; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 9px; background: #fff; padding: 8px 11px; font: inherit; font-size: .7rem; font-weight: 750; cursor: pointer; }
+
   .home-topbar {
     min-height: 58px;
-    border-bottom: 1px solid #ebecef;
-    background: #ffffff;
+    border-bottom: 1px solid var(--soon-line);
+    background: rgba(246,242,235,.92);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 18px;
     padding: 0 20px;
   }
+
+  .home-social-summary { margin-left: auto; }
+  .home-social-summary button { min-height: 38px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--soon-line); border-radius: 999px; background: #fff; color: var(--soon-ink); padding: 0 14px; font: inherit; font-size: .74rem; cursor: pointer; }
+  .home-social-summary button:hover { border-color: var(--soon-oxblood); background: #fff; }
+  .home-social-summary strong { font-size: .76rem; }
+  .home-social-summary i { color: #a0a3aa; font-style: normal; }
+  .home-social-summary .social-platform-icon { display:grid; place-items:center; color: var(--soon-oxblood); }
+  .home-social-summary .not-connected { color: #696d75; }
 
   .home-topbar-left h1 {
     margin: 0;
@@ -3146,6 +3527,14 @@ const homeStyles = `
   }
 
   @media (max-width: 980px) {
+    .growth-launcher-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .growth-outcome { justify-content: flex-start; flex-wrap: wrap; }
+    .workspace-overview { grid-template-columns: 1fr 1fr; }
+    .continue-card { grid-column: 1 / -1; }
+
     .dashboard-page {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -3235,11 +3624,28 @@ const homeStyles = `
       padding: 14px 16px;
     }
 
+    .growth-launcher { width: calc(100% - 24px); margin: 48px 12px 0; padding: 0; }
+    .growth-launcher-copy h2 { margin-top: 22px; font-size: 1.48rem; }
+    .soon-logo-crop { width: 124px; height: 60px; }
+    .soon-logo-crop img { top: -56px; left: -25px; width: 170px; height: 170px; }
+    .growth-outcome strong { width: 100%; }
+    .growth-secondary { flex-direction: column; gap: 11px; }
+    .workspace-overview { grid-template-columns: 1fr; margin: 12px 12px 24px; }
+    .home-quick-actions { width: calc(100% - 24px); grid-template-columns: 1fr; margin: 12px 12px 26px; }
+    .campaign-command-actions small { display: none; }
+    .continue-card { grid-column: auto; }
+    .post-mini-list>button { grid-template-columns: 46px minmax(0,1fr) auto; }
+    .post-mini-list>button>b { grid-column: 2 / -1; }
+
     .home-topbar-left,
     .home-topbar-right {
       width: 100%;
       min-width: 0;
     }
+
+    .home-social-summary { width: 100%; margin-left: 0; }
+    .home-social-summary button { width: 100%; justify-content: center; overflow: hidden; }
+    .home-social-summary button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .home-topbar-left h1 {
       font-size: 17px;
@@ -3271,6 +3677,20 @@ const homeStyles = `
 
     .connect-banner button {
       flex: 0 0 auto;
+    }
+
+    .growth-launcher {
+      width: calc(100% - 24px);
+      margin: 48px 12px 0;
+      padding: 0;
+    }
+
+    .growth-launcher-actions {
+      margin-top: 18px;
+    }
+
+    .growth-action {
+      min-height: 76px;
     }
 
     .home-body {
