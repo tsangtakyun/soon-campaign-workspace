@@ -24,6 +24,14 @@ type Draft = {
 
 type Asset = { id: string; url: string; width?: number; height?: number };
 
+const templateThemes: Record<string, { background: string; ink: string; accent: string; label: string }> = {
+  "editorial-clear": { background: "#f6f2eb", ink: "#6b2c30", accent: "#c7e63a", label: "重點整理" },
+  "product-focus": { background: "#ffffff", ink: "#202126", accent: "#d9bbb5", label: "產品重點" },
+  "problem-solution": { background: "#fff4cf", ink: "#202126", accent: "#b46a61", label: "問題與解決方案" },
+  "creator-natural": { background: "#efe8df", ink: "#4d2023", accent: "#8ca67a", label: "日常分享" },
+  "bold-social": { background: "#202126", ink: "#ffffff", accent: "#f6d260", label: "你需要知道" },
+};
+
 const box = (style: React.CSSProperties, children: React.ReactNode) =>
   React.createElement(
     "div",
@@ -87,6 +95,7 @@ async function renderPage(
   index: number,
   fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string },
   branding: { logoUrl?: string | null; name: string },
+  theme: { background: string; ink: string; accent: string; label: string },
 ) {
   const cover = draft.layout === "cover" || index === 0;
   const body = Array.isArray(draft.body) ? draft.body : [];
@@ -173,7 +182,7 @@ async function renderPage(
                 marginBottom: 20,
               },
             },
-            "生活常識 × 科學解說",
+            theme.label,
           ),
           React.createElement(
             "div",
@@ -216,8 +225,8 @@ async function renderPage(
           display: "flex",
           flexDirection: "column",
           padding: "58px 64px 48px",
-          background: "#f8f6f0",
-          color: "#171717",
+          background: theme.background,
+          color: theme.ink,
         },
         [
           React.createElement(
@@ -227,11 +236,12 @@ async function renderPage(
               style: {
                 display: "flex",
                 fontSize: 23,
-                color: "#777",
+                color: theme.ink,
+                opacity: 0.68,
                 marginBottom: 18,
               },
             },
-            "生活常識 × 科學解說",
+            theme.label,
           ),
           React.createElement(
             "div",
@@ -253,7 +263,7 @@ async function renderPage(
               display: "flex",
               width: 90,
               height: 5,
-              background: "#111",
+              background: theme.accent,
               marginBottom: 27,
             },
           }),
@@ -309,7 +319,7 @@ async function renderPage(
         fontFamily: fonts.family,
         position: "relative",
         overflow: "hidden",
-        background: "#f8f6f0",
+        background: theme.background,
       },
       cover ? [image, content] : content,
     ),
@@ -347,7 +357,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { data: project, error } = await access.admin
       .from("content_projects")
-      .select("id,production")
+      .select("id,production,format_decision")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -375,6 +385,10 @@ export async function POST(req: Request) {
       logoUrl: workspace?.logo_url || fallbackLogoUrl,
       name: workspaceName,
     };
+    const templateCode = typeof project.format_decision?.templateCode === "string"
+      ? project.format_decision.templateCode
+      : "editorial-clear";
+    const theme = templateThemes[templateCode] || templateThemes["editorial-clear"];
     const productionStatus = project.production?.productionStatus;
     if (
       productionStatus !== "drafts_confirmed" &&
@@ -417,6 +431,7 @@ export async function POST(req: Request) {
         index,
         fonts,
         branding,
+        theme,
       );
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;

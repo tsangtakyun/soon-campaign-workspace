@@ -75,11 +75,12 @@ type Permissions = {
   role: string;
 };
 
-type StudioStep = "brief" | "format" | "structure" | "assets" | "drafts" | "carousel";
+type StudioStep = "brief" | "format" | "style" | "structure" | "assets" | "drafts" | "carousel";
 
 const studioSteps: { id: StudioStep; label: string }[] = [
   { id: "brief", label: "Brief" },
   { id: "format", label: "格式" },
+  { id: "style", label: "風格" },
   { id: "structure", label: "故事結構" },
   { id: "assets", label: "圖片素材" },
   { id: "drafts", label: "逐頁草稿" },
@@ -108,6 +109,16 @@ const videoMethods = [
     label: "AI 生成影片",
     note: "建立影片畫面及生成指示，稍後接駁 fal.ai",
   },
+];
+
+type StyleTemplate = { code: string; version: number; name: string; note: string; formats: string[]; tone: string; palette: [string, string, string] };
+
+const styleTemplates: StyleTemplate[] = [
+  { code: "editorial-clear", version: 1, name: "清晰雜誌風", note: "大標題、留白及清楚的資訊層次", formats: ["carousel", "single_image"], tone: "專業・易讀", palette: ["#f6f2eb", "#6b2c30", "#c7e63a"] },
+  { code: "product-focus", version: 1, name: "產品主角", note: "突出產品、功能及一個主要賣點", formats: ["carousel", "single_image", "short_video"], tone: "直接・商業", palette: ["#ffffff", "#202126", "#d9bbb5"] },
+  { code: "problem-solution", version: 1, name: "問題與解決方案", note: "先呈現痛點，再逐步交代解決方法", formats: ["carousel", "short_video"], tone: "實用・有說服力", palette: ["#fff4cf", "#202126", "#b46a61"] },
+  { code: "creator-natural", version: 1, name: "Creator 日常感", note: "自然生活場景、第一身分享及真實語氣", formats: ["single_image", "short_video"], tone: "親切・自然", palette: ["#efe8df", "#4d2023", "#8ca67a"] },
+  { code: "bold-social", version: 1, name: "社交媒體重點式", note: "強烈開場、短句及高辨識度畫面", formats: ["carousel", "single_image", "short_video"], tone: "鮮明・有節奏", palette: ["#202126", "#f6d260", "#ffffff"] },
 ];
 
 const stageLabels: Record<Project["stage"], string> = {
@@ -165,6 +176,7 @@ export default function ContentStudioPage() {
   const [selectedFormat, setSelectedFormat] = useState("");
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
   const [videoMethod, setVideoMethod] = useState("human_filming");
+  const [selectedStyleCode, setSelectedStyleCode] = useState("");
   const [promptOpen, setPromptOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editingDraft, setEditingDraft] = useState<number | null>(null);
@@ -223,6 +235,7 @@ export default function ContentStudioPage() {
     if (project.stage === "brief") return "brief";
     if (project.stage === "format") return "format";
     const production = project.production;
+    if (!production?.status && typeof project.format_decision?.templateCode !== "string") return "style";
     if (!production?.status || production.status === "structure_ready") return "structure";
     if (production.status !== "structure_confirmed") return "structure";
     if (project.selected_format === "short_video") {
@@ -343,6 +356,11 @@ export default function ContentStudioPage() {
       selected.format_decision?.videoMethod === "ai_video_generation"
         ? "ai_video_generation"
         : "human_filming",
+    );
+    setSelectedStyleCode(
+      typeof selected.format_decision?.templateCode === "string"
+        ? selected.format_decision.templateCode
+        : "",
     );
     const requested = new URLSearchParams(window.location.search).get("step") as StudioStep | null;
     const latest = latestAvailableStep(selected);
@@ -1196,7 +1214,11 @@ export default function ContentStudioPage() {
                           className={
                             selectedFormat === format.id ? "active" : ""
                           }
-                          onClick={() => setSelectedFormat(format.id)}
+                          onClick={() => {
+                            setSelectedFormat(format.id);
+                            const recommended = styleTemplates.find((template) => template.formats.includes(format.id));
+                            setSelectedStyleCode(recommended?.code || "");
+                          }}
                         >
                           <i aria-hidden="true">{format.icon}</i>
                           <span><strong>{format.label}</strong><small>{format.note}</small></span>
@@ -1254,13 +1276,61 @@ export default function ContentStudioPage() {
                               selectedFormat,
                               stage: "production",
                             },
-                            "格式已確認，進入製作",
-                            "structure",
+                            "格式已確認，請選擇內容風格",
+                            "style",
                           )
                         }
                       >
                         確認格式 →
                       </button>
+                    </div>
+                  </div>
+                ) : activeStep === "style" ? (
+                  <div className="editor-card">
+                    <div className="section-title">
+                      <div>
+                        <span>STEP 3</span>
+                        <h3>選擇內容風格</h3>
+                      </div>
+                      <em>SOON 已按內容格式篩選合適款式</em>
+                    </div>
+                    <div className="style-intro">
+                      <div><b>建議選擇第一款</b><span>你可以改選；SOON 會保存今次決定，逐步了解品牌偏好。</span></div>
+                      <small>Template Library v1・由 SOON Creator 管理</small>
+                    </div>
+                    <div className="style-template-grid">
+                      {styleTemplates.filter((template) => template.formats.includes(selected.selected_format || selectedFormat)).map((template, index) => (
+                        <button key={template.code} type="button" className={selectedStyleCode === template.code ? "active" : ""} onClick={() => setSelectedStyleCode(template.code)}>
+                          <div className="template-preview" style={{ background: template.palette[0], color: template.palette[1] }}>
+                            <i style={{ background: template.palette[2] }} />
+                            <strong>Aa</strong>
+                            <span><b /><b /></span>
+                          </div>
+                          <div className="template-copy">
+                            <span>{index === 0 ? "SOON 建議" : template.tone}</span>
+                            <strong>{template.name}</strong>
+                            <small>{template.note}</small>
+                            <em>v{template.version}</em>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="actions">
+                      <button className="secondary" type="button" onClick={() => goToStep("format")}>← 修改格式</button>
+                      <button type="button" disabled={saving || !selectedStyleCode} onClick={() => {
+                        const template = styleTemplates.find((item) => item.code === selectedStyleCode);
+                        void saveProject({
+                          formatDecision: {
+                            ...(selected.format_decision || {}),
+                            templateCode: selectedStyleCode,
+                            templateVersion: template?.version || 1,
+                            templateSource: "soon_creator_v1",
+                            templateName: template?.name || selectedStyleCode,
+                            templateTone: template?.tone || "",
+                            templateSelectedAt: new Date().toISOString(),
+                          },
+                        }, "內容風格已儲存，下一步建立內容結構", "structure");
+                      }}>{saving ? "儲存中…" : "使用這個風格 →"}</button>
                     </div>
                   </div>
                 ) : (
@@ -2359,4 +2429,5 @@ const editingStyles = `
   .format-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.format-settings,.video-methods{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:16px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:17px}.format-settings>div:first-child,.video-methods>div:first-child{display:grid;gap:4px}.format-settings small,.video-methods small{color:var(--soon-muted);font-size:11px}.quantity-control{display:flex;align-items:center;gap:12px}.quantity-control button{width:38px;height:38px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:19px;cursor:pointer}.quantity-control button:disabled{opacity:.35}.quantity-control b{min-width:44px;text-align:center}.video-methods{align-items:flex-start;flex-direction:column}.video-methods>div:last-child{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.video-methods>div:last-child button{display:grid;gap:5px;border:1px solid var(--soon-line);border-radius:11px;background:#fff;color:var(--soon-ink);padding:14px;text-align:left;cursor:pointer}.video-methods>div:last-child button.active{border-color:var(--soon-oxblood);box-shadow:inset 0 0 0 1px var(--soon-oxblood)}.video-methods button span{color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.format-settings{align-items:flex-start;flex-direction:column}.video-methods>div:last-child{grid-template-columns:1fr}}
   .video-package-ready{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border:1px solid #d9e5b5;border-radius:14px;background:#f3f8e3;padding:18px}.video-package-ready>div{display:grid;gap:6px}.video-package-ready small{color:var(--soon-oxblood);font-size:10px;font-weight:850;letter-spacing:.08em}.video-package-ready h4{margin:0;font-size:18px}.video-package-ready p{margin:0;color:var(--soon-muted);font-size:11px}.video-package-ready ul{margin:4px 0 0;padding-left:18px;color:#565b62;font-size:11px;line-height:1.55}.video-package-ready>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.video-package-ready>span{color:#397552;font-size:11px;font-weight:800}@media(max-width:700px){.video-package-ready{flex-direction:column}.video-package-ready>button{width:100%}}
   .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
+  .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span,.style-intro small{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>button{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>button:hover{transform:translateY(-2px)}.style-template-grid>button.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:118px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:16px;overflow:hidden}.template-preview>i{position:absolute;width:76px;height:76px;right:-15px;top:-17px;border-radius:50%}.template-preview>strong{position:relative;font-size:28px;letter-spacing:-.06em}.template-preview>span{position:relative;display:grid;gap:5px}.template-preview>span b{display:block;width:78%;height:5px;border-radius:9px;background:currentColor;opacity:.7}.template-preview>span b:last-child{width:48%;opacity:.35}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}.template-copy>em{color:#999;font-size:8px;font-style:normal}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
 `;

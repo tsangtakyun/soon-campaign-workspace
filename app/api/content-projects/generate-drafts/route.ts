@@ -113,6 +113,7 @@ export async function POST(req: Request) {
       "\n【Production Prompt】\n" + prompt.production_prompt,
       "\n【Project】\n" + project.title,
       "Brief：" + JSON.stringify(project.brief || {}),
+      "已選內容風格：" + JSON.stringify(project.format_decision || {}),
       "已確認故事結構：" + JSON.stringify(pages),
       isVideo ? "參考圖片素材：" + JSON.stringify(assets) : "圖片素材（必須用 asset id 引用）：" + JSON.stringify(assets),
       "鏡頭／頁數及次序必須與已確認結構一致。使用繁體中文書面語，不要新增未經核實的事實。",
