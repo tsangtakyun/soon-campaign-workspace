@@ -46,7 +46,7 @@ export default function ContentReviewPage() {
   const changesTotal = queue.reduce((sum, item) => sum + item.changes, 0)
 
   return <main className="content-review-page"><DashboardSidebar activeItem="內容審批"/><section className="content-review-shell">
-    <header><small>內容審批</small><h1>{pendingTotal ? `${pendingTotal} 項內容等待你確認` : changesTotal ? `${changesTotal} 項內容正在修改` : '審批已完成'}</h1><p>按宣傳活動及星期整理；你的決定會自動保存。</p></header>
+    <header><small>內容審批</small><h1>{loading ? '正在整理待審批內容' : pendingTotal ? `${pendingTotal} 項內容等待你確認` : changesTotal ? `${changesTotal} 項內容正在修改` : '審批已完成'}</h1><p>按宣傳活動及星期整理；你的決定會自動保存。</p></header>
     {loading ? <div className="review-state"><i/><strong>正在整理待審批內容…</strong></div> : error ? <div className="review-state"><strong>{error}</strong><button onClick={() => void load()} type="button">重新載入</button></div> : !queue.length ? <div className="review-empty"><span><SoonIcon name="check" size={28}/></span><h2>目前沒有待審批內容</h2><p>新素材完成後，會自動出現在這裡。</p><button onClick={() => router.push('/onboarding/campaign-centre')} type="button">查看所有宣傳包</button></div> : <section className="review-queue">{queue.map(({ campaign, week, pending, changes }) => <article key={`${campaign.id}-${week}`}>
       <div className="review-campaign">{campaign.imageUrl ? <img src={campaign.imageUrl} alt=""/> : <span><SoonIcon name="campaign" size={22}/></span>}<div><small>WEEK {week}</small><h2>{nameOf(campaign)}</h2><p>{pending ? `${pending} 項待審批` : ''}{pending && changes ? ' · ' : ''}{changes ? `${changes} 項正在修改` : ''}</p></div></div>
       <div className="review-counts">{pending ? <span className="pending"><i/>{pending} 待審批</span> : null}{changes ? <span><SoonIcon name="edit" size={14}/>{changes} 修改中</span> : null}</div>
