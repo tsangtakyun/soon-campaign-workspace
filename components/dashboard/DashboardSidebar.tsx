@@ -42,6 +42,18 @@ type DashboardSidebarProps = {
 
 const BECHILL_LOGO_URL = '/brand-assets/bechilltogether/bunchill-logo.png'
 const EGG_SOON_LOGO_URL = '/brand-assets/eggsoon/soon-egg.png'
+const PENDING_APPROVAL_CACHE_PREFIX = 'soon-pending-approval-count:'
+
+function readCachedPendingApproval(workspaceId?: string | null) {
+  if (typeof window === 'undefined' || !workspaceId) return 0
+  const value = Number(window.localStorage.getItem(`${PENDING_APPROVAL_CACHE_PREFIX}${workspaceId}`))
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+}
+
+function cachePendingApproval(workspaceId: string, count: number) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(`${PENDING_APPROVAL_CACHE_PREFIX}${workspaceId}`, String(Math.max(0, Math.floor(count))))
+}
 
 export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
   const router = useRouter()
@@ -56,7 +68,9 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     if (!cachedWorkspace) return
 
     setWorkspaces([cachedWorkspace])
-    setActiveWorkspaceIdState(getActiveWorkspaceId() || cachedWorkspace.id)
+    const cachedWorkspaceId = getActiveWorkspaceId() || cachedWorkspace.id
+    setActiveWorkspaceIdState(cachedWorkspaceId)
+    setPendingApprovalCount(readCachedPendingApproval(cachedWorkspaceId))
   }, [])
 
   const activeWorkspace =
@@ -76,7 +90,11 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     try {
       const response = await fetch(`/api/product-campaigns?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: 'no-store' })
       const payload = await response.json().catch(() => null)
-      if (response.ok) setPendingApprovalCount(Number(payload?.pendingApproval) || 0)
+      if (response.ok) {
+        const count = Number(payload?.pendingApproval) || 0
+        setPendingApprovalCount(count)
+        cachePendingApproval(workspaceId, count)
+      }
     } catch {
       // Keep navigation available when campaign summaries are temporarily unavailable.
     }
@@ -160,7 +178,7 @@ export function DashboardSidebar({ activeItem }: DashboardSidebarProps) {
     const nextWorkspace = workspaces.find((workspace) => workspace.id === workspaceId)
     if (nextWorkspace) cacheActiveWorkspace(nextWorkspace)
     setActiveWorkspaceIdState(workspaceId)
-    setPendingApprovalCount(0)
+    setPendingApprovalCount(readCachedPendingApproval(workspaceId))
     void refreshPendingApproval(workspaceId)
     setWorkspaceMenuOpen(false)
     router.refresh()
