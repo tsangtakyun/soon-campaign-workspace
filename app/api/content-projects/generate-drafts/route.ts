@@ -50,17 +50,18 @@ export async function POST(req: Request) {
 
     const { data: project, error } = await access.admin
       .from("content_projects")
-      .select("id,title,brief,production,prompt_version_id")
+      .select("id,title,brief,production,prompt_version_id,selected_format,format_decision")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
     if (error) throw error;
+    const isVideo = project.selected_format === "short_video";
     if (
       project.production?.status !== "structure_confirmed" ||
-      project.production?.assetStatus !== "confirmed"
+      (!isVideo && project.production?.assetStatus !== "confirmed")
     ) {
       return NextResponse.json(
-        { error: "請先確認故事結構及圖片素材" },
+        { error: isVideo ? "請先確認短片結構" : "請先確認故事結構及圖片素材" },
         { status: 400 },
       );
     }
@@ -85,17 +86,36 @@ export async function POST(req: Request) {
 
     const pages = project.production.pages || [];
     const assets = project.production.assets || [];
+    const videoMethod = project.format_decision?.videoMethod === "ai_video_generation"
+      ? "ai_video_generation"
+      : "human_filming";
+    const outputInstruction = isVideo
+      ? videoMethod === "ai_video_generation"
+        ? [
+            "你正在建立 AI 短片生成計劃。不要聲稱影片已經生成。",
+            "輸出開場句、片長、連續鏡頭、畫面生成提示、旁白／字幕及貼文文案。",
+            '只輸出 JSON：{"captionDraft":"社交媒體貼文文案","hook":"首三秒開場句","durationSeconds":20,"pages":[{"page":"S.1","headline":"鏡頭名稱","subheadline":"秒數","body":["旁白或字幕"],"assetId":"","layout":"ai_scene","designDirection":"可供 AI 影片模型使用的具體畫面、動作及鏡頭指示"}]}',
+          ]
+        : [
+            "你正在建立真人拍攝短片製作包。內容必須以一般品牌團隊可執行的方式撰寫。",
+            "輸出開場句、片長、逐鏡腳本、人物動作、對白／旁白、拍攝清單及貼文文案。",
+            '只輸出 JSON：{"captionDraft":"社交媒體貼文文案","hook":"首三秒開場句","durationSeconds":20,"shotList":["需要準備的拍攝項目"],"pages":[{"page":"S.1","headline":"鏡頭名稱","subheadline":"秒數","body":["對白、旁白或字幕"],"assetId":"","layout":"human_scene","designDirection":"人物動作、場景及實際拍攝方法"}]}',
+          ]
+      : [
+          project.selected_format === "single_image"
+            ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
+            : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
+          "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
+          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"已提供素材 id 或空字串","layout":"cover|editorial_article","designDirection":"具體排版方向"}]}',
+        ];
     const input = [
-      "你正在執行 IG Carousel 圖片生成前的逐頁製作草稿階段。不要生成圖片。",
-      "嚴格遵從 Workspace Production Prompt，但今次只輸出每頁最終文案、圖片配對及 layout direction。",
+      ...outputInstruction,
       "\n【Production Prompt】\n" + prompt.production_prompt,
       "\n【Project】\n" + project.title,
       "Brief：" + JSON.stringify(project.brief || {}),
       "已確認故事結構：" + JSON.stringify(pages),
-      "圖片素材（必須用 asset id 引用）：" + JSON.stringify(assets),
-      "\n只輸出 JSON：",
-      '{"captionDraft":"IG caption","pages":[{"page":"P.1","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"已提供素材 id 或空字串","layout":"cover|editorial_article","designDirection":"具體排版方向"}]}',
-      "頁數及頁碼必須與已確認故事結構完全一致。中文不用句號。不要新增未經核實的事實。",
+      isVideo ? "參考圖片素材：" + JSON.stringify(assets) : "圖片素材（必須用 asset id 引用）：" + JSON.stringify(assets),
+      "鏡頭／頁數及次序必須與已確認結構一致。使用繁體中文書面語，不要新增未經核實的事實。",
     ].join("\n");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -126,6 +146,14 @@ export async function POST(req: Request) {
       ...project.production,
       pageDrafts: drafts.pages || [],
       captionDraft: drafts.captionDraft || "",
+      ...(isVideo ? {
+        videoPlan: {
+          method: videoMethod,
+          hook: drafts.hook || "",
+          durationSeconds: Number(drafts.durationSeconds) || 20,
+          shotList: Array.isArray(drafts.shotList) ? drafts.shotList : [],
+        },
+      } : {}),
       productionStatus: "drafts_ready",
       draftsGeneratedAt: new Date().toISOString(),
     };

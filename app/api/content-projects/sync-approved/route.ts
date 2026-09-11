@@ -28,7 +28,8 @@ export async function POST(req: Request) {
     if (projectsError) throw projectsError
 
     const approvedProjects = (projects || []).filter((project: any) =>
-      project?.production?.approvalStatus === 'approved',
+      project?.production?.approvalStatus === 'approved' &&
+      !(project.selected_format === 'short_video' && project?.production?.productionStatus === 'package_ready'),
     )
     if (!approvedProjects.length) {
       return NextResponse.json({ created: 0, success: true })

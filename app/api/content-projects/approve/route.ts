@@ -73,9 +73,11 @@ export async function POST(req: Request) {
         ? jobOutput.assets.map((asset: Record<string, unknown>, index: number) => ({ page: `P.${index + 1}`, url: typeof asset.url === 'string' ? asset.url : '' })).filter((asset: { url: string }) => asset.url)
         : typeof jobOutput.asset?.url === 'string' ? [{ page: 'P.1', url: jobOutput.asset.url }] : []
       const savedAssets = jobAssets.length ? jobAssets : assets
-      if (!savedAssets.length || generationJob?.status !== 'completed') return NextResponse.json({ error: '素材尚未完成，不能批准' }, { status: 409 })
-      const sourceKey = project.campaign_id ? `campaign-creative-${projectId}` : `content-project-${projectId}`
-      const postValues = {
+      const isVideoProductionPackage = project.selected_format === 'short_video' && production.productionStatus === 'package_ready'
+      if ((!savedAssets.length || generationJob?.status !== 'completed') && !isVideoProductionPackage) return NextResponse.json({ error: '素材尚未完成，不能批准' }, { status: 409 })
+      if (!isVideoProductionPackage) {
+        const sourceKey = project.campaign_id ? `campaign-creative-${projectId}` : `content-project-${projectId}`
+        const postValues = {
         user_id: project.created_by || user.id,
         workspace_id: workspaceId,
         campaign_id: project.campaign_id || null,
@@ -91,20 +93,21 @@ export async function POST(req: Request) {
         status: 'approved',
         approved_at: now,
         updated_at: now,
+        }
+
+        const { data: existingPost, error: existingPostError } = await access.admin
+          .from('campaign_posts')
+          .select('id')
+          .eq('workspace_id', workspaceId)
+          .eq('source_key', sourceKey)
+          .maybeSingle()
+        if (existingPostError) throw existingPostError
+
+        const postResult = existingPost?.id
+          ? await access.admin.from('campaign_posts').update(postValues).eq('id', existingPost.id)
+          : await access.admin.from('campaign_posts').insert(postValues)
+        if (postResult.error) throw postResult.error
       }
-
-      const { data: existingPost, error: existingPostError } = await access.admin
-        .from('campaign_posts')
-        .select('id')
-        .eq('workspace_id', workspaceId)
-        .eq('source_key', sourceKey)
-        .maybeSingle()
-      if (existingPostError) throw existingPostError
-
-      const postResult = existingPost?.id
-        ? await access.admin.from('campaign_posts').update(postValues).eq('id', existingPost.id)
-        : await access.admin.from('campaign_posts').insert(postValues)
-      if (postResult.error) throw postResult.error
     } else {
       const { error: withdrawError } = await access.admin
         .from('campaign_posts')

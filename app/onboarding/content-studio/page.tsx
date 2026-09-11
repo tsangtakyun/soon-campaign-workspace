@@ -196,10 +196,28 @@ export default function ContentStudioPage() {
       null,
     [projects, selectedId],
   );
+  const visibleStudioSteps = useMemo(
+    () => selected?.selected_format === "short_video"
+      ? studioSteps.filter((step) => step.id !== "assets")
+      : studioSteps,
+    [selected?.selected_format],
+  );
   const angleOptions = useMemo(
     () => workspaceAngleOptions(workspace),
     [workspace],
   );
+
+  function stepLabel(step: StudioStep) {
+    if (step === "structure" && selected?.selected_format === "short_video") return "短片結構";
+    if (step === "assets" && selected?.selected_format === "single_image") return "圖片素材";
+    if (step === "drafts" && selected?.selected_format === "short_video") return "製作草稿";
+    if (step === "carousel") {
+      if (selected?.selected_format === "short_video") return "製作包";
+      if (selected?.selected_format === "single_image") return "單張貼文";
+      return "輪播圖片";
+    }
+    return studioSteps.find((item) => item.id === step)?.label || step;
+  }
 
   function latestAvailableStep(project: Project): StudioStep {
     if (project.stage === "brief") return "brief";
@@ -207,6 +225,10 @@ export default function ContentStudioPage() {
     const production = project.production;
     if (!production?.status || production.status === "structure_ready") return "structure";
     if (production.status !== "structure_confirmed") return "structure";
+    if (project.selected_format === "short_video") {
+      if (!production.productionStatus) return "drafts";
+      return production.productionStatus === "drafts_ready" ? "drafts" : "carousel";
+    }
     if (production.assetStatus !== "confirmed" || !production.productionStatus) return "assets";
     if (production.productionStatus === "drafts_ready") return "drafts";
     return "carousel";
@@ -469,11 +491,14 @@ export default function ContentStudioPage() {
         production: {
           ...selected.production,
           status: "structure_confirmed",
+          ...(selected.selected_format === "short_video" ? { assetStatus: "not_required" } : {}),
           confirmedAt: new Date().toISOString(),
         },
       },
-      "故事結構已確認，下一步可以接駁全套圖片生成",
-      "assets",
+      selected.selected_format === "short_video"
+        ? "短片結構已確認，下一步建立製作包"
+        : "故事結構已確認，下一步可以準備圖片素材",
+      selected.selected_format === "short_video" ? "drafts" : "assets",
     );
   }
 
@@ -888,16 +913,32 @@ export default function ContentStudioPage() {
       setMessage("請先儲存正在編輯的頁面");
       return;
     }
+    const isVideo = selected.selected_format === "short_video";
     await saveProject(
       {
         production: {
           ...selected.production,
-          productionStatus: "drafts_confirmed",
+          productionStatus: isVideo ? "package_ready" : "drafts_confirmed",
           draftsConfirmedAt: new Date().toISOString(),
         },
       },
-      "逐頁文案及版面草稿已確認，已進入全套圖片生成階段",
+      isVideo ? "短片製作包已確認，可以提交審批" : "內容草稿已確認，已進入圖片生成階段",
       "carousel",
+    );
+  }
+
+  async function submitVideoPackage() {
+    if (!selected?.production) return;
+    await saveProject(
+      {
+        stage: "approval",
+        production: {
+          ...selected.production,
+          approvalStatus: "pending",
+          submittedForApprovalAt: new Date().toISOString(),
+        },
+      },
+      "短片製作包已提交審批",
     );
   }
 
@@ -1053,8 +1094,8 @@ export default function ContentStudioPage() {
                 </div>
 
                 <nav className="studio-step-nav" aria-label="內容製作步驟">
-                  {studioSteps.map((step, index) => {
-                    const latestIndex = studioSteps.findIndex(
+                  {visibleStudioSteps.map((step, index) => {
+                    const latestIndex = visibleStudioSteps.findIndex(
                       (item) => item.id === latestAvailableStep(selected),
                     );
                     const disabled = index > latestIndex;
@@ -1067,7 +1108,7 @@ export default function ContentStudioPage() {
                         onClick={() => goToStep(step.id)}
                       >
                         <span>{index < latestIndex ? "✓" : index + 1}</span>
-                        {step.label}
+                        {stepLabel(step.id)}
                       </button>
                     );
                   })}
@@ -1227,7 +1268,7 @@ export default function ContentStudioPage() {
                     <div className="section-title">
                       <div>
                         <span>STEP {studioSteps.findIndex((step) => step.id === activeStep) + 1}</span>
-                        <h3>{studioSteps.find((step) => step.id === activeStep)?.label}</h3>
+                        <h3>{stepLabel(activeStep)}</h3>
                       </div>
                       <em>按 Project 鎖定嘅 Workspace Prompt 執行</em>
                     </div>
@@ -1398,6 +1439,16 @@ export default function ContentStudioPage() {
                         {selected.production.status ===
                         "structure_confirmed" ? (
                           <>
+                            {selected.selected_format === "short_video" && !selected.production.productionStatus ? (
+                              <div className="video-draft-start">
+                                <div>
+                                  <small>{selected.format_decision?.videoMethod === "ai_video_generation" ? "AI 生成影片" : "真人拍攝"}</small>
+                                  <b>{selected.format_decision?.videoMethod === "ai_video_generation" ? "建立影片生成計劃" : "建立完整拍攝製作包"}</b>
+                                  <p>{selected.format_decision?.videoMethod === "ai_video_generation" ? "SOON 會整理開場句、逐鏡畫面、旁白及影片生成指示。" : "SOON 會整理開場句、逐鏡腳本、人物動作、拍攝清單及貼文文案。"}</p>
+                                </div>
+                                <button type="button" disabled={saving} onClick={() => void generatePageDrafts()}>{saving ? "正在製作…" : "開始建立 →"}</button>
+                              </div>
+                            ) : null}
                             <div className="next-production">
                               <div className="asset-upload-head">
                                 <div>
@@ -1604,13 +1655,14 @@ export default function ContentStudioPage() {
                               selected.production.productionStatus ===
                                 "drafts_confirmed" ||
                               selected.production.productionStatus ===
+                                "package_ready" ||
+                              selected.production.productionStatus ===
                                 "images_ready") &&
                             Array.isArray(selected.production.pageDrafts) ? (
                               <div className="page-drafts">
                                 <div className="page-drafts-heading">
-                                  <h4>逐頁文案及版面草稿</h4>
-                                  {selected.production.productionStatus ===
-                                  "drafts_confirmed" ? (
+                                  <h4>{selected.selected_format === "short_video" ? "逐鏡短片製作草稿" : selected.selected_format === "single_image" ? "單張貼文草稿" : "逐頁文案及版面草稿"}</h4>
+                                  {selected.production.productionStatus === "drafts_confirmed" || selected.production.productionStatus === "package_ready" ? (
                                     <span className="confirmed-pill">
                                       已確認
                                     </span>
@@ -1634,7 +1686,7 @@ export default function ContentStudioPage() {
                                           <img src={asset.url} alt="" />
                                         ) : (
                                           <div className="draft-no-image">
-                                            未指定圖片
+                                            {selected.selected_format === "short_video" ? "鏡頭" : "未指定圖片"}
                                           </div>
                                         )}
                                         <div>
@@ -1840,10 +1892,16 @@ export default function ContentStudioPage() {
                                   <div className="draft-confirm-step">
                                     <div>
                                       <b>
-                                        草稿確認後，下一步生成全套 Carousel 圖
+                                        {selected.selected_format === "short_video"
+                                          ? "確認短片製作包"
+                                          : selected.selected_format === "single_image"
+                                            ? "確認後生成單張貼文"
+                                            : "確認後生成全套輪播圖片"}
                                       </b>
                                       <p>
-                                        請先檢查每頁文案、圖片配對及版面指示；確認後會鎖定今次製作版本
+                                        {selected.selected_format === "short_video"
+                                          ? "請檢查開場句、逐鏡內容及拍攝方法；確認後會鎖定這個製作版本。"
+                                          : "請檢查文案、圖片配對及版面指示；確認後會鎖定這個製作版本。"}
                                       </p>
                                     </div>
                                     <button
@@ -1851,8 +1909,18 @@ export default function ContentStudioPage() {
                                       disabled={saving || editingDraft !== null}
                                       onClick={() => void confirmPageDrafts()}
                                     >
-                                      確認逐頁草稿，進入圖片生成 →
+                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "確認草稿，進入圖片生成 →"}
                                     </button>
+                                  </div>
+                                ) : selected.production.productionStatus === "package_ready" ? (
+                                  <div className="video-package-ready">
+                                    <div>
+                                      <small>{selected.format_decision?.videoMethod === "ai_video_generation" ? "AI 影片生成計劃" : "真人拍攝製作包"}</small>
+                                      <h4>{String((selected.production.videoPlan as any)?.hook || "短片製作資料已準備")}</h4>
+                                      <p>建議片長：{String((selected.production.videoPlan as any)?.durationSeconds || 20)} 秒</p>
+                                      {Array.isArray((selected.production.videoPlan as any)?.shotList) && (selected.production.videoPlan as any).shotList.length ? <ul>{(selected.production.videoPlan as any).shotList.map((item: string) => <li key={item}>{item}</li>)}</ul> : null}
+                                    </div>
+                                    {selected.stage === "production" ? <button type="button" disabled={saving} onClick={() => void submitVideoPackage()}>{saving ? "提交中…" : "提交製作包審批 →"}</button> : <span>✓ 已提交審批</span>}
                                   </div>
                                 ) : selected.production.productionStatus ===
                                   "drafts_confirmed" ? (
@@ -1860,13 +1928,13 @@ export default function ContentStudioPage() {
                                     <div>
                                       <b>
                                         {generatingCarousel
-                                          ? "正在生成全套 Carousel 圖"
-                                          : "下一步｜生成全套 Carousel 圖"}
+                                          ? selected.selected_format === "single_image" ? "正在生成單張貼文" : "正在生成全套輪播圖片"
+                                          : selected.selected_format === "single_image" ? "下一步｜生成單張貼文" : "下一步｜生成全套輪播圖片"}
                                       </b>
                                       <p>
                                         {generatingCarousel
                                           ? "正在並行處理每一頁，完成後圖片會直接出現，請勿關閉頁面…"
-                                          : "系統會按已確認文案、圖片配對及 Workspace Production Prompt，輸出 1080 × 1350 px 圖片"}
+                                          : `系統會按已確認文案、圖片配對及內容規則，輸出 ${selected.selected_format === "single_image" ? "1 張" : "全套"} 1080 × 1350 px 圖片`}
                                       </p>
                                     </div>
                                     <button
@@ -1878,7 +1946,7 @@ export default function ContentStudioPage() {
                                     >
                                       {generatingCarousel
                                         ? "生成中…"
-                                        : "開始生成全套 Carousel 圖 →"}
+                                        : selected.selected_format === "single_image" ? "開始生成單張貼文 →" : "開始生成全套輪播圖片 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus ===
@@ -1886,7 +1954,7 @@ export default function ContentStudioPage() {
                                   <div className="generated-carousel">
                                     <div className="generated-carousel-head">
                                       <div>
-                                        <b>全套 Carousel 圖已生成</b>
+                                        <b>{selected.selected_format === "single_image" ? "單張貼文已生成" : "全套輪播圖片已生成"}</b>
                                         <p>每頁尺寸：1080 × 1350 px</p>
                                       </div>
                                       <button
@@ -2041,7 +2109,7 @@ export default function ContentStudioPage() {
                                                     new Date().toISOString(),
                                                 },
                                               },
-                                              "全套 Carousel 已提交審批",
+                                              selected.selected_format === "single_image" ? "單張貼文已提交審批" : "輪播貼文已提交審批",
                                             )
                                           }
                                         >
@@ -2116,27 +2184,27 @@ export default function ContentStudioPage() {
                   <button
                     type="button"
                     className="secondary"
-                    disabled={studioSteps.findIndex((step) => step.id === activeStep) === 0}
+                    disabled={visibleStudioSteps.findIndex((step) => step.id === activeStep) === 0}
                     onClick={() => {
-                      const index = studioSteps.findIndex((step) => step.id === activeStep);
-                      if (index > 0) goToStep(studioSteps[index - 1].id);
+                      const index = visibleStudioSteps.findIndex((step) => step.id === activeStep);
+                      if (index > 0) goToStep(visibleStudioSteps[index - 1].id);
                     }}
                   >
                     ← 上一步
                   </button>
                   <span>
-                    {studioSteps.findIndex((step) => step.id === activeStep) + 1} / {studioSteps.length}
+                    {visibleStudioSteps.findIndex((step) => step.id === activeStep) + 1} / {visibleStudioSteps.length}
                   </span>
                   <button
                     type="button"
                     disabled={
-                      studioSteps.findIndex((step) => step.id === activeStep) >=
-                      studioSteps.findIndex((step) => step.id === latestAvailableStep(selected))
+                      visibleStudioSteps.findIndex((step) => step.id === activeStep) >=
+                      visibleStudioSteps.findIndex((step) => step.id === latestAvailableStep(selected))
                     }
                     onClick={() => {
-                      const index = studioSteps.findIndex((step) => step.id === activeStep);
-                      const latestIndex = studioSteps.findIndex((step) => step.id === latestAvailableStep(selected));
-                      if (index < latestIndex) goToStep(studioSteps[index + 1].id);
+                      const index = visibleStudioSteps.findIndex((step) => step.id === activeStep);
+                      const latestIndex = visibleStudioSteps.findIndex((step) => step.id === latestAvailableStep(selected));
+                      if (index < latestIndex) goToStep(visibleStudioSteps[index + 1].id);
                     }}
                   >
                     下一步 →
@@ -2289,4 +2357,6 @@ const editingStyles = `
   .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.page-drafts img,.draft-no-image{width:180px;height:220px;object-fit:contain;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;color:#999;font-size:11px}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.page-drafts img,.draft-no-image{width:100%;height:250px}}
   .studio-page{--soon-ivory:#f6f2eb;--soon-ink:#202126;--soon-oxblood:#6b2c30;--soon-oxblood-dark:#4d2023;--soon-clay:#b46a61;--soon-chartreuse:#c7e63a;--soon-line:#ded5cd;--soon-muted:#6f737d;background:var(--soon-ivory);color:var(--soon-ink)}.studio-shell{background:var(--soon-ivory)}.studio-topbar{min-height:86px;border-color:var(--soon-line);background:rgba(246,242,235,.94);padding:0 34px}.studio-topbar h1{font-size:26px;letter-spacing:-.035em}.studio-topbar p{color:var(--soon-muted)}.studio-topbar .secondary{border:1px solid var(--soon-line);background:#fff!important;color:var(--soon-oxblood)!important}.studio-layout{grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 86px)}.project-list{border-color:var(--soon-line);background:#efe8df;padding:22px 16px}.project-list>div strong{color:var(--soon-oxblood);font-size:12px;letter-spacing:.06em}.project-list-card.active{border-color:#c9aaa5;box-shadow:4px 4px 0 #ddc6c1}.project-list-card.active .project-select-button{background:#fff}.project-delete-button{background:#f7eee9}.studio-workspace{max-width:1120px;padding:32px clamp(20px,4vw,46px)}.editor-card{border-color:var(--soon-line);background:#fff;box-shadow:none}.section-title span{color:var(--soon-oxblood)}.studio-step-nav{border-color:var(--soon-line);background:rgba(246,242,235,.94)}.studio-step-nav button{background:#ebe4dc}.studio-step-nav button.active{background:var(--soon-oxblood);color:#fff}.studio-step-nav button.done{background:#edf6d4;color:#52691a}.studio-step-footer{border-color:var(--soon-line);background:rgba(246,242,235,.96)}.studio-step-footer button,.actions button:not(.secondary),.asset-upload-button,.asset-page-actions button,.draft-start-row button,.draft-confirm-step button,.generation-next-step button,.generated-carousel-head button{background:var(--soon-oxblood);color:#fff}.format-grid button.active,.angle-options button.active,.asset-source-tabs button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood)}.production-ready b,.structure-status>b{background:#edf6d4;color:#52691a}.story-pages article>span,.page-drafts span{background:var(--soon-oxblood)}.welcome a,.generated-download-button{background:var(--soon-oxblood)!important}.next-production,.generation-next-step{border-color:#dce8b6;background:#f3f8e3}.studio-message{background:#f1ebe4;color:var(--soon-oxblood)}@media(max-width:900px){.studio-topbar{min-height:auto;padding:20px}.studio-topbar h1{font-size:23px}.studio-layout{min-height:0}.project-list{background:#efe8df}.studio-workspace{padding:18px 14px 70px}.editor-card{padding:19px 15px}.studio-step-footer{grid-template-columns:1fr 1fr}.studio-step-footer span{grid-column:1/-1;grid-row:1}.studio-step-footer button{min-height:44px}}
   .format-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.format-settings,.video-methods{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:16px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:17px}.format-settings>div:first-child,.video-methods>div:first-child{display:grid;gap:4px}.format-settings small,.video-methods small{color:var(--soon-muted);font-size:11px}.quantity-control{display:flex;align-items:center;gap:12px}.quantity-control button{width:38px;height:38px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:19px;cursor:pointer}.quantity-control button:disabled{opacity:.35}.quantity-control b{min-width:44px;text-align:center}.video-methods{align-items:flex-start;flex-direction:column}.video-methods>div:last-child{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.video-methods>div:last-child button{display:grid;gap:5px;border:1px solid var(--soon-line);border-radius:11px;background:#fff;color:var(--soon-ink);padding:14px;text-align:left;cursor:pointer}.video-methods>div:last-child button.active{border-color:var(--soon-oxblood);box-shadow:inset 0 0 0 1px var(--soon-oxblood)}.video-methods button span{color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.format-settings{align-items:flex-start;flex-direction:column}.video-methods>div:last-child{grid-template-columns:1fr}}
+  .video-package-ready{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border:1px solid #d9e5b5;border-radius:14px;background:#f3f8e3;padding:18px}.video-package-ready>div{display:grid;gap:6px}.video-package-ready small{color:var(--soon-oxblood);font-size:10px;font-weight:850;letter-spacing:.08em}.video-package-ready h4{margin:0;font-size:18px}.video-package-ready p{margin:0;color:var(--soon-muted);font-size:11px}.video-package-ready ul{margin:4px 0 0;padding-left:18px;color:#565b62;font-size:11px;line-height:1.55}.video-package-ready>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.video-package-ready>span{color:#397552;font-size:11px;font-weight:800}@media(max-width:700px){.video-package-ready{flex-direction:column}.video-package-ready>button{width:100%}}
+  .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
 `;
