@@ -82,6 +82,17 @@ export async function POST(req: Request) {
     const workspaceInstructions = [prompt.brief_prompt, prompt.format_prompt, prompt.production_prompt]
       .filter((value) => typeof value === 'string' && value.trim())
       .join('\n\n--- NEXT WORKFLOW PROMPT ---\n\n')
+    const formatDecision = project.format_decision && typeof project.format_decision === 'object'
+      ? project.format_decision as Record<string, unknown>
+      : {}
+    const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
+    const formatInstruction = project.selected_format === 'single_image'
+      ? '這是單張貼文。pages 必須只輸出 P.1，集中一個最清晰的視覺訊息。'
+      : project.selected_format === 'short_video'
+        ? formatDecision.videoMethod === 'ai_video_generation'
+          ? '這是 AI 生成短片。pages 代表連續鏡頭，並為每個鏡頭提供可供影片生成使用的 visualDirection。不要聲稱影片已經生成。'
+          : '這是真人拍攝短片。pages 代表連續鏡頭，內容必須實際可拍攝；提供人物動作、畫面及說話重點。'
+        : `這是輪播貼文。pages 必須剛好輸出 ${slideCount} 頁，由 P.1 至 P.${slideCount}。`
 
     const userPrompt = [
       '你正在 SOON Content Studio 執行已確認格式之後的「資料核查＋故事結構」階段。',
@@ -98,6 +109,7 @@ export async function POST(req: Request) {
       `Brief：${JSON.stringify(project.brief || {})}`,
       `已確認格式：${project.selected_format || '未提供'}`,
       `格式備註：${JSON.stringify(project.format_decision || {})}`,
+      `格式製作要求：${formatInstruction}`,
       '',
       '只輸出一個 JSON object，不要 Markdown code fence。JSON 必須符合：',
       '{',
@@ -108,7 +120,7 @@ export async function POST(req: Request) {
       '  "sources": [{"label":"來源名稱","url":"https://..."}],',
       '  "pages": [{"page":"P.1","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
       '}',
-      'pages 必須由 P.1 開始連續編號；Carousel 一般 5–9 頁，按資料量決定。不要把未核實內容寫成事實。',
+      'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
       'confirmedFacts 只可包含來源內容或來源連結明確支持的事實；品牌自述必須放入 selfReportedClaims。',
       '如沒有外部來源連結，confirmedFacts 必須是空陣列。不得以一般常識補充解剖、生物力學、醫療或訓練原理；這些內容只能列為待核實，亦不得寫入 pages。',
     ].join('\n')
