@@ -127,6 +127,14 @@ const stageLabels: Record<Project["stage"], string> = {
   archived: "已封存",
 };
 
+const stylePreviewCopy: Record<string, { eyebrow: string; headline: string; detail: string }> = {
+  "editorial-clear": { eyebrow: "品牌指南 · 01", headline: "粉絲多，不代表適合", detail: "選擇創作者的 3 個重點" },
+  "product-focus": { eyebrow: "產品重點", headline: "一眼看懂核心賣點", detail: "功能 · 情境 · 行動" },
+  "problem-solution": { eyebrow: "常見問題", headline: "為何內容未能帶來成效？", detail: "問題 → 原因 → 解法" },
+  "creator-natural": { eyebrow: "真實分享", headline: "我會這樣選創作者", detail: "第一身經驗與日常畫面" },
+  "bold-social": { eyebrow: "先看結論", headline: "你可能一直選錯人", detail: "5 張圖說清楚" },
+};
+
 function workspaceAngleOptions(workspace: WorkspaceSummary | null) {
   if (workspace?.promptProfileKey === "egg-carousel-v1") {
     return [
@@ -508,7 +516,7 @@ export default function ContentStudioPage() {
   async function generateStructure() {
     if (!workspaceId || !selected || !permissions?.canEdit) return;
     setSaving(true);
-    setMessage("AI 正在整理資料核查同 P.1–P.N 故事結構，通常需要約半分鐘…");
+    setMessage("正在核對資料及整理內容順序，通常需要約半分鐘…");
     try {
       const response = await fetch("/api/content-projects/generate-structure", {
         method: "POST",
@@ -525,7 +533,7 @@ export default function ContentStudioPage() {
           item.id === selected.id ? { ...item, ...payload.project } : item,
         ),
       );
-      setMessage("資料核查同故事結構已完成，請檢查後確認");
+      setMessage("資料核查及內容順序已完成，請檢查後確認");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能生成故事結構");
     } finally {
@@ -1170,22 +1178,22 @@ export default function ContentStudioPage() {
                     <div className="section-title">
                       <div>
                         <span>STEP 2</span>
-                        <h3>建立 Content Brief</h3>
+                        <h3>提供內容資料</h3>
                       </div>
-                      <em>會使用目前 Workspace 嘅 Prompt Profile</em>
                     </div>
-                    <label>
-                      <span>題材摘要</span>
+                    <label className="brief-source-field">
+                      <span>貼上資料或描述今次想製作的內容</span>
                       <textarea
                         value={brief.summary}
                         onChange={(event) =>
                           setBrief({ ...brief, summary: event.target.value })
                         }
-                        placeholder="今次題材講緊乜？"
+                        placeholder={"例如：貼上文章、產品資料、活動詳情或你的想法。\n資料未完整亦可以，SOON 會協助整理。"}
                       />
+                      <small>可以直接貼上原文，毋須先整理成 Brief。</small>
                     </label>
                     <div className="angle-field">
-                      <span>想要方向／角度</span>
+                      <span>內容方向（選填）</span>
                       <div className="angle-options">
                         {angleOptions.map((option) => (
                           <button
@@ -1196,13 +1204,12 @@ export default function ContentStudioPage() {
                               setBrief({ ...brief, angle: option })
                             }
                           >
-                            {option}
+                            {option === "交由 AI 決定" ? "交由 SOON 建議" : option}
                           </button>
                         ))}
                       </div>
                       <small>
-                        目標觀眾、資料核查及內容限制會由 AI 按 Workspace Prompt
-                        自動處理
+                        如未有指定方向，可選擇「交由 SOON 建議」。
                       </small>
                     </div>
                     <div className="actions">
@@ -1330,25 +1337,26 @@ export default function ContentStudioPage() {
                       <em>SOON 已按內容格式篩選合適款式</em>
                     </div>
                     <div className="style-intro">
-                      <div><b>建議選擇第一款</b><span>你可以改選；SOON 會保存今次決定，逐步了解品牌偏好。</span></div>
-                      <small>Template Library v1・由 SOON Creator 管理</small>
+                      <div><b>SOON 已選出最合適的風格</b><span>你亦可以選擇其他風格；今次選擇會用於改善日後建議。</span></div>
                     </div>
                     <div className="style-template-grid">
-                      {styleTemplates.filter((template) => template.formats.includes(selected.selected_format || selectedFormat)).map((template, index) => (
+                      {styleTemplates.filter((template) => template.formats.includes(selected.selected_format || selectedFormat)).map((template, index) => {
+                        const preview = stylePreviewCopy[template.code] || stylePreviewCopy["editorial-clear"];
+                        return (
                         <button key={template.code} type="button" className={selectedStyleCode === template.code ? "active" : ""} onClick={() => setSelectedStyleCode(template.code)}>
-                          <div className="template-preview" style={{ background: template.palette[0], color: template.palette[1] }}>
-                            <i style={{ background: template.palette[2] }} />
-                            <strong>Aa</strong>
-                            <span><b /><b /></span>
+                          <div className="template-preview" data-style={template.code} style={{ background: template.palette[0], color: template.palette[1] }}>
+                            <i style={{ background: template.palette[2] }} aria-hidden="true" />
+                            <small>{preview.eyebrow}</small>
+                            <strong>{preview.headline}</strong>
+                            <p>{preview.detail}</p>
                           </div>
                           <div className="template-copy">
                             <span>{index === 0 ? "SOON 建議" : template.tone}</span>
                             <strong>{template.name}</strong>
                             <small>{template.note}</small>
-                            <em>v{template.version}</em>
                           </div>
                         </button>
-                      ))}
+                      )})}
                     </div>
                     {styleTemplates.find((template) => template.code === selectedStyleCode) ? (() => {
                       const rules = styleTemplates.find((template) => template.code === selectedStyleCode)!;
@@ -1385,7 +1393,7 @@ export default function ContentStudioPage() {
                         <span>STEP {studioSteps.findIndex((step) => step.id === activeStep) + 1}</span>
                         <h3>{stepLabel(activeStep)}</h3>
                       </div>
-                      <em>按 Project 鎖定嘅 Workspace Prompt 執行</em>
+                      <em>按照已確認的內容設定製作</em>
                     </div>
                     {selected.production?.status ? (
                       <div className="structure-result">
@@ -1398,13 +1406,12 @@ export default function ContentStudioPage() {
                                 ? "故事結構已確認"
                                 : "資料核查＋故事結構"}
                             </h4>
-                            <p>
-                              {String(
-                                selected.production.verificationSummary || "",
-                              )}
-                            </p>
+                            <p>SOON 已完成資料核查，請確認以下內容順序是否合適。</p>
                           </div>
                         </div>
+                        <details className="structure-evidence">
+                          <summary>查看資料核查詳情</summary>
+                          <p>{String(selected.production.verificationSummary || "")}</p>
                         <div className="fact-grid">
                           {[
                             ["已確認事實", selected.production.confirmedFacts],
@@ -1429,8 +1436,9 @@ export default function ContentStudioPage() {
                             </section>
                           ))}
                         </div>
+                        </details>
                         <div className="story-pages">
-                          <h4>P.1–P.N 故事結構</h4>
+                          <h4>內容順序</h4>
                           {(Array.isArray(selected.production.pages)
                             ? selected.production.pages
                             : []
@@ -1517,15 +1525,9 @@ export default function ContentStudioPage() {
                                       </div>
                                     </div>
                                     <p>
-                                      <strong>內容：</strong>
                                       {page.copyDirection || page.purpose || ""}
                                     </p>
-                                    {page.visualDirection ? (
-                                      <p>
-                                        <strong>畫面：</strong>
-                                        {page.visualDirection}
-                                      </p>
-                                    ) : null}
+                                    {page.visualDirection ? <details className="page-visual-detail"><summary>查看畫面建議</summary><p>{page.visualDirection}</p></details> : null}
                                   </>
                                 )}
                               </div>
@@ -1605,8 +1607,8 @@ export default function ContentStudioPage() {
                                   {licensedResults.length ? <div className="licensed-result-grid">{licensedResults.map((result) => <article key={result.id}><img src={result.thumbnail} alt={result.title} /><div><strong>{result.title}</strong><small>{result.creator} · {result.license}</small><div><a href={result.sourceUrl || result.licenseUrl || "#"} target="_blank" rel="noreferrer">查看來源／授權 ↗</a><button type="button" onClick={() => void addLicensedImage(result)}>加入 {assetTargetPage}</button></div></div></article>)}</div> : null}
                                 </div>
                               )}
-                              <div className="asset-visual-guidance">
-                                <b>AI 建議畫面</b>
+                              <details className="asset-visual-guidance">
+                                <summary>查看 SOON 的畫面建議</summary>
                                 {Array.isArray(selected.production.pages) &&
                                 selected.production.pages.some(
                                   (page) =>
@@ -1634,7 +1636,7 @@ export default function ContentStudioPage() {
                                 ) : (
                                   <p>AI 暫未提供指定畫面建議，可按每頁內容準備相關圖片。</p>
                                 )}
-                              </div>
+                              </details>
                               {Array.isArray(selected.production.assets) &&
                               selected.production.assets.length ? (
                                 <div className="asset-grid">
@@ -2251,10 +2253,9 @@ export default function ContentStudioPage() {
                     ) : (
                       <div className="production-ready">
                         <b>✓</b>
-                        <h4>Brief 同內容格式已確認</h4>
+                        <h4>內容資料及格式已確認</h4>
                         <p>
-                          下一步先由 AI 按 Workspace Prompt 完成資料核查，再提出
-                          P.1–P.N 故事結構俾你確認，暫時唔會生成圖片。
+                          SOON 會先核對資料，再整理每一頁的內容順序。這一步暫時不會生成圖片。
                         </p>
                       </div>
                     )}
@@ -2288,8 +2289,8 @@ export default function ContentStudioPage() {
                           onClick={generateStructure}
                         >
                           {saving
-                            ? "AI 整理中…"
-                            : "開始 AI 資料核查及故事結構 →"}
+                            ? "正在核對資料及整理內容…"
+                            : "整理內容順序 →"}
                         </button>
                       )}
                     </div>
@@ -2450,12 +2451,12 @@ const editingStyles = `
   .studio-loading-skeleton i:nth-child(2){width:82%}.studio-loading-skeleton i:nth-child(3){width:64%}
   @keyframes studio-loading-spin{to{transform:rotate(360deg)}}
   @keyframes studio-loading-shimmer{to{background-position:-220% 0}}
-  .studio-step-nav{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:7px;margin:0 0 18px;padding:10px;background:rgba(255,255,255,.96);border:1px solid #e5e6e9;border-radius:13px;backdrop-filter:blur(10px)}
+  .studio-step-nav{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:0 0 18px;padding:9px;background:rgba(255,255,255,.96);border:1px solid #e5e6e9;border-radius:13px;backdrop-filter:blur(10px);overflow-x:auto}
   .studio-step-nav button{display:flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:9px;background:#f2f3f5;color:#696d75;padding:10px 7px;font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap}.studio-step-nav button span{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#fff;font-size:9px}.studio-step-nav button.done{color:#23723b;background:#edf8f0}.studio-step-nav button.active{background:#111;color:#fff}.studio-step-nav button.active span{color:#111}.studio-step-nav button:disabled{opacity:.42;cursor:not-allowed}
   .production-card:not([data-step="structure"]) .structure-status,.production-card:not([data-step="structure"]) .fact-grid,.production-card:not([data-step="structure"]) .story-pages,.production-card:not([data-step="structure"]) .structure-sources,.production-card:not([data-step="structure"])>.actions,.production-card:not([data-step="structure"]) .production-ready{display:none}
   .production-card:not([data-step="assets"]) .next-production{display:none}.production-card:not([data-step="drafts"]):not([data-step="carousel"]) .page-drafts{display:none}.production-card[data-step="drafts"] .generated-carousel,.production-card[data-step="drafts"] .page-drafts>.generation-next-step{display:none}.production-card[data-step="carousel"] .page-drafts-heading,.production-card[data-step="carousel"] .page-drafts>article,.production-card[data-step="carousel"] .draft-confirm-step{display:none}
   .studio-step-footer{position:sticky;bottom:12px;z-index:11;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;margin-top:18px;padding:10px 12px;border:1px solid #e1e3e6;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 8px 28px rgba(20,22,26,.1);backdrop-filter:blur(10px)}.studio-step-footer span{text-align:center;color:#7b7f87;font-size:11px;font-weight:750}.studio-step-footer button{border:0;border-radius:9px;background:#111;color:#fff;padding:10px 14px;font-size:11px;font-weight:800;cursor:pointer}.studio-step-footer button:disabled{opacity:.35;cursor:not-allowed}
-  @media(max-width:900px){.studio-step-nav{display:flex;overflow-x:auto;justify-content:flex-start}.studio-step-nav button{min-width:118px}.studio-step-footer{bottom:8px}}
+  @media(max-width:900px){.studio-step-nav{display:flex;overflow-x:auto;justify-content:flex-start}.studio-step-nav button{min-width:104px}.studio-step-footer{bottom:8px}}
   .generated-carousel-head button:disabled{opacity:.45;cursor:not-allowed}
   .carousel-generation-status{display:flex;align-items:center;gap:8px;border-radius:9px;background:#e8f3eb;color:#24653a;padding:10px 12px;font-size:11px;font-weight:800}
   .carousel-generation-status span{width:14px;height:14px;border:2px solid #9bc4a7;border-top-color:#24653a;border-radius:50%;animation:carousel-generation-spin .8s linear infinite}
@@ -2473,7 +2474,7 @@ const editingStyles = `
   .page-editor-actions{display:flex;justify-content:flex-end;gap:7px}
   .page-editor-actions button:last-child{background:#111;color:#fff}
   .asset-upload-head{display:flex;justify-content:space-between;gap:18px;align-items:center}.asset-upload-head p{margin:5px 0 0!important}.asset-upload-actions{display:flex;align-items:center;gap:7px}.asset-upload-button,.asset-library-button{display:block!important;margin:0!important;border:0;background:#111;color:#fff;border-radius:9px;padding:10px 14px;font-size:12px;font-weight:750;cursor:pointer}.asset-library-button{background:#eceef1;color:#222}.asset-upload-button input{display:none}.asset-empty{text-align:center;color:#92969e;background:#f7f7f8;border-radius:10px;padding:28px;margin-top:15px;font-size:12px}.asset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:16px}.asset-grid article{border:1px solid #e1e3e6;border-radius:11px;overflow:hidden;background:#fff}.asset-grid img{width:100%;height:150px;object-fit:contain;background:#f2f2f3;display:block}.asset-grid article>div{padding:10px;display:grid;gap:7px}.asset-grid strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.asset-grid small{font-size:10px;color:#898d95}.asset-grid select{width:100%;border:1px solid #dedfe3;border-radius:7px;background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important;color-scheme:light;padding:7px;font-size:10px}.asset-grid select option{background:#fff!important;color:#111!important}.asset-actions{display:flex;gap:5px}.asset-actions button{flex:1;border:0;border-radius:7px;padding:7px;background:#f0f1f3;font-size:10px;font-weight:700;cursor:pointer}.asset-actions button.active{background:#e4f5e9;color:#1c7837}.asset-confirm-row{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:17px;padding-top:15px;border-top:1px solid #e6e7ea}.asset-confirm-row span{font-size:11px;color:#686d75}.asset-confirm-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:10px 14px;font-size:11px;font-weight:750;cursor:pointer}.asset-confirm-row button:disabled{opacity:.5}@media(max-width:900px){.asset-grid{grid-template-columns:1fr 1fr}.asset-upload-head{align-items:flex-start}.asset-upload-actions{align-items:stretch;flex-direction:column}.asset-confirm-row{align-items:flex-start;flex-direction:column}}
-  .asset-visual-guidance{margin-top:15px;padding:14px 15px;border:1px solid #e2ded0;border-radius:11px;background:#faf8f1}.asset-visual-guidance>b{display:block;font-size:12px;margin-bottom:8px}.asset-visual-guidance ul{display:grid;gap:7px;margin:0;padding:0;list-style:none}.asset-visual-guidance li{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:start;font-size:11px;line-height:1.5;color:#555961}.asset-visual-guidance li strong{color:#222}.asset-visual-guidance p{margin:0!important;font-size:11px;color:#737780;line-height:1.55}
+  .asset-visual-guidance{margin-top:15px;padding:13px 15px;border:1px solid #e2ded0;border-radius:11px;background:#faf8f1}.asset-visual-guidance>summary{cursor:pointer;font-size:12px;font-weight:800;color:#34373c}.asset-visual-guidance[open]>summary{margin-bottom:10px}.asset-visual-guidance ul{display:grid;gap:7px;margin:0;padding:0;list-style:none}.asset-visual-guidance li{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:start;font-size:11px;line-height:1.5;color:#555961}.asset-visual-guidance li strong{color:#222}.asset-visual-guidance p{margin:0!important;font-size:11px;color:#737780;line-height:1.55}
   .asset-source-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}.asset-source-tabs button{border:1px solid #dfe1e5;background:#fff;border-radius:10px;padding:11px 9px;font-size:11px;font-weight:750;cursor:pointer}.asset-source-tabs button.active{background:#111;color:#fff;border-color:#111}.asset-source-panel,.asset-search-panel{margin-top:9px;border:1px solid #e2e3e6;border-radius:11px;padding:14px;background:#fafafa}.asset-source-panel{display:flex;align-items:center;justify-content:space-between;gap:15px}.asset-source-panel b,.asset-license-note b{font-size:12px}.asset-page-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.asset-page-actions button,.asset-search-controls button,.licensed-result-grid button{border:0;background:#111;color:#fff;border-radius:8px;padding:9px 11px;font-size:10px;font-weight:750;cursor:pointer}.asset-page-actions button:disabled{opacity:.5}.asset-license-note{background:#fff7df;border:1px solid #ecdca9;border-radius:9px;padding:11px}.asset-license-note p{line-height:1.55!important;color:#655c43!important}.asset-search-controls{display:grid;grid-template-columns:92px 1fr auto;gap:7px;margin-top:10px}.asset-search-controls select,.asset-search-controls input{border:1px solid #dfe1e5;border-radius:8px;background:#fff!important;color:#111!important;padding:9px;font-size:11px}.licensed-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}.licensed-result-grid article{border:1px solid #e1e3e6;border-radius:9px;overflow:hidden;background:#fff}.licensed-result-grid img{width:100%;height:130px;object-fit:cover;background:#eee;display:block}.licensed-result-grid article>div{padding:9px;display:grid;gap:6px}.licensed-result-grid strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.licensed-result-grid small{font-size:9px;color:#747880}.licensed-result-grid article>div>div{display:flex;align-items:center;justify-content:space-between;gap:5px}.licensed-result-grid a,.asset-source-meta a{font-size:9px;color:#555;text-decoration:underline}.asset-source-meta{white-space:normal!important;line-height:1.4}.asset-source-meta a{display:inline}.licensed-result-grid button{padding:7px 8px}@media(max-width:900px){.asset-source-tabs,.licensed-result-grid{grid-template-columns:1fr}.asset-source-panel{align-items:flex-start;flex-direction:column}.asset-search-controls{grid-template-columns:1fr}.asset-page-actions{justify-content:flex-start}}
   .asset-source-tabs button{border-color:#111;background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:.72;transition:opacity .15s ease,box-shadow .15s ease}.asset-source-tabs button:hover{opacity:.88}.asset-source-tabs button.active{background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#111;opacity:1;box-shadow:0 0 0 2px #fff,0 0 0 4px #111}
   .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.page-drafts img,.draft-no-image{width:180px;height:220px;object-fit:contain;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;color:#999;font-size:11px}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.page-drafts img,.draft-no-image{width:100%;height:250px}}
@@ -2481,7 +2482,8 @@ const editingStyles = `
   .format-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.format-settings{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:16px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:17px}.format-settings>div:first-child{display:grid;gap:4px}.format-settings small{color:var(--soon-muted);font-size:11px}.quantity-control{display:flex;align-items:center;gap:12px}.quantity-control button{width:38px;height:38px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:19px;cursor:pointer}.quantity-control button:disabled{opacity:.35}.quantity-control b{min-width:44px;text-align:center}@media(max-width:1100px){.format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.format-settings{align-items:flex-start;flex-direction:column}}
   .video-package-ready{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border:1px solid #d9e5b5;border-radius:14px;background:#f3f8e3;padding:18px}.video-package-ready>div{display:grid;gap:6px}.video-package-ready small{color:var(--soon-oxblood);font-size:10px;font-weight:850;letter-spacing:.08em}.video-package-ready h4{margin:0;font-size:18px}.video-package-ready p{margin:0;color:var(--soon-muted);font-size:11px}.video-package-ready ul{margin:4px 0 0;padding-left:18px;color:#565b62;font-size:11px;line-height:1.55}.video-package-ready>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.video-package-ready>span{color:#397552;font-size:11px;font-weight:800}@media(max-width:700px){.video-package-ready{flex-direction:column}.video-package-ready>button{width:100%}}
   .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
-  .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span,.style-intro small{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>button{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>button:hover{transform:translateY(-2px)}.style-template-grid>button.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:118px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:16px;overflow:hidden}.template-preview>i{position:absolute;width:76px;height:76px;right:-15px;top:-17px;border-radius:50%}.template-preview>strong{position:relative;font-size:28px;letter-spacing:-.06em}.template-preview>span{position:relative;display:grid;gap:5px}.template-preview>span b{display:block;width:78%;height:5px;border-radius:9px;background:currentColor;opacity:.7}.template-preview>span b:last-child{width:48%;opacity:.35}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}.template-copy>em{color:#999;font-size:8px;font-style:normal}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
+  .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>button{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>button:hover{transform:translateY(-2px)}.style-template-grid>button.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:150px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:7px;padding:17px;overflow:hidden}.template-preview>i{position:absolute;width:78px;height:78px;right:-16px;top:-20px;border-radius:50%}.template-preview>small{position:relative;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.template-preview>strong{position:relative;max-width:88%;font-size:22px;line-height:1.05;letter-spacing:-.045em}.template-preview>p{position:relative;margin:0;font-size:9px;line-height:1.35;opacity:.75}.template-preview[data-style="product-focus"]{justify-content:center}.template-preview[data-style="product-focus"]>i{width:54px;height:88px;right:22px;top:26px;border-radius:8px;box-shadow:9px 9px 0 rgba(0,0,0,.08)}.template-preview[data-style="product-focus"]>strong,.template-preview[data-style="product-focus"]>p{max-width:58%}.template-preview[data-style="problem-solution"]>strong{font-size:20px}.template-preview[data-style="bold-social"]>strong{font-size:25px;text-transform:uppercase}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
+  .brief-source-field textarea{min-height:150px;font-size:15px;line-height:1.65}.brief-source-field>small{color:var(--soon-muted);font-size:11px}.structure-evidence{border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:13px 15px}.structure-evidence>summary,.page-visual-detail>summary{cursor:pointer;font-size:11px;font-weight:800;color:var(--soon-oxblood)}.structure-evidence>p{color:var(--soon-muted);font-size:11px;line-height:1.55}.structure-evidence .fact-grid{margin-top:12px}.story-pages article:not(:has(.page-editor)) p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.page-visual-detail{margin-top:8px}.page-visual-detail p{display:block!important;margin-top:8px!important}.studio-message{position:relative;margin-top:14px!important;border:1px solid #dbc8c1;border-radius:12px!important;background:#f7eee9!important;color:var(--soon-oxblood)!important;padding:15px 16px 15px 44px!important;font-size:14px!important;font-weight:750;line-height:1.45}.studio-message:before{content:"";position:absolute;left:17px;top:17px;width:12px;height:12px;border:2px solid #c9aaa5;border-top-color:var(--soon-oxblood);border-radius:50%;animation:studio-loading-spin .8s linear infinite}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
   .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}
