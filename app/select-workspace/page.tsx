@@ -132,14 +132,17 @@ function WorkspaceSelector() {
                 </div>
               ) : null}
 
-              <Link className="create-workspace-link" href="/onboarding/new-workspace">
-                <span aria-hidden="true">＋</span>
-                <span>
-                  <strong>建立新工作空間</strong>
-                  <small>為另一個品牌設定獨立的內容及資料</small>
-                </span>
-                <span aria-hidden="true">→</span>
-              </Link>
+              <div className="create-workspace-section">
+                <div className="create-divider"><span /><em>其他品牌</em><span /></div>
+                <Link className="create-workspace-link" href="/onboarding/new-workspace">
+                  <span className="create-icon" aria-hidden="true">＋</span>
+                  <span className="create-copy">
+                    <strong>建立新工作空間</strong>
+                    <small>為另一個品牌設定獨立的內容及資料</small>
+                  </span>
+                  <span className="create-action">開始設定&nbsp; →</span>
+                </Link>
+              </div>
             </div>
           ) : null}
 
@@ -218,10 +221,14 @@ function WorkspaceSelector() {
         .workspace-copy small { color: #777b84; font-size: 0.8rem; }
         .workspace-role { border-radius: 999px; background: #eee8e2; padding: 5px 9px; color: #62656c; font-size: 0.72rem; white-space: nowrap; }
         .workspace-arrow { min-width: 24px; color: #6b2c30; font-size: 1rem; text-align: right; white-space: nowrap; }
-        .create-workspace-link {
+        .create-workspace-section { display: grid; gap: 13px; margin-top: 8px; }
+        .create-divider { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+        .create-divider span { height: 1px; background: #e5ded7; }
+        .create-divider em { color: #8a817c; font-size: 0.72rem; font-style: normal; }
+        :global(.create-workspace-link) {
           min-height: 68px;
           display: grid;
-          grid-template-columns: 46px minmax(0, 1fr) auto;
+          grid-template-columns: 46px minmax(0, 1fr) max-content;
           gap: 14px;
           align-items: center;
           border: 1px solid #c9aaa5;
@@ -230,12 +237,14 @@ function WorkspaceSelector() {
           color: #4d2023;
           padding: 14px;
           text-decoration: none;
+          transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
         }
-        .create-workspace-link > span:first-child { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #6b2c30; color: #fff; font-size: 1.45rem; }
-        .create-workspace-link strong, .create-workspace-link small { display: block; }
-        .create-workspace-link small { margin-top: 5px; color: #786d69; line-height: 1.4; }
-        .create-workspace-link > span:last-child { color: #6b2c30; }
-        .create-workspace-link:hover { border-color: #6b2c30; background: #f2e3de; transform: translateY(-1px); }
+        :global(.create-workspace-link .create-icon) { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #6b2c30; color: #fff; font-size: 1.45rem; }
+        :global(.create-workspace-link .create-copy) { min-width: 0; display: grid; gap: 4px; }
+        :global(.create-workspace-link .create-copy strong) { color: #322a28; font-size: 0.95rem; line-height: 1.3; }
+        :global(.create-workspace-link .create-copy small) { color: #786d69; font-size: 0.78rem; line-height: 1.4; }
+        :global(.create-workspace-link .create-action) { color: #6b2c30; font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+        :global(.create-workspace-link:hover) { border-color: #6b2c30; background: #f2e3de; transform: translateY(-1px); }
         .status, .empty-state { border-radius: 14px; background: #f3eee8; padding: 22px; color: #666a72; text-align: center; }
         .status.error { color: #991b1b; background: #fef2f2; }
         .empty-state p { margin: 7px 0 0; color: #777b84; font-size: 0.9rem; }
@@ -247,6 +256,9 @@ function WorkspaceSelector() {
           .workspace-avatar { width: 42px; height: 42px; }
           .soon-mark img { height: 44px; }
           .workspace-role { display: none; }
+          :global(.create-workspace-link) { grid-template-columns: 42px minmax(0,1fr); }
+          :global(.create-workspace-link .create-icon) { width: 42px; height: 42px; }
+          :global(.create-workspace-link .create-action) { grid-column: 2; }
         }
       `}</style>
     </main>
