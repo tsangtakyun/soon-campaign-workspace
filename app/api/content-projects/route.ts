@@ -86,6 +86,9 @@ export async function POST(req: Request) {
     const selectedFormat = typeof body.selectedFormat === 'string' && allowedFormats.has(body.selectedFormat)
       ? body.selectedFormat
       : null
+    const videoMethod = body.videoMethod === 'ai_video_generation'
+      ? 'ai_video_generation'
+      : body.videoMethod === 'human_filming' ? 'human_filming' : null
     const { data: prompt } = await access.admin
       .from('workspace_prompt_versions')
       .select('id')
@@ -106,13 +109,20 @@ export async function POST(req: Request) {
         source_name: typeof body.sourceName === 'string' ? body.sourceName.slice(0, 200) : null,
         source_note: typeof body.sourceNote === 'string' ? body.sourceNote.slice(0, 3000) : null,
         selected_format: selectedFormat,
+        format_decision: selectedFormat ? { videoMethod: selectedFormat === 'short_video' ? videoMethod || 'human_filming' : null } : {},
         stage: 'brief',
         created_by: user.id,
         updated_by: user.id,
       })
-      .select('id,title,stage')
+      .select('id,title,source_url,source_name,source_note,stage,selected_format,brief,format_decision,production,updated_at')
       .single()
     if (error) throw error
+    if (selectedFormat) {
+      await access.admin.from('content_preference_events').insert({ workspace_id: workspaceId, content_project_id: data.id, actor_id: user.id, event_type: 'selected', dimension: 'format', value: selectedFormat, metadata: { source: 'content_studio_entry' } })
+      if (selectedFormat === 'short_video' && videoMethod) {
+        await access.admin.from('content_preference_events').insert({ workspace_id: workspaceId, content_project_id: data.id, actor_id: user.id, event_type: 'selected', dimension: 'production_method', value: videoMethod, metadata: { source: 'content_studio_entry' } })
+      }
+    }
     return NextResponse.json({ project: data, success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create content project', detail: String(error) }, { status: 500 })
