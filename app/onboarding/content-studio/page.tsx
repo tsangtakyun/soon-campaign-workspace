@@ -232,10 +232,7 @@ export default function ContentStudioPage() {
   const studioLoadedRef = useRef(false);
 
   const selected = useMemo(
-    () =>
-      projects.find((project) => project.id === selectedId) ||
-      projects[0] ||
-      null,
+    () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId],
   );
   const visibleStudioSteps = useMemo(
