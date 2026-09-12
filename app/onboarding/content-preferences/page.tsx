@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import type { ContentPreferenceSummary, RankedPreference } from '@/lib/content-preference-summary'
 import {
   isBechillWorkspace,
   isEggWorkspace,
@@ -120,6 +121,7 @@ type WorkspacePreferenceMode = 'loading' | 'bechill' | 'egg' | 'empty'
 
 export default function ContentPreferencesPage() {
   const [preferenceMode, setPreferenceMode] = useState<WorkspacePreferenceMode>('loading')
+  const [summary, setSummary] = useState<ContentPreferenceSummary | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -127,11 +129,16 @@ export default function ContentPreferencesPage() {
     async function loadWorkspace() {
       if (!cancelled) setPreferenceMode('loading')
       try {
-        const { activeWorkspace } = await resolveActiveWorkspace()
+        const { activeWorkspace, workspaceId } = await resolveActiveWorkspace()
         if (!cancelled) {
           setPreferenceMode(
             isBechillWorkspace(activeWorkspace) ? 'bechill' : isEggWorkspace(activeWorkspace) ? 'egg' : 'empty'
           )
+        }
+        if (workspaceId) {
+          const response = await fetch(`/api/content-preference-summary?workspaceId=${workspaceId}`, { cache: 'no-store' })
+          const payload = await response.json().catch(() => null)
+          if (!cancelled) setSummary(response.ok ? payload?.summary || null : null)
         }
       } catch {
         if (!cancelled) setPreferenceMode('empty')
@@ -168,8 +175,9 @@ export default function ContentPreferencesPage() {
             <div className="cp-learned-head">
               <div>
                 <h2>SOON 已記住的內容偏好</h2>
+                <p className="cp-desc">根據實際選擇、審批、發布及成效逐步更新。</p>
               </div>
-              {preferenceMode !== 'empty' && preferenceMode !== 'loading' ? <span>更新：2026年8月13日</span> : null}
+              {summary ? <span>{summary.statusLabel} · {summary.evidenceCount} 項紀錄</span> : null}
             </div>
             {preferenceMode === 'loading' ? (
               <div className="cp-loading-panel" aria-busy="true">
@@ -182,19 +190,24 @@ export default function ContentPreferencesPage() {
                   <i />
                 </div>
               </div>
-            ) : preferenceMode !== 'empty' ? (
-              <div className="cp-preference-grid">
-                {(preferenceMode === 'egg' ? eggSoonLearnedPreferences : bunchillLearnedPreferences).map((group) => (
-                  <article className="cp-preference-card" key={group.title}>
-                    <h3>{group.title}</h3>
-                    <ul>
-                      {group.items.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </article>
-                ))}
-              </div>
+            ) : summary?.evidenceCount ? (
+              <>
+                <div className="cp-signal-grid">
+                  <PreferenceSignalCard icon="▦" title="內容格式" items={summary.preferredFormats} empty="尚未有足夠格式紀錄" />
+                  <PreferenceSignalCard icon="◐" title="設計風格" items={summary.preferredTemplates} empty="尚未有足夠風格紀錄" />
+                  <PreferenceSignalCard icon="▶" title="短片製作" items={summary.preferredProductionMethods} empty="尚未有短片製作紀錄" />
+                </div>
+                <div className="cp-evidence-strip">
+                  <div><b>{summary.activity.approvals}</b><span>已批准</span></div>
+                  <div><b>{summary.activity.publications}</b><span>已發布</span></div>
+                  <div><b>{summary.activity.performanceSamples}</b><span>成效紀錄</span></div>
+                  <div><b>{summary.activity.copyEdits + summary.activity.designEdits}</b><span>內容調整</span></div>
+                </div>
+                <section className="cp-recommendations">
+                  <div><span>下一輪建議</span><small>只有累積足夠證據的項目才會影響排序</small></div>
+                  {summary.recommendations.length ? <ul>{summary.recommendations.map((item) => <li key={item}>✓ {item}</li>)}</ul> : <p>完成更多審批或發布內容後，SOON 才會提出偏好建議。</p>}
+                </section>
+              </>
             ) : (
               <div className="cp-empty-panel">
                 <strong>內容偏好尚未整理</strong>
@@ -202,12 +215,27 @@ export default function ContentPreferencesPage() {
               </div>
             )}
           </section>
+
+          {preferenceMode === 'bechill' || preferenceMode === 'egg' ? (
+            <details className="cp-rules">
+              <summary>查看已確認的品牌守則</summary>
+              <div className="cp-preference-grid">
+                {(preferenceMode === 'egg' ? eggSoonLearnedPreferences : bunchillLearnedPreferences).map((group) => (
+                  <article className="cp-preference-card" key={group.title}><h3>{group.title}</h3><ul>{group.items.map((item) => <li key={item}>{item}</li>)}</ul></article>
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `${dashboardSidebarStyles}\n${styles}` }} />
     </main>
   )
+}
+
+function PreferenceSignalCard({ icon, title, items, empty }: { icon: string; title: string; items: RankedPreference[]; empty: string }) {
+  return <article className="cp-signal-card"><header><i>{icon}</i><h3>{title}</h3></header>{items.length ? <ol>{items.map((item, index) => <li key={item.value}><b>{index + 1}</b><span><strong>{item.label}</strong><small>{item.evidenceCount} 項相關紀錄{item.performanceCount ? ` · ${item.performanceCount} 項成效` : ''}</small></span></li>)}</ol> : <p>{empty}</p>}</article>
 }
 
 const styles = `
@@ -363,6 +391,32 @@ const styles = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .cp-signal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .cp-signal-card { border: 1px solid #e4e5e9; border-radius: 14px; padding: 16px; background: #fff; min-height: 170px; }
+  .cp-signal-card header { display: flex; align-items: center; gap: 9px; }
+  .cp-signal-card header i { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: #fff3bf; color: #756019; font-style: normal; font-weight: 800; }
+  .cp-signal-card h3 { margin: 0; font-size: 14px; }
+  .cp-signal-card ol { list-style: none; display: grid; gap: 12px; margin: 16px 0 0; padding: 0; }
+  .cp-signal-card li { display: flex; align-items: flex-start; gap: 9px; }
+  .cp-signal-card li > b { width: 20px; height: 20px; border-radius: 50%; background: #202126; color: white; display: grid; place-items: center; font-size: 11px; flex: 0 0 auto; }
+  .cp-signal-card li span { display: grid; gap: 2px; }
+  .cp-signal-card li strong { font-size: 13px; }
+  .cp-signal-card li small, .cp-signal-card > p { color: #7a7e87; font-size: 12px; line-height: 1.45; }
+  .cp-signal-card > p { margin: 28px 0 0; }
+  .cp-evidence-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #e4e5e9; border-radius: 12px; background: #fafafa; overflow: hidden; }
+  .cp-evidence-strip div { padding: 13px 16px; display: grid; gap: 2px; border-right: 1px solid #e4e5e9; }
+  .cp-evidence-strip div:last-child { border-right: 0; }
+  .cp-evidence-strip b { font-size: 18px; }
+  .cp-evidence-strip span { color: #747780; font-size: 12px; }
+  .cp-recommendations { border-radius: 12px; padding: 16px; background: #202126; color: white; display: grid; gap: 12px; }
+  .cp-recommendations > div { display: flex; justify-content: space-between; gap: 16px; }
+  .cp-recommendations > div span { font-size: 14px; font-weight: 700; }
+  .cp-recommendations small, .cp-recommendations p { color: #b8bbc2; font-size: 12px; margin: 0; }
+  .cp-recommendations ul { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .cp-recommendations li { background: #34363b; border-radius: 999px; padding: 7px 10px; font-size: 12px; }
+  .cp-rules { border-top: 1px solid #e8e9ec; padding-top: 16px; }
+  .cp-rules summary { cursor: pointer; font-size: 14px; font-weight: 650; margin-bottom: 14px; }
+
   .cp-preference-card {
     background: #ffffff;
     border: 1px solid #e4e5e9;
@@ -398,5 +452,10 @@ const styles = `
     .cp-preference-grid {
       grid-template-columns: 1fr;
     }
+    .cp-signal-grid { grid-template-columns: 1fr; }
+    .cp-evidence-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cp-evidence-strip div:nth-child(2) { border-right: 0; }
+    .cp-evidence-strip div:nth-child(-n+2) { border-bottom: 1px solid #e4e5e9; }
+    .cp-recommendations > div { flex-direction: column; gap: 4px; }
   }
 `
