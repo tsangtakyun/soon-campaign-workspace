@@ -5,7 +5,7 @@ import { anthropicModel } from "@/lib/anthropic-models";
 import { isUuid } from "@/lib/oauth-connections";
 import { createServerSupabase } from "@/lib/server-supabase";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
-import { contentStyleRulePrompt } from "@/lib/content-style-library";
+import { contentStylePromptFromDecision } from "@/lib/content-style-library";
 
 function parseJson(text: string) {
   const clean = text
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
     const input = [
       ...outputInstruction,
       "\n【Production Prompt】\n" + prompt.production_prompt,
-      "\n【SOON Style 製作規格】\n" + contentStyleRulePrompt(project.format_decision?.templateCode, project.selected_format),
+      "\n【SOON Style 製作規格】\n" + contentStylePromptFromDecision(project.format_decision, project.selected_format),
       "\n【Project】\n" + project.title,
       "Brief：" + JSON.stringify(project.brief || {}),
       "已選內容風格：" + JSON.stringify(project.format_decision || {}),

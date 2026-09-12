@@ -31,3 +31,19 @@ export function contentStyleRulePrompt(code: unknown, format: unknown) {
   const formatKey = typeof format === 'string' ? format : ''
   return [`Style：${style.name} v${style.version}`, `語氣：${style.tone}`, ...style.rules.structure, ...style.rules.copy, ...style.rules.visual, ...(style.rules.byFormat[formatKey] || [])].map((rule) => `- ${rule}`).join('\n')
 }
+
+export function contentStylePromptFromDecision(decision: unknown, format: unknown) {
+  const value = decision && typeof decision === 'object' ? decision as Record<string, unknown> : {}
+  const snapshot = value.styleRulesSnapshot
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    return contentStyleRulePrompt(value.templateCode, format)
+  }
+
+  const name = typeof value.templateName === 'string' ? value.templateName : 'SOON Core Style'
+  const ref = typeof value.styleVersionRef === 'string' ? value.styleVersionRef : ''
+  return [
+    `Style：${name}${ref ? `（${ref}）` : ''}`,
+    '以下是建立此項目時保存的正式 Style 規格；不得自行換成其他 Style：',
+    JSON.stringify(snapshot, null, 2),
+  ].join('\n')
+}

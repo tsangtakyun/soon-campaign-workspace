@@ -385,8 +385,10 @@ export async function POST(req: Request) {
       logoUrl: workspace?.logo_url || fallbackLogoUrl,
       name: workspaceName,
     };
-    const templateCode = typeof project.format_decision?.templateCode === "string"
-      ? project.format_decision.templateCode
+    const templateCode = typeof project.format_decision?.renderTemplateCode === "string"
+      ? project.format_decision.renderTemplateCode
+      : typeof project.format_decision?.templateCode === "string"
+        ? project.format_decision.templateCode
       : "editorial-clear";
     const theme = templateThemes[templateCode] || templateThemes["editorial-clear"];
     const productionStatus = project.production?.productionStatus;

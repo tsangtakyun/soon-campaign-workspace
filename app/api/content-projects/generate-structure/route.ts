@@ -5,7 +5,7 @@ import { anthropicModel } from '@/lib/anthropic-models'
 import { isUuid } from '@/lib/oauth-connections'
 import { createServerSupabase } from '@/lib/server-supabase'
 import { getWorkspaceAccess } from '@/lib/workspace-access'
-import { contentStyleRulePrompt } from '@/lib/content-style-library'
+import { contentStylePromptFromDecision } from '@/lib/content-style-library'
 
 function parseJsonObject(text: string) {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     const formatDecision = project.format_decision && typeof project.format_decision === 'object'
       ? project.format_decision as Record<string, unknown>
       : {}
-    const styleRules = contentStyleRulePrompt(formatDecision.templateCode, project.selected_format)
+    const styleRules = contentStylePromptFromDecision(formatDecision, project.selected_format)
     const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
     const formatInstruction = project.selected_format === 'single_image'
       ? '這是單張貼文。pages 必須只輸出 P.1，集中一個最清晰的視覺訊息。'

@@ -10,7 +10,7 @@ import {
 import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
 import { SoonLoading } from "@/components/ui/SoonLoading";
 import { SoonIcon, type SoonIconName } from "@/components/ui/SoonIcon";
-import { contentStyleTemplates as styleTemplates } from "@/lib/content-style-library";
+import { contentStyleTemplates as styleTemplates, type ContentStyleTemplate } from "@/lib/content-style-library";
 import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
@@ -85,6 +85,27 @@ type PreferenceEvent = {
   metadata?: Record<string, unknown>;
 };
 
+type CorePublishedStyle = {
+  styleId: string;
+  code: string;
+  format: string;
+  name: string;
+  description: string;
+  version: {
+    id: string;
+    number: number;
+    ref: string;
+    contentHash: string;
+    rules: Record<string, unknown>;
+  };
+  evidence?: { confirmedReferenceCount?: number };
+};
+
+type DisplayStyle = ContentStyleTemplate & {
+  source: "soon_core" | "soon_creator";
+  core?: CorePublishedStyle;
+};
+
 type StudioStep = "brief" | "format" | "style" | "structure" | "assets" | "drafts" | "carousel";
 
 const studioSteps: { id: StudioStep; label: string }[] = [
@@ -133,6 +154,7 @@ const stylePreviewCopy: Record<string, { eyebrow: string; headline: string; deta
   "problem-solution": { eyebrow: "常見問題", headline: "為何內容未能帶來成效？", detail: "問題 → 原因 → 解法" },
   "creator-natural": { eyebrow: "真實分享", headline: "我會這樣選創作者", detail: "第一身經驗與日常畫面" },
   "bold-social": { eyebrow: "先看結論", headline: "你可能一直選錯人", detail: "5 張圖說清楚" },
+  "editorial_contrast_carousel": { eyebrow: "對照觀點", headline: "表面相似，結果卻不同", detail: "背景 → 反差 → 證據 → 結論" },
 };
 
 function workspaceAngleOptions(workspace: WorkspaceSummary | null) {
@@ -183,6 +205,8 @@ export default function ContentStudioPage() {
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
   const [videoMethod, setVideoMethod] = useState("human_filming");
   const [selectedStyleCode, setSelectedStyleCode] = useState("");
+  const [coreStyles, setCoreStyles] = useState<CorePublishedStyle[]>([]);
+  const [loadingStyles, setLoadingStyles] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editingDraft, setEditingDraft] = useState<number | null>(null);
@@ -224,6 +248,36 @@ export default function ContentStudioPage() {
     () => workspaceAngleOptions(workspace),
     [workspace],
   );
+  const displayStyles = useMemo<DisplayStyle[]>(() => {
+    const format = selected?.selected_format || selectedFormat;
+    const local = styleTemplates
+      .filter((template) => template.formats.includes(format))
+      .map((template) => ({ ...template, source: "soon_creator" as const }));
+    if (format !== "carousel" || !coreStyles.length) return local;
+    const palettes: Array<[string, string, string]> = [
+      ["#f6f2eb", "#6b2c30", "#c7e63a"],
+      ["#fff4cf", "#202126", "#b46a61"],
+      ["#202126", "#f6d260", "#ffffff"],
+    ];
+    const canonical = coreStyles.map((style, index): DisplayStyle => ({
+      code: style.code,
+      version: style.version.number,
+      name: style.name,
+      note: style.description,
+      formats: ["carousel"],
+      tone: "SOON 建議",
+      palette: palettes[index % palettes.length],
+      rules: {
+        structure: ["按照已驗證的內容次序逐頁推進", "每頁集中傳達一個重點"],
+        copy: ["使用清晰、可快速閱讀的書面語", "內容聲稱必須有資料支持"],
+        visual: ["維持一致網格及清楚對比", "首圖及重點句必須容易辨認"],
+        byFormat: { carousel: ["由開場、背景、證據推進至結論及行動"] },
+      },
+      source: "soon_core",
+      core: style,
+    }));
+    return [...canonical, ...local.filter((item) => !canonical.some((core) => core.code === item.code))];
+  }, [coreStyles, selected?.selected_format, selectedFormat]);
 
   function stepLabel(step: StudioStep) {
     if (step === "structure" && selected?.selected_format === "short_video") return "短片結構";
@@ -375,6 +429,33 @@ export default function ContentStudioPage() {
     const requestedIndex = studioSteps.findIndex((step) => step.id === requested);
     goToStep(requestedIndex >= 0 && requestedIndex <= latestIndex ? requested! : latest);
   }, [selected?.id]);
+
+  useEffect(() => {
+    if (!workspaceId || (selected?.selected_format || selectedFormat) !== "carousel") {
+      setCoreStyles([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingStyles(true);
+    fetch(`/api/content-styles?workspaceId=${encodeURIComponent(workspaceId)}&format=carousel`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("未能載入最新風格")))
+      .then((payload) => {
+        if (!cancelled) {
+          const styles = Array.isArray(payload?.styles) ? payload.styles as CorePublishedStyle[] : [];
+          setCoreStyles(styles);
+          if (styles[0] && typeof selected?.format_decision?.templateSource !== "string") {
+            setSelectedStyleCode(styles[0].code);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCoreStyles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStyles(false);
+      });
+    return () => { cancelled = true; };
+  }, [workspaceId, selected?.selected_format, selectedFormat]);
 
   async function saveProject(
     updates: Record<string, unknown>,
@@ -1340,7 +1421,7 @@ export default function ContentStudioPage() {
                       <div><b>SOON 已選出最合適的風格</b><span>你亦可以選擇其他風格；今次選擇會用於改善日後建議。</span></div>
                     </div>
                     <div className="style-template-grid">
-                      {styleTemplates.filter((template) => template.formats.includes(selected.selected_format || selectedFormat)).map((template, index) => {
+                      {displayStyles.map((template, index) => {
                         const preview = stylePreviewCopy[template.code] || stylePreviewCopy["editorial-clear"];
                         return (
                         <button key={template.code} type="button" className={selectedStyleCode === template.code ? "active" : ""} onClick={() => setSelectedStyleCode(template.code)}>
@@ -1358,22 +1439,30 @@ export default function ContentStudioPage() {
                         </button>
                       )})}
                     </div>
-                    {styleTemplates.find((template) => template.code === selectedStyleCode) ? (() => {
-                      const rules = styleTemplates.find((template) => template.code === selectedStyleCode)!;
-                      return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>SOON Style Library · v{rules.version} · 規格只供查看</small></details>;
+                    {displayStyles.find((template) => template.code === selectedStyleCode) ? (() => {
+                      const rules = displayStyles.find((template) => template.code === selectedStyleCode)!;
+                      return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>{rules.source === "soon_core" ? "已連接 SOON 最新製作規格" : "SOON 經典風格"}</small></details>;
                     })() : null}
+                    {loadingStyles ? <p className="style-loading">正在載入最新風格…</p> : null}
                     <div className="actions">
                       <button className="secondary" type="button" onClick={() => goToStep("format")}>← 修改格式</button>
                       <button type="button" disabled={saving || !selectedStyleCode} onClick={() => {
-                        const template = styleTemplates.find((item) => item.code === selectedStyleCode);
+                        const template = displayStyles.find((item) => item.code === selectedStyleCode);
+                        const core = template?.core;
                         void saveProject({
                           formatDecision: {
                             ...(selected.format_decision || {}),
                             templateCode: selectedStyleCode,
                             templateVersion: template?.version || 1,
-                            templateSource: "soon_creator_v1",
+                            templateSource: template?.source || "soon_creator",
                             templateName: template?.name || selectedStyleCode,
                             templateTone: template?.tone || "",
+                            renderTemplateCode: core ? "editorial-clear" : selectedStyleCode,
+                            styleId: core?.styleId || null,
+                            styleVersionId: core?.version.id || null,
+                            styleVersionRef: core?.version.ref || null,
+                            styleContentHash: core?.version.contentHash || null,
+                            styleRulesSnapshot: core?.version.rules || null,
                             templateSelectedAt: new Date().toISOString(),
                           },
                         }, "內容風格已儲存，下一步建立內容結構", "structure", [{
@@ -1381,7 +1470,7 @@ export default function ContentStudioPage() {
                           dimension: "template",
                           value: selectedStyleCode,
                           previousValue: typeof selected.format_decision?.templateCode === "string" ? selected.format_decision.templateCode : null,
-                          metadata: { templateVersion: template?.version || 1, templateSource: "soon_creator_v1", format: selected.selected_format },
+                          metadata: { templateVersion: template?.version || 1, templateSource: template?.source || "soon_creator", styleVersionRef: core?.version.ref || null, format: selected.selected_format },
                         }]);
                       }}>{saving ? "儲存中…" : "使用這個風格 →"}</button>
                     </div>
