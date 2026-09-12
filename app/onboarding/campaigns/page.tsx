@@ -419,7 +419,6 @@ export default function CampaignsPage() {
           sourceName: idea.source,
           sourceNote: idea.note,
           sourceUrl: idea.url || null,
-          selectedFormat: idea.format || null,
           title: idea.title,
           topicIdeaId: idea.id,
           workspaceId: activeWorkspaceId,
