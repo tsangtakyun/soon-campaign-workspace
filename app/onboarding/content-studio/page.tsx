@@ -1572,9 +1572,9 @@ export default function ContentStudioPage() {
                                 </div>
                               </div>
                               <div className="asset-source-tabs" role="tablist" aria-label="圖片素材來源">
-                                <button className={assetSourceMode === "upload" ? "active" : ""} onClick={() => setAssetSourceMode("upload")}>↑ 上載圖片</button>
-                                <button className={assetSourceMode === "generate" ? "active" : ""} onClick={() => setAssetSourceMode("generate")}>✦ AI 生成圖片</button>
-                                <button className={assetSourceMode === "search" ? "active" : ""} onClick={() => setAssetSourceMode("search")}>⌕ AI 搜尋授權圖片</button>
+                                <button type="button" className={assetSourceMode === "upload" ? "active" : ""} onClick={() => setAssetSourceMode("upload")}>↑ 上載圖片</button>
+                                <button type="button" className={assetSourceMode === "generate" ? "active" : ""} onClick={() => setAssetSourceMode("generate")}>✦ AI 生成圖片</button>
+                                <button type="button" className={assetSourceMode === "search" ? "active" : ""} onClick={() => setAssetSourceMode("search")}>⌕ AI 搜尋授權圖片</button>
                               </div>
                               {assetSourceMode === "upload" ? (
                                 <div className="asset-source-panel">
@@ -1590,7 +1590,7 @@ export default function ContentStudioPage() {
                                   <div className="asset-page-actions">
                                     {(Array.isArray(selected.production.pages) ? selected.production.pages : []).map((page: any, index: number) => {
                                       const pageName = page?.page || `P.${index + 1}`;
-                                      return <button key={pageName} disabled={Boolean(generatingAssetPage)} onClick={() => void generateProjectAsset(pageName)}>{generatingAssetPage === pageName ? `${pageName} 生成中…` : `生成 ${pageName}`}</button>;
+                                      return <button type="button" key={pageName} disabled={Boolean(generatingAssetPage)} onClick={() => void generateProjectAsset(pageName)}>{generatingAssetPage === pageName ? `${pageName} 生成中…` : `生成 ${pageName}`}</button>;
                                     })}
                                   </div>
                                 </div>
@@ -1600,9 +1600,9 @@ export default function ContentStudioPage() {
                                   <div className="asset-search-controls">
                                     <select value={assetTargetPage} onChange={(event) => setAssetTargetPage(event.target.value)}>{(Array.isArray(selected.production.pages) ? selected.production.pages : []).map((page: any, index: number) => { const pageName = page?.page || `P.${index + 1}`; return <option key={pageName} value={pageName}>{pageName}</option>; })}</select>
                                     <input value={imageSearchQuery} onChange={(event) => setImageSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchLicensedImages(); }} placeholder="留空會按該頁 AI 畫面建議搜尋" />
-                                    <button disabled={searchingImages} onClick={() => void searchLicensedImages()}>{searchingImages ? "AI 搜尋中…" : "按 AI 建議搜尋"}</button>
+                                    <button type="button" disabled={searchingImages} onClick={() => void searchLicensedImages()}>{searchingImages ? "AI 搜尋中…" : "按 AI 建議搜尋"}</button>
                                   </div>
-                                  {licensedResults.length ? <div className="licensed-result-grid">{licensedResults.map((result) => <article key={result.id}><img src={result.thumbnail} alt={result.title} /><div><strong>{result.title}</strong><small>{result.creator} · {result.license}</small><div><a href={result.sourceUrl || result.licenseUrl || "#"} target="_blank" rel="noreferrer">查看來源／授權 ↗</a><button onClick={() => void addLicensedImage(result)}>加入 {assetTargetPage}</button></div></div></article>)}</div> : null}
+                                  {licensedResults.length ? <div className="licensed-result-grid">{licensedResults.map((result) => <article key={result.id}><img src={result.thumbnail} alt={result.title} /><div><strong>{result.title}</strong><small>{result.creator} · {result.license}</small><div><a href={result.sourceUrl || result.licenseUrl || "#"} target="_blank" rel="noreferrer">查看來源／授權 ↗</a><button type="button" onClick={() => void addLicensedImage(result)}>加入 {assetTargetPage}</button></div></div></article>)}</div> : null}
                                 </div>
                               )}
                               <div className="asset-visual-guidance">
