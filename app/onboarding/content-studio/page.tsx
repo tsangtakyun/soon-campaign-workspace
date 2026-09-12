@@ -564,6 +564,11 @@ export default function ContentStudioPage() {
     await saveProject(
       { production: selected.production },
       "故事結構修改已儲存",
+      undefined,
+      [
+        { eventType: "edited", dimension: "copy", value: "story_structure", metadata: { step: "structure" } },
+        { eventType: "edited", dimension: "design", value: "visual_direction", metadata: { step: "structure" } },
+      ],
     );
     setEditingPage(null);
   }
@@ -908,6 +913,11 @@ export default function ContentStudioPage() {
     await saveProject(
       { production: selected.production },
       "逐頁草稿修改已儲存",
+      undefined,
+      [
+        { eventType: "edited", dimension: "copy", value: "content_draft", metadata: { step: "drafts", format: selected.selected_format } },
+        { eventType: "edited", dimension: "design", value: "layout_direction", metadata: { step: "drafts", format: selected.selected_format } },
+      ],
     );
     setEditingDraft(null);
   }

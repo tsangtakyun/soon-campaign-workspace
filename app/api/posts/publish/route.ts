@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const supabase = createAdminSupabase()
     const { data: post, error: postError } = await supabase
       .from('campaign_posts')
-      .select('id,user_id,title,body,post_type,image_url,scheduled_at,workspace_id,captions')
+      .select('id,user_id,title,body,post_type,image_url,scheduled_at,workspace_id,captions,content_project_id')
       .eq('id', postId)
       .eq('workspace_id', workspaceId)
       .maybeSingle()
@@ -155,6 +155,25 @@ export async function POST(req: Request) {
         })
         .eq('id', postId)
         .eq('workspace_id', workspaceId)
+      if (post.content_project_id) {
+        const { data: project } = await supabase
+          .from('content_projects')
+          .select('selected_format,format_decision')
+          .eq('id', post.content_project_id)
+          .eq('workspace_id', workspaceId)
+          .maybeSingle()
+        const { error: preferenceError } = await supabase.from('content_preference_events').upsert({
+          workspace_id: workspaceId,
+          content_project_id: post.content_project_id,
+          actor_id: user.id,
+          event_type: 'published',
+          dimension: 'template',
+          value: typeof project?.format_decision?.templateCode === 'string' ? project.format_decision.templateCode : 'no_template',
+          metadata: { format: project?.selected_format || post.post_type, platforms: publishResult.platforms_published, campaignPostId: post.id },
+          dedupe_key: `published:${post.id}`,
+        }, { onConflict: 'dedupe_key', ignoreDuplicates: true })
+        if (preferenceError) console.warn('[posts/publish] preference event unavailable', preferenceError)
+      }
     } else {
       await supabase
         .from('campaign_posts')

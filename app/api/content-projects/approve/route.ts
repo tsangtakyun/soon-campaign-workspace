@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from('content_projects')
-      .select('id,campaign_id,campaign_angle_id,creative_role,title,selected_format,brief,production,created_by')
+      .select('id,campaign_id,campaign_angle_id,creative_role,title,selected_format,format_decision,brief,production,created_by')
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
       .maybeSingle()
@@ -125,6 +125,22 @@ export async function POST(req: Request) {
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
     if (updateError) throw updateError
+    const templateCode = typeof project.format_decision?.templateCode === 'string' ? project.format_decision.templateCode : 'no_template'
+    const { error: preferenceError } = await access.admin.from('content_preference_events').insert({
+      workspace_id: workspaceId,
+      content_project_id: projectId,
+      actor_id: user.id,
+      event_type: decision === 'approved' ? 'approved' : 'rejected',
+      dimension: 'template',
+      value: templateCode,
+      metadata: {
+        decision,
+        format: project.selected_format,
+        productionMethod: project.format_decision?.videoMethod || null,
+        noteProvided: Boolean(note),
+      },
+    })
+    if (preferenceError) console.warn('[content-projects/approve] preference event unavailable', preferenceError)
     if (note) {
       const { data: existingNote, error: existingNoteError } = await access.admin
         .from('review_notes')

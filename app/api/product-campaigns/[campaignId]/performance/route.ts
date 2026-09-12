@@ -55,6 +55,25 @@ export async function POST(request: Request, { params }: RouteProps) {
     const rows = observations.flatMap((item: JsonRecord) => { const post = postMap.get(String(item.postId)); if (!post?.content_project_id || !post.campaign_angle_id) return []; const impressions = metric(item.impressions || item.views); const engagements = metric(item.engagements) || metric(item.likes) + metric(item.comments) + metric(item.shares) + metric(item.saves); return [{ workspace_id: data.campaign.workspace_id, campaign_id: data.campaign.id, campaign_angle_id: post.campaign_angle_id, content_project_id: post.content_project_id, campaign_post_id: post.id, platform: String(item.platform || 'manual').slice(0, 40), external_media_id: String(item.externalMediaId || '').slice(0, 200) || null, period_start: item.periodStart || null, period_end: item.periodEnd || now, impressions, reach: metric(item.reach), clicks: metric(item.clicks), engagements, conversions: metric(item.conversions), spend: metric(item.spend), raw_metrics: item.rawMetrics || item, source: String(item.source || 'platform_sync').slice(0, 50) }] })
     if (!rows.length) return NextResponse.json({ error: '數據未能對應Campaign posts' }, { status: 400 })
     const { error } = await data.access.admin.from('creative_performance_snapshots').upsert(rows, { onConflict: 'content_project_id,platform,period_end' }); if (error) throw error
+    const projectIds = [...new Set(rows.map((row: JsonRecord) => row.content_project_id))]
+    const { data: projectPreferences } = await data.access.admin.from('content_projects').select('id,selected_format,format_decision').in('id', projectIds)
+    const preferenceByProject = new Map((projectPreferences || []).map((project: JsonRecord) => [project.id, project]))
+    const performanceEvents = rows.map((row: JsonRecord) => {
+      const project = preferenceByProject.get(row.content_project_id)
+      const templateCode = typeof project?.format_decision?.templateCode === 'string' ? project.format_decision.templateCode : 'no_template'
+      return {
+        workspace_id: data.campaign.workspace_id,
+        content_project_id: row.content_project_id,
+        actor_id: data.user.id,
+        event_type: 'performed',
+        dimension: 'template',
+        value: templateCode,
+        dedupe_key: `performance:${row.content_project_id}:${row.platform}:${row.period_end}`,
+        metadata: { format: project?.selected_format || null, impressions: row.impressions, reach: row.reach, clicks: row.clicks, engagements: row.engagements, conversions: row.conversions, spend: row.spend, campaignId: data.campaign.id, campaignPostId: row.campaign_post_id, periodEnd: row.period_end },
+      }
+    })
+    const { error: preferenceError } = await data.access.admin.from('content_preference_events').upsert(performanceEvents, { onConflict: 'dedupe_key', ignoreDuplicates: true })
+    if (preferenceError) console.warn('[campaign performance] preference events unavailable', preferenceError)
     const result = await report(data)
     if (result.winner) { await data.access.admin.from('campaign_angles').update({ status: 'testing' }).eq('campaign_id', data.campaign.id).eq('status', 'approved'); await data.access.admin.from('campaign_angles').update({ status: 'winner' }).eq('id', result.winner.angleId) }
     await data.access.admin.from('marketing_campaigns').update({ generation_status: result.winner ? 'winner_identified' : 'measuring', status: 'measuring', updated_at: now }).eq('id', data.campaign.id)

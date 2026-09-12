@@ -65,6 +65,16 @@ export async function POST(req: Request) {
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
     if (updateError) throw updateError
+    const { error: eventError } = await access.admin.from('content_preference_events').insert({
+      workspace_id: workspaceId,
+      content_project_id: projectId,
+      actor_id: user.id,
+      event_type: 'edited',
+      dimension: 'design',
+      value: 'canvas_design',
+      metadata: { page, canvasWidth: Math.max(100, Math.round(Number(body.canvasWidth) || 1080)), canvasHeight: Math.max(100, Math.round(Number(body.canvasHeight) || 1350)) },
+    })
+    if (eventError) console.warn('[content-projects/save-design] preference event unavailable', eventError)
     return NextResponse.json({ imageUrl, success: true })
   } catch (error) {
     console.error('[content-projects/save-design]', error)
