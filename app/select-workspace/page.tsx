@@ -94,7 +94,7 @@ function WorkspaceSelector() {
         <div className="workspace-card">
           <p className="eyebrow">歡迎回來</p>
           <h1>選擇工作空間</h1>
-          <p className="intro">揀選今次要管理嘅品牌，之後仍可在左上角切換。</p>
+          <p className="intro">選擇今次要管理的品牌；進入後仍可隨時切換。</p>
 
           {loading ? <div className="status">正在載入你的工作空間...</div> : null}
           {message ? <div className="status error">{message}</div> : null}
@@ -135,8 +135,8 @@ function WorkspaceSelector() {
               <Link className="create-workspace-link" href="/onboarding/new-workspace">
                 <span aria-hidden="true">＋</span>
                 <span>
-                  <strong>建立新工作台</strong>
-                  <small>為另一個品牌重新開始設定</small>
+                  <strong>建立新工作空間</strong>
+                  <small>為另一個品牌設定獨立的內容及資料</small>
                 </span>
                 <span aria-hidden="true">→</span>
               </Link>
@@ -154,26 +154,26 @@ function WorkspaceSelector() {
           display: grid;
           place-items: center;
           padding: 40px 24px;
-          background: #07080b;
-          color: #f7f8fb;
+          background: #f6f2eb;
+          color: #202126;
         }
         .workspace-select-glow {
           position: absolute;
           width: 520px;
           height: 520px;
           border-radius: 50%;
-          filter: blur(110px);
-          opacity: 0.24;
+          filter: blur(100px);
+          opacity: 0.32;
           pointer-events: none;
         }
-        .workspace-select-glow--one { top: -280px; left: -160px; background: #ef3f2f; }
-        .workspace-select-glow--two { right: -180px; bottom: -300px; background: #ffd337; }
+        .workspace-select-glow--one { top: -320px; left: -180px; background: #d9bbb5; }
+        .workspace-select-glow--two { right: -220px; bottom: -330px; background: #c7e63a; }
         .workspace-select-shell { width: min(720px, 100%); position: relative; z-index: 1; }
         header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
         header button {
           border: 0;
           background: transparent;
-          color: rgba(255,255,255,0.68);
+          color: #6b2c30;
           font: inherit;
           cursor: pointer;
           text-decoration: underline;
@@ -182,15 +182,15 @@ function WorkspaceSelector() {
         .soon-mark { display: inline-flex; align-items: center; }
         .soon-mark img { display: block; width: auto; height: 52px; object-fit: contain; }
         .workspace-card {
-          border: 1px solid rgba(255,255,255,0.11);
+          border: 1px solid #ded5cd;
           border-radius: 22px;
-          background: rgba(20,21,25,0.94);
-          box-shadow: 0 36px 100px rgba(0,0,0,0.52);
+          background: rgba(255,255,255,0.92);
+          box-shadow: 0 22px 60px rgba(77,32,35,0.08);
           padding: clamp(26px, 5vw, 48px);
         }
-        .eyebrow { margin: 0 0 8px; color: #ffd337; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.16em; }
+        .eyebrow { margin: 0 0 8px; color: #8b6f18; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.16em; }
         h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.35rem); line-height: 1.08; }
-        .intro { margin: 12px 0 30px; color: rgba(255,255,255,0.62); line-height: 1.65; }
+        .intro { margin: 12px 0 30px; color: #6f737d; line-height: 1.65; }
         .workspace-list { display: grid; gap: 12px; }
         .workspace-option {
           width: 100%;
@@ -198,46 +198,47 @@ function WorkspaceSelector() {
           grid-template-columns: 46px minmax(0, 1fr) auto auto;
           gap: 14px;
           align-items: center;
-          border: 1px solid rgba(255,255,255,0.1);
+          border: 1px solid #ded5cd;
           border-radius: 14px;
-          background: rgba(255,255,255,0.045);
-          color: #ffffff;
+          background: #faf8f4;
+          color: #202126;
           padding: 14px;
           text-align: left;
           cursor: pointer;
           transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
         }
-        .workspace-option:hover { border-color: rgba(255,211,55,0.62); background: rgba(255,255,255,0.075); transform: translateY(-1px); }
+        .workspace-option:hover { border-color: #b98d86; background: #ffffff; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(77,32,35,0.07); }
         .workspace-option:disabled { cursor: wait; opacity: 0.7; transform: none; }
-        .workspace-avatar { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; background: #ef3f2f; font-weight: 900; }
+        .workspace-avatar { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 12px; background: #6b2c30; color: #fff; font-weight: 900; }
         .workspace-avatar--logo { overflow: hidden; background: #ffffff; }
         .workspace-avatar--logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
         .workspace-copy { min-width: 0; display: grid; gap: 4px; }
         .workspace-copy strong, .workspace-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .workspace-copy strong { font-size: 1rem; }
-        .workspace-copy small { color: rgba(255,255,255,0.5); font-size: 0.8rem; }
-        .workspace-role { border-radius: 999px; background: rgba(255,255,255,0.08); padding: 5px 9px; color: rgba(255,255,255,0.7); font-size: 0.72rem; white-space: nowrap; }
-        .workspace-arrow { min-width: 24px; color: #ffd337; font-size: 1rem; text-align: right; white-space: nowrap; }
+        .workspace-copy small { color: #777b84; font-size: 0.8rem; }
+        .workspace-role { border-radius: 999px; background: #eee8e2; padding: 5px 9px; color: #62656c; font-size: 0.72rem; white-space: nowrap; }
+        .workspace-arrow { min-width: 24px; color: #6b2c30; font-size: 1rem; text-align: right; white-space: nowrap; }
         .create-workspace-link {
           min-height: 68px;
           display: grid;
           grid-template-columns: 46px minmax(0, 1fr) auto;
           gap: 14px;
           align-items: center;
-          border: 1px dashed rgba(255,211,55,0.48);
+          border: 1px solid #c9aaa5;
           border-radius: 14px;
-          color: #ffffff;
-          padding: 12px 14px;
+          background: #f7eee9;
+          color: #4d2023;
+          padding: 14px;
           text-decoration: none;
         }
-        .create-workspace-link > span:first-child { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: rgba(255,211,55,0.12); color: #ffd337; font-size: 1.45rem; }
+        .create-workspace-link > span:first-child { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: #6b2c30; color: #fff; font-size: 1.45rem; }
         .create-workspace-link strong, .create-workspace-link small { display: block; }
-        .create-workspace-link small { margin-top: 4px; color: rgba(255,255,255,0.5); }
-        .create-workspace-link > span:last-child { color: #ffd337; }
-        .create-workspace-link:hover { border-color: #ffd337; background: rgba(255,211,55,0.06); }
-        .status, .empty-state { border-radius: 14px; background: rgba(255,255,255,0.05); padding: 22px; color: rgba(255,255,255,0.7); text-align: center; }
-        .status.error { color: #ffb7b0; }
-        .empty-state p { margin: 7px 0 0; color: rgba(255,255,255,0.52); font-size: 0.9rem; }
+        .create-workspace-link small { margin-top: 5px; color: #786d69; line-height: 1.4; }
+        .create-workspace-link > span:last-child { color: #6b2c30; }
+        .create-workspace-link:hover { border-color: #6b2c30; background: #f2e3de; transform: translateY(-1px); }
+        .status, .empty-state { border-radius: 14px; background: #f3eee8; padding: 22px; color: #666a72; text-align: center; }
+        .status.error { color: #991b1b; background: #fef2f2; }
+        .empty-state p { margin: 7px 0 0; color: #777b84; font-size: 0.9rem; }
         @media (max-width: 580px) {
           .workspace-select-page { padding: 24px 16px; align-items: start; }
           .workspace-select-shell { margin-top: 32px; }
