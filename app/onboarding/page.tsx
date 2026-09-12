@@ -1486,10 +1486,10 @@ export default function OnboardingHomePage() {
       <ClaimOnboardingSession />
       <DashboardSidebar activeItem="首頁" />
 
-      <section className="home-shell">
+      <section className={`home-shell${dashboardLoading ? ' is-loading' : ''}`}>
         <header className="home-topbar">
           <div className="home-topbar-left">
-            <h1>{dashboardLoading ? '正在載入工作台…' : `歡迎回來，${brandName || '你的工作台'}`}</h1>
+            <h1>{dashboardLoading ? 'SOON 工作空間' : `歡迎回來，${brandName || '你的工作台'}`}</h1>
           </div>
           <div className="home-social-summary">
             {connectedSocialAccount ? <button type="button" onClick={() => router.push('/onboarding/insights')}>
@@ -1500,6 +1500,15 @@ export default function OnboardingHomePage() {
             </button> : <button className="not-connected" type="button" onClick={() => router.push('/onboarding/integrations')}>＋ 連接社交帳戶</button>}
           </div>
         </header>
+
+        {dashboardLoading ? <section className="home-initial-loading" aria-live="polite" aria-busy="true">
+          <div className="home-loading-card">
+            <img src="/icon.png" alt="SOON" />
+            <strong>正在載入工作台</strong>
+            <span>正在同步內容、審批狀態及最新數據。</span>
+            <div aria-hidden="true"><i /></div>
+          </div>
+        </section> : null}
 
         <section className="growth-launcher" aria-labelledby="growth-launcher-title">
           <div className="growth-launcher-copy"><div className="soon-logo-crop"><img src="/brand-assets/soon/soon-logo.png" alt="SOON" /></div><span>YOUR MARKETING WORKSPACE</span><h2 id="growth-launcher-title">今日想推廣甚麼？</h2></div>
@@ -1621,6 +1630,8 @@ const homeStyles = `
   .dashboard-page .sidebar-credit-card { display: none; }
 
   .home-shell {
+    position: relative;
+    min-height: 100vh;
     min-width: 0;
     background:
       linear-gradient(rgba(107,44,48,.028) 1px, transparent 1px),
@@ -1630,6 +1641,16 @@ const homeStyles = `
     display: flex;
     flex-direction: column;
   }
+
+  .home-initial-loading { position:absolute;z-index:20;inset:58px 0 0;display:grid;place-items:center;padding:24px;background:var(--soon-ivory); }
+  .home-loading-card { width:min(360px,100%);display:grid;justify-items:center;gap:13px;border:1px solid var(--soon-line);border-radius:18px;background:#fff;padding:31px 28px;box-shadow:0 18px 50px rgba(77,32,35,.07);text-align:center; }
+  .home-loading-card img { width:100px;height:56px;display:block;object-fit:contain; }
+  .home-loading-card strong { color:var(--soon-ink);font-size:1rem; }
+  .home-loading-card span { color:var(--soon-muted);font-size:.72rem;line-height:1.5; }
+  .home-loading-card>div { width:100%;height:4px;overflow:hidden;border-radius:999px;background:#eee8e2;margin-top:5px; }
+  .home-loading-card i { display:block;width:42%;height:100%;border-radius:inherit;background:var(--soon-oxblood);animation:home-loading-slide 1.1s ease-in-out infinite; }
+  @keyframes home-loading-slide { from{transform:translateX(-110%)} to{transform:translateX(345%)} }
+  @media (prefers-reduced-motion: reduce) { .home-loading-card i { animation:none;width:100%;opacity:.65;transform:none; } }
 
   .growth-launcher {
     width: min(760px, calc(100% - 44px));
