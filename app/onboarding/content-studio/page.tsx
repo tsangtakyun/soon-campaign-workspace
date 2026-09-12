@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/DashboardSidebar";
 import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
 import { SoonLoading } from "@/components/ui/SoonLoading";
+import { contentStyleTemplates as styleTemplates } from "@/lib/content-style-library";
 import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
@@ -114,16 +115,6 @@ const formats = [
     note: "建立畫面、旁白及影片生成指示",
     icon: "✦",
   },
-];
-
-type StyleTemplate = { code: string; version: number; name: string; note: string; formats: string[]; tone: string; palette: [string, string, string] };
-
-const styleTemplates: StyleTemplate[] = [
-  { code: "editorial-clear", version: 1, name: "清晰雜誌風", note: "大標題、留白及清楚的資訊層次", formats: ["carousel", "single_image"], tone: "專業・易讀", palette: ["#f6f2eb", "#6b2c30", "#c7e63a"] },
-  { code: "product-focus", version: 1, name: "產品主角", note: "突出產品、功能及一個主要賣點", formats: ["carousel", "single_image", "short_video"], tone: "直接・商業", palette: ["#ffffff", "#202126", "#d9bbb5"] },
-  { code: "problem-solution", version: 1, name: "問題與解決方案", note: "先呈現痛點，再逐步交代解決方法", formats: ["carousel", "short_video"], tone: "實用・有說服力", palette: ["#fff4cf", "#202126", "#b46a61"] },
-  { code: "creator-natural", version: 1, name: "Creator 日常感", note: "自然生活場景、第一身分享及真實語氣", formats: ["single_image", "short_video"], tone: "親切・自然", palette: ["#efe8df", "#4d2023", "#8ca67a"] },
-  { code: "bold-social", version: 1, name: "社交媒體重點式", note: "強烈開場、短句及高辨識度畫面", formats: ["carousel", "single_image", "short_video"], tone: "鮮明・有節奏", palette: ["#202126", "#f6d260", "#ffffff"] },
 ];
 
 const stageLabels: Record<Project["stage"], string> = {
@@ -1082,7 +1073,7 @@ export default function ContentStudioPage() {
           </div>
           {permissions?.canManagePrompt ? (
             <button className="secondary" onClick={openPromptManager}>
-              內容規則
+              品牌內容設定
             </button>
           ) : null}
         </header>
@@ -1365,6 +1356,10 @@ export default function ContentStudioPage() {
                         </button>
                       ))}
                     </div>
+                    {styleTemplates.find((template) => template.code === selectedStyleCode) ? (() => {
+                      const rules = styleTemplates.find((template) => template.code === selectedStyleCode)!;
+                      return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>SOON Style Library · v{rules.version} · 規格只供查看</small></details>;
+                    })() : null}
                     <div className="actions">
                       <button className="secondary" type="button" onClick={() => goToStep("format")}>← 修改格式</button>
                       <button type="button" disabled={saving || !selectedStyleCode} onClick={() => {
@@ -2373,7 +2368,7 @@ export default function ContentStudioPage() {
             <header>
               <div>
                 <span>只限 Owner</span>
-                <h2>Workspace Prompt 管理</h2>
+                <h2>品牌內容設定</h2>
                 <p>
                   {promptVersion
                     ? `目前版本 v${promptVersion}；儲存會建立新版本`
@@ -2401,7 +2396,7 @@ export default function ContentStudioPage() {
               />
             </label>
             <label>
-              <span>Content Master／格式判斷 Prompt</span>
+              <span>品牌格式偏好</span>
               <textarea
                 value={prompt.formatPrompt}
                 onChange={(event) =>
@@ -2494,4 +2489,5 @@ const editingStyles = `
   .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
   .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span,.style-intro small{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>button{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>button:hover{transform:translateY(-2px)}.style-template-grid>button.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:118px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:16px;overflow:hidden}.template-preview>i{position:absolute;width:76px;height:76px;right:-15px;top:-17px;border-radius:50%}.template-preview>strong{position:relative;font-size:28px;letter-spacing:-.06em}.template-preview>span{position:relative;display:grid;gap:5px}.template-preview>span b{display:block;width:78%;height:5px;border-radius:9px;background:currentColor;opacity:.7}.template-preview>span b:last-child{width:48%;opacity:.35}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}.template-copy>em{color:#999;font-size:8px;font-style:normal}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
+  .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
 `;
