@@ -382,12 +382,17 @@ export default function ContentStudioPage() {
         window.location.search,
       ).get("project");
       setSelectedId((current) => {
-        const preferred = requestedProjectId || current;
-        return preferred &&
-          payload.projects?.some((item: Project) => item.id === preferred)
-          ? preferred
-          : payload.projects?.[0]?.id || null;
+        if (requestedProjectId && incomingProjects.some((item) => item.id === requestedProjectId)) {
+          return requestedProjectId;
+        }
+        if (isInitialLoad) return null;
+        return current && incomingProjects.some((item) => item.id === current) ? current : null;
       });
+      if (isInitialLoad && !requestedProjectId) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("step");
+        window.history.replaceState(null, "", url);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能載入內容製作");
     } finally {
@@ -402,6 +407,28 @@ export default function ContentStudioPage() {
     window.addEventListener(WORKSPACE_CHANGED_EVENT, changed);
     return () => window.removeEventListener(WORKSPACE_CHANGED_EVENT, changed);
   }, []);
+
+  function openProject(project: Project) {
+    setSelectedId(project.id);
+    const step = latestAvailableStep(project);
+    setActiveStep(step);
+    const url = new URL(window.location.href);
+    url.searchParams.set("project", project.id);
+    url.searchParams.set("step", step);
+    window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function openNewContent() {
+    setSelectedId(null);
+    setMessage("");
+    setActiveStep("format");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("project");
+    url.searchParams.delete("step");
+    window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   useEffect(() => {
     if (!selected) return;
@@ -512,10 +539,13 @@ export default function ContentStudioPage() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.project?.id) throw new Error(payload?.detail || payload?.error || "未能建立內容");
-      setProjects([payload.project]);
+      setProjects((current) => [payload.project, ...current.filter((item) => item.id !== payload.project.id)]);
       setSelectedId(payload.project.id);
       setSelectedFormat(format.outputFormat);
       if (format.videoMethod) setVideoMethod(format.videoMethod);
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", payload.project.id);
+      window.history.replaceState(null, "", url);
       goToStep("brief");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能建立內容");
@@ -543,11 +573,8 @@ export default function ContentStudioPage() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.detail || payload?.error || "未能刪除內容");
 
-      setProjects((current) => {
-        const remaining = current.filter((item) => item.id !== project.id);
-        if (selectedId === project.id) setSelectedId(remaining[0]?.id || null);
-        return remaining;
-      });
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      if (selectedId === project.id) openNewContent();
       setMessage("內容已刪除");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能刪除內容");
@@ -1166,6 +1193,7 @@ export default function ContentStudioPage() {
               <strong>製作中</strong>
               <span>{projects.length}</span>
             </div>
+            <button type="button" className="new-project-button" onClick={openNewContent}>＋ 建立新內容</button>
             {loading ? (
               <p className="empty">正在整理內容…</p>
             ) : projects.length ? (
@@ -1177,7 +1205,7 @@ export default function ContentStudioPage() {
                   <button
                     type="button"
                     className="project-select-button"
-                    onClick={() => setSelectedId(project.id)}
+                    onClick={() => openProject(project)}
                   >
                     <strong>{project.title}</strong>
                     <div className="project-creator">
@@ -2521,6 +2549,7 @@ export default function ContentStudioPage() {
 }
 
 const styles = `
+  .project-list>.new-project-button{display:block!important;width:100%!important;min-height:42px;margin:0 0 13px!important;border:1px solid #c9aaa5!important;border-radius:10px!important;background:#f7eee9!important;color:#6b2c30!important;-webkit-text-fill-color:#6b2c30!important;padding:10px 12px!important;font:inherit;font-size:12px!important;font-weight:800!important;text-align:left;cursor:pointer}.project-list>.new-project-button:hover{border-color:#6b2c30!important;background:#f2e3de!important}
   .site-nav{display:none}.studio-page{min-height:100vh;background:#f7f7f8;color:#202126;display:grid;grid-template-columns:240px minmax(0,1fr)}.studio-shell{min-width:0;background:#fff}.studio-topbar{min-height:72px;border-bottom:1px solid #ebecef;padding:0 28px;display:flex;align-items:center;justify-content:space-between}.studio-topbar h1{font-size:22px;margin:0}.studio-topbar p{font-size:13px;color:#777b84;margin:4px 0 0}.studio-topbar button,.actions button,.prompt-modal footer button{border:0;border-radius:10px;padding:11px 17px;background:#111;color:#fff;font-weight:750;cursor:pointer}.secondary{background:#f0f1f3!important;color:#27292e!important}.studio-layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 72px)}.project-list{min-width:0;background:#f7f7f8;border-right:1px solid #e8e9ec;padding:20px 14px}.project-list>div{display:flex;justify-content:space-between;padding:0 8px 12px}.project-list>div span{color:#8a8e96}.project-list>button{width:100%;border:1px solid transparent;background:transparent;border-radius:12px;text-align:left;padding:13px;margin-bottom:7px;display:grid;gap:5px;cursor:pointer}.project-list>button.active{background:#fff;border-color:#dedfe3;box-shadow:0 5px 18px rgba(0,0,0,.05)}.project-list button span{font-size:11px;color:#777b84}.project-list button strong{font-size:14px;line-height:1.35}.project-list button em{font-style:normal;font-size:11px;color:#a0a3aa}.empty{font-size:13px;color:#8a8e96;padding:20px 8px;line-height:1.6}.studio-workspace{min-width:0;padding:30px;max-width:1050px;width:100%;box-sizing:border-box}.project-head{display:flex;justify-content:space-between;gap:30px;align-items:flex-start;margin-bottom:26px}.project-head>div>span{font-size:12px;font-weight:750;color:#777b84}.project-head h2{font-size:25px;line-height:1.3;margin:6px 0}.project-head a{font-size:12px;color:#555961}.stage-track{display:flex;align-items:center;gap:8px;white-space:nowrap;padding-top:8px}.stage-track b{font-size:11px;color:#a4a7ae}.stage-track b.done{color:#111}.stage-track i{display:block;width:26px;height:1px;background:#d9dadd}.editor-card{min-width:0;border:1px solid #e1e2e5;border-radius:18px;padding:26px;box-shadow:0 10px 35px rgba(20,22,26,.05)}.section-title{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ededee;padding-bottom:18px;margin-bottom:22px}.section-title span{font-size:10px;font-weight:800;letter-spacing:.1em;color:#888c94}.section-title h3{margin:4px 0 0;font-size:20px}.section-title em{font-size:11px;color:#8c9098;font-style:normal}.editor-card label,.prompt-modal label{display:grid;gap:7px;margin:15px 0}.editor-card label>span,.prompt-modal label>span{font-size:12px;font-weight:750;color:#555961}.editor-card input,.editor-card textarea,.prompt-modal input,.prompt-modal textarea{appearance:none;border:1px solid #dfe1e5;border-radius:10px;padding:12px 13px;font:inherit;resize:vertical;background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important;color-scheme:light}.editor-card input::placeholder,.editor-card textarea::placeholder,.prompt-modal input::placeholder,.prompt-modal textarea::placeholder{color:#8b8e95!important;-webkit-text-fill-color:#8b8e95!important;opacity:1}.editor-card textarea{min-height:90px}.two-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.angle-field{display:grid;gap:9px;margin:18px 0}.angle-field>span{font-size:12px;font-weight:750;color:#555961}.angle-field small{color:#8b8f97;font-size:11px}.angle-options{display:flex;gap:8px;flex-wrap:wrap}.angle-options button{border:1px solid #dfe1e5;background:#fff;color:#2b2d31;border-radius:999px;padding:9px 13px;font-weight:700;cursor:pointer}.angle-options button.active{background:#111;color:#fff;border-color:#111}.actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px;flex-wrap:wrap}.actions button:disabled{opacity:.45;cursor:not-allowed}.format-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.format-grid button{border:1px solid #dedfe3;background:#fafafa;border-radius:13px;padding:17px;text-align:left;display:grid;gap:5px;cursor:pointer}.format-grid button.active{background:#111;color:#fff;border-color:#111}.format-grid span{font-size:12px;color:#7d8189}.format-grid .active span{color:#ccc}.production-ready{text-align:center;padding:45px 20px}.production-ready b{display:grid;place-items:center;margin:auto;width:44px;height:44px;border-radius:50%;background:#e8f8ed;color:#20813d;font-size:20px}.production-ready h4{font-size:19px;margin:14px 0 7px}.production-ready p{max-width:500px;margin:auto;color:#737780;line-height:1.6}.structure-result{display:grid;gap:22px}.structure-status{display:flex;gap:14px;align-items:flex-start;background:#f5faf6;border-radius:13px;padding:16px}.structure-status>b{display:grid;place-items:center;flex:0 0 32px;height:32px;border-radius:50%;background:#dff4e5;color:#20813d}.structure-status h4,.story-pages>h4{margin:2px 0 6px;font-size:16px}.structure-status p{margin:0;color:#646971;line-height:1.55}.fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fact-grid section{background:#f7f7f8;border-radius:12px;padding:14px}.fact-grid h5,.structure-sources h5{margin:0 0 9px;font-size:12px}.fact-grid ul{margin:0;padding-left:17px;color:#5f636b;font-size:12px;line-height:1.55}.story-pages{display:grid;gap:9px}.story-pages article{display:grid;grid-template-columns:48px 1fr;gap:12px;border:1px solid #e4e5e8;border-radius:12px;padding:13px}.story-pages article>span{font-size:11px;font-weight:800;background:#111;color:#fff;border-radius:8px;padding:7px;height:max-content;text-align:center}.story-pages h5{margin:1px 0 6px}.story-pages p{font-size:12px;color:#656a72;line-height:1.5;margin:3px 0}.story-pages p strong{color:#2b2e33}.structure-sources{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.structure-sources h5{width:100%}.structure-sources a{font-size:11px;color:#454951;background:#f1f2f4;padding:7px 10px;border-radius:999px;text-decoration:none}.next-production{border:1px dashed #cfd2d7;border-radius:12px;padding:15px}.next-production p{margin:5px 0 0;color:#747880;font-size:12px}.studio-message{background:#f4f4f5;border-radius:9px;padding:10px 13px;font-size:12px}.welcome{text-align:center;padding:100px 20px}.welcome>span{font-size:40px}.welcome h2{margin:14px 0 8px}.welcome p{color:#777b84}.welcome a{display:inline-block;background:#111;color:#fff;border-radius:10px;padding:11px 16px;text-decoration:none;margin-top:10px}.welcome small{display:block;margin-top:18px;color:#a33}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.46);z-index:100;display:grid;place-items:center;padding:22px}.prompt-modal{background:#fff!important;color:#111!important;color-scheme:light;width:min(760px,100%);max-height:90vh;overflow:auto;border-radius:18px;padding:24px}.prompt-modal header{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:15px}.prompt-modal header span{font-size:10px;font-weight:800;background:#fff0c2;padding:4px 7px;border-radius:6px}.prompt-modal h2{margin:8px 0 3px;color:#111}.prompt-modal header p{margin:0;color:#777;font-size:12px}.prompt-modal header button{border:0;background:transparent;color:#111;font-size:25px;cursor:pointer}.prompt-modal textarea{min-height:130px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.prompt-modal footer{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}@media(max-width:900px){.studio-page{display:block;width:100%;max-width:100vw}.studio-shell,.studio-layout,.project-list,.studio-workspace,.editor-card{min-width:0;max-width:100%}.studio-layout{display:block}.project-list{border-right:0;border-bottom:1px solid #ddd}.project-head{display:block}.stage-track{max-width:100%;margin-top:18px;overflow-x:auto;padding-bottom:6px}.two-fields,.format-grid,.fact-grid{grid-template-columns:1fr}.studio-workspace{padding:20px;overflow:hidden}}
 `;
 
