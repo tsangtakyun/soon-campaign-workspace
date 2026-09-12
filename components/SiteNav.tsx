@@ -59,7 +59,7 @@ export default function SiteNav() {
           <Link href="/#workflow">內容流程</Link>
           <Link href="/#about">關於 SOON</Link>
           <Link href="/#pricing">定價</Link>
-          <Link href="/login?google=1">登入</Link>
+          <Link href="/login">登入</Link>
           <Link href="/contact" className="nav-secondary">
             聯絡我們
           </Link>

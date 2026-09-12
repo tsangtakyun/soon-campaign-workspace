@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -12,15 +12,13 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
   const next = normalizeAuthNext(searchParams.get('next'))
-  const startGoogleAutomatically = searchParams.get('google') === '1'
-  const automaticGoogleStarted = useRef(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState<'google' | 'email' | ''>('')
   const [message, setMessage] = useState('')
 
-  const handleGoogleLogin = useCallback(async () => {
+  async function handleGoogleLogin() {
     setLoading('google')
     document.cookie = `soon_auth_next=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax`
     document.cookie = 'soon_auth_flow=login; Path=/; Max-Age=600; SameSite=Lax'
@@ -34,13 +32,7 @@ function LoginContent() {
         },
       },
     })
-  }, [next])
-
-  useEffect(() => {
-    if (!startGoogleAutomatically || automaticGoogleStarted.current) return
-    automaticGoogleStarted.current = true
-    void handleGoogleLogin()
-  }, [handleGoogleLogin, startGoogleAutomatically])
+  }
 
   async function handleEmailLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
