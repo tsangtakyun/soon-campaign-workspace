@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/DashboardSidebar";
 import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingSession";
 import { SoonLoading } from "@/components/ui/SoonLoading";
+import { SoonIcon, type SoonIconName } from "@/components/ui/SoonIcon";
 import { contentStyleTemplates as styleTemplates } from "@/lib/content-style-library";
 import {
   resolveActiveWorkspace,
@@ -97,15 +98,15 @@ const studioSteps: { id: StudioStep; label: string }[] = [
 ];
 
 const formats = [
-  { id: "carousel", outputFormat: "carousel", videoMethod: null, label: "輪播貼文", note: "以多張圖片逐步說明內容", icon: "▣" },
-  { id: "single_image", outputFormat: "single_image", videoMethod: null, label: "單張貼文", note: "以一張主視覺傳達一個重點", icon: "□" },
+  { id: "carousel", outputFormat: "carousel", videoMethod: null, label: "輪播貼文", note: "多張圖片，逐步說清一個故事", icon: "carousel" as SoonIconName },
+  { id: "single_image", outputFormat: "single_image", videoMethod: null, label: "單張貼文", note: "一張主視覺，集中傳達一個重點", icon: "image" as SoonIconName },
   {
     id: "human_video",
     outputFormat: "short_video",
     videoMethod: "human_filming",
     label: "真人短片",
     note: "提供腳本、分鏡及拍攝清單",
-    icon: "●",
+    icon: "creator" as SoonIconName,
   },
   {
     id: "ai_video",
@@ -113,7 +114,7 @@ const formats = [
     videoMethod: "ai_video_generation",
     label: "AI 短片",
     note: "建立畫面、旁白及影片生成指示",
-    icon: "✦",
+    icon: "spark" as SoonIconName,
   },
 ];
 
@@ -1067,15 +1068,7 @@ export default function ContentStudioPage() {
       <DashboardSidebar activeItem="內容製作" />
       <section className="studio-shell">
         <header className="studio-topbar">
-          <div>
-            <h1>內容製作</h1>
-            <p>{workspace?.brandName || workspace?.name || "目前工作台"} · 選擇格式 → 建立 Brief → 製作</p>
-          </div>
-          {permissions?.canManagePrompt ? (
-            <button className="secondary" onClick={openPromptManager}>
-              品牌內容設定
-            </button>
-          ) : null}
+          <h1>內容製作</h1>
         </header>
 
         <div className="studio-layout">
@@ -1251,6 +1244,7 @@ export default function ContentStudioPage() {
                       {formats.map((format) => (
                         <button
                           key={format.id}
+                          data-format={format.id}
                           className={
                             selectedFormat === format.outputFormat && (format.videoMethod === null || videoMethod === format.videoMethod) ? "active" : ""
                           }
@@ -1261,7 +1255,7 @@ export default function ContentStudioPage() {
                             setSelectedStyleCode(recommended?.code || "");
                           }}
                         >
-                          <i aria-hidden="true">{format.icon}</i>
+                          <i><SoonIcon name={format.icon} size={24} /></i>
                           <span><strong>{format.label}</strong><small>{format.note}</small></span>
                         </button>
                       ))}
@@ -2342,8 +2336,8 @@ export default function ContentStudioPage() {
                 </div>
                 <div className="format-grid entry-format-grid">
                   {formats.map((format) => (
-                    <button key={format.id} type="button" disabled={startingProject || !permissions?.canEdit} onClick={() => void startNewProject(format)}>
-                      <i aria-hidden="true">{format.icon}</i>
+                    <button key={format.id} data-format={format.id} type="button" disabled={startingProject || !permissions?.canEdit} onClick={() => void startNewProject(format)}>
+                      <i><SoonIcon name={format.icon} size={24} /></i>
                       <span><strong>{format.label}</strong><small>{format.note}</small></span>
                     </button>
                   ))}
@@ -2490,4 +2484,5 @@ const editingStyles = `
   .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span,.style-intro small{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>button{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>button:hover{transform:translateY(-2px)}.style-template-grid>button.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:118px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:16px;overflow:hidden}.template-preview>i{position:absolute;width:76px;height:76px;right:-15px;top:-17px;border-radius:50%}.template-preview>strong{position:relative;font-size:28px;letter-spacing:-.06em}.template-preview>span{position:relative;display:grid;gap:5px}.template-preview>span b{display:block;width:78%;height:5px;border-radius:9px;background:currentColor;opacity:.7}.template-preview>span b:last-child{width:48%;opacity:.35}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}.template-copy>em{color:#999;font-size:8px;font-style:normal}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
+  .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}
 `;
