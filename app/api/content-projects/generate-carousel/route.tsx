@@ -541,7 +541,7 @@ export async function POST(req: Request) {
       fontFile.byteOffset + fontFile.byteLength,
     ) as ArrayBuffer;
     const editorialFontFile = await readFile(
-      path.join(process.cwd(), "public/fonts/max32002/SweiJaySerifCJKtc-Regular.woff2"),
+      path.join(process.cwd(), "public/fonts/max32002/NotoSerifCJKtc-Regular.otf"),
     );
     const editorialFont = editorialFontFile.buffer.slice(
       editorialFontFile.byteOffset,
