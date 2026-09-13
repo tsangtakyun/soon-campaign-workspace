@@ -43,10 +43,6 @@ const box = (style: React.CSSProperties, children: React.ReactNode) =>
 
 const DEFAULT_CAROUSEL_FONT = "SOON Rounded CJK";
 const EDITORIAL_CAROUSEL_FONT = "SOON Editorial CJK";
-const ROUNDED_BOLD_FONT_URL =
-  "https://raw.githubusercontent.com/max32002/swei-gothic/master/WebFont/CJK%20TC/SweiGothicCJKtc-Bold.woff";
-
-let roundedBoldFontPromise: Promise<ArrayBuffer> | null = null;
 
 async function prepareImageSource(url: string) {
   const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
@@ -75,21 +71,6 @@ function resolveCarouselFontFamily(fontStyle?: string | null) {
     return DEFAULT_CAROUSEL_FONT;
   }
   return DEFAULT_CAROUSEL_FONT;
-}
-
-async function loadRoundedBoldFont(fallback: ArrayBuffer) {
-  if (!roundedBoldFontPromise) {
-    roundedBoldFontPromise = fetch(ROUNDED_BOLD_FONT_URL)
-      .then((response) => {
-        if (!response.ok) throw new Error(`Bold font HTTP ${response.status}`);
-        return response.arrayBuffer();
-      })
-      .catch((error) => {
-        console.warn("[content-projects/generate-carousel] bold font fallback", error);
-        return fallback;
-      });
-  }
-  return roundedBoldFontPromise;
 }
 
 async function renderPage(
@@ -549,7 +530,9 @@ export async function POST(req: Request) {
     ) as ArrayBuffer;
     const fonts = {
       regular: font,
-      bold: await loadRoundedBoldFont(font),
+      // ImageResponse/Satori cannot parse WOFF2. Register only local TTF/OTF
+      // buffers so the renderer never receives a webfont with that signature.
+      bold: font,
       family: resolveCarouselFontFamily(workspace?.font_style),
       editorial: editorialFont,
     };
