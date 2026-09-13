@@ -1614,8 +1614,8 @@ export default function ContentStudioPage() {
                     <div className="angle-field">
                       <div className="direction-heading">
                         <div>
-                          <span>想用哪個方向製作？</span>
-                          <small>SOON 會根據你提供的資料，建議最合適的內容方向。</small>
+                          <span>{directionRecommendations.length ? "SOON 建議的製作方向" : "讓 SOON 整理今次內容"}</span>
+                          <small>{directionRecommendations.length ? "選擇一個方向，或重新分析取得其他建議。" : "SOON 會分析內容重點、合適方向及製作安排。"}</small>
                         </div>
                         <button
                           type="button"
@@ -1624,7 +1624,7 @@ export default function ContentStudioPage() {
                           onClick={() => void recommendDirections()}
                         >
                           <SoonIcon name={recommendingDirections ? "refresh" : "spark"} size={16} />
-                          {recommendingDirections ? "正在分析…" : directionRecommendations.length ? "重新分析" : "讓 SOON 分析"}
+                          {recommendingDirections ? "正在分析…" : directionRecommendations.length ? "重新分析" : "分析內容"}
                         </button>
                       </div>
                       {!brief.summary.trim() ? <p className="direction-hint">先在上方貼上資料，SOON 才能提供合適建議。</p> : null}
@@ -1705,6 +1705,7 @@ export default function ContentStudioPage() {
                         disabled={
                           saving ||
                           !brief.summary.trim() ||
+                          !directionRecommendations.length ||
                           !permissions?.canEdit
                         }
                         onClick={() =>
@@ -1736,7 +1737,7 @@ export default function ContentStudioPage() {
                           )
                         }
                       >
-                        確認 Brief →
+                        {directionRecommendations.length ? "確認 Brief →" : "請先分析內容"}
                       </button>
                     </div>
                   </div>
