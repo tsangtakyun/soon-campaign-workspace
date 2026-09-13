@@ -329,6 +329,7 @@ export default function ContentStudioPage() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [generatingCarousel, setGeneratingCarousel] = useState(false);
   const [message, setMessage] = useState("");
+  const [studioLoadError, setStudioLoadError] = useState(false);
   const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
   const [directionRecommendations, setDirectionRecommendations] = useState<DirectionRecommendation[]>([]);
   const [recommendingDirections, setRecommendingDirections] = useState(false);
@@ -451,12 +452,30 @@ export default function ContentStudioPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  async function fetchStudioData(url: string, attempts = 3) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (response.ok || response.status < 500 || attempt === attempts - 1) {
+          return response;
+        }
+      } catch (error) {
+        lastError = error;
+        if (attempt === attempts - 1) throw error;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 350 * 2 ** attempt));
+    }
+    throw lastError instanceof Error ? lastError : new Error("未能載入內容製作");
+  }
+
   async function loadStudio() {
     const isInitialLoad = !studioLoadedRef.current;
     if (isInitialLoad) {
       setLoading(true);
       setMessage("");
     }
+    setStudioLoadError(false);
     try {
       const resolved = await resolveActiveWorkspace();
       setWorkspace(resolved.activeWorkspace);
@@ -465,9 +484,8 @@ export default function ContentStudioPage() {
         setProjects([]);
         return;
       }
-      const response = await fetch(
+      const response = await fetchStudioData(
         `/api/content-projects?workspaceId=${encodeURIComponent(resolved.workspaceId)}`,
-        { cache: "no-store" },
       );
       const payload = await response.json().catch(() => null);
       if (response.status === 403) {
@@ -493,26 +511,31 @@ export default function ContentStudioPage() {
         });
       });
       setPermissions(payload.permissions || null);
-      const brandResponse = await fetch(
-        `/api/brand-kit-data?workspace_id=${encodeURIComponent(resolved.workspaceId)}`,
-        { cache: "no-store" },
-      );
-      const brandPayload = await brandResponse.json().catch(() => null);
-      setBrandLibraryAssets(
-        brandResponse.ok && Array.isArray(brandPayload?.assets)
-          ? brandPayload.assets
-              .filter((asset: any) => typeof asset?.url === "string")
-              .map((asset: any) => ({
-                id: `brand-${asset.id}`,
-                url: asset.url,
-                filename: asset.filename || "品牌素材",
-                width: Number(asset.width) || 1080,
-                height: Number(asset.height) || 1080,
-                assignedPage: "auto",
-                isCover: false,
-              }))
-          : [],
-      );
+      try {
+        const brandResponse = await fetchStudioData(
+          `/api/brand-kit-data?workspace_id=${encodeURIComponent(resolved.workspaceId)}`,
+          2,
+        );
+        const brandPayload = await brandResponse.json().catch(() => null);
+        setBrandLibraryAssets(
+          brandResponse.ok && Array.isArray(brandPayload?.assets)
+            ? brandPayload.assets
+                .filter((asset: any) => typeof asset?.url === "string")
+                .map((asset: any) => ({
+                  id: `brand-${asset.id}`,
+                  url: asset.url,
+                  filename: asset.filename || "品牌素材",
+                  width: Number(asset.width) || 1080,
+                  height: Number(asset.height) || 1080,
+                  assignedPage: "auto",
+                  isCover: false,
+                }))
+            : [],
+        );
+      } catch {
+        // Brand assets are optional and should not prevent the studio from loading.
+        setBrandLibraryAssets([]);
+      }
       const requestedProjectId = new URLSearchParams(
         window.location.search,
       ).get("project");
@@ -529,7 +552,8 @@ export default function ContentStudioPage() {
         window.history.replaceState(null, "", url);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "未能載入內容製作");
+      setStudioLoadError(true);
+      setMessage("連線暫時中斷，請重新載入內容。");
     } finally {
       studioLoadedRef.current = true;
       setLoading(false);
@@ -2728,7 +2752,14 @@ export default function ContentStudioPage() {
                   ))}
                 </div>
                 <div className="entry-topic-link"><span>已有題材但未決定格式？</span><Link href="/onboarding/topic-library">先到題材庫查看 →</Link></div>
-                {startingProject ? <p className="studio-message">正在建立內容…</p> : message ? <p className="studio-message">{message}</p> : null}
+                {startingProject ? (
+                  <p className="studio-message">正在建立內容…</p>
+                ) : studioLoadError ? (
+                  <div className="studio-load-error" role="alert">
+                    <span>{message}</span>
+                    <button type="button" onClick={() => void loadStudio()}>重新載入</button>
+                  </div>
+                ) : message ? <p className="studio-message">{message}</p> : null}
               </div>
             )}
           </section>
@@ -2873,6 +2904,7 @@ const editingStyles = `
   .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>article{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>article:hover{transform:translateY(-2px)}.style-template-grid>article.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:150px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:7px;padding:17px;overflow:hidden}.template-preview>i{position:absolute;width:78px;height:78px;right:-16px;top:-20px;border-radius:50%}.template-preview>small{position:relative;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.template-preview>strong{position:relative;max-width:88%;font-size:22px;line-height:1.05;letter-spacing:-.045em}.template-preview>p{position:relative;margin:0;font-size:9px;line-height:1.35;opacity:.75}.template-preview[data-style="product-focus"]{justify-content:center}.template-preview[data-style="product-focus"]>i{width:54px;height:88px;right:22px;top:26px;border-radius:8px;box-shadow:9px 9px 0 rgba(0,0,0,.08)}.template-preview[data-style="product-focus"]>strong,.template-preview[data-style="product-focus"]>p{max-width:58%}.template-preview[data-style="problem-solution"]>strong{font-size:20px}.template-preview[data-style="bold-social"]>strong{font-size:25px;text-transform:uppercase}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
   .brief-source-field textarea{min-height:150px;font-size:15px;line-height:1.65}.brief-source-field>small{color:var(--soon-muted);font-size:11px}.structure-evidence{border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:13px 15px}.structure-evidence>summary,.page-visual-detail>summary{cursor:pointer;font-size:11px;font-weight:800;color:var(--soon-oxblood)}.structure-evidence>p{color:var(--soon-muted);font-size:11px;line-height:1.55}.structure-evidence .fact-grid{margin-top:12px}.story-pages article:not(:has(.page-editor)) p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.page-visual-detail{margin-top:8px}.page-visual-detail p{display:block!important;margin-top:8px!important}.studio-message{position:relative;margin-top:14px!important;border:1px solid #dbc8c1;border-radius:12px!important;background:#f7eee9!important;color:var(--soon-oxblood)!important;padding:15px 16px 15px 44px!important;font-size:14px!important;font-weight:750;line-height:1.45}.studio-message:before{content:"";position:absolute;left:17px;top:17px;width:12px;height:12px;border:2px solid #c9aaa5;border-top-color:var(--soon-oxblood);border-radius:50%;animation:studio-loading-spin .8s linear infinite}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
+  .studio-load-error{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dbc8c1;border-radius:12px;background:#f7eee9;padding:13px 15px;color:var(--soon-oxblood);font-size:13px;font-weight:750}.studio-load-error button{flex:none;border:1px solid var(--soon-oxblood);border-radius:9px;background:#fff;color:var(--soon-oxblood);padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}@media(max-width:560px){.studio-load-error{align-items:flex-start;flex-direction:column}.studio-load-error button{width:100%}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
   .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}
 `;

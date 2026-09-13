@@ -70,10 +70,33 @@ export function clearActiveWorkspaceId() {
   window.dispatchEvent(new CustomEvent(WORKSPACE_CHANGED_EVENT, { detail: { workspaceId: null } }))
 }
 
+async function fetchWorkspaceList(attempts = 3) {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch('/api/workspaces', { cache: 'no-store' })
+      if (response.ok || response.status < 500 || attempt === attempts - 1) {
+        return response
+      }
+    } catch (error) {
+      lastError = error
+      if (attempt === attempts - 1) throw error
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 350 * 2 ** attempt))
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('未能載入工作空間')
+}
+
 export async function resolveActiveWorkspace() {
   const storedWorkspaceId = getActiveWorkspaceId()
-  const workspaceResponse = await fetch('/api/workspaces', { cache: 'no-store' })
+  const workspaceResponse = await fetchWorkspaceList()
   const workspacePayload = await workspaceResponse.json().catch(() => null)
+  if (!workspaceResponse.ok) {
+    throw new Error(workspacePayload?.error || '未能載入工作空間')
+  }
   const workspaces = Array.isArray(workspacePayload?.workspaces)
     ? (workspacePayload.workspaces as WorkspaceSummary[])
     : []
