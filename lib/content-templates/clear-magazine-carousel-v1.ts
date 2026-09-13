@@ -22,5 +22,7 @@ export const clearMagazineCarouselV1 = {
 } as const;
 
 export function isClearMagazineCarousel(templateCode?: string | null) {
-  return templateCode === clearMagazineCarouselV1.code || templateCode === clearMagazineCarouselV1.sourceStyleCode;
+  return templateCode === clearMagazineCarouselV1.code
+    || templateCode === clearMagazineCarouselV1.sourceStyleCode
+    || templateCode === "editorial-clear";
 }
