@@ -953,19 +953,30 @@ export default function ContentStudioPage() {
     }
 
     setAssetUploadStatus({ type: "progress", text: `正在轉換 ${file.name}…` });
+    let convertedBlob: Blob | null = null;
     try {
       const { default: heic2any } = await import("heic2any");
       const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-      const blob = Array.isArray(converted) ? converted[0] : converted;
-      if (!blob) throw new Error("轉換結果為空白");
-      return new File(
-        [blob],
-        file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-        { type: "image/jpeg", lastModified: file.lastModified },
-      );
+      convertedBlob = Array.isArray(converted) ? converted[0] : converted;
     } catch {
+      setAssetUploadStatus({ type: "progress", text: `正在以兼容模式讀取 ${file.name}…` });
+      try {
+        const { heicTo } = await import("heic-to/csp");
+        const converted = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
+        convertedBlob = converted instanceof Blob ? converted : null;
+      } catch {
+        convertedBlob = null;
+      }
+    }
+
+    if (!convertedBlob) {
       throw new Error(`未能讀取 ${file.name}，請確認檔案完整或先在相片 App 匯出為 JPEG`);
     }
+    return new File(
+      [convertedBlob],
+      file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+      { type: "image/jpeg", lastModified: file.lastModified },
+    );
   }
 
   async function uploadProjectAssets(event: ChangeEvent<HTMLInputElement>) {
