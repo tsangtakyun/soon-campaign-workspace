@@ -88,6 +88,23 @@ export async function POST(req: Request) {
       : {}
     const styleRules = contentStylePromptFromDecision(formatDecision, project.selected_format)
     const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
+    const templateContract = formatDecision.templateContractSnapshot && typeof formatDecision.templateContractSnapshot === 'object'
+      ? formatDecision.templateContractSnapshot as Record<string, unknown>
+      : null
+    const contractRoles = Array.isArray(templateContract?.page_roles)
+      ? templateContract.page_roles
+          .map((item) => item && typeof item === 'object' && 'role' in item ? String(item.role) : '')
+          .filter(Boolean)
+      : []
+    const roleInstruction = project.selected_format === 'carousel' && contractRoles.length
+      ? [
+          `Template 的完整參考結構為 ${contractRoles.length} 頁：${contractRoles.join(' → ')}。`,
+          `用家已選擇 ${slideCount} 頁，頁數選擇優先於 Template 的完整頁數；不得擅自增加頁面。`,
+          slideCount < contractRoles.length
+            ? '請保留 cover 與 end，將最相近的中段功能自然合併。合併後每頁仍只可有一個清晰主旨，最後一頁同時承擔總結及 CTA。'
+            : '請按 Template 角色順序分配內容；如頁數較多，只可拆細中段，不可重複同一訊息。',
+        ].join('\n')
+      : ''
     const formatInstruction = project.selected_format === 'single_image'
       ? '這是單張貼文。pages 必須只輸出 P.1，集中一個最清晰的視覺訊息。'
       : project.selected_format === 'short_video'
@@ -105,6 +122,7 @@ export async function POST(req: Request) {
       '',
       '【SOON Style 製作規格】',
       styleRules,
+      roleInstruction,
       '',
       '【本次 Project】',
       `題目：${project.title}`,
@@ -123,9 +141,12 @@ export async function POST(req: Request) {
       '  "selfReportedClaims": ["當事人或原帖自述"],',
       '  "unverifiedClaims": ["未能獨立核實或需要再查證的說法"],',
       '  "sources": [{"label":"來源名稱","url":"https://..."}],',
-      '  "pages": [{"page":"P.1","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
+      '  "pages": [{"page":"P.1","role":"cover|content|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
       '}',
       'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
+      '輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 使用簡潔書面語，建議不超過 18 個中文字。',
+      'copyDirection 只保留該頁必要內容，使用 2 至 3 個短句，建議不超過 70 個中文字；地址、價格、營業時間及免責資料不要分散重複。',
+      '不得使用過度絕對或來源未支持的標題，例如「不是工廠製作」；應改為準確的比較或描述。',
       'confirmedFacts 只可包含來源內容或來源連結明確支持的事實；品牌自述必須放入 selfReportedClaims。',
       '如沒有外部來源連結，confirmedFacts 必須是空陣列。不得以一般常識補充解剖、生物力學、醫療或訓練原理；這些內容只能列為待核實，亦不得寫入 pages。',
     ].join('\n')
