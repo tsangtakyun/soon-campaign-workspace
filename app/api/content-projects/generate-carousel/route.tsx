@@ -21,6 +21,7 @@ type Draft = {
   body?: string[];
   assetId?: string;
   layout?: string;
+  role?: string;
 };
 
 type Asset = { id: string; url: string; width?: number; height?: number };
@@ -335,10 +336,18 @@ async function renderPage(
   );
 }
 
-function clearMagazineRole(index: number, total: number) {
+type ClearMagazineRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
+
+function clearMagazineRole(index: number, total: number): ClearMagazineRole {
   if (index === 0) return "cover";
   if (index === total - 1) return "end";
-  return ["longform", "split", "comparison", "feature"][(index - 1) % 4];
+  // The reference set has six artboards, but the customer's chosen slide count
+  // remains authoritative. A five-page carousel keeps the distinct cover,
+  // long-form, split, comparison and end roles instead of shrinking six pages.
+  const middle: ClearMagazineRole[] = total <= 5
+    ? ["longform", "split", "comparison"]
+    : ["longform", "split", "comparison", "feature"];
+  return middle[Math.min(index - 1, middle.length - 1)];
 }
 
 async function renderClearMagazinePage(
@@ -348,26 +357,30 @@ async function renderClearMagazinePage(
   total: number,
   fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string },
   branding: { logoUrl?: string | null; name: string; colors?: string[] },
+  secondaryAsset?: Asset,
 ) {
-  const role = clearMagazineRole(index, total);
+  const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
+  const role = (["cover", "longform", "split", "comparison", "feature", "end"] as const)
+    .includes(requestedRole as ClearMagazineRole)
+    ? requestedRole as ClearMagazineRole
+    : clearMagazineRole(index, total);
   const colors = branding.colors || [];
   const accent = colors[0] || "#f1d443";
-  const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#151515";
-  const paper = "#f4efe7";
-  const page = draft.page || `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
-  const body = (Array.isArray(draft.body) ? draft.body : []).slice(0, 4);
+  const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#050505";
+  const page = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+  const body = (Array.isArray(draft.body) ? draft.body : []).filter(Boolean).slice(0, 4);
   const source = asset?.url;
-  const picture = (style: React.CSSProperties) => source
-    ? React.createElement("img", { src: source, width: 1080, height: 1350, style: { objectFit: "cover", ...style } })
+  const picture = (style: React.CSSProperties, url = source) => url
+    ? React.createElement("img", { src: url, width: 1080, height: 1350, style: { objectFit: "cover", ...style } })
     : box({ ...style, background: "#d9d4cc" }, null);
   const logo = branding.logoUrl
     ? React.createElement("img", { src: branding.logoUrl, width: 42, height: 42, style: { width: 42, height: 42, objectFit: "contain" } })
     : React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } }, branding.name);
-  const textBlock = (options: { color: string; headlineSize?: number; align?: "left" | "center" }) =>
+  const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean }) =>
     box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
       React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 24, fontWeight: 700, marginBottom: 18 } }, draft.subheadline || "重點整理"),
       React.createElement("strong", { key: "head", style: { display: "flex", fontSize: options.headlineSize || 58, lineHeight: 1.14, letterSpacing: "-2px" } }, draft.headline || ""),
-      ...body.map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: 29, lineHeight: 1.42, marginTop: bodyIndex === 0 ? 28 : 6 } }, line)),
+      ...(options.showBody === false ? [] : body.map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: options.bodySize || 31, lineHeight: 1.45, marginTop: bodyIndex === 0 ? 28 : 8 } }, line))),
     ]);
   const chrome = (color: string) => [
     React.createElement("div", { key: "logo", style: { position: "absolute", display: "flex", left: 58, top: 48, color } }, logo),
@@ -379,40 +392,48 @@ async function renderClearMagazinePage(
       picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      box({ position: "absolute", left: 58, right: 58, bottom: 74, display: "flex", flexDirection: "column" }, [
-        textBlock({ color: "white", headlineSize: 68 }),
+      box({ position: "absolute", left: 68, right: 68, bottom: 66, display: "flex", flexDirection: "column" }, [
+        textBlock({ color: "white", headlineSize: 72, bodySize: 28 }),
         React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontSize: 42, marginTop: 20 } }, "→"),
       ]),
     ]);
   } else if (role === "end") {
-    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "150px 58px 0" }, [
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "155px 66px 0" }, [
       ...chrome("white"),
-      textBlock({ color: "white", headlineSize: 59 }),
-      box({ position: "absolute", left: 58, right: 58, bottom: 58, height: 470, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
-      React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: 80, bottom: 82, padding: "15px 22px", background: accent, color: dark, fontSize: 23, fontWeight: 700 } }, "了解更多 →"),
+      textBlock({ color: "white", headlineSize: 61, bodySize: 31 }),
+      box({ position: "absolute", left: 0, bottom: 0, width: 820, height: 555, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: 62, bottom: 84, padding: "18px 28px", borderRadius: 22, background: accent, color: dark, fontSize: 24, fontWeight: 700 } }, "了解更多 →"),
     ]);
   } else if (role === "comparison") {
-    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: paper, padding: "145px 58px 55px" }, [
-      ...chrome(dark),
-      textBlock({ color: dark, headlineSize: 52 }),
-      box({ display: "flex", gap: 18, flex: 1, marginTop: 32 }, [
-        box({ flex: 1, flexDirection: "column", overflow: "hidden", background: "white" }, [picture({ width: "100%", height: 290 }), React.createElement("b", { key: "l", style: { display: "flex", padding: 20, fontSize: 25 } }, body[0] || "比較一")]),
-        box({ flex: 1, flexDirection: "column", overflow: "hidden", background: accent }, [picture({ width: "100%", height: 290, filter: "saturate(.78)" }), React.createElement("b", { key: "r", style: { display: "flex", padding: 20, fontSize: 25 } }, body[1] || "比較二")]),
-      ]),
-    ]);
-  } else if (role === "split" || role === "feature") {
-    const imageOnRight = role === "feature";
-    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "145px 58px 58px", gap: 34, flexDirection: imageOnRight ? "row" : "column" }, [
+    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark, color: "white", padding: "150px 70px 62px" }, [
       ...chrome("white"),
-      box({ flex: imageOnRight ? 1 : "0 0 46%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
-      box({ flex: 1, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: imageOnRight ? 48 : 54 })),
+      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 29, fontWeight: 700 } }, draft.subheadline || "真正分別"),
+      React.createElement("strong", { key: "head", style: { display: "flex", alignSelf: "center", textAlign: "center", fontSize: 57, lineHeight: 1.16, margin: "42px 30px 38px" } }, draft.headline || ""),
+      box({ display: "flex", gap: 70, justifyContent: "center" }, [
+        box({ width: 340, height: 380, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#f36a2d" }, [picture({ width: "100%", height: 285 }), React.createElement("b", { key: "l", style: { display: "flex", padding: "18px 20px", fontSize: 25 } }, body[0] || "比較一")]),
+        box({ width: 340, height: 380, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#477877" }, [picture({ width: "100%", height: 285 }, secondaryAsset?.url), React.createElement("b", { key: "r", style: { display: "flex", padding: "18px 20px", fontSize: 25 } }, body[1] || "比較二")]),
+      ]),
+      React.createElement("span", { key: "summary", style: { display: "flex", textAlign: "center", alignSelf: "center", fontSize: 30, lineHeight: 1.45, margin: "38px 54px 0" } }, body.slice(2).join("\n") || draft.subheadline || ""),
+    ]);
+  } else if (role === "split") {
+    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
+      ...chrome("white"),
+      box({ height: 700, width: "100%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      box({ flex: 1, padding: "42px 72px 58px" }, textBlock({ color: "white", headlineSize: 58, bodySize: 31 })),
+    ]);
+  } else if (role === "feature") {
+    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "150px 60px 62px", gap: 38 }, [
+      ...chrome("white"),
+      box({ width: 420, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 56, bodySize: 31 })),
+      box({ flex: 1, height: 940, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
     ]);
   } else {
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.9),rgba(0,0,0,.08))" }, null),
       ...chrome("white"),
-      box({ position: "absolute", left: 58, right: 58, bottom: 70 }, textBlock({ color: "white", headlineSize: 58 })),
+      box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "rgba(0,0,0,.48)" }, null),
+      box({ position: "absolute", left: 72, right: 72, top: 155 }, textBlock({ color: "white", headlineSize: 65, bodySize: 38 })),
     ]);
   }
   return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: fonts.family, position: "relative", overflow: "hidden" }, content), {
@@ -523,8 +544,12 @@ export async function POST(req: Request) {
       const preparedAsset = asset?.url
         ? { ...asset, url: preparedImageUrls.get(asset.url) || asset.url }
         : asset;
+      const secondarySource = assets.find((item) => item.id !== draft.assetId && item.url);
+      const secondaryAsset = secondarySource?.url
+        ? { ...secondarySource, url: preparedImageUrls.get(secondarySource.url) || secondarySource.url }
+        : undefined;
       const response = isClearMagazineCarousel(templateCode)
-        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding)
+        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset)
         : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;

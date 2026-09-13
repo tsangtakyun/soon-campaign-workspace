@@ -87,6 +87,11 @@ export async function POST(req: Request) {
 
     const pages = project.production.pages || [];
     const assets = project.production.assets || [];
+    const isClearMagazine = ["clear-magazine-carousel-v1", "clear_magazine_carousel", "editorial-clear"]
+      .includes(String(project.format_decision?.renderTemplateCode || project.format_decision?.templateCode || ""));
+    const clearMagazineRoles = pages.length <= 5
+      ? ["cover", "longform", "split", "comparison", "end"]
+      : ["cover", "longform", "split", "comparison", "feature", "end"];
     const videoMethod = project.format_decision?.videoMethod === "ai_video_generation"
       ? "ai_video_generation"
       : "human_filming";
@@ -107,7 +112,12 @@ export async function POST(req: Request) {
             ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
             : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
-          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"已提供素材 id 或空字串","layout":"cover|editorial_article","designDirection":"具體排版方向"}]}',
+          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"已提供素材 id 或空字串","layout":"頁面角色","designDirection":"具體排版方向"}]}',
+          ...(isClearMagazine ? [
+            `清晰雜誌風必須依次使用以下頁型：${clearMagazineRoles.slice(0, pages.length).join(" → ")}。`,
+            "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
+            "comparison 頁的 body[0] 與 body[1] 是左右兩項標籤，其餘段落才是比較結論。",
+          ] : []),
         ];
     const input = [
       ...outputInstruction,
