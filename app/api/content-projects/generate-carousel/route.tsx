@@ -42,6 +42,7 @@ const box = (style: React.CSSProperties, children: React.ReactNode) =>
   );
 
 const DEFAULT_CAROUSEL_FONT = "SOON Rounded CJK";
+const EDITORIAL_CAROUSEL_FONT = "SOON Editorial CJK";
 const ROUNDED_BOLD_FONT_URL =
   "https://raw.githubusercontent.com/max32002/swei-gothic/master/WebFont/CJK%20TC/SweiGothicCJKtc-Bold.woff";
 
@@ -355,9 +356,10 @@ async function renderClearMagazinePage(
   asset: Asset | undefined,
   index: number,
   total: number,
-  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string },
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer },
   branding: { logoUrl?: string | null; name: string; colors?: string[] },
   secondaryAsset?: Asset,
+  hasBrandFont = false,
 ) {
   const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
   const role = (["cover", "longform", "split", "comparison", "feature", "end"] as const)
@@ -368,7 +370,15 @@ async function renderClearMagazinePage(
   const accent = colors[0] || "#f1d443";
   const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#050505";
   const page = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
-  const body = (Array.isArray(draft.body) ? draft.body : []).filter(Boolean).slice(0, 4);
+  const editorialFamily = hasBrandFont ? fonts.family : EDITORIAL_CAROUSEL_FONT;
+  const clamp = (value: string | undefined, max: number) => {
+    const clean = String(value || "").trim();
+    return clean.length > max ? `${clean.slice(0, max).trim()}…` : clean;
+  };
+  const body = (Array.isArray(draft.body) ? draft.body : [])
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((line) => clamp(line, 54));
   const source = asset?.url;
   const picture = (style: React.CSSProperties, url = source) => url
     ? React.createElement("img", { src: url, width: 1080, height: 1350, style: { objectFit: "cover", ...style } })
@@ -378,8 +388,8 @@ async function renderClearMagazinePage(
     : React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } }, branding.name);
   const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean }) =>
     box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
-      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 24, fontWeight: 700, marginBottom: 18 } }, draft.subheadline || "重點整理"),
-      React.createElement("strong", { key: "head", style: { display: "flex", fontSize: options.headlineSize || 58, lineHeight: 1.14, letterSpacing: "-2px" } }, draft.headline || ""),
+      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 24, fontWeight: 700, marginBottom: 18 } }, clamp(draft.subheadline || "重點整理", 28)),
+      React.createElement("strong", { key: "head", style: { display: "flex", fontSize: options.headlineSize || 58, lineHeight: 1.14, letterSpacing: "-2px" } }, clamp(draft.headline, 24)),
       ...(options.showBody === false ? [] : body.map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: options.bodySize || 31, lineHeight: 1.45, marginTop: bodyIndex === 0 ? 28 : 8 } }, line))),
     ]);
   const chrome = (color: string) => [
@@ -436,12 +446,14 @@ async function renderClearMagazinePage(
       box({ position: "absolute", left: 72, right: 72, top: 155 }, textBlock({ color: "white", headlineSize: 65, bodySize: 38 })),
     ]);
   }
-  return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: fonts.family, position: "relative", overflow: "hidden" }, content), {
+  return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: editorialFamily, position: "relative", overflow: "hidden" }, content), {
     width: 1080,
     height: 1350,
     fonts: [
       { name: fonts.family, data: fonts.regular, weight: 400 },
       { name: fonts.family, data: fonts.bold, weight: 700 },
+      { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 400 },
+      { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 700 },
     ],
   });
 }
@@ -528,10 +540,18 @@ export async function POST(req: Request) {
       fontFile.byteOffset,
       fontFile.byteOffset + fontFile.byteLength,
     ) as ArrayBuffer;
+    const editorialFontFile = await readFile(
+      path.join(process.cwd(), "public/fonts/max32002/SweiJaySerifCJKtc-Regular.woff2"),
+    );
+    const editorialFont = editorialFontFile.buffer.slice(
+      editorialFontFile.byteOffset,
+      editorialFontFile.byteOffset + editorialFontFile.byteLength,
+    ) as ArrayBuffer;
     const fonts = {
       regular: font,
       bold: await loadRoundedBoldFont(font),
       family: resolveCarouselFontFamily(workspace?.font_style),
+      editorial: editorialFont,
     };
     const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
     const preparedImageUrls = new Map(
@@ -549,7 +569,7 @@ export async function POST(req: Request) {
         ? { ...secondarySource, url: preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
       const response = isClearMagazineCarousel(templateCode)
-        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset)
+        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, Boolean(workspace?.font_style))
         : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;
