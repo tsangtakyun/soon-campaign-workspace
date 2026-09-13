@@ -328,6 +328,7 @@ export default function ContentStudioPage() {
   const [startingProject, setStartingProject] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [generatingCarousel, setGeneratingCarousel] = useState(false);
+  const autoGenerationProjectRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
   const [studioLoadError, setStudioLoadError] = useState(false);
   const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
@@ -1335,7 +1336,7 @@ export default function ContentStudioPage() {
       return;
     }
     const isVideo = selected.selected_format === "short_video";
-    const confirmed = await saveProject(
+    await saveProject(
       {
         production: {
           ...selected.production,
@@ -1346,7 +1347,6 @@ export default function ContentStudioPage() {
       isVideo ? "短片製作包已確認，可以提交審批" : "內容草稿已確認，已進入圖片生成階段",
       "carousel",
     );
-    if (confirmed && !isVideo) await generateCarouselImages();
   }
 
   async function submitVideoPackage() {
@@ -1434,6 +1434,27 @@ export default function ContentStudioPage() {
       : /(未能|失敗|中斷|請先)/.test(message)
         ? "error"
         : "success";
+
+  useEffect(() => {
+    if (
+      activeStep !== "carousel" ||
+      selected?.selected_format === "short_video" ||
+      selected?.production?.productionStatus !== "drafts_confirmed" ||
+      saving ||
+      generatingCarousel ||
+      autoGenerationProjectRef.current === selected?.id
+    )
+      return;
+    autoGenerationProjectRef.current = selected.id;
+    void generateCarouselImages();
+  }, [
+    activeStep,
+    generatingCarousel,
+    saving,
+    selected?.id,
+    selected?.production?.productionStatus,
+    selected?.selected_format,
+  ]);
 
   useEffect(() => {
     if (!message || messageTone !== "success") return;
