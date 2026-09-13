@@ -328,6 +328,7 @@ export default function ContentStudioPage() {
   const [startingProject, setStartingProject] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [generatingCarousel, setGeneratingCarousel] = useState(false);
+  const [generatingStructure, setGeneratingStructure] = useState(false);
   const autoGenerationProjectRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
   const [studioLoadError, setStudioLoadError] = useState(false);
@@ -841,7 +842,8 @@ export default function ContentStudioPage() {
   async function generateStructure() {
     if (!workspaceId || !selected || !permissions?.canEdit) return;
     setSaving(true);
-    setMessage("正在核對資料及整理內容順序，通常需要約半分鐘…");
+    setGeneratingStructure(true);
+    setMessage("");
     try {
       const response = await fetch("/api/content-projects/generate-structure", {
         method: "POST",
@@ -863,6 +865,7 @@ export default function ContentStudioPage() {
       setMessage(error instanceof Error ? error.message : "未能生成故事結構");
     } finally {
       setSaving(false);
+      setGeneratingStructure(false);
     }
   }
 
@@ -1896,7 +1899,7 @@ export default function ContentStudioPage() {
                             templateCreatorCommit: coreTemplate?.version.creatorCommit || null,
                             templateSelectedAt: new Date().toISOString(),
                           },
-                        }, "正在核對資料及整理內容順序…", "structure", [{
+                        }, "", "structure", [{
                           eventType: selected.format_decision?.templateCode && selected.format_decision.templateCode !== selectedStyleCode ? "changed" : "selected",
                           dimension: "template",
                           value: selectedStyleCode,
@@ -2748,13 +2751,13 @@ export default function ContentStudioPage() {
                         ) : null}
                       </div>
                     ) : (
-                      <div className="production-ready">
-                        <b className={saving ? "working" : ""}>{saving ? "" : "!"}</b>
-                        <h4>{saving ? "正在整理內容順序" : "尚未建立內容順序"}</h4>
-                        <p>{saving ? "SOON 正在核對資料，並整理每一頁的內容重點…" : "請返回風格頁重新選擇內容風格。"}</p>
+                      <div className={`production-ready${generatingStructure ? " is-generating" : ""}`} role={generatingStructure ? "status" : undefined} aria-live="polite">
+                        <b className={generatingStructure ? "working" : ""}>{generatingStructure ? "" : "!"}</b>
+                        <h4>{generatingStructure ? `正在整理 ${carouselSlideCount} 頁內容` : "尚未建立內容順序"}</h4>
+                        <p>{generatingStructure ? "SOON 正在核對你提供的資料，並按照所選模板安排每一頁。完成後會自動顯示內容順序，毋須再次按鈕。" : "請返回風格頁重新選擇內容風格。"}</p>
                       </div>
                     )}
-                    {saving && !selected.production?.status ? null : <div className="actions">
+                    {generatingStructure ? null : <div className="actions">
                       <button
                         className="secondary"
                         disabled={saving}

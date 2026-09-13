@@ -96,11 +96,22 @@ export async function POST(req: Request) {
           .map((item) => item && typeof item === 'object' && 'role' in item ? String(item.role) : '')
           .filter(Boolean)
       : []
+    const roleDefinitions = [
+      'cover：用一句吸引人的開場及一個清晰承諾帶出主題。',
+      'longform：解釋主題的核心價值或背景，不得重複封面開場。',
+      'split：把一個流程、步驟或兩組互相關聯的內容清楚拆開。',
+      'comparison：作明確的並列比較，讓讀者一眼看出差異。',
+      'feature：整理口味、產品選擇、功能或其他具體賣點。',
+      'end：只保留總結、行動呼籲及必要店舖資料。',
+    ].join('\n')
     const roleInstruction = project.selected_format === 'carousel' && contractRoles.length
       ? [
           `Template 的完整參考結構為 ${contractRoles.length} 頁：${contractRoles.join(' → ')}。`,
           `用家已選擇 ${slideCount} 頁，頁數選擇優先於 Template 的完整頁數；不得擅自增加頁面。`,
-          slideCount < contractRoles.length
+          `各角色功能如下：\n${roleDefinitions}`,
+          slideCount === contractRoles.length
+            ? '頁數與 Template 完整結構相同。每一頁的 role 必須按位置逐一完全對應上述角色，不得改名、互換或用相鄰頁重複同一訊息。'
+            : slideCount < contractRoles.length
             ? '請保留 cover 與 end，將最相近的中段功能自然合併。合併後每頁仍只可有一個清晰主旨，最後一頁同時承擔總結及 CTA。'
             : '請按 Template 角色順序分配內容；如頁數較多，只可拆細中段，不可重複同一訊息。',
         ].join('\n')
@@ -141,7 +152,7 @@ export async function POST(req: Request) {
       '  "selfReportedClaims": ["當事人或原帖自述"],',
       '  "unverifiedClaims": ["未能獨立核實或需要再查證的說法"],',
       '  "sources": [{"label":"來源名稱","url":"https://..."}],',
-      '  "pages": [{"page":"P.1","role":"cover|content|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
+      '  "pages": [{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
       '}',
       'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
       '輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 使用簡潔書面語，建議不超過 18 個中文字。',
