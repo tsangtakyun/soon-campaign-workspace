@@ -101,6 +101,17 @@ type CorePublishedStyle = {
     rules: Record<string, unknown>;
   };
   evidence?: { confirmedReferenceCount?: number };
+  templates?: Array<{
+    templateId: string;
+    code: string;
+    version: {
+      number: number;
+      rendererCode: string;
+      contentHash: string;
+      creatorCommit?: string | null;
+      contract: Record<string, unknown>;
+    };
+  }>;
 };
 
 type DisplayStyle = ContentStyleTemplate & {
@@ -1674,6 +1685,7 @@ export default function ContentStudioPage() {
                       <button type="button" disabled={saving || !selectedStyleCode} onClick={() => {
                         const template = displayStyles.find((item) => item.code === selectedStyleCode);
                         const core = template?.core;
+                        const coreTemplate = core?.templates?.[0];
                         void saveProject({
                           formatDecision: {
                             ...(selected.format_decision || {}),
@@ -1682,14 +1694,21 @@ export default function ContentStudioPage() {
                             templateSource: template?.source || "soon_creator",
                             templateName: template?.name || selectedStyleCode,
                             templateTone: template?.tone || "",
-                            renderTemplateCode: isClearMagazineCarousel(selectedStyleCode)
-                              ? clearMagazineCarouselV1.code
-                              : selectedStyleCode,
+                            renderTemplateCode: coreTemplate?.version.rendererCode
+                              || (isClearMagazineCarousel(selectedStyleCode)
+                                ? clearMagazineCarouselV1.code
+                                : selectedStyleCode),
                             styleId: core?.styleId || null,
                             styleVersionId: core?.version.id || null,
                             styleVersionRef: core?.version.ref || null,
                             styleContentHash: core?.version.contentHash || null,
                             styleRulesSnapshot: core?.version.rules || null,
+                            templateRegistryId: coreTemplate?.templateId || null,
+                            templateRegistryCode: coreTemplate?.code || null,
+                            templateRegistryVersion: coreTemplate?.version.number || null,
+                            templateContentHash: coreTemplate?.version.contentHash || null,
+                            templateContractSnapshot: coreTemplate?.version.contract || null,
+                            templateCreatorCommit: coreTemplate?.version.creatorCommit || null,
                             templateSelectedAt: new Date().toISOString(),
                           },
                         }, "內容風格已儲存，下一步建立內容結構", "structure", [{
@@ -1697,7 +1716,15 @@ export default function ContentStudioPage() {
                           dimension: "template",
                           value: selectedStyleCode,
                           previousValue: typeof selected.format_decision?.templateCode === "string" ? selected.format_decision.templateCode : null,
-                          metadata: { templateVersion: template?.version || 1, templateSource: template?.source || "soon_creator", styleVersionRef: core?.version.ref || null, format: selected.selected_format },
+                          metadata: {
+                            templateVersion: coreTemplate?.version.number || template?.version || 1,
+                            templateSource: template?.source || "soon_creator",
+                            styleVersionRef: core?.version.ref || null,
+                            templateRegistryId: coreTemplate?.templateId || null,
+                            templateContentHash: coreTemplate?.version.contentHash || null,
+                            rendererCode: coreTemplate?.version.rendererCode || null,
+                            format: selected.selected_format,
+                          },
                         }]);
                       }}>{saving ? "儲存中…" : "使用這個風格 →"}</button>
                     </div>
