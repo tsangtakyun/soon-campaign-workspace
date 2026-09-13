@@ -1335,7 +1335,7 @@ export default function ContentStudioPage() {
       return;
     }
     const isVideo = selected.selected_format === "short_video";
-    await saveProject(
+    const confirmed = await saveProject(
       {
         production: {
           ...selected.production,
@@ -1346,6 +1346,7 @@ export default function ContentStudioPage() {
       isVideo ? "短片製作包已確認，可以提交審批" : "內容草稿已確認，已進入圖片生成階段",
       "carousel",
     );
+    if (confirmed && !isVideo) await generateCarouselImages();
   }
 
   async function submitVideoPackage() {
@@ -2466,7 +2467,7 @@ export default function ContentStudioPage() {
                                       disabled={saving || editingDraft !== null}
                                       onClick={() => void confirmPageDrafts()}
                                     >
-                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "確認草稿，進入圖片生成 →"}
+                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "確認內容並製作圖片 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus === "package_ready" ? (
@@ -2486,12 +2487,12 @@ export default function ContentStudioPage() {
                                       <b>
                                         {generatingCarousel
                                           ? selected.selected_format === "single_image" ? "正在生成單張貼文" : "正在生成全套輪播圖片"
-                                          : selected.selected_format === "single_image" ? "下一步｜生成單張貼文" : "下一步｜生成全套輪播圖片"}
+                                          : selected.selected_format === "single_image" ? "準備繼續製作單張貼文" : "準備繼續製作輪播圖片"}
                                       </b>
                                       <p>
                                         {generatingCarousel
                                           ? "正在並行處理每一頁，完成後圖片會直接出現，請勿關閉頁面…"
-                                          : `系統會按已確認文案、圖片配對及內容規則，輸出 ${selected.selected_format === "single_image" ? "1 張" : "全套"} 1080 × 1350 px 圖片`}
+                                          : "上次製作未有完成，你可以由這裡繼續。"}
                                       </p>
                                     </div>
                                     <button
@@ -2502,8 +2503,8 @@ export default function ContentStudioPage() {
                                       }
                                     >
                                       {generatingCarousel
-                                        ? "生成中…"
-                                        : selected.selected_format === "single_image" ? "開始生成單張貼文 →" : "開始生成全套輪播圖片 →"}
+                                        ? "生成中，毋須再按"
+                                        : "繼續製作 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus ===
