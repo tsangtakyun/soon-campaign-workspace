@@ -20,6 +20,11 @@ type Recommendation = {
 }
 
 const clean = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : ''
+const normalizeSlideCount = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return null
+  const count = Math.round(Number(value))
+  return Number.isFinite(count) ? Math.min(10, Math.max(3, count)) : null
+}
 
 function normalize(value: unknown): Recommendation[] {
   if (!Array.isArray(value)) return []
@@ -65,6 +70,9 @@ export async function POST(request: Request) {
       access.admin.from('brand_kits').select('business_name,business_type,elevator_pitch,audience,market_positioning,brand_profile').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
     ])
 
+    let coreRecommendations: Recommendation[] = []
+    let coreSlideCount: number | null = null
+    let coreSlideCountReason = ''
     const coreKey = process.env.SOON_CORE_KNOWLEDGE_KEY
     if (coreKey) {
       try {
@@ -76,8 +84,17 @@ export async function POST(request: Request) {
         })
         if (response.ok) {
           const payload = await response.json()
-          const recommendations = normalize(payload?.recommendations)
-          if (recommendations.length) return NextResponse.json({ recommendations, source: 'soon_core' })
+          coreRecommendations = normalize(payload?.recommendations)
+          coreSlideCount = normalizeSlideCount(payload?.recommendedSlideCount)
+          coreSlideCountReason = clean(payload?.slideCountReason, 180)
+          if (coreRecommendations.length && (format !== 'carousel' || coreSlideCount)) {
+            return NextResponse.json({
+              recommendations: coreRecommendations,
+              recommendedSlideCount: coreSlideCount,
+              slideCountReason: coreSlideCountReason,
+              source: 'soon_core',
+            })
+          }
         }
       } catch (error) {
         console.error('[content-directions] Core recommendation unavailable', error)
@@ -85,14 +102,19 @@ export async function POST(request: Request) {
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) return NextResponse.json({ recommendations: fallback(summary), source: 'fallback' })
+    if (!apiKey) return NextResponse.json({
+      recommendations: coreRecommendations.length ? coreRecommendations : fallback(summary),
+      recommendedSlideCount: coreSlideCount,
+      slideCountReason: coreSlideCountReason,
+      source: coreRecommendations.length ? 'soon_core' : 'fallback',
+    })
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL), max_tokens: 1200, temperature: 0.3,
         system: 'You are SOON, a senior Hong Kong content strategist. Return valid JSON only. Use concise polished Traditional Chinese. Never invent claims or facts.',
-        messages: [{ role: 'user', content: `根據以下資料推薦剛好 3 個明顯不同、可直接製作的內容方向。每個方向只需一個核心概念。\n格式：${format}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n只輸出 {"recommendations":[{"id":"stable-slug","title":"最多14字","concept":"一句具體構想","reason":"一句適合原因","hook":"示例開場句","category":"內容分類","version":"ai-v1"}]}` }],
+        messages: [{ role: 'user', content: `根據以下資料推薦剛好 3 個明顯不同、可直接製作的內容方向。每個方向只需一個核心概念。\n格式：${format}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n${format === 'carousel' ? '同時按題材可拆成的獨立內容重點，建議 3 至 10 張輪播圖片。張數必須足以完整講清故事，但不可為湊數而重複內容。recommendedSlideCount 必須是 3 至 10 的整數。' : 'recommendedSlideCount 必須是 null。'}\n只輸出 {"recommendations":[{"id":"stable-slug","title":"最多14字","concept":"一句具體構想","reason":"一句適合原因","hook":"示例開場句","category":"內容分類","version":"ai-v1"}],"recommendedSlideCount":${format === 'carousel' ? '6' : 'null'},"slideCountReason":"一句具體解釋內容可如何分頁"}` }],
       }),
     })
     const data = await response.json()
@@ -100,7 +122,13 @@ export async function POST(request: Request) {
     const output = Array.isArray(data.content) ? data.content.find((item: any) => item.type === 'text')?.text : ''
     const parsed = JSON.parse(String(output || '').replace(/^```json\s*|\s*```$/g, ''))
     const recommendations = normalize(parsed?.recommendations)
-    return NextResponse.json({ recommendations: recommendations.length ? recommendations : fallback(summary), source: recommendations.length ? 'creator_ai' : 'fallback' })
+    const recommendedSlideCount = format === 'carousel' ? normalizeSlideCount(parsed?.recommendedSlideCount) : null
+    return NextResponse.json({
+      recommendations: recommendations.length ? recommendations : (coreRecommendations.length ? coreRecommendations : fallback(summary)),
+      recommendedSlideCount,
+      slideCountReason: recommendedSlideCount ? clean(parsed?.slideCountReason, 180) : '',
+      source: recommendations.length ? 'creator_ai' : (coreRecommendations.length ? 'soon_core' : 'fallback'),
+    })
   } catch (error) {
     console.error('[content-directions] recommendation failed', error)
     return NextResponse.json({ error: '未能取得內容方向建議', detail: String(error) }, { status: 500 })

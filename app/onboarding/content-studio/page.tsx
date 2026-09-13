@@ -79,16 +79,6 @@ type Permissions = {
   role: string;
 };
 
-function recommendedCarouselSlides(project: Project | null) {
-  const source = [project?.source_note, project?.brief?.summary, project?.title]
-    .filter(Boolean)
-    .join("\n");
-  if (source.length >= 1800) return 8;
-  if (source.length >= 900) return 6;
-  if (source.length >= 420) return 5;
-  return 4;
-}
-
 type PreferenceEvent = {
   eventType: "selected" | "changed" | "rejected" | "edited" | "approved" | "published" | "performed";
   dimension: "format" | "template" | "production_method" | "copy" | "design";
@@ -344,6 +334,8 @@ export default function ContentStudioPage() {
   const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
   const [directionRecommendations, setDirectionRecommendations] = useState<DirectionRecommendation[]>([]);
   const [recommendingDirections, setRecommendingDirections] = useState(false);
+  const [recommendedSlideCount, setRecommendedSlideCount] = useState<number | null>(null);
+  const [slideCountReason, setSlideCountReason] = useState("");
   const [customDirectionsOpen, setCustomDirectionsOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState("");
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
@@ -379,10 +371,6 @@ export default function ContentStudioPage() {
   const selected = useMemo(
     () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId],
-  );
-  const suggestedCarouselSlideCount = useMemo(
-    () => recommendedCarouselSlides(selected),
-    [selected],
   );
   const visibleStudioSteps = useMemo(
     () => selected?.selected_format === "short_video"
@@ -624,6 +612,16 @@ export default function ContentStudioPage() {
       if (!response.ok) throw new Error(payload?.detail || payload?.error || "未能取得內容方向建議");
       const recommendations = Array.isArray(payload?.recommendations) ? payload.recommendations : [];
       setDirectionRecommendations(recommendations);
+      const hasSlideCount = payload?.recommendedSlideCount !== null && payload?.recommendedSlideCount !== undefined && payload?.recommendedSlideCount !== "";
+      const slideCount = Number(payload?.recommendedSlideCount);
+      const normalizedSlideCount = hasSlideCount && Number.isFinite(slideCount)
+        ? Math.min(10, Math.max(3, Math.round(slideCount)))
+        : null;
+      setRecommendedSlideCount(normalizedSlideCount);
+      setSlideCountReason(typeof payload?.slideCountReason === "string" ? payload.slideCountReason : "");
+      if ((selected.selected_format || selectedFormat) === "carousel" && normalizedSlideCount) {
+        setCarouselSlideCount(normalizedSlideCount);
+      }
       if (recommendations[0]) {
         setBrief((current) => ({
           ...current,
@@ -650,6 +648,8 @@ export default function ContentStudioPage() {
       directionSource: selected.brief?.directionSource || "",
     });
     setDirectionRecommendations([]);
+    setRecommendedSlideCount(null);
+    setSlideCountReason("");
     setCustomDirectionsOpen(false);
     setSelectedFormat(selected.selected_format || "");
     setCarouselSlideCount(
@@ -1601,9 +1601,12 @@ export default function ContentStudioPage() {
                       <span>貼上資料或描述今次想製作的內容</span>
                       <textarea
                         value={brief.summary}
-                        onChange={(event) =>
-                          setBrief({ ...brief, summary: event.target.value })
-                        }
+                        onChange={(event) => {
+                          setBrief({ ...brief, summary: event.target.value });
+                          setDirectionRecommendations([]);
+                          setRecommendedSlideCount(null);
+                          setSlideCountReason("");
+                        }}
                         placeholder={"例如：貼上文章、產品資料、活動詳情或你的想法。\n資料未完整亦可以，SOON 會協助整理。"}
                       />
                       <small>可以直接貼上原文，毋須先整理成 Brief。</small>
@@ -1621,7 +1624,7 @@ export default function ContentStudioPage() {
                           onClick={() => void recommendDirections()}
                         >
                           <SoonIcon name={recommendingDirections ? "refresh" : "spark"} size={16} />
-                          {recommendingDirections ? "正在分析…" : directionRecommendations.length ? "換一批方向" : "讓 SOON 建議"}
+                          {recommendingDirections ? "正在分析…" : directionRecommendations.length ? "重新分析" : "讓 SOON 分析"}
                         </button>
                       </div>
                       {!brief.summary.trim() ? <p className="direction-hint">先在上方貼上資料，SOON 才能提供合適建議。</p> : null}
@@ -1651,6 +1654,26 @@ export default function ContentStudioPage() {
                             </button>
                           ))}
                         </div>
+                      ) : null}
+                      {(selected.selected_format || selectedFormat) === "carousel" && directionRecommendations.length ? (
+                        <section className="slide-count-recommendation" aria-label="輪播張數">
+                          <div>
+                            <strong>{recommendedSlideCount ? `SOON 建議製作 ${recommendedSlideCount} 張` : "選擇輪播張數"}</strong>
+                            <small>{slideCountReason || "你可以按今次需要選擇 3–10 張。"}</small>
+                          </div>
+                          <div className="quantity-options" aria-label="選擇輪播圖片數量">
+                            {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
+                              <button
+                                type="button"
+                                key={count}
+                                className={carouselSlideCount === count ? "active" : ""}
+                                onClick={() => setCarouselSlideCount(count)}
+                              >
+                                {count} 張{count === recommendedSlideCount ? <small>SOON 建議</small> : null}
+                              </button>
+                            ))}
+                          </div>
+                        </section>
                       ) : null}
                       <button type="button" className="custom-directions-toggle" onClick={() => setCustomDirectionsOpen((open) => !open)}>
                         自行選擇方向 <SoonIcon name="chevron-down" size={14} />
@@ -1686,7 +1709,18 @@ export default function ContentStudioPage() {
                         }
                         onClick={() =>
                           saveProject(
-                            { brief, stage: "production" },
+                            {
+                              brief,
+                              stage: "production",
+                              formatDecision: {
+                                ...(selected.format_decision || {}),
+                                ...(selected.selected_format === "carousel" ? {
+                                  slideCount: carouselSlideCount,
+                                  slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
+                                  slideCountReason: slideCountReason || null,
+                                } : {}),
+                              },
+                            },
                             "Brief 已確認，請選擇內容風格",
                             "style",
                             [{
@@ -1726,12 +1760,6 @@ export default function ContentStudioPage() {
                           onClick={() => {
                             setSelectedFormat(format.outputFormat);
                             if (format.videoMethod) setVideoMethod(format.videoMethod);
-                            if (
-                              format.outputFormat === "carousel" &&
-                              !Number(selected?.format_decision?.slideCount)
-                            ) {
-                              setCarouselSlideCount(suggestedCarouselSlideCount);
-                            }
                             const recommended = styleTemplates.find((template) => template.formats.includes(format.outputFormat));
                             setSelectedStyleCode(recommended?.code || "");
                           }}
@@ -1741,26 +1769,6 @@ export default function ContentStudioPage() {
                         </button>
                       ))}
                     </div>
-                    {selectedFormat === "carousel" ? (
-                      <section className="format-settings" aria-label="輪播貼文設定">
-                        <div>
-                          <strong>今次製作幾多張？</strong>
-                          <small>SOON 根據題材建議 {suggestedCarouselSlideCount} 張；你可以自由選擇 3–10 張。</small>
-                        </div>
-                        <div className="quantity-options" aria-label="選擇輪播圖片數量">
-                          {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
-                            <button
-                              type="button"
-                              key={count}
-                              className={carouselSlideCount === count ? "active" : ""}
-                              onClick={() => setCarouselSlideCount(count)}
-                            >
-                              {count} 張{count === suggestedCarouselSlideCount ? <small>建議</small> : null}
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
                     <div className="actions">
                       <button
                         className="secondary"
@@ -1777,7 +1785,6 @@ export default function ContentStudioPage() {
                             {
                               formatDecision: {
                                 ...(selected.format_decision || {}),
-                                slideCount: selectedFormat === "carousel" ? carouselSlideCount : null,
                                 videoMethod: selectedFormat === "short_video" ? videoMethod : null,
                               },
                               selectedFormat,
@@ -2980,7 +2987,7 @@ const editingStyles = `
   .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.page-drafts img,.draft-no-image{width:180px;height:220px;object-fit:contain;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;color:#999;font-size:11px}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.page-drafts img,.draft-no-image{width:100%;height:250px}}
   .draft-layout-detail{margin-top:12px;border-top:1px solid #ece8e3;padding-top:10px}.draft-layout-detail summary{width:max-content;cursor:pointer;color:var(--soon-oxblood);font-size:10px;font-weight:800}.draft-layout-detail p{margin:9px 0 0!important;border-radius:9px;background:#f7f5f2;padding:11px;color:#777b83!important;font-size:10px!important;line-height:1.55!important}.draft-layout-detail:not([open]) p{display:none}
   .studio-page{--soon-ivory:#f6f2eb;--soon-ink:#202126;--soon-oxblood:#6b2c30;--soon-oxblood-dark:#4d2023;--soon-clay:#b46a61;--soon-chartreuse:#c7e63a;--soon-line:#ded5cd;--soon-muted:#6f737d;background:var(--soon-ivory);color:var(--soon-ink)}.studio-shell{background:var(--soon-ivory)}.studio-topbar{min-height:86px;border-color:var(--soon-line);background:rgba(246,242,235,.94);padding:0 34px}.studio-topbar h1{font-size:26px;letter-spacing:-.035em}.studio-topbar p{color:var(--soon-muted)}.studio-topbar .secondary{border:1px solid var(--soon-line);background:#fff!important;color:var(--soon-oxblood)!important}.studio-layout{grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 86px)}.project-list{border-color:var(--soon-line);background:#efe8df;padding:22px 16px}.project-list>div strong{color:var(--soon-oxblood);font-size:12px;letter-spacing:.06em}.project-list-card.active{border-color:#c9aaa5;box-shadow:4px 4px 0 #ddc6c1}.project-list-card.active .project-select-button{background:#fff}.project-delete-button{background:#f7eee9}.studio-workspace{max-width:1120px;padding:32px clamp(20px,4vw,46px)}.editor-card{border-color:var(--soon-line);background:#fff;box-shadow:none}.section-title span{color:var(--soon-oxblood)}.studio-step-nav{border-color:var(--soon-line);background:rgba(246,242,235,.94)}.studio-step-nav button{background:#ebe4dc}.studio-step-nav button.active{background:var(--soon-oxblood);color:#fff}.studio-step-nav button.done{background:#edf6d4;color:#52691a}.studio-step-footer{border-color:var(--soon-line);background:rgba(246,242,235,.96)}.studio-step-footer button,.actions button:not(.secondary),.asset-upload-button,.asset-page-actions button,.draft-start-row button,.draft-confirm-step button,.generation-next-step button,.generated-carousel-head button{background:var(--soon-oxblood);color:#fff}.format-grid button.active,.angle-options button.active,.asset-source-tabs button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood)}.production-ready b,.structure-status>b{background:#edf6d4;color:#52691a}.story-pages article>span,.page-drafts span{background:var(--soon-oxblood)}.welcome a,.generated-download-button{background:var(--soon-oxblood)!important}.next-production,.generation-next-step{border-color:#dce8b6;background:#f3f8e3}.studio-message{background:#f1ebe4;color:var(--soon-oxblood)}@media(max-width:900px){.studio-topbar{min-height:auto;padding:20px}.studio-topbar h1{font-size:23px}.studio-layout{min-height:0}.project-list{background:#efe8df}.studio-workspace{padding:18px 14px 70px}.editor-card{padding:19px 15px}.studio-step-footer{grid-template-columns:1fr 1fr}.studio-step-footer span{grid-column:1/-1;grid-row:1}.studio-step-footer button{min-height:44px}}
-  .format-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.format-settings{display:grid;gap:14px;margin-top:16px;border:2px solid var(--soon-oxblood);border-radius:14px;background:#faf8f4;padding:18px}.format-settings>div:first-child{display:grid;gap:4px}.format-settings small{color:var(--soon-muted);font-size:11px}.quantity-options{display:grid;grid-template-columns:repeat(8,minmax(58px,1fr));gap:8px}.quantity-options button{min-height:48px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:13px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.quantity-options button small{font-size:9px;color:#71852e}.quantity-options button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood);color:#fff}.quantity-options button.active small{color:#e4f6a4}@media(max-width:1100px){.format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quantity-options{grid-template-columns:repeat(4,1fr)}}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.quantity-options{grid-template-columns:repeat(4,1fr)}}
+  .format-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.slide-count-recommendation{display:grid;gap:14px;margin-top:16px;border:1px solid #d7e9a1;border-radius:14px;background:#f6fae8;padding:18px}.slide-count-recommendation>div:first-child{display:grid;gap:4px}.slide-count-recommendation>div:first-child strong{font-size:15px;color:var(--soon-ink)}.slide-count-recommendation>div:first-child small{color:var(--soon-muted);font-size:12px;line-height:1.5}.quantity-options{display:grid;grid-template-columns:repeat(8,minmax(58px,1fr));gap:8px}.quantity-options button{min-height:48px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:13px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.quantity-options button small{font-size:9px;color:#71852e}.quantity-options button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood);color:#fff}.quantity-options button.active small{color:#e4f6a4}@media(max-width:1100px){.format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quantity-options{grid-template-columns:repeat(4,1fr)}}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.quantity-options{grid-template-columns:repeat(4,1fr)}}
   .video-package-ready{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border:1px solid #d9e5b5;border-radius:14px;background:#f3f8e3;padding:18px}.video-package-ready>div{display:grid;gap:6px}.video-package-ready small{color:var(--soon-oxblood);font-size:10px;font-weight:850;letter-spacing:.08em}.video-package-ready h4{margin:0;font-size:18px}.video-package-ready p{margin:0;color:var(--soon-muted);font-size:11px}.video-package-ready ul{margin:4px 0 0;padding-left:18px;color:#565b62;font-size:11px;line-height:1.55}.video-package-ready>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.video-package-ready>span{color:#397552;font-size:11px;font-weight:800}@media(max-width:700px){.video-package-ready{flex-direction:column}.video-package-ready>button{width:100%}}
   .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
   .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:14px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px}.style-intro b{font-size:12px}.style-intro span{color:var(--soon-muted);font-size:10px}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>article{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>article:hover{transform:translateY(-2px)}.style-template-grid>article.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:150px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:7px;padding:17px;overflow:hidden}.template-preview>i{position:absolute;width:78px;height:78px;right:-16px;top:-20px;border-radius:50%}.template-preview>small{position:relative;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.template-preview>strong{position:relative;max-width:88%;font-size:22px;line-height:1.05;letter-spacing:-.045em}.template-preview>p{position:relative;margin:0;font-size:9px;line-height:1.35;opacity:.75}.template-preview[data-style="product-focus"]{justify-content:center}.template-preview[data-style="product-focus"]>i{width:54px;height:88px;right:22px;top:26px;border-radius:8px;box-shadow:9px 9px 0 rgba(0,0,0,.08)}.template-preview[data-style="product-focus"]>strong,.template-preview[data-style="product-focus"]>p{max-width:58%}.template-preview[data-style="problem-solution"]>strong{font-size:20px}.template-preview[data-style="bold-social"]>strong{font-size:25px;text-transform:uppercase}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-template-grid{grid-template-columns:1fr}}
