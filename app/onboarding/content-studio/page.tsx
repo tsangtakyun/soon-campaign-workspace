@@ -944,6 +944,29 @@ export default function ContentStudioPage() {
     });
   }
 
+  async function normalizeUploadImage(file: File) {
+    const isHeic = /image\/(heic|heif)/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+    if (!isHeic) {
+      if (!file.type.startsWith("image/")) throw new Error(`${file.name} 不是支援的圖片格式`);
+      return file;
+    }
+
+    setMessage(`正在轉換 ${file.name}…`);
+    try {
+      const { default: heic2any } = await import("heic2any");
+      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      const blob = Array.isArray(converted) ? converted[0] : converted;
+      if (!blob) throw new Error("轉換結果為空白");
+      return new File(
+        [blob],
+        file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+        { type: "image/jpeg", lastModified: file.lastModified },
+      );
+    } catch {
+      throw new Error(`未能讀取 ${file.name}，請確認檔案完整或先在相片 App 匯出為 JPEG`);
+    }
+  }
+
   async function uploadProjectAssets(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     if (!files.length || !workspaceId || !selected?.production) return;
@@ -960,14 +983,17 @@ export default function ContentStudioPage() {
         : [];
       const uploaded: ProjectAsset[] = [];
       for (const file of files) {
-        if (!file.type.startsWith("image/")) continue;
-        const dimensions = await imageDimensions(file);
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const uploadFile = await normalizeUploadImage(file);
+        const dimensions = await imageDimensions(uploadFile).catch(() => {
+          throw new Error(`未能讀取 ${file.name} 的圖片尺寸`);
+        });
+        setMessage(`正在上載 ${file.name}…`);
+        const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         const id = crypto.randomUUID();
         const storagePath = `${user.id}/content-projects/${workspaceId}/${selected.id}/${id}-${safeName}`;
         const { error } = await supabase.storage
           .from("brand-assets")
-          .upload(storagePath, file, { cacheControl: "3600", upsert: false });
+          .upload(storagePath, uploadFile, { cacheControl: "3600", contentType: uploadFile.type, upsert: false });
         if (error) throw error;
         const { data } = supabase.storage
           .from("brand-assets")
@@ -975,7 +1001,7 @@ export default function ContentStudioPage() {
         uploaded.push({
           id,
           url: data.publicUrl,
-          filename: file.name,
+          filename: uploadFile.name,
           ...dimensions,
           assignedPage: "auto",
           isCover: existing.length === 0 && uploaded.length === 0,
@@ -1994,7 +2020,7 @@ export default function ContentStudioPage() {
                                   <div><b>使用你已有嘅圖片</b><p>適合品牌相、產品相、活動相或已獲授權素材。</p></div>
                                   <div className="asset-upload-actions">
                                     {brandLibraryAssets.length ? <button type="button" className="asset-library-button" disabled={saving} onClick={() => void addBrandLibraryAssets()}>從品牌素材庫加入</button> : null}
-                                    <label className="asset-upload-button">{uploadingAssets ? "上載中…" : "+ 上載圖片"}<input type="file" accept="image/*" multiple disabled={uploadingAssets} onChange={uploadProjectAssets} /></label>
+                                    <label className="asset-upload-button">{uploadingAssets ? "上載中…" : "+ 上載圖片"}<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple disabled={uploadingAssets} onChange={uploadProjectAssets} /></label>
                                   </div>
                                 </div>
                               ) : assetSourceMode === "generate" ? (
