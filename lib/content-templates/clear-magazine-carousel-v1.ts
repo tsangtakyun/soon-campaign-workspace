@@ -4,6 +4,14 @@ export const clearMagazineCarouselV1 = {
   version: 1,
   output: { width: 1080, height: 1350, ratio: "4:5" },
   previewPath: "/templates/clear-magazine-carousel-v1/style-preview-square.png",
+  previewPages: [
+    "/templates/clear-magazine-carousel-v1/01-cover.png",
+    "/templates/clear-magazine-carousel-v1/02-content.png",
+    "/templates/clear-magazine-carousel-v1/03-content.png",
+    "/templates/clear-magazine-carousel-v1/04-content.png",
+    "/templates/clear-magazine-carousel-v1/05-content.png",
+    "/templates/clear-magazine-carousel-v1/06-end.png",
+  ],
   bodyPunctuation: "line-breaks-only",
   pages: [
     { role: "cover", layers: ["EYEBROW", "HEADLINE", "BODY", "PAGE_NUMBER", "CTA_ARROW", "LOGO", "IMAGE_MAIN"] },
