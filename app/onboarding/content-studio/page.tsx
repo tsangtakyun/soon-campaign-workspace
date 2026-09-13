@@ -1344,7 +1344,6 @@ export default function ContentStudioPage() {
                 <section className="studio-progress">
                   <div className="studio-progress-head">
                     <strong>製作進度</strong>
-                    <span><SoonIcon name="edit" size={13} /> 可返回已完成的步驟修改</span>
                   </div>
                   <nav className="studio-step-nav" aria-label="內容製作步驟">
                     {visibleStudioSteps.map((step, index) => {
@@ -1365,7 +1364,7 @@ export default function ContentStudioPage() {
                         >
                           <span>{done ? "✓" : index + 1}</span>
                           <b>{stepLabel(step.id)}</b>
-                          {done ? <em><SoonIcon name="edit" size={11} /> 修改</em> : current ? <em>目前</em> : null}
+                          {current ? <em>目前</em> : null}
                         </button>
                       );
                     })}
