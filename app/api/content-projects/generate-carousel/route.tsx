@@ -7,6 +7,7 @@ import React from "react";
 import sharp from "sharp";
 
 import { isUuid } from "@/lib/oauth-connections";
+import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import { createServerSupabase } from "@/lib/server-supabase";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 
@@ -334,6 +335,96 @@ async function renderPage(
   );
 }
 
+function clearMagazineRole(index: number, total: number) {
+  if (index === 0) return "cover";
+  if (index === total - 1) return "end";
+  return ["longform", "split", "comparison", "feature"][(index - 1) % 4];
+}
+
+async function renderClearMagazinePage(
+  draft: Draft,
+  asset: Asset | undefined,
+  index: number,
+  total: number,
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string },
+  branding: { logoUrl?: string | null; name: string; colors?: string[] },
+) {
+  const role = clearMagazineRole(index, total);
+  const colors = branding.colors || [];
+  const accent = colors[0] || "#f1d443";
+  const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#151515";
+  const paper = "#f4efe7";
+  const page = draft.page || `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+  const body = (Array.isArray(draft.body) ? draft.body : []).slice(0, 4);
+  const source = asset?.url;
+  const picture = (style: React.CSSProperties) => source
+    ? React.createElement("img", { src: source, width: 1080, height: 1350, style: { objectFit: "cover", ...style } })
+    : box({ ...style, background: "#d9d4cc" }, null);
+  const logo = branding.logoUrl
+    ? React.createElement("img", { src: branding.logoUrl, width: 42, height: 42, style: { width: 42, height: 42, objectFit: "contain" } })
+    : React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } }, branding.name);
+  const textBlock = (options: { color: string; headlineSize?: number; align?: "left" | "center" }) =>
+    box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
+      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 24, fontWeight: 700, marginBottom: 18 } }, draft.subheadline || "重點整理"),
+      React.createElement("strong", { key: "head", style: { display: "flex", fontSize: options.headlineSize || 58, lineHeight: 1.14, letterSpacing: "-2px" } }, draft.headline || ""),
+      ...body.map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: 29, lineHeight: 1.42, marginTop: bodyIndex === 0 ? 28 : 6 } }, line)),
+    ]);
+  const chrome = (color: string) => [
+    React.createElement("div", { key: "logo", style: { position: "absolute", display: "flex", left: 58, top: 48, color } }, logo),
+    React.createElement("span", { key: "page", style: { position: "absolute", display: "flex", right: 58, top: 55, color, fontSize: 20 } }, page),
+  ];
+  let content: React.ReactNode;
+  if (role === "cover") {
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
+      picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
+      box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
+      ...chrome("white"),
+      box({ position: "absolute", left: 58, right: 58, bottom: 74, display: "flex", flexDirection: "column" }, [
+        textBlock({ color: "white", headlineSize: 68 }),
+        React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontSize: 42, marginTop: 20 } }, "→"),
+      ]),
+    ]);
+  } else if (role === "end") {
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "150px 58px 0" }, [
+      ...chrome("white"),
+      textBlock({ color: "white", headlineSize: 59 }),
+      box({ position: "absolute", left: 58, right: 58, bottom: 58, height: 470, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: 80, bottom: 82, padding: "15px 22px", background: accent, color: dark, fontSize: 23, fontWeight: 700 } }, "了解更多 →"),
+    ]);
+  } else if (role === "comparison") {
+    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: paper, padding: "145px 58px 55px" }, [
+      ...chrome(dark),
+      textBlock({ color: dark, headlineSize: 52 }),
+      box({ display: "flex", gap: 18, flex: 1, marginTop: 32 }, [
+        box({ flex: 1, flexDirection: "column", overflow: "hidden", background: "white" }, [picture({ width: "100%", height: 290 }), React.createElement("b", { key: "l", style: { display: "flex", padding: 20, fontSize: 25 } }, body[0] || "比較一")]),
+        box({ flex: 1, flexDirection: "column", overflow: "hidden", background: accent }, [picture({ width: "100%", height: 290, filter: "saturate(.78)" }), React.createElement("b", { key: "r", style: { display: "flex", padding: 20, fontSize: 25 } }, body[1] || "比較二")]),
+      ]),
+    ]);
+  } else if (role === "split" || role === "feature") {
+    const imageOnRight = role === "feature";
+    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "145px 58px 58px", gap: 34, flexDirection: imageOnRight ? "row" : "column" }, [
+      ...chrome("white"),
+      box({ flex: imageOnRight ? 1 : "0 0 46%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      box({ flex: 1, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: imageOnRight ? 48 : 54 })),
+    ]);
+  } else {
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
+      picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
+      box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.9),rgba(0,0,0,.08))" }, null),
+      ...chrome("white"),
+      box({ position: "absolute", left: 58, right: 58, bottom: 70 }, textBlock({ color: "white", headlineSize: 58 })),
+    ]);
+  }
+  return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: fonts.family, position: "relative", overflow: "hidden" }, content), {
+    width: 1080,
+    height: 1350,
+    fonts: [
+      { name: fonts.family, data: fonts.regular, weight: 400 },
+      { name: fonts.family, data: fonts.bold, weight: 700 },
+    ],
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -365,7 +456,7 @@ export async function POST(req: Request) {
     const [{ data: workspace }, { data: brandProfile }] = await Promise.all([
       access.admin
         .from("workspaces")
-        .select("name,logo_url,font_style")
+        .select("name,logo_url,font_style,brand_colors")
         .eq("id", workspaceId)
         .maybeSingle(),
       access.admin
@@ -384,6 +475,11 @@ export async function POST(req: Request) {
     const branding = {
       logoUrl: workspace?.logo_url || fallbackLogoUrl,
       name: workspaceName,
+      colors: Array.isArray(workspace?.brand_colors)
+        ? workspace.brand_colors
+            .map((color) => typeof color === "string" ? color : color && typeof color === "object" && "hex" in color ? String(color.hex) : "")
+            .filter((color): color is string => /^#[0-9a-f]{6}$/i.test(color))
+        : [],
     };
     const templateCode = typeof project.format_decision?.renderTemplateCode === "string"
       ? project.format_decision.renderTemplateCode
@@ -427,14 +523,9 @@ export async function POST(req: Request) {
       const preparedAsset = asset?.url
         ? { ...asset, url: preparedImageUrls.get(asset.url) || asset.url }
         : asset;
-      const response = await renderPage(
-        draft,
-        preparedAsset,
-        index,
-        fonts,
-        branding,
-        theme,
-      );
+      const response = isClearMagazineCarousel(templateCode)
+        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding)
+        : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;
       const { error: uploadError } = await access.admin.storage
