@@ -83,6 +83,22 @@ export async function POST(req: Request) {
     const workspaceInstructions = [prompt.brief_prompt, prompt.format_prompt, prompt.production_prompt]
       .filter((value) => typeof value === 'string' && value.trim())
       .join('\n\n--- NEXT WORKFLOW PROMPT ---\n\n')
+    const { data: contentPreferences } = await access.admin
+      .from('content_preferences')
+      .select('content_mood')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+    const contentMood = contentPreferences?.content_mood && typeof contentPreferences.content_mood === 'object'
+      ? contentPreferences.content_mood as Record<string, unknown>
+      : {}
+    const languageStyle = contentMood.languageStyle === 'written' || contentMood.languageStyle === 'conversational'
+      ? contentMood.languageStyle
+      : 'brand'
+    const languageInstruction = languageStyle === 'written'
+      ? '本工作台選擇「書面語」：所有對外文案使用自然、簡潔的繁體中文書面語，避免「有冇、係咪、睇、揀、唔、咁、佢」等口語。'
+      : languageStyle === 'conversational'
+        ? '本工作台選擇「口語」：使用自然香港廣東話及短句，保持清楚、可信，不使用生硬書面腔。'
+        : '本工作台選擇「品牌慣用語氣」：優先遵從 Workspace Prompt 內的品牌語氣及不同內容格式規則。'
     const formatDecision = project.format_decision && typeof project.format_decision === 'object'
       ? project.format_decision as Record<string, unknown>
       : {}
@@ -131,6 +147,9 @@ export async function POST(req: Request) {
       '【Workspace Prompt】',
       workspaceInstructions,
       '',
+      '【文字語氣設定】',
+      languageInstruction,
+      '',
       '【SOON Style 製作規格】',
       styleRules,
       roleInstruction,
@@ -155,7 +174,7 @@ export async function POST(req: Request) {
       '  "pages": [{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
       '}',
       'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
-      '輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 使用簡潔書面語，建議不超過 18 個中文字。',
+      `輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 應遵從上述文字語氣設定，建議不超過 18 個中文字。`,
       'copyDirection 只保留該頁必要內容，使用 2 至 3 個短句，建議不超過 70 個中文字；地址、價格、營業時間及免責資料不要分散重複。',
       '不得使用過度絕對或來源未支持的標題，例如「不是工廠製作」；應改為準確的比較或描述。',
       'confirmedFacts 只可包含來源內容或來源連結明確支持的事實；品牌自述必須放入 selfReportedClaims。',

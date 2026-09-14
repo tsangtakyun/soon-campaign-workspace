@@ -118,10 +118,20 @@ const eggSoonLearnedPreferences = [
 ]
 
 type WorkspacePreferenceMode = 'loading' | 'bechill' | 'egg' | 'empty'
+type LanguageStyle = 'brand' | 'written' | 'conversational'
+
+const languageStyleOptions: Array<{ value: LanguageStyle; title: string; description: string }> = [
+  { value: 'brand', title: '品牌慣用語氣', description: '按照品牌守則及內容格式，自動選擇合適語氣。' },
+  { value: 'written', title: '書面語', description: '使用簡潔、自然的繁體中文書面語。' },
+  { value: 'conversational', title: '口語', description: '使用自然香港廣東話，適合較生活化內容。' },
+]
 
 export default function ContentPreferencesPage() {
   const [preferenceMode, setPreferenceMode] = useState<WorkspacePreferenceMode>('loading')
   const [summary, setSummary] = useState<ContentPreferenceSummary | null>(null)
+  const [workspaceId, setWorkspaceId] = useState('')
+  const [languageStyle, setLanguageStyle] = useState<LanguageStyle>('brand')
+  const [languageStatus, setLanguageStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   useEffect(() => {
     let cancelled = false
@@ -130,15 +140,25 @@ export default function ContentPreferencesPage() {
       if (!cancelled) setPreferenceMode('loading')
       try {
         const { activeWorkspace, workspaceId } = await resolveActiveWorkspace()
+        if (!cancelled) setWorkspaceId(workspaceId || '')
         if (!cancelled) {
           setPreferenceMode(
             isBechillWorkspace(activeWorkspace) ? 'bechill' : isEggWorkspace(activeWorkspace) ? 'egg' : 'empty'
           )
         }
         if (workspaceId) {
-          const response = await fetch(`/api/content-preference-summary?workspaceId=${workspaceId}`, { cache: 'no-store' })
-          const payload = await response.json().catch(() => null)
-          if (!cancelled) setSummary(response.ok ? payload?.summary || null : null)
+          const [summaryResponse, languageResponse] = await Promise.all([
+            fetch(`/api/content-preference-summary?workspaceId=${workspaceId}`, { cache: 'no-store' }),
+            fetch(`/api/content-language-preference?workspaceId=${workspaceId}`, { cache: 'no-store' }),
+          ])
+          const [summaryPayload, languagePayload] = await Promise.all([
+            summaryResponse.json().catch(() => null),
+            languageResponse.json().catch(() => null),
+          ])
+          if (!cancelled) {
+            setSummary(summaryResponse.ok ? summaryPayload?.summary || null : null)
+            setLanguageStyle(languageResponse.ok ? languagePayload?.languageStyle || 'brand' : 'brand')
+          }
         }
       } catch {
         if (!cancelled) setPreferenceMode('empty')
@@ -158,6 +178,26 @@ export default function ContentPreferencesPage() {
     }
   }, [])
 
+  async function saveLanguageStyle(next: LanguageStyle) {
+    if (!workspaceId || next === languageStyle || languageStatus === 'saving') return
+    const previous = languageStyle
+    setLanguageStyle(next)
+    setLanguageStatus('saving')
+    try {
+      const response = await fetch('/api/content-language-preference', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId, languageStyle: next }),
+      })
+      if (!response.ok) throw new Error('save failed')
+      setLanguageStatus('saved')
+      window.setTimeout(() => setLanguageStatus('idle'), 1800)
+    } catch {
+      setLanguageStyle(previous)
+      setLanguageStatus('error')
+    }
+  }
+
   return (
     <main className="dashboard-page">
       <ClaimOnboardingSession />
@@ -171,6 +211,33 @@ export default function ContentPreferencesPage() {
         </header>
 
         <div className="content-prefs-body">
+          <section className="cp-section cp-language-section">
+            <div className="cp-learned-head">
+              <div>
+                <h2>文字語氣</h2>
+                <p className="cp-desc">新內容會預設使用這個語氣。</p>
+              </div>
+              <span aria-live="polite">
+                {languageStatus === 'saving' ? '儲存中…' : languageStatus === 'saved' ? '已儲存' : languageStatus === 'error' ? '未能儲存' : '工作台設定'}
+              </span>
+            </div>
+            <div className="cp-language-options">
+              {languageStyleOptions.map((option) => (
+                <button
+                  aria-pressed={languageStyle === option.value}
+                  className={languageStyle === option.value ? 'is-selected' : ''}
+                  disabled={!workspaceId || languageStatus === 'saving'}
+                  key={option.value}
+                  onClick={() => void saveLanguageStyle(option.value)}
+                  type="button"
+                >
+                  <i>{languageStyle === option.value ? '✓' : ''}</i>
+                  <span><strong>{option.title}</strong><small>{option.description}</small></span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="cp-section">
             <div className="cp-learned-head">
               <div>
@@ -284,6 +351,18 @@ const styles = `
     flex-direction: column;
     gap: 14px;
   }
+
+  .cp-language-section { border: 1px solid #e4e5e9; border-radius: 14px; padding: 18px; }
+  .cp-language-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .cp-language-options button { appearance: none; border: 1px solid #dfe1e5; border-radius: 12px; background: #fff; color: #202126; cursor: pointer; display: flex; gap: 10px; min-height: 88px; padding: 14px; text-align: left; transition: border-color .15s ease, background .15s ease; }
+  .cp-language-options button:hover { border-color: #9b5b60; }
+  .cp-language-options button.is-selected { border: 2px solid #7b2d32; background: #fff9f7; padding: 13px; }
+  .cp-language-options button:disabled { cursor: default; }
+  .cp-language-options i { border: 1px solid #d8dade; border-radius: 50%; display: grid; flex: 0 0 auto; font-size: 11px; font-style: normal; height: 22px; place-items: center; width: 22px; }
+  .cp-language-options .is-selected i { background: #7b2d32; border-color: #7b2d32; color: #fff; }
+  .cp-language-options span { display: grid; gap: 5px; }
+  .cp-language-options strong { font-size: 14px; }
+  .cp-language-options small { color: #70747c; font-size: 12px; line-height: 1.45; }
 
   .cp-empty-panel {
     min-height: 180px;
@@ -445,6 +524,7 @@ const styles = `
   }
 
   @media (max-width: 760px) {
+    .cp-language-options { grid-template-columns: 1fr; }
     .cp-learned-head {
       flex-direction: column;
     }
