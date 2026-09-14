@@ -7,6 +7,16 @@ import { createServerSupabase } from "@/lib/server-supabase";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 import { contentStylePromptFromDecision } from "@/lib/content-style-library";
 
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
+type VisualAsset = Record<string, unknown> & {
+  id?: string;
+  url?: string;
+  filename?: string;
+  visualAnalysis?: Record<string, unknown>;
+};
+
 function parseJson(text: string) {
   const clean = text
     .trim()
@@ -20,6 +30,64 @@ function parseJson(text: string) {
     if (start >= 0 && end > start)
       return JSON.parse(clean.slice(start, end + 1));
     throw new Error("AI response is not valid JSON");
+  }
+}
+
+async function analyzeVisualAssets(apiKey: string, assets: VisualAsset[]) {
+  const pending = assets.filter((asset) => asset.id && asset.url && !asset.visualAnalysis).slice(0, 10);
+  if (!pending.length) return assets;
+
+  try {
+    let totalBytes = 0;
+    const content: Array<Record<string, unknown>> = [{
+      type: "text",
+      text: "逐張分析以下圖片。分析必須只根據畫面，不可從檔名猜測。",
+    }];
+    for (const asset of pending) {
+      const response = await fetch(String(asset.url), { signal: AbortSignal.timeout(12_000) });
+      if (!response.ok) continue;
+      const mediaType = (response.headers.get("content-type") || "").split(";")[0];
+      if (!new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]).has(mediaType)) continue;
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.byteLength > 8_000_000 || totalBytes + buffer.byteLength > 18_000_000) continue;
+      totalBytes += buffer.byteLength;
+      content.push({ type: "text", text: `ASSET_ID: ${asset.id}\nFILENAME: ${asset.filename || "unknown"}` });
+      content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: buffer.toString("base64") } });
+    }
+    if (content.length === 1) return assets;
+    content.push({
+      type: "text",
+      text: [
+        "只輸出 JSON，不要加解釋。每張圖片都要用 ASSET_ID 對應。",
+        "subject 是主要畫面主體；objects 是可見的重要物件；scene 是場景；action 是正在發生的動作；visibleText 是清楚可辨認的文字。",
+        "relationship 只可為 brand_product、competitor_or_comparison、process、people_or_lifestyle、place、information、unknown。",
+        "contentUses 說明適合支持哪些內容意圖，例如產品特色、製作過程、口味、比較、人物體驗、店舖資料。distinctiveCues 寫出可區分相似圖片的視覺線索。",
+        '{"assets":[{"id":"","subject":"","objects":[],"scene":"","action":"","visibleText":[],"relationship":"unknown","contentUses":[],"distinctiveCues":[]}]}',
+      ].join("\n"),
+    });
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: anthropicModel(process.env.ANTHROPIC_PRODUCT_MODEL || process.env.ANTHROPIC_CONTENT_MODEL),
+        max_tokens: 2400,
+        temperature: 0,
+        system: "You are a visual asset librarian. Return valid JSON only.",
+        messages: [{ role: "user", content }],
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    const data = await response.json();
+    if (!response.ok) return assets;
+    const text = Array.isArray(data.content)
+      ? data.content.filter((item: { type?: string }) => item.type === "text").map((item: { text?: string }) => item.text || "").join("\n")
+      : "";
+    const parsed = parseJson(text);
+    const analyses = new Map((Array.isArray(parsed.assets) ? parsed.assets : []).map((item: Record<string, unknown>) => [String(item.id || ""), item]));
+    return assets.map((asset) => analyses.has(String(asset.id)) ? { ...asset, visualAnalysis: analyses.get(String(asset.id)) } : asset);
+  } catch (error) {
+    console.warn("[content-projects/generate-drafts] visual analysis skipped", error);
+    return assets;
   }
 }
 
@@ -86,7 +154,8 @@ export async function POST(req: Request) {
       );
 
     const pages = project.production.pages || [];
-    const assets = project.production.assets || [];
+    const assets: VisualAsset[] = project.production.assets || [];
+    const analyzedAssets = isVideo ? assets : await analyzeVisualAssets(apiKey, assets);
     const { data: contentPreferences } = await access.admin
       .from("content_preferences").select("content_mood")
       .eq("workspace_id", workspaceId).maybeSingle();
@@ -138,8 +207,11 @@ export async function POST(req: Request) {
       "Brief：" + JSON.stringify(project.brief || {}),
       "已選內容風格：" + JSON.stringify(project.format_decision || {}),
       "已確認故事結構：" + JSON.stringify(pages),
-      isVideo ? "參考圖片素材：" + JSON.stringify(assets) : "圖片素材（必須用 asset id 引用）：" + JSON.stringify(assets),
+      isVideo ? "參考圖片素材：" + JSON.stringify(analyzedAssets) : "圖片素材及畫面分析（必須用 asset id 引用）：" + JSON.stringify(analyzedAssets),
       "圖片必須按每頁主題及畫面用途配對，不可按照上載次序機械分配。",
+      "配圖時必須比較該頁完整意圖與 visualAnalysis，不可只因兩者共有產品名稱或單一名詞便配對。",
+      "competitor_or_comparison 素材主要用於比較頁；口味、功能或產品特色頁不可使用不相關的競品包裝。process、place、people_or_lifestyle 亦必須配合頁面所述場景。",
+      "若素材 assignedPage 不是 auto，必須優先遵從用家的指定頁面。除非版面需要，不要在不同頁重複使用同一素材。",
       languageInstruction,
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
     ].join("\n");
@@ -168,7 +240,7 @@ export async function POST(req: Request) {
           .join("\n")
       : "";
     const drafts = parseJson(text);
-    const validAssetIds = new Set(assets.map((asset: { id?: string }) => asset.id).filter(Boolean));
+    const validAssetIds = new Set(analyzedAssets.map((asset) => asset.id).filter(Boolean));
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
     const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
     const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
@@ -211,6 +283,7 @@ export async function POST(req: Request) {
     });
     const production = {
       ...project.production,
+      assets: analyzedAssets,
       pageDrafts: pagesWithComparisonAssets,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
