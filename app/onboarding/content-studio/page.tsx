@@ -1931,7 +1931,7 @@ export default function ContentStudioPage() {
                       <div className="production-ready is-generating" role="status" aria-live="polite">
                         <b className="working" />
                         <h4>{`正在重新整理 ${carouselSlideCount} 頁內容`}</h4>
-                        <p>SOON 正在重新核對資料，並按照所選模板安排每一頁。完成後會自動以新內容取代目前版本。</p>
+                        <p>SOON 正在重新核對資料</p>
                       </div>
                     ) : selected.production?.status ? (
                       <div className="structure-result">
