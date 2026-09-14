@@ -34,10 +34,10 @@ export const clearMagazineCarouselV1 = {
       body: { x: 83, y: 450, width: 743, height: 436 },
     },
     split: {
-      image: { x: -92, y: -26, width: 1264, height: 843 },
+      image: { x: 72, y: 145, width: 936, height: 545 },
       eyebrow: { x: 74, y: 163, width: 218, height: 38 },
-      headline: { x: 89, y: 719, width: 526, height: 143 },
-      body: { x: 87, y: 892, width: 896, height: 308 },
+      headline: { x: 74, y: 785, width: 900, height: 100 },
+      body: { x: 74, y: 885, width: 900, height: 260 },
     },
     comparison: {
       eyebrow: { x: 74, y: 163, width: 155, height: 38 },

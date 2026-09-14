@@ -395,12 +395,18 @@ function resolveClearMagazineRole(draft: Draft, index: number, total: number): C
   if (draft.templateArtboardId && artboardRole[draft.templateArtboardId]) {
     return artboardRole[draft.templateArtboardId];
   }
+  // Migrate older drafts which predate templateArtboardId. Process/explainer
+  // copy belongs to the full-bleed text artboard; option/list copy belongs to
+  // the left-text/right-image artboard. This repairs stale swapped role labels.
+  const assetCount = new Set([...(draft.assetIds || []), draft.assetId].filter(Boolean)).size;
+  if (assetCount > 1) return "split";
+  if (/(?:以外|口味|選擇|值得試|功能|款式|產品|服務)/i.test(text)) return "feature";
+  if (/(?:製作|過程|即場|步驟|如何|點樣|由.+到|開始)/i.test(text)) return "longform";
   const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
   if (["longform", "split", "feature"].includes(requestedRole)) {
     return requestedRole as ClearMagazineRole;
   }
-  const assetCount = new Set([...(draft.assetIds || []), draft.assetId].filter(Boolean)).size;
-  return assetCount > 1 ? "split" : "feature";
+  return "feature";
 }
 
 async function renderClearMagazinePage(
@@ -451,7 +457,7 @@ async function renderClearMagazinePage(
   ];
   const swipeCue = React.createElement("img", { key: "swipe", src: branding.swipeUrl, width: 102, height: 59, style: { ...rectStyle(layout.chrome.swipe), objectFit: "contain" } });
   const commonText = (l: { eyebrow: Rect; headline: Rect; body: Rect }, options?: { centered?: boolean; headlineSize?: number; bodySize?: number; headlineWidth?: number }) => [
-    textLayer("eye", { ...l.eyebrow, width: Math.max(l.eyebrow.width, 500) }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 39, lineHeight: 1.05, fontWeight: 700 }),
+    textLayer("eye", { ...l.eyebrow, width: Math.max(l.eyebrow.width, 500) }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
     textLayer("head", { ...l.headline, width: options?.headlineWidth || l.headline.width }, cleanHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: adaptiveHeadlineSize(options?.headlineSize || 62), lineHeight: 1.12, fontWeight: 700, letterSpacing: "-2px", textAlign: options?.centered ? "center" : "left", justifyContent: options?.centered ? "center" : "flex-start" }),
     textLayer("body", l.body, bodyText, { color: "white", whiteSpace: "pre-wrap", fontSize: options?.bodySize || 29, lineHeight: 1.25 }),
   ];
@@ -462,14 +468,14 @@ async function renderClearMagazinePage(
       picture(rectStyle(l.image)),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 68, bodySize: 38, headlineWidth: 935 }),
+      ...commonText(l, { headlineSize: 68, bodySize: 29, headlineWidth: 935 }),
       swipeCue,
     ]);
   } else if (role === "end") {
     const l = layout.end;
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 64, bodySize: 37, headlineWidth: 935 }),
+      ...commonText(l, { headlineSize: 58, bodySize: 28, headlineWidth: 935 }),
       picture(rectStyle(l.image)),
       box({ ...rectStyle(l.ctaBox), background: accent, borderRadius: 22 }, null),
       textLayer("cta", l.ctaText, "了解更多 →", { color: dark, fontSize: 24, lineHeight: 1.25, justifyContent: "center" }),
@@ -478,7 +484,7 @@ async function renderClearMagazinePage(
     const l = layout.comparison;
     content = box({ width: "100%", height: "100%", position: "relative", background: dark, color: "white" }, [
       ...chrome("white"),
-      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "真正分別", { color: accent, fontSize: 39, fontWeight: 700 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "真正分別", { color: accent, fontSize: 24, fontWeight: 700 }),
       textLayer("head", l.headline, cleanHeadline(draft.headline), { color: "white", fontSize: adaptiveHeadlineSize(62), lineHeight: 1.12, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
       box({ ...rectStyle(l.leftCard), background: "#f36a2d", borderRadius: 20 }, null),
       box({ ...rectStyle(l.rightCard), background: "#477877", borderRadius: 20 }, null),
@@ -486,8 +492,8 @@ async function renderClearMagazinePage(
       picture({ ...rectStyle(l.rightImage), objectFit: "cover" }, secondaryAsset?.url),
       textLayer("ll", l.leftLabel, body[0] || "比較一", { color: "white", fontSize: 25 }),
       textLayer("rl", l.rightLabel, body[1] || "比較二", { color: "white", fontSize: 25 }),
-      textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, body[2] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
-      textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, body[3] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, body[3] ? body[2] : String(body[2] || "").split(/[；;]/, 2)[0], { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, body[3] || String(body[2] || "").split(/[；;]/, 2)[1] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
       ...(body[4] ? [textLayer("summary", { x: 158, y: 1125, width: 755, height: 70 }, body[4], { color: "white", fontSize: 23, textAlign: "center", justifyContent: "center" })] : []),
       swipeCue,
     ]);
@@ -495,8 +501,8 @@ async function renderClearMagazinePage(
     const l = layout.split;
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
       ...chrome("white"),
-      secondaryAsset?.url ? box({ ...rectStyle(l.image), gap: 20 }, [picture({ width: 622, height: "100%" }), picture({ width: 622, height: "100%" }, secondaryAsset.url)]) : picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 64, bodySize: 37, headlineWidth: 890 }),
+      secondaryAsset?.url ? box({ ...rectStyle(l.image), gap: 20 }, [picture({ width: 458, height: "100%" }), picture({ width: 458, height: "100%" }, secondaryAsset.url)]) : picture(rectStyle(l.image)),
+      ...commonText(l, { headlineSize: 58, bodySize: 29, headlineWidth: 900 }),
       swipeCue,
     ]);
   } else if (role === "feature") {
@@ -504,7 +510,7 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
       picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 64, bodySize: 37 }),
+      ...commonText(l, { headlineSize: 58, bodySize: 29 }),
       swipeCue,
     ]);
   } else {
@@ -512,7 +518,7 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture({ ...rectStyle(l.image), objectFit: "cover" }),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 78, bodySize: body.join("").length > 115 ? 45 : 50 }),
+      ...commonText(l, { headlineSize: 62, bodySize: body.join("").length > 115 ? 27 : 30 }),
       swipeCue,
     ]);
   }
