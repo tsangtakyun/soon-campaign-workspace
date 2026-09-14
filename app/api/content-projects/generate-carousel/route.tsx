@@ -23,6 +23,7 @@ type Draft = {
   assetIds?: string[];
   layout?: string;
   role?: string;
+  templateArtboardId?: string;
   imageTreatment?: "auto" | "cutout" | "full-bleed" | "card";
 };
 
@@ -386,18 +387,20 @@ function resolveClearMagazineRole(draft: Draft, index: number, total: number): C
   if (/(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i.test(text)) {
     return "comparison";
   }
-  // The PSD artboards define a visual language, not a page-number template.
-  // Infer a safe layout from the actual copy and assets when an older draft
-  // does not yet carry an explicit semantic role.
-  const body = Array.isArray(draft.body) ? draft.body.filter(Boolean) : [];
-  const assetCount = new Set([...(draft.assetIds || []), draft.assetId].filter(Boolean)).size;
-  if (assetCount > 1) return "split";
-  if (body.length >= 3 || text.length > 105) return "longform";
+  const artboardRole: Record<string, ClearMagazineRole> = {
+    "01_COVER": "cover", "02_FULL_BLEED_TEXT": "longform",
+    "03_IMAGE_TOP_TEXT_BOTTOM": "split", "04_COMPARISON": "comparison",
+    "05_LEFT_TEXT_RIGHT_IMAGE": "feature", "06_END_CTA": "end",
+  };
+  if (draft.templateArtboardId && artboardRole[draft.templateArtboardId]) {
+    return artboardRole[draft.templateArtboardId];
+  }
   const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
   if (["longform", "split", "feature"].includes(requestedRole)) {
     return requestedRole as ClearMagazineRole;
   }
-  return "feature";
+  const assetCount = new Set([...(draft.assetIds || []), draft.assetId].filter(Boolean)).size;
+  return assetCount > 1 ? "split" : "feature";
 }
 
 async function renderClearMagazinePage(
@@ -435,9 +438,9 @@ async function renderClearMagazinePage(
     ? React.createElement("img", { src: branding.logoUrl, width: 73, height: 70, style: { width: 73, height: 70, objectFit: "contain", objectPosition: "left center" } })
     : React.createElement("span", { style: { fontFamily: fonts.family, fontSize: 20, fontWeight: 700 } }, branding.name);
   const headlineLength = cleanHeadline(draft.headline).length;
-  const adaptiveHeadlineSize = (preferred: number) => headlineLength > 21
-    ? Math.max(47, preferred - 13)
-    : headlineLength > 15 ? preferred - 7 : preferred;
+  const adaptiveHeadlineSize = (preferred: number) => headlineLength > 24
+    ? Math.max(45, preferred - 12)
+    : headlineLength > 18 ? preferred - 6 : preferred;
   type Rect = { x: number; y: number; width: number; height: number; opacity?: number };
   const rectStyle = (rect: Rect): React.CSSProperties => ({ position: "absolute", left: rect.x, top: rect.y, width: rect.width, height: rect.height, overflow: "hidden", ...(rect.opacity == null ? {} : { opacity: rect.opacity }) });
   const textLayer = (key: string, rect: Rect, value: React.ReactNode, style: React.CSSProperties) => React.createElement("div", { key, style: { ...rectStyle(rect), display: "flex", ...style } }, value);
@@ -447,10 +450,10 @@ async function renderClearMagazinePage(
     textLayer("page", layout.chrome.pageNumber, page, { color, fontFamily: EDITORIAL_CAROUSEL_FONT, fontSize: 29, lineHeight: 1 }),
   ];
   const swipeCue = React.createElement("img", { key: "swipe", src: branding.swipeUrl, width: 102, height: 59, style: { ...rectStyle(layout.chrome.swipe), objectFit: "contain" } });
-  const commonText = (l: { eyebrow: Rect; headline: Rect; body: Rect }, options?: { centered?: boolean; headlineSize?: number; bodySize?: number }) => [
-    textLayer("eye", l.eyebrow, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
-    textLayer("head", l.headline, cleanHeadline(draft.headline), { color: "white", fontSize: adaptiveHeadlineSize(options?.headlineSize || 62), lineHeight: 1.12, fontWeight: 700, letterSpacing: "-2px", textAlign: options?.centered ? "center" : "left", justifyContent: options?.centered ? "center" : "flex-start" }),
-    textLayer("body", l.body, bodyText, { color: "white", whiteSpace: "pre-wrap", fontSize: options?.bodySize || 29, lineHeight: 1.42 }),
+  const commonText = (l: { eyebrow: Rect; headline: Rect; body: Rect }, options?: { centered?: boolean; headlineSize?: number; bodySize?: number; headlineWidth?: number }) => [
+    textLayer("eye", { ...l.eyebrow, width: Math.max(l.eyebrow.width, 500) }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 39, lineHeight: 1.05, fontWeight: 700 }),
+    textLayer("head", { ...l.headline, width: options?.headlineWidth || l.headline.width }, cleanHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: adaptiveHeadlineSize(options?.headlineSize || 62), lineHeight: 1.12, fontWeight: 700, letterSpacing: "-2px", textAlign: options?.centered ? "center" : "left", justifyContent: options?.centered ? "center" : "flex-start" }),
+    textLayer("body", l.body, bodyText, { color: "white", whiteSpace: "pre-wrap", fontSize: options?.bodySize || 29, lineHeight: 1.25 }),
   ];
   let content: React.ReactNode;
   if (role === "cover") {
@@ -459,14 +462,14 @@ async function renderClearMagazinePage(
       picture(rectStyle(l.image)),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 72, bodySize: 28 }),
+      ...commonText(l, { headlineSize: 68, bodySize: 38, headlineWidth: 935 }),
       swipeCue,
     ]);
   } else if (role === "end") {
     const l = layout.end;
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 58, bodySize: 28 }),
+      ...commonText(l, { headlineSize: 64, bodySize: 37, headlineWidth: 935 }),
       picture(rectStyle(l.image)),
       box({ ...rectStyle(l.ctaBox), background: accent, borderRadius: 22 }, null),
       textLayer("cta", l.ctaText, "了解更多 →", { color: dark, fontSize: 24, lineHeight: 1.25, justifyContent: "center" }),
@@ -475,7 +478,7 @@ async function renderClearMagazinePage(
     const l = layout.comparison;
     content = box({ width: "100%", height: "100%", position: "relative", background: dark, color: "white" }, [
       ...chrome("white"),
-      textLayer("eye", l.eyebrow, cleanBodyLine(draft.subheadline) || "真正分別", { color: accent, fontSize: 24, fontWeight: 700 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "真正分別", { color: accent, fontSize: 39, fontWeight: 700 }),
       textLayer("head", l.headline, cleanHeadline(draft.headline), { color: "white", fontSize: adaptiveHeadlineSize(62), lineHeight: 1.12, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
       box({ ...rectStyle(l.leftCard), background: "#f36a2d", borderRadius: 20 }, null),
       box({ ...rectStyle(l.rightCard), background: "#477877", borderRadius: 20 }, null),
@@ -483,7 +486,9 @@ async function renderClearMagazinePage(
       picture({ ...rectStyle(l.rightImage), objectFit: "cover" }, secondaryAsset?.url),
       textLayer("ll", l.leftLabel, body[0] || "比較一", { color: "white", fontSize: 25 }),
       textLayer("rl", l.rightLabel, body[1] || "比較二", { color: "white", fontSize: 25 }),
-      textLayer("summary", l.body, body.slice(2).join("\n"), { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.4, textAlign: "center", justifyContent: "center" }),
+      textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, body[2] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, body[3] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      ...(body[4] ? [textLayer("summary", { x: 158, y: 1125, width: 755, height: 70 }, body[4], { color: "white", fontSize: 23, textAlign: "center", justifyContent: "center" })] : []),
       swipeCue,
     ]);
   } else if (role === "split") {
@@ -491,7 +496,7 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
       ...chrome("white"),
       secondaryAsset?.url ? box({ ...rectStyle(l.image), gap: 20 }, [picture({ width: 622, height: "100%" }), picture({ width: 622, height: "100%" }, secondaryAsset.url)]) : picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 60, bodySize: 28 }),
+      ...commonText(l, { headlineSize: 64, bodySize: 37, headlineWidth: 890 }),
       swipeCue,
     ]);
   } else if (role === "feature") {
@@ -499,7 +504,7 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
       picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 58, bodySize: 28 }),
+      ...commonText(l, { headlineSize: 64, bodySize: 37 }),
       swipeCue,
     ]);
   } else {
@@ -507,7 +512,7 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture({ ...rectStyle(l.image), objectFit: "cover" }),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 62, bodySize: body.join("").length > 115 ? 27 : 30 }),
+      ...commonText(l, { headlineSize: 78, bodySize: body.join("").length > 115 ? 45 : 50 }),
       swipeCue,
     ]);
   }

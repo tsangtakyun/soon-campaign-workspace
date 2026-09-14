@@ -200,9 +200,10 @@ export async function POST(req: Request) {
             ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
             : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
-          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"imageTreatment":"auto|cutout|full-bleed|card","assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
+          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","templateArtboardId":"01_COVER|02_FULL_BLEED_TEXT|03_IMAGE_TOP_TEXT_BOTTOM|04_COMPARISON|05_LEFT_TEXT_RIGHT_IMAGE|06_END_CTA","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"imageTreatment":"auto|cutout|full-bleed|card","assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
             "頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。",
+            "每頁必須保存固定 templateArtboardId：cover=01_COVER、longform=02_FULL_BLEED_TEXT、split=03_IMAGE_TOP_TEXT_BOTTOM、comparison=04_COMPARISON、feature=05_LEFT_TEXT_RIGHT_IMAGE、end=06_END_CTA。",
             "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
             "版面文案使用雜誌式換行建立節奏。body 每個陣列項目應是一個完整短段，段尾不要加入逗號、句號、分號或冒號；問號及感嘆號只在語意確實需要時使用。",
             "comparison 頁的 body[0]、body[1] 是左右標籤；body[2]、body[3] 分別解釋左、右兩項；如有必要，body[4] 才是簡短總結。左右內容不可合併成一段放在卡片外。",
@@ -258,6 +259,7 @@ export async function POST(req: Request) {
     const validAssetIds = new Set(analyzedAssets.map((asset) => asset.id).filter(Boolean));
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
     const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
+    const artboardByRole: Record<string, string> = { cover: "01_COVER", longform: "02_FULL_BLEED_TEXT", split: "03_IMAGE_TOP_TEXT_BOTTOM", comparison: "04_COMPARISON", feature: "05_LEFT_TEXT_RIGHT_IMAGE", end: "06_END_CTA" };
     const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
       const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
@@ -283,7 +285,7 @@ export async function POST(req: Request) {
             reason: needsAnotherImage ? "這一頁需要兩張能清楚呈現比較雙方的圖片。" : "現有圖片未能清楚支持這一頁的內容。",
             suggestions: needsAnotherImage ? ["比較項目左方的清晰圖片", "比較項目右方的清晰圖片"] : ["能直接呈現這一頁主題的產品、服務或場景圖片"],
           };
-      return { ...draft, role, layout: role, assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
+      return { ...draft, role, layout: role, templateArtboardId: artboardByRole[role], assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
     });
     const production = {
       ...project.production,
