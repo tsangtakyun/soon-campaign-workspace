@@ -199,13 +199,14 @@ export async function POST(req: Request) {
             ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
             : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
-          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"layout":"頁面角色","designDirection":"具體排版方向"}]}',
+          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
             "頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。",
             "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
             "comparison 頁的 body[0] 與 body[1] 是左右兩項標籤，其餘段落才是比較結論。",
             "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；不足兩張合適素材時只填合適的一張，不可隨機補圖。",
-            "split 頁可按內容使用一至兩張素材；其他頁只需一張主要素材。assetId 必須等於 assetIds 第一項。",
+            "split 頁只在兩張圖片分別支持兩項互補內容時使用一至兩張素材；其他頁只需一張主要素材。不可為了填滿版面而增加第二張圖片。assetId 必須等於 assetIds 第一項。",
+            "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
           ] : []),
         ];
     const input = [
@@ -220,6 +221,7 @@ export async function POST(req: Request) {
       "圖片必須按每頁主題及畫面用途配對，不可按照上載次序機械分配。",
       "配圖時必須比較該頁完整意圖與 visualAnalysis，不可只因兩者共有產品名稱或單一名詞便配對。",
       "competitor_or_comparison 素材主要用於比較頁；口味、功能或產品特色頁不可使用不相關的競品包裝。process、place、people_or_lifestyle 亦必須配合頁面所述場景。",
+      "圖片是否合適要以圖片實際可見內容能否支持該頁訊息判斷。若頁面介紹其他產品或服務，但現有圖片只見主要產品或製作過程，必須標示 missing 並要求相關產品或服務圖片。",
       "若素材 assignedPage 不是 auto，必須優先遵從用家的指定頁面。除非版面需要，不要在不同頁重複使用同一素材。",
       languageInstruction,
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
@@ -269,32 +271,21 @@ export async function POST(req: Request) {
         ? "comparison"
         : modelRole === "comparison" ? "feature" : modelRole;
       const allowedIds = role === "comparison" || role === "split" ? assetIds.slice(0, 2) : assetIds.slice(0, 1);
-      return { ...draft, role, layout: role, assetId: allowedIds[0] || "", assetIds: allowedIds };
-    });
-    const pagesWithComparisonAssets = normalizedPages.map((draft, index, allDrafts) => {
-      const role = String(draft.role || draft.layout || "");
-      const currentIds = Array.isArray(draft.assetIds) ? draft.assetIds as string[] : [];
-      const draftText = [draft.headline, draft.subheadline, ...(Array.isArray(draft.body) ? draft.body : [])]
-        .filter((item): item is string => typeof item === "string")
-        .join(" ");
-      const needsPair = role === "comparison" || (role === "split" && comparisonLanguage.test(draftText));
-      if (!needsPair || currentIds.length >= 2) return draft;
-
-      // The model often identifies the contrasting asset correctly for the next
-      // page but omits it from the comparison page. Reuse the nearest semantic
-      // candidate instead of leaving a one-sided comparison layout.
-      const nearbyDrafts = [...allDrafts.slice(index + 1), ...allDrafts.slice(0, index)].filter((item) => item !== draft);
-      const secondaryId = nearbyDrafts
-        .flatMap((item) => Array.isArray(item.assetIds) ? item.assetIds as string[] : [])
-        .find((id) => validAssetIds.has(id) && !currentIds.includes(id));
-      if (!secondaryId) return draft;
-      const pairedIds = [...currentIds, secondaryId].slice(0, 2);
-      return { ...draft, assetId: pairedIds[0] || "", assetIds: pairedIds };
+      const needsAnotherImage = role === "comparison" && allowedIds.length < 2;
+      const modelMissing = draft.assetStatus === "missing";
+      const assetStatus = modelMissing || allowedIds.length === 0 || needsAnotherImage ? "missing" : "matched";
+      const request = draft.assetRequest && typeof draft.assetRequest === "object"
+        ? draft.assetRequest
+        : {
+            reason: needsAnotherImage ? "這一頁需要兩張能清楚呈現比較雙方的圖片。" : "現有圖片未能清楚支持這一頁的內容。",
+            suggestions: needsAnotherImage ? ["比較項目左方的清晰圖片", "比較項目右方的清晰圖片"] : ["能直接呈現這一頁主題的產品、服務或場景圖片"],
+          };
+      return { ...draft, role, layout: role, assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
     });
     const production = {
       ...project.production,
       assets: analyzedAssets,
-      pageDrafts: pagesWithComparisonAssets,
+      pageDrafts: normalizedPages,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
         videoPlan: {
