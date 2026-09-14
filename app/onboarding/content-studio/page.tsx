@@ -1280,6 +1280,18 @@ export default function ContentStudioPage() {
     }
   }
 
+  async function regeneratePageDrafts() {
+    if (!Array.isArray(selected?.production?.pageDrafts) || !selected.production.pageDrafts.length) {
+      await generatePageDrafts();
+      return;
+    }
+    const confirmed = window.confirm(
+      "重新生成會取代目前全部逐頁草稿，包括你已作出的修改。確定繼續？",
+    );
+    if (!confirmed) return;
+    await generatePageDrafts();
+  }
+
   function updatePageDraft(index: number, field: string, value: unknown) {
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
@@ -2329,11 +2341,16 @@ export default function ContentStudioPage() {
                               <div className="page-drafts">
                                 <div className="page-drafts-heading">
                                   <h4>{selected.selected_format === "short_video" ? "逐鏡短片製作草稿" : selected.selected_format === "single_image" ? "單張貼文草稿" : "逐頁文案及版面草稿"}</h4>
-                                  {selected.production.productionStatus === "drafts_confirmed" || selected.production.productionStatus === "package_ready" ? (
-                                    <span className="confirmed-pill">
-                                      已確認
-                                    </span>
-                                  ) : null}
+                                  <div className="page-drafts-heading-actions">
+                                    {selected.production.productionStatus === "drafts_ready" ? (
+                                      <button type="button" disabled={saving || editingDraft !== null} onClick={() => void regeneratePageDrafts()}>
+                                        {saving ? "正在重新生成…" : "重新生成草稿"}
+                                      </button>
+                                    ) : null}
+                                    {selected.production.productionStatus === "drafts_confirmed" || selected.production.productionStatus === "package_ready" ? (
+                                      <span className="confirmed-pill">已確認</span>
+                                    ) : null}
+                                  </div>
                                 </div>
                                 {selected.production.pageDrafts.map(
                                   (draft: any, index: number) => {
@@ -3011,6 +3028,7 @@ const editingStyles = `
   .carousel-generation-status span{width:14px;height:14px;border:2px solid #9bc4a7;border-top-color:#24653a;border-radius:50%;animation:carousel-generation-spin .8s linear infinite}
   .carousel-approval-status{border-radius:11px;background:#e8f3eb;color:#24653a;padding:13px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;font-weight:800}.carousel-approval-status a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 17px;border-radius:9px;background:#176b38;color:#fff;text-decoration:none;white-space:nowrap;font-size:12px}.carousel-approval-status a:hover{background:#10592d}@media(max-width:600px){.carousel-approval-status{align-items:stretch;flex-direction:column}.carousel-approval-status a{width:100%;box-sizing:border-box;min-height:48px;font-size:14px}}
   @keyframes carousel-generation-spin{to{transform:rotate(360deg)}}
+  .page-drafts-heading-actions{display:flex;align-items:center;gap:8px}.page-drafts-heading-actions button{border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#222;padding:8px 11px;font-size:10px;font-weight:800;cursor:pointer}.page-drafts-heading-actions button:disabled{opacity:.45;cursor:not-allowed}
   .page-drafts-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}.page-drafts-heading h4{margin:0}.page-drafts-heading .confirmed-pill{background:#e8f7ed!important;color:#208345!important}.draft-confirm-step,.generation-next-step{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px dashed #cfd2d7;border-radius:13px;padding:16px;margin-top:7px}.draft-confirm-step b,.generation-next-step b{font-size:13px}.draft-confirm-step p,.generation-next-step p{margin:5px 0 0;font-size:11px;color:#747880}.draft-confirm-step button,.generation-next-step button,.generated-carousel-head button{flex:0 0 auto;border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-confirm-step button:disabled,.generation-next-step button:disabled{opacity:.45;cursor:not-allowed}.generation-next-step{background:#f6faf7;border-style:solid;border-color:#dcebe0}.generated-carousel{display:grid;gap:14px;border:1px solid #dcebe0;background:#f6faf7;border-radius:13px;padding:16px}.generated-carousel-head{display:flex;align-items:center;justify-content:space-between;gap:15px}.generated-carousel-head p{margin:4px 0 0}.generated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.page-drafts .generated-grid article{display:block;grid-template-columns:none;background:#fff;border:1px solid #e1e3e6;border-radius:10px;overflow:hidden}.page-drafts .generated-grid article>img{display:block;width:100%;height:auto;aspect-ratio:4/5;object-fit:contain;background:#f3f3f1}.page-drafts .generated-grid article>div:last-child{display:grid;gap:8px;padding:10px 12px}.page-drafts .generated-grid article>div:last-child b{white-space:nowrap}.generated-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:7px}.generated-actions a{display:flex;align-items:center;justify-content:center;border-radius:7px;padding:8px 6px!important;font-size:10px;font-weight:800;text-decoration:none}.generated-edit-button{background:#eceef1;color:#222!important}.generated-download-button{background:#111;color:#fff!important}.caption-draft{white-space:pre-wrap;background:#fff;border-radius:10px;padding:13px!important}@media(max-width:700px){.draft-confirm-step,.generation-next-step{align-items:flex-start;flex-direction:column}.generated-grid{grid-template-columns:1fr 1fr}}
   .page-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   .page-card-head>div{display:flex;gap:5px}
