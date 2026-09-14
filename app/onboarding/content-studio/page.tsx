@@ -1927,7 +1927,13 @@ export default function ContentStudioPage() {
                       </div>
                       <em>按照已確認的內容設定製作</em>
                     </div>
-                    {selected.production?.status ? (
+                    {generatingStructure ? (
+                      <div className="production-ready is-generating" role="status" aria-live="polite">
+                        <b className="working" />
+                        <h4>{`正在重新整理 ${carouselSlideCount} 頁內容`}</h4>
+                        <p>SOON 正在重新核對資料，並按照所選模板安排每一頁。完成後會自動以新內容取代目前版本。</p>
+                      </div>
+                    ) : selected.production?.status ? (
                       <div className="structure-result">
                         <div className="structure-status">
                           <b>✓</b>
@@ -2751,10 +2757,10 @@ export default function ContentStudioPage() {
                         ) : null}
                       </div>
                     ) : (
-                      <div className={`production-ready${generatingStructure ? " is-generating" : ""}`} role={generatingStructure ? "status" : undefined} aria-live="polite">
-                        <b className={generatingStructure ? "working" : ""}>{generatingStructure ? "" : "!"}</b>
-                        <h4>{generatingStructure ? `正在整理 ${carouselSlideCount} 頁內容` : "尚未建立內容順序"}</h4>
-                        <p>{generatingStructure ? "SOON 正在核對你提供的資料，並按照所選模板安排每一頁。完成後會自動顯示內容順序，毋須再次按鈕。" : "請返回風格頁重新選擇內容風格。"}</p>
+                      <div className="production-ready">
+                        <b>!</b>
+                        <h4>尚未建立內容順序</h4>
+                        <p>請返回風格頁重新選擇內容風格。</p>
                       </div>
                     )}
                     {generatingStructure ? null : <div className="actions">
