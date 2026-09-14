@@ -112,6 +112,12 @@ export async function POST(req: Request) {
           .map((item) => item && typeof item === 'object' && 'role' in item ? String(item.role) : '')
           .filter(Boolean)
       : []
+    const templateCode = String(formatDecision.renderTemplateCode || formatDecision.templateCode || '')
+    const usesSemanticTemplateRoles = [
+      'clear-magazine-carousel-v1',
+      'clear_magazine_carousel',
+      'editorial-clear',
+    ].includes(templateCode)
     const roleDefinitions = [
       'cover：用一句吸引人的開場及一個清晰承諾帶出主題。',
       'longform：解釋主題的核心價值或背景，不得重複封面開場。',
@@ -125,7 +131,9 @@ export async function POST(req: Request) {
           `Template 的完整參考結構為 ${contractRoles.length} 頁：${contractRoles.join(' → ')}。`,
           `用家已選擇 ${slideCount} 頁，頁數選擇優先於 Template 的完整頁數；不得擅自增加頁面。`,
           `各角色功能如下：\n${roleDefinitions}`,
-          slideCount === contractRoles.length
+          usesSemanticTemplateRoles
+            ? 'Template artboards 只提供視覺規則與可用頁型，不代表固定頁序。除 cover 必須在首頁、end 必須在末頁外，中段須按內容語意選擇 longform、split、comparison 或 feature；不可為了還原參考圖次序而硬套頁型。'
+            : slideCount === contractRoles.length
             ? '頁數與 Template 完整結構相同。每一頁的 role 必須按位置逐一完全對應上述角色，不得改名、互換或用相鄰頁重複同一訊息。'
             : slideCount < contractRoles.length
             ? '請保留 cover 與 end，將最相近的中段功能自然合併。合併後每頁仍只可有一個清晰主旨，最後一頁同時承擔總結及 CTA。'
