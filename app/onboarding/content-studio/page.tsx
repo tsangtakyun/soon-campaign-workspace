@@ -595,7 +595,7 @@ export default function ContentStudioPage() {
   }
 
   async function recommendDirections() {
-    if (!workspaceId || !selected || !brief.summary.trim() || recommendingDirections) return;
+    if (!workspaceId || !selected || !String(brief.summary || "").trim() || recommendingDirections) return;
     setRecommendingDirections(true);
     setMessage("");
     try {
@@ -1645,14 +1645,14 @@ export default function ContentStudioPage() {
                         <button
                           type="button"
                           className="direction-recommend-button"
-                          disabled={!brief.summary.trim() || recommendingDirections}
+                          disabled={!String(brief.summary || "").trim() || recommendingDirections}
                           onClick={() => void recommendDirections()}
                         >
                           <SoonIcon name={recommendingDirections ? "refresh" : "spark"} size={16} />
                           {recommendingDirections ? "正在分析…" : directionRecommendations.length ? "重新分析" : "分析內容"}
                         </button>
                       </div>
-                      {!brief.summary.trim() ? <p className="direction-hint">先在上方貼上資料，SOON 才能提供合適建議。</p> : null}
+                      {!String(brief.summary || "").trim() ? <p className="direction-hint">先在上方貼上資料，SOON 才能提供合適建議。</p> : null}
                       {directionRecommendations.length ? (
                         <div className="direction-card-grid">
                           {directionRecommendations.map((recommendation, index) => (
@@ -1729,7 +1729,7 @@ export default function ContentStudioPage() {
                       <button
                         disabled={
                           saving ||
-                          !brief.summary.trim() ||
+                          !String(brief.summary || "").trim() ||
                           !directionRecommendations.length ||
                           !permissions?.canEdit
                         }

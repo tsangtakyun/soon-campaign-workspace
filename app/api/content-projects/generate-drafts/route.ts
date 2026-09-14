@@ -17,11 +17,12 @@ type VisualAsset = Record<string, unknown> & {
   visualAnalysis?: Record<string, unknown>;
 };
 
-function parseJson(text: string) {
-  const clean = text
+function parseJson(text: unknown) {
+  const clean = String(text ?? "")
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
+  if (!clean) throw new Error("AI 暫未回傳草稿內容，請重新生成");
   try {
     return JSON.parse(clean);
   } catch {
