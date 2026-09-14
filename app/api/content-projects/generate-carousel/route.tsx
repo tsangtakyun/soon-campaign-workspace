@@ -363,6 +363,13 @@ async function renderClearMagazinePage(
   const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#050505";
   const page = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
   const editorialFamily = hasBrandFont ? fonts.family : EDITORIAL_CAROUSEL_FONT;
+  // A real print-style safe area: every visible element stays inside this
+  // frame. Images may bleed only when the selected role explicitly calls for
+  // a full-bleed cover.
+  const safeX = 72;
+  const safeTop = 58;
+  const safeBottom = 64;
+  const safeWidth = 1080 - safeX * 2;
   const clean = (value: string | undefined) => String(value || "").trim();
   const body = (Array.isArray(draft.body) ? draft.body : [])
     .filter(Boolean)
@@ -390,8 +397,8 @@ async function renderClearMagazinePage(
     ]);
   };
   const chrome = (color: string) => [
-    React.createElement("div", { key: "logo", style: { position: "absolute", display: "flex", left: 58, top: 48, color } }, logo),
-    React.createElement("span", { key: "page", style: { position: "absolute", display: "flex", right: 58, top: 55, color, fontSize: 20 } }, page),
+    React.createElement("div", { key: "logo", style: { position: "absolute", display: "flex", left: safeX, top: safeTop, color } }, logo),
+    React.createElement("span", { key: "page", style: { position: "absolute", display: "flex", right: safeX, top: safeTop + 7, color, fontSize: 20 } }, page),
   ];
   let content: React.ReactNode;
   if (role === "cover") {
@@ -399,26 +406,26 @@ async function renderClearMagazinePage(
       picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      box({ position: "absolute", left: 68, right: 68, bottom: 58, display: "flex", flexDirection: "column" }, [
+      box({ position: "absolute", left: safeX, right: safeX, bottom: safeBottom, display: "flex", flexDirection: "column" }, [
         textBlock({ color: "white", headlineSize: 86, bodySize: 29, bodyLines: 2 }),
-        React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontSize: 52, lineHeight: 1, marginTop: 14, transform: "rotate(-4deg)" } }, "⟶"),
+        React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontFamily: fonts.family, fontSize: 44, lineHeight: 1, marginTop: 14 } }, "→"),
       ]),
     ]);
   } else if (role === "end") {
-    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "155px 66px 0" }, [
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: `150px ${safeX}px ${safeBottom}px` }, [
       ...chrome("white"),
-      textBlock({ color: "white", headlineSize: 68, bodySize: 29, bodyLines: 2, maxWidth: 930 }),
-      box({ position: "absolute", left: 0, bottom: 0, width: 820, height: 585, overflow: "hidden", background: "white" }, picture({ width: "100%", height: "100%", objectFit: "cover" })),
-      React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: 62, bottom: 84, padding: "18px 28px", borderRadius: 22, background: accent, color: dark, fontSize: 24, fontWeight: 700 } }, "了解更多 →"),
+      textBlock({ color: "white", headlineSize: 64, bodySize: 28, bodyLines: 2, maxWidth: safeWidth }),
+      box({ position: "absolute", left: safeX, bottom: safeBottom, width: 690, height: 535, overflow: "hidden", background: "white" }, picture({ width: "100%", height: "100%", objectFit: "cover" })),
+      React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: safeX, bottom: safeBottom + 22, padding: "18px 26px", borderRadius: 22, background: accent, color: dark, fontSize: 24, fontWeight: 700 } }, "了解更多 →"),
     ]);
   } else if (role === "comparison") {
-    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark, color: "white", padding: "150px 70px 62px" }, [
+    content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark, color: "white", padding: `150px ${safeX}px ${safeBottom}px` }, [
       ...chrome("white"),
       React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 29, fontWeight: 700 } }, draft.subheadline || "真正分別"),
       React.createElement("strong", { key: "head", style: { display: "flex", alignSelf: "center", textAlign: "center", fontFamily: fonts.family, fontSize: adaptiveHeadlineSize(68), fontWeight: 700, lineHeight: 1.12, margin: "38px 30px 34px" } }, draft.headline || ""),
-      box({ display: "flex", gap: 52, justifyContent: "center" }, [
-        box({ width: 405, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#f36a2d" }, [picture({ width: "100%", height: 355 }), React.createElement("b", { key: "l", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[0] || "比較一")]),
-        box({ width: 405, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#477877" }, [picture({ width: "100%", height: 355 }, secondaryAsset?.url), React.createElement("b", { key: "r", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[1] || "比較二")]),
+      box({ display: "flex", gap: 40, justifyContent: "center" }, [
+        box({ width: 448, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#f36a2d" }, [picture({ width: "100%", height: 355 }), React.createElement("b", { key: "l", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[0] || "比較一")]),
+        box({ width: 448, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#477877" }, [picture({ width: "100%", height: 355 }, secondaryAsset?.url), React.createElement("b", { key: "r", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[1] || "比較二")]),
       ]),
       React.createElement("span", { key: "summary", style: { display: "flex", textAlign: "center", alignSelf: "center", fontSize: 30, lineHeight: 1.4, margin: "32px 54px 0" } }, body.slice(2, 3).join("\n") || draft.subheadline || ""),
     ]);
@@ -426,24 +433,24 @@ async function renderClearMagazinePage(
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
       ...chrome("white"),
       secondaryAsset?.url
-        ? box({ display: "flex", height: 700, width: "100%", overflow: "hidden", gap: 8, background: dark }, [
-            box({ width: 536, height: 700, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
-            box({ width: 536, height: 700, overflow: "hidden" }, picture({ width: "100%", height: "100%" }, secondaryAsset.url)),
+        ? box({ display: "flex", position: "absolute", left: safeX, top: 145, height: 545, width: safeWidth, overflow: "hidden", gap: 20, background: dark }, [
+            box({ width: 458, height: 545, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+            box({ width: 458, height: 545, overflow: "hidden" }, picture({ width: "100%", height: "100%" }, secondaryAsset.url)),
           ])
-        : box({ height: 700, width: "100%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
-      box({ flex: 1, padding: "42px 72px 58px" }, textBlock({ color: "white", headlineSize: 67, bodySize: 30, bodyLines: 2 })),
+        : box({ position: "absolute", left: safeX, top: 145, height: 545, width: safeWidth, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      box({ position: "absolute", left: safeX, right: safeX, top: 735, bottom: safeBottom }, textBlock({ color: "white", headlineSize: 64, bodySize: 29, bodyLines: 2 })),
     ]);
   } else if (role === "feature") {
-    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "145px 60px 62px", gap: 38 }, [
+    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: `145px ${safeX}px ${safeBottom}px`, gap: 40 }, [
       ...chrome("white"),
-      box({ width: 455, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 68, bodySize: 30, bodyLines: 3 })),
-      box({ flex: 1, height: 945, overflow: "hidden", borderRadius: 2 }, picture({ width: "100%", height: "100%" })),
+      box({ width: 420, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 64, bodySize: 29, bodyLines: 3 })),
+      box({ width: 476, height: 945, overflow: "hidden", borderRadius: 2 }, picture({ width: "100%", height: "100%" })),
     ]);
   } else {
-    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "150px 58px 58px", gap: 42 }, [
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: `150px ${safeX}px ${safeBottom}px`, gap: 40 }, [
       ...chrome("white"),
-      box({ width: 440, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 68, bodySize: body.join("").length > 115 ? 27 : 31, bodyLines: 4 })),
-      box({ flex: 1, height: 1010, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      box({ width: 424, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 64, bodySize: body.join("").length > 115 ? 26 : 29, bodyLines: 4 })),
+      box({ width: 472, height: 1010, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
     ]);
   }
   return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: editorialFamily, position: "relative", overflow: "hidden" }, content), {
