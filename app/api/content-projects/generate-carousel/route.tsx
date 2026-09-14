@@ -321,6 +321,20 @@ async function renderPage(
 
 type ClearMagazineRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
+function resolveClearMagazineRole(draft: Draft, index: number, total: number): ClearMagazineRole {
+  if (index === 0) return "cover";
+  if (index === total - 1) return "end";
+  const text = [draft.headline, draft.subheadline, ...(draft.body || [])].join(" ");
+  if (/(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i.test(text)) {
+    return "comparison";
+  }
+  const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
+  if (["longform", "split", "feature"].includes(requestedRole)) {
+    return requestedRole as ClearMagazineRole;
+  }
+  return clearMagazineRole(index, total);
+}
+
 function clearMagazineRole(index: number, total: number): ClearMagazineRole {
   if (index === 0) return "cover";
   if (index === total - 1) return "end";
@@ -343,20 +357,13 @@ async function renderClearMagazinePage(
   secondaryAsset?: Asset,
   hasBrandFont = false,
 ) {
-  const requestedRole = String(draft.role || draft.layout || "").toLowerCase();
-  const role = (["cover", "longform", "split", "comparison", "feature", "end"] as const)
-    .includes(requestedRole as ClearMagazineRole)
-    ? requestedRole as ClearMagazineRole
-    : clearMagazineRole(index, total);
+  const role = resolveClearMagazineRole(draft, index, total);
   const colors = branding.colors || [];
   const accent = colors[0] || "#f1d443";
   const dark = colors.find((color) => /^#[0-5]/i.test(color)) || "#050505";
   const page = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
   const editorialFamily = hasBrandFont ? fonts.family : EDITORIAL_CAROUSEL_FONT;
-  const clamp = (value: string | undefined, max: number) => {
-    const clean = String(value || "").trim();
-    return clean.length > max ? `${clean.slice(0, max).trim()}…` : clean;
-  };
+  const clean = (value: string | undefined) => String(value || "").trim();
   const body = (Array.isArray(draft.body) ? draft.body : [])
     .filter(Boolean)
     .slice(0, 4)
@@ -368,10 +375,14 @@ async function renderClearMagazinePage(
   const logo = branding.logoUrl
     ? React.createElement("img", { src: branding.logoUrl, width: 42, height: 42, style: { width: 42, height: 42, objectFit: "contain" } })
     : React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } }, branding.name);
-  const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean; bodyLines?: number }) =>
+  const headlineLength = clean(draft.headline).length;
+  const adaptiveHeadlineSize = (preferred: number) => headlineLength > 21
+    ? Math.max(47, preferred - 13)
+    : headlineLength > 15 ? preferred - 7 : preferred;
+  const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean; bodyLines?: number; maxWidth?: number | string }) =>
     box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
-      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 24, fontWeight: 700, marginBottom: 18 } }, clamp(draft.subheadline || "重點整理", 28)),
-      React.createElement("strong", { key: "head", style: { display: "flex", fontSize: options.headlineSize || 58, lineHeight: 1.14, letterSpacing: "-2px" } }, clamp(draft.headline, 24)),
+      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontFamily: fonts.family, fontSize: 24, fontWeight: 700, marginBottom: 18, maxWidth: options.maxWidth } }, clean(draft.subheadline) || "重點整理"),
+      React.createElement("strong", { key: "head", style: { display: "flex", fontFamily: fonts.family, fontSize: adaptiveHeadlineSize(options.headlineSize || 62), fontWeight: 700, lineHeight: 1.12, letterSpacing: "-2px", maxWidth: options.maxWidth } }, clean(draft.headline)),
       ...(options.showBody === false ? [] : body.slice(0, options.bodyLines ?? 3).map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: options.bodySize || 31, lineHeight: 1.42, marginTop: bodyIndex === 0 ? 28 : 10 } }, line))),
     ]);
   const chrome = (color: string) => [
@@ -384,23 +395,23 @@ async function renderClearMagazinePage(
       picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      box({ position: "absolute", left: 68, right: 68, bottom: 66, display: "flex", flexDirection: "column" }, [
-        textBlock({ color: "white", headlineSize: 72, bodySize: 28 }),
-        React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontSize: 42, marginTop: 20 } }, "→"),
+      box({ position: "absolute", left: 68, right: 68, bottom: 58, display: "flex", flexDirection: "column" }, [
+        textBlock({ color: "white", headlineSize: 86, bodySize: 29, bodyLines: 2 }),
+        React.createElement("span", { key: "cta", style: { display: "flex", alignSelf: "flex-end", color: accent, fontSize: 52, lineHeight: 1, marginTop: 14, transform: "rotate(-4deg)" } }, "⟶"),
       ]),
     ]);
   } else if (role === "end") {
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "155px 66px 0" }, [
       ...chrome("white"),
-      textBlock({ color: "white", headlineSize: 61, bodySize: 29, bodyLines: 2 }),
-      box({ position: "absolute", left: 0, bottom: 0, width: 820, height: 585, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      textBlock({ color: "white", headlineSize: 68, bodySize: 29, bodyLines: 2, maxWidth: 930 }),
+      box({ position: "absolute", left: 0, bottom: 0, width: 820, height: 585, overflow: "hidden", background: "white" }, picture({ width: "100%", height: "100%", objectFit: "cover" })),
       React.createElement("span", { key: "cta", style: { position: "absolute", display: "flex", right: 62, bottom: 84, padding: "18px 28px", borderRadius: 22, background: accent, color: dark, fontSize: 24, fontWeight: 700 } }, "了解更多 →"),
     ]);
   } else if (role === "comparison") {
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark, color: "white", padding: "150px 70px 62px" }, [
       ...chrome("white"),
       React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontSize: 29, fontWeight: 700 } }, draft.subheadline || "真正分別"),
-      React.createElement("strong", { key: "head", style: { display: "flex", alignSelf: "center", textAlign: "center", fontSize: 57, lineHeight: 1.16, margin: "42px 30px 38px" } }, draft.headline || ""),
+      React.createElement("strong", { key: "head", style: { display: "flex", alignSelf: "center", textAlign: "center", fontFamily: fonts.family, fontSize: adaptiveHeadlineSize(68), fontWeight: 700, lineHeight: 1.12, margin: "38px 30px 34px" } }, draft.headline || ""),
       box({ display: "flex", gap: 52, justifyContent: "center" }, [
         box({ width: 405, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#f36a2d" }, [picture({ width: "100%", height: 355 }), React.createElement("b", { key: "l", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[0] || "比較一")]),
         box({ width: 405, height: 500, flexDirection: "column", overflow: "hidden", borderRadius: 20, background: "#477877" }, [picture({ width: "100%", height: 355 }, secondaryAsset?.url), React.createElement("b", { key: "r", style: { display: "flex", padding: "20px 22px", fontSize: 27, lineHeight: 1.3 } }, body[1] || "比較二")]),
@@ -416,21 +427,19 @@ async function renderClearMagazinePage(
             box({ width: 536, height: 700, overflow: "hidden" }, picture({ width: "100%", height: "100%" }, secondaryAsset.url)),
           ])
         : box({ height: 700, width: "100%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
-      box({ flex: 1, padding: "42px 72px 58px" }, textBlock({ color: "white", headlineSize: 58, bodySize: 31 })),
+      box({ flex: 1, padding: "42px 72px 58px" }, textBlock({ color: "white", headlineSize: 67, bodySize: 30, bodyLines: 2 })),
     ]);
   } else if (role === "feature") {
-    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "150px 60px 62px", gap: 38 }, [
+    content = box({ width: "100%", height: "100%", position: "relative", background: dark, padding: "145px 60px 62px", gap: 38 }, [
       ...chrome("white"),
-      box({ width: 420, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 56, bodySize: 31 })),
-      box({ flex: 1, height: 940, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      box({ width: 455, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 68, bodySize: 30, bodyLines: 3 })),
+      box({ flex: 1, height: 945, overflow: "hidden", borderRadius: 2 }, picture({ width: "100%", height: "100%" })),
     ]);
   } else {
-    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
-      picture({ position: "absolute", inset: 0, width: "100%", height: "100%" }),
-      box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.9),rgba(0,0,0,.08))" }, null),
+    content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark, padding: "150px 58px 58px", gap: 42 }, [
       ...chrome("white"),
-      box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "rgba(0,0,0,.48)" }, null),
-      box({ position: "absolute", left: 72, right: 72, top: 155 }, textBlock({ color: "white", headlineSize: 62, bodySize: body.join("").length > 115 ? 30 : 34, bodyLines: 3 })),
+      box({ width: 440, flexDirection: "column", justifyContent: "center" }, textBlock({ color: "white", headlineSize: 68, bodySize: body.join("").length > 115 ? 27 : 31, bodyLines: 4 })),
+      box({ flex: 1, height: 1010, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
     ]);
   }
   return new ImageResponse(box({ width: "100%", height: "100%", fontFamily: editorialFamily, position: "relative", overflow: "hidden" }, content), {
