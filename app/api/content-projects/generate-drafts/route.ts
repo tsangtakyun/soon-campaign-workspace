@@ -38,18 +38,27 @@ async function analyzeVisualAssets(apiKey: string, assets: VisualAsset[]) {
   if (!pending.length) return assets;
 
   try {
-    let totalBytes = 0;
     const content: Array<Record<string, unknown>> = [{
       type: "text",
       text: "逐張分析以下圖片。分析必須只根據畫面，不可從檔名猜測。",
     }];
-    for (const asset of pending) {
-      const response = await fetch(String(asset.url), { signal: AbortSignal.timeout(12_000) });
-      if (!response.ok) continue;
-      const mediaType = (response.headers.get("content-type") || "").split(";")[0];
-      if (!new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]).has(mediaType)) continue;
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.byteLength > 8_000_000 || totalBytes + buffer.byteLength > 18_000_000) continue;
+    const supportedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+    const downloaded = await Promise.all(pending.map(async (asset) => {
+      try {
+        const response = await fetch(String(asset.url), { signal: AbortSignal.timeout(8_000) });
+        if (!response.ok) return null;
+        const mediaType = (response.headers.get("content-type") || "").split(";")[0];
+        if (!supportedTypes.has(mediaType)) return null;
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return buffer.byteLength <= 8_000_000 ? { asset, mediaType, buffer } : null;
+      } catch {
+        return null;
+      }
+    }));
+    let totalBytes = 0;
+    for (const item of downloaded) {
+      if (!item || totalBytes + item.buffer.byteLength > 18_000_000) continue;
+      const { asset, mediaType, buffer } = item;
       totalBytes += buffer.byteLength;
       content.push({ type: "text", text: `ASSET_ID: ${asset.id}\nFILENAME: ${asset.filename || "unknown"}` });
       content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: buffer.toString("base64") } });
@@ -75,7 +84,7 @@ async function analyzeVisualAssets(apiKey: string, assets: VisualAsset[]) {
         system: "You are a visual asset librarian. Return valid JSON only.",
         messages: [{ role: "user", content }],
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(28_000),
     });
     const data = await response.json();
     if (!response.ok) return assets;
@@ -229,6 +238,7 @@ export async function POST(req: Request) {
         system: "You are SOON Content Studio. Return valid JSON only.",
         messages: [{ role: "user", content: input }],
       }),
+      signal: AbortSignal.timeout(72_000),
     });
     const data = await response.json();
     if (!response.ok)
