@@ -101,9 +101,6 @@ export async function POST(req: Request) {
         : "優先遵從 Workspace Prompt 內的品牌慣用語氣。";
     const isClearMagazine = ["clear-magazine-carousel-v1", "clear_magazine_carousel", "editorial-clear"]
       .includes(String(project.format_decision?.renderTemplateCode || project.format_decision?.templateCode || ""));
-    const clearMagazineRoles = pages.length <= 5
-      ? ["cover", "longform", "split", "comparison", "end"]
-      : ["cover", "longform", "split", "comparison", "feature", "end"];
     const videoMethod = project.format_decision?.videoMethod === "ai_video_generation"
       ? "ai_video_generation"
       : "human_filming";
@@ -126,7 +123,7 @@ export async function POST(req: Request) {
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
           '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
-            `清晰雜誌風必須依次使用以下頁型：${clearMagazineRoles.slice(0, pages.length).join(" → ")}。`,
+            "頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。",
             "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
             "comparison 頁的 body[0] 與 body[1] 是左右兩項標籤，其餘段落才是比較結論。",
             "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；不足兩張合適素材時只填合適的一張，不可隨機補圖。",
@@ -172,20 +169,26 @@ export async function POST(req: Request) {
       : "";
     const drafts = parseJson(text);
     const validAssetIds = new Set(assets.map((asset: { id?: string }) => asset.id).filter(Boolean));
-    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>, index: number) => {
+    const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
+    const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
+    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
       const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
       const assetIds = [...new Set(requestedIds)];
-      // A published template owns its page-role sequence. The model supplies
-      // content and image choices, but must not move a split/comparison layout
-      // to another page when regenerating copy.
-      const role = isClearMagazine
-        ? clearMagazineRoles[index] || String(draft.role || draft.layout || "")
-        : String(draft.role || draft.layout || "");
+      const draftText = [draft.headline, draft.subheadline, ...(Array.isArray(draft.body) ? draft.body : [])]
+        .filter((item): item is string => typeof item === "string")
+        .join(" ");
+      const requestedRole = String(draft.role || draft.layout || "");
+      const modelRole = validRoles.has(requestedRole) ? requestedRole : "longform";
+      // Content semantics outrank the model's page-role label. A page that
+      // explicitly discusses a difference must render as a comparison; a page
+      // labelled comparison without comparative content falls back to feature.
+      const role = comparisonLanguage.test(draftText)
+        ? "comparison"
+        : modelRole === "comparison" ? "feature" : modelRole;
       const allowedIds = role === "comparison" || role === "split" ? assetIds.slice(0, 2) : assetIds.slice(0, 1);
       return { ...draft, role, layout: role, assetId: allowedIds[0] || "", assetIds: allowedIds };
     });
-    const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|\bvs\.?\b)/i;
     const pagesWithComparisonAssets = normalizedPages.map((draft, index, allDrafts) => {
       const role = String(draft.role || draft.layout || "");
       const currentIds = Array.isArray(draft.assetIds) ? draft.assetIds as string[] : [];
