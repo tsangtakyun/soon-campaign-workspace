@@ -20,6 +20,7 @@ type Draft = {
   subheadline?: string;
   body?: string[];
   assetId?: string;
+  assetIds?: string[];
   layout?: string;
   role?: string;
 };
@@ -543,11 +544,14 @@ export async function POST(req: Request) {
       ),
     );
     const outputs = await Promise.all(drafts.map(async (draft, index) => {
-      const asset = assets.find((item) => item.id === draft.assetId);
+      const requestedAssetIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
+        .filter((id): id is string => typeof id === "string" && Boolean(id));
+      const assetIds = [...new Set(requestedAssetIds)];
+      const asset = assets.find((item) => item.id === assetIds[0]);
       const preparedAsset = asset?.url
         ? { ...asset, url: preparedImageUrls.get(asset.url) || asset.url }
         : asset;
-      const secondarySource = assets.find((item) => item.id !== draft.assetId && item.url);
+      const secondarySource = assets.find((item) => item.id === assetIds[1] && item.url);
       const secondaryAsset = secondarySource?.url
         ? { ...secondarySource, url: preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;

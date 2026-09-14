@@ -87,6 +87,18 @@ export async function POST(req: Request) {
 
     const pages = project.production.pages || [];
     const assets = project.production.assets || [];
+    const { data: contentPreferences } = await access.admin
+      .from("content_preferences").select("content_mood")
+      .eq("workspace_id", workspaceId).maybeSingle();
+    const contentMood = contentPreferences?.content_mood && typeof contentPreferences.content_mood === "object"
+      ? contentPreferences.content_mood as Record<string, unknown> : {};
+    const languageStyle = contentMood.languageStyle === "written" || contentMood.languageStyle === "conversational"
+      ? contentMood.languageStyle : "brand";
+    const languageInstruction = languageStyle === "written"
+      ? "使用自然、簡潔的繁體中文書面語，避免有冇、係咪、睇、揀、唔、咁、佢等口語。"
+      : languageStyle === "conversational"
+        ? "使用自然香港廣東話及短句，保持清楚、可信。"
+        : "優先遵從 Workspace Prompt 內的品牌慣用語氣。";
     const isClearMagazine = ["clear-magazine-carousel-v1", "clear_magazine_carousel", "editorial-clear"]
       .includes(String(project.format_decision?.renderTemplateCode || project.format_decision?.templateCode || ""));
     const clearMagazineRoles = pages.length <= 5
@@ -112,11 +124,13 @@ export async function POST(req: Request) {
             ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
             : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
-          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"已提供素材 id 或空字串","layout":"頁面角色","designDirection":"具體排版方向"}]}',
+          '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
             `清晰雜誌風必須依次使用以下頁型：${clearMagazineRoles.slice(0, pages.length).join(" → ")}。`,
             "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
             "comparison 頁的 body[0] 與 body[1] 是左右兩項標籤，其餘段落才是比較結論。",
+            "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；不足兩張合適素材時只填合適的一張，不可隨機補圖。",
+            "split 頁可按內容使用一至兩張素材；其他頁只需一張主要素材。assetId 必須等於 assetIds 第一項。",
           ] : []),
         ];
     const input = [
@@ -128,7 +142,9 @@ export async function POST(req: Request) {
       "已選內容風格：" + JSON.stringify(project.format_decision || {}),
       "已確認故事結構：" + JSON.stringify(pages),
       isVideo ? "參考圖片素材：" + JSON.stringify(assets) : "圖片素材（必須用 asset id 引用）：" + JSON.stringify(assets),
-      "鏡頭／頁數及次序必須與已確認結構一致。使用繁體中文書面語，不要新增未經核實的事實。",
+      "圖片必須按每頁主題及畫面用途配對，不可按照上載次序機械分配。",
+      languageInstruction,
+      "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
     ].join("\n");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -155,9 +171,18 @@ export async function POST(req: Request) {
           .join("\n")
       : "";
     const drafts = parseJson(text);
+    const validAssetIds = new Set(assets.map((asset: { id?: string }) => asset.id).filter(Boolean));
+    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
+      const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
+        .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
+      const assetIds = [...new Set(requestedIds)];
+      const role = String(draft.role || draft.layout || "");
+      const allowedIds = role === "comparison" || role === "split" ? assetIds.slice(0, 2) : assetIds.slice(0, 1);
+      return { ...draft, assetId: allowedIds[0] || "", assetIds: allowedIds };
+    });
     const production = {
       ...project.production,
-      pageDrafts: drafts.pages || [],
+      pageDrafts: normalizedPages,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
         videoPlan: {

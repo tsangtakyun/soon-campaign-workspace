@@ -1285,7 +1285,17 @@ export default function ContentStudioPage() {
       return;
     const pageDrafts = selected.production.pageDrafts.map(
       (draft: any, draftIndex: number) =>
-        draftIndex === index ? { ...draft, [field]: value } : draft,
+        draftIndex === index
+          ? {
+              ...draft,
+              [field]: value,
+              ...(field === "assetIds" && Array.isArray(value)
+                ? { assetId: value[0] || "" }
+                : field === "assetId"
+                  ? { assetIds: value ? [value] : [] }
+                  : {}),
+            }
+          : draft,
     );
     setProjects((current) =>
       current.map((item) =>
@@ -2327,25 +2337,35 @@ export default function ContentStudioPage() {
                                 </div>
                                 {selected.production.pageDrafts.map(
                                   (draft: any, index: number) => {
-                                    const asset = Array.isArray(
+                                    const availableAssets = Array.isArray(
                                       selected.production?.assets,
                                     )
-                                      ? (
-                                          selected.production
-                                            .assets as ProjectAsset[]
-                                        ).find(
-                                          (item) => item.id === draft.assetId,
-                                        )
-                                      : null;
+                                      ? selected.production.assets as ProjectAsset[]
+                                      : [];
+                                    const requestedAssetIds = [
+                                      ...(Array.isArray(draft.assetIds) ? draft.assetIds : []),
+                                      draft.assetId,
+                                    ].filter((id: unknown): id is string => typeof id === "string" && Boolean(id));
+                                    const draftAssetIds = [...new Set(requestedAssetIds)];
+                                    const draftAssets = draftAssetIds
+                                      .map((id) => availableAssets.find((item) => item.id === id))
+                                      .filter((item): item is ProjectAsset => Boolean(item));
+                                    const draftRole = String(draft.role || draft.layout || "");
+                                    const supportsMultipleImages = ["comparison", "split"].includes(draftRole);
+                                    const isComparisonDraft = draftRole === "comparison";
+                                    const previewSlots = isComparisonDraft ? 2 : Math.max(1, draftAssets.length);
                                     return (
                                       <article key={index}>
-                                        {asset ? (
-                                          <img src={asset.url} alt="" />
-                                        ) : (
-                                          <div className="draft-no-image">
-                                            {selected.selected_format === "short_video" ? "鏡頭" : "未指定圖片"}
-                                          </div>
-                                        )}
+                                        <div className={`draft-assets-preview${previewSlots > 1 ? " is-multi" : ""}`}>
+                                          {draftAssets.slice(0, supportsMultipleImages ? 2 : 1).map((asset) => (
+                                            <img key={asset.id} src={asset.url} alt="" />
+                                          ))}
+                                          {Array.from({ length: Math.max(0, previewSlots - draftAssets.length) }).map((_, missingIndex) => (
+                                            <div className="draft-no-image" key={`missing-${missingIndex}`}>
+                                              {selected.selected_format === "short_video" ? "鏡頭" : isComparisonDraft ? "尚欠比較圖片" : "未指定圖片"}
+                                            </div>
+                                          ))}
+                                        </div>
                                         <div>
                                           {editingDraft === index ? (
                                             <div className="draft-editor">
@@ -2397,14 +2417,14 @@ export default function ContentStudioPage() {
                                                 />
                                               </label>
                                               <label>
-                                                <b>配對圖片</b>
+                                                <b>{supportsMultipleImages ? "左側圖片" : "配對圖片"}</b>
                                                 <select
-                                                  value={draft.assetId || ""}
+                                                  value={draftAssetIds[0] || ""}
                                                   onChange={(event) =>
                                                     updatePageDraft(
                                                       index,
-                                                      "assetId",
-                                                      event.target.value,
+                                                      supportsMultipleImages ? "assetIds" : "assetId",
+                                                      supportsMultipleImages ? [event.target.value, draftAssetIds[1] || ""].filter(Boolean) : event.target.value,
                                                     )
                                                   }
                                                 >
@@ -2428,6 +2448,20 @@ export default function ContentStudioPage() {
                                                     : null}
                                                 </select>
                                               </label>
+                                              {supportsMultipleImages ? (
+                                                <label>
+                                                  <b>右側圖片</b>
+                                                  <select
+                                                    value={draftAssetIds[1] || ""}
+                                                    onChange={(event) => updatePageDraft(index, "assetIds", [draftAssetIds[0] || "", event.target.value].filter(Boolean))}
+                                                  >
+                                                    <option value="">{isComparisonDraft ? "尚欠比較圖片" : "不使用第二張圖片"}</option>
+                                                    {availableAssets.map((item) => (
+                                                      <option key={item.id} value={item.id} disabled={item.id === draftAssetIds[0]}>{item.filename}</option>
+                                                    ))}
+                                                  </select>
+                                                </label>
+                                              ) : null}
                                               <details className="draft-layout-detail">
                                                 <summary>查看版面設定</summary>
                                                 <p>{draft.designDirection}</p>
@@ -2994,7 +3028,7 @@ const editingStyles = `
   .asset-visual-guidance{margin-top:15px;padding:13px 15px;border:1px solid #e2ded0;border-radius:11px;background:#faf8f1}.asset-visual-guidance>summary{cursor:pointer;font-size:12px;font-weight:800;color:#34373c}.asset-visual-guidance[open]>summary{margin-bottom:10px}.asset-visual-guidance ul{display:grid;gap:7px;margin:0;padding:0;list-style:none}.asset-visual-guidance li{display:grid;grid-template-columns:36px 1fr;gap:8px;align-items:start;font-size:11px;line-height:1.5;color:#555961}.asset-visual-guidance li strong{color:#222}.asset-visual-guidance p{margin:0!important;font-size:11px;color:#737780;line-height:1.55}
   .asset-source-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}.asset-source-tabs button{border:1px solid #dfe1e5;background:#fff;border-radius:10px;padding:11px 9px;font-size:11px;font-weight:750;cursor:pointer}.asset-source-tabs button.active{background:#111;color:#fff;border-color:#111}.asset-source-panel,.asset-search-panel{margin-top:9px;border:1px solid #e2e3e6;border-radius:11px;padding:14px;background:#fafafa}.asset-source-panel{display:flex;align-items:center;justify-content:space-between;gap:15px}.asset-source-panel b,.asset-license-note b{font-size:12px}.asset-page-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.asset-page-actions button,.asset-search-controls button,.licensed-result-grid button{border:0;background:#111;color:#fff;border-radius:8px;padding:9px 11px;font-size:10px;font-weight:750;cursor:pointer}.asset-page-actions button:disabled{opacity:.5}.asset-license-note{background:#fff7df;border:1px solid #ecdca9;border-radius:9px;padding:11px}.asset-license-note p{line-height:1.55!important;color:#655c43!important}.asset-search-controls{display:grid;grid-template-columns:92px 1fr auto;gap:7px;margin-top:10px}.asset-search-controls select,.asset-search-controls input{border:1px solid #dfe1e5;border-radius:8px;background:#fff!important;color:#111!important;padding:9px;font-size:11px}.licensed-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:11px}.licensed-result-grid article{border:1px solid #e1e3e6;border-radius:9px;overflow:hidden;background:#fff}.licensed-result-grid img{width:100%;height:130px;object-fit:cover;background:#eee;display:block}.licensed-result-grid article>div{padding:9px;display:grid;gap:6px}.licensed-result-grid strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.licensed-result-grid small{font-size:9px;color:#747880}.licensed-result-grid article>div>div{display:flex;align-items:center;justify-content:space-between;gap:5px}.licensed-result-grid a,.asset-source-meta a{font-size:9px;color:#555;text-decoration:underline}.asset-source-meta{white-space:normal!important;line-height:1.4}.asset-source-meta a{display:inline}.licensed-result-grid button{padding:7px 8px}@media(max-width:900px){.asset-source-tabs,.licensed-result-grid{grid-template-columns:1fr}.asset-source-panel{align-items:flex-start;flex-direction:column}.asset-search-controls{grid-template-columns:1fr}.asset-page-actions{justify-content:flex-start}}
   .asset-source-tabs button{border-color:#111;background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:.72;transition:opacity .15s ease,box-shadow .15s ease}.asset-source-tabs button:hover{opacity:.88}.asset-source-tabs button.active{background:#111;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#111;opacity:1;box-shadow:0 0 0 2px #fff,0 0 0 4px #111}
-  .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.page-drafts img,.draft-no-image{width:180px;height:220px;object-fit:contain;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;color:#999;font-size:11px}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.page-drafts img,.draft-no-image{width:100%;height:250px}}
+  .draft-start-row{display:flex;justify-content:flex-end;margin-top:12px}.draft-start-row button{border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-start-row button:disabled{opacity:.5}.page-drafts{display:grid;gap:12px}.page-drafts>h4{margin:8px 0}.page-drafts article{display:grid;grid-template-columns:180px 1fr;border:1px solid #e1e3e6;border-radius:13px;overflow:hidden}.draft-assets-preview{width:180px;height:220px;display:grid;grid-template-columns:1fr;background:#f2f2f3}.draft-assets-preview.is-multi{grid-template-columns:1fr 1fr;gap:2px}.draft-assets-preview img,.draft-assets-preview .draft-no-image{width:100%;height:220px;min-width:0;object-fit:cover;background:#f2f2f3}.draft-no-image{display:grid;place-items:center;text-align:center;color:#777;font-size:10px;padding:8px;box-sizing:border-box}.page-drafts article>div:last-child{padding:16px}.page-drafts span{font-size:10px;font-weight:800;background:#111;color:#fff;border-radius:6px;padding:5px 7px}.page-drafts h5{font-size:17px;margin:12px 0 5px}.page-drafts h6{font-size:12px;margin:0 0 10px;color:#676b73}.page-drafts p{font-size:12px;line-height:1.55;color:#50545b}.page-drafts small{display:block;margin-top:10px;color:#8a8e96}.draft-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-card-head>div{display:flex;gap:6px}.draft-card-head button,.draft-editor-actions button{border:0;border-radius:7px;padding:7px 10px;background:#f1f2f4;color:#222;font-size:10px;font-weight:800;cursor:pointer}.draft-card-head button.delete{background:#fff0f0;color:#b52a2a}.draft-editor{display:grid;gap:10px}.draft-editor label{display:grid;gap:5px}.draft-editor label>b{font-size:10px;color:#34373c}.draft-editor input,.draft-editor textarea,.draft-editor select{width:100%;box-sizing:border-box;border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#111;padding:9px 10px;font:inherit;font-size:11px}.draft-editor textarea{min-height:82px;resize:vertical;line-height:1.5}.draft-editor-actions{display:flex;justify-content:flex-end;gap:7px}.draft-editor-actions button.primary{background:#111;color:#fff}.draft-editor-actions button:disabled{opacity:.5}@media(max-width:700px){.page-drafts article{grid-template-columns:1fr}.draft-assets-preview{width:100%;height:250px}.draft-assets-preview img,.draft-assets-preview .draft-no-image{height:250px}}
   .draft-layout-detail{margin-top:12px;border-top:1px solid #ece8e3;padding-top:10px}.draft-layout-detail summary{width:max-content;cursor:pointer;color:var(--soon-oxblood);font-size:10px;font-weight:800}.draft-layout-detail p{margin:9px 0 0!important;border-radius:9px;background:#f7f5f2;padding:11px;color:#777b83!important;font-size:10px!important;line-height:1.55!important}.draft-layout-detail:not([open]) p{display:none}
   .studio-page{--soon-ivory:#f6f2eb;--soon-ink:#202126;--soon-oxblood:#6b2c30;--soon-oxblood-dark:#4d2023;--soon-clay:#b46a61;--soon-chartreuse:#c7e63a;--soon-line:#ded5cd;--soon-muted:#6f737d;background:var(--soon-ivory);color:var(--soon-ink)}.studio-shell{background:var(--soon-ivory)}.studio-topbar{min-height:86px;border-color:var(--soon-line);background:rgba(246,242,235,.94);padding:0 34px}.studio-topbar h1{font-size:26px;letter-spacing:-.035em}.studio-topbar p{color:var(--soon-muted)}.studio-topbar .secondary{border:1px solid var(--soon-line);background:#fff!important;color:var(--soon-oxblood)!important}.studio-layout{grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 86px)}.project-list{border-color:var(--soon-line);background:#efe8df;padding:22px 16px}.project-list>div strong{color:var(--soon-oxblood);font-size:12px;letter-spacing:.06em}.project-list-card.active{border-color:#c9aaa5;box-shadow:4px 4px 0 #ddc6c1}.project-list-card.active .project-select-button{background:#fff}.project-delete-button{background:#f7eee9}.studio-workspace{max-width:1120px;padding:32px clamp(20px,4vw,46px)}.editor-card{border-color:var(--soon-line);background:#fff;box-shadow:none}.section-title span{color:var(--soon-oxblood)}.studio-step-nav{border-color:var(--soon-line);background:rgba(246,242,235,.94)}.studio-step-nav button{background:#ebe4dc}.studio-step-nav button.active{background:var(--soon-oxblood);color:#fff}.studio-step-nav button.done{background:#edf6d4;color:#52691a}.studio-step-footer{border-color:var(--soon-line);background:rgba(246,242,235,.96)}.studio-step-footer button,.actions button:not(.secondary),.asset-upload-button,.asset-page-actions button,.draft-start-row button,.draft-confirm-step button,.generation-next-step button,.generated-carousel-head button{background:var(--soon-oxblood);color:#fff}.format-grid button.active,.angle-options button.active,.asset-source-tabs button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood)}.production-ready b,.structure-status>b{background:#edf6d4;color:#52691a}.story-pages article>span,.page-drafts span{background:var(--soon-oxblood)}.welcome a,.generated-download-button{background:var(--soon-oxblood)!important}.next-production,.generation-next-step{border-color:#dce8b6;background:#f3f8e3}.studio-message{background:#f1ebe4;color:var(--soon-oxblood)}@media(max-width:900px){.studio-topbar{min-height:auto;padding:20px}.studio-topbar h1{font-size:23px}.studio-layout{min-height:0}.project-list{background:#efe8df}.studio-workspace{padding:18px 14px 70px}.editor-card{padding:19px 15px}.studio-step-footer{grid-template-columns:1fr 1fr}.studio-step-footer span{grid-column:1/-1;grid-row:1}.studio-step-footer button{min-height:44px}}
   .format-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.format-grid button{grid-template-columns:42px 1fr;align-items:center;gap:12px;min-height:116px}.format-grid button>i{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#eee7df;color:var(--soon-oxblood);font-size:22px;font-style:normal}.format-grid button>span{display:grid;gap:4px}.format-grid button strong{font-size:15px}.format-grid button small{color:#777b83;font-size:11px;line-height:1.45}.format-grid button.active>i{background:var(--soon-chartreuse);color:var(--soon-oxblood)}.format-grid button.active small{color:#eadfdf}.slide-count-recommendation{display:grid;gap:14px;margin-top:16px;border:1px solid #d7e9a1;border-radius:14px;background:#f6fae8;padding:18px}.slide-count-recommendation>div:first-child{display:grid;gap:4px}.slide-count-recommendation>div:first-child strong{font-size:15px;color:var(--soon-ink)}.slide-count-recommendation>div:first-child small{color:var(--soon-muted);font-size:12px;line-height:1.5}.quantity-options{display:grid;grid-template-columns:repeat(8,minmax(58px,1fr));gap:8px}.quantity-options button{min-height:48px;border:1px solid var(--soon-line);border-radius:10px;background:#fff;color:var(--soon-ink);font-size:13px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.quantity-options button small{font-size:9px;color:#71852e}.quantity-options button.active{border-color:var(--soon-oxblood);background:var(--soon-oxblood);color:#fff}.quantity-options button.active small{color:#e4f6a4}@media(max-width:1100px){.format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quantity-options{grid-template-columns:repeat(4,1fr)}}@media(max-width:760px){.format-grid{grid-template-columns:1fr}.format-grid button{min-height:88px}.quantity-options{grid-template-columns:repeat(4,1fr)}}
