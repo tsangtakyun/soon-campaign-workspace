@@ -180,9 +180,30 @@ export async function POST(req: Request) {
       const allowedIds = role === "comparison" || role === "split" ? assetIds.slice(0, 2) : assetIds.slice(0, 1);
       return { ...draft, assetId: allowedIds[0] || "", assetIds: allowedIds };
     });
+    const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|\bvs\.?\b)/i;
+    const pagesWithComparisonAssets = normalizedPages.map((draft, index, allDrafts) => {
+      const role = String(draft.role || draft.layout || "");
+      const currentIds = Array.isArray(draft.assetIds) ? draft.assetIds as string[] : [];
+      const draftText = [draft.headline, draft.subheadline, ...(Array.isArray(draft.body) ? draft.body : [])]
+        .filter((item): item is string => typeof item === "string")
+        .join(" ");
+      const needsPair = role === "comparison" || (role === "split" && comparisonLanguage.test(draftText));
+      if (!needsPair || currentIds.length >= 2) return draft;
+
+      // The model often identifies the contrasting asset correctly for the next
+      // page but omits it from the comparison page. Reuse the nearest semantic
+      // candidate instead of leaving a one-sided comparison layout.
+      const nearbyDrafts = [...allDrafts.slice(index + 1), ...allDrafts.slice(0, index)].filter((item) => item !== draft);
+      const secondaryId = nearbyDrafts
+        .flatMap((item) => Array.isArray(item.assetIds) ? item.assetIds as string[] : [])
+        .find((id) => validAssetIds.has(id) && !currentIds.includes(id));
+      if (!secondaryId) return draft;
+      const pairedIds = [...currentIds, secondaryId].slice(0, 2);
+      return { ...draft, assetId: pairedIds[0] || "", assetIds: pairedIds };
+    });
     const production = {
       ...project.production,
-      pageDrafts: normalizedPages,
+      pageDrafts: pagesWithComparisonAssets,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
         videoPlan: {

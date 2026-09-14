@@ -410,7 +410,12 @@ async function renderClearMagazinePage(
   } else if (role === "split") {
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
       ...chrome("white"),
-      box({ height: 700, width: "100%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+      secondaryAsset?.url
+        ? box({ display: "flex", height: 700, width: "100%", overflow: "hidden", gap: 8, background: dark }, [
+            box({ width: 536, height: 700, overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
+            box({ width: 536, height: 700, overflow: "hidden" }, picture({ width: "100%", height: "100%" }, secondaryAsset.url)),
+          ])
+        : box({ height: 700, width: "100%", overflow: "hidden" }, picture({ width: "100%", height: "100%" })),
       box({ flex: 1, padding: "42px 72px 58px" }, textBlock({ color: "white", headlineSize: 58, bodySize: 31 })),
     ]);
   } else if (role === "feature") {
