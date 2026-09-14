@@ -172,13 +172,18 @@ export async function POST(req: Request) {
       : "";
     const drafts = parseJson(text);
     const validAssetIds = new Set(assets.map((asset: { id?: string }) => asset.id).filter(Boolean));
-    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
+    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>, index: number) => {
       const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
       const assetIds = [...new Set(requestedIds)];
-      const role = String(draft.role || draft.layout || "");
+      // A published template owns its page-role sequence. The model supplies
+      // content and image choices, but must not move a split/comparison layout
+      // to another page when regenerating copy.
+      const role = isClearMagazine
+        ? clearMagazineRoles[index] || String(draft.role || draft.layout || "")
+        : String(draft.role || draft.layout || "");
       const allowedIds = role === "comparison" || role === "split" ? assetIds.slice(0, 2) : assetIds.slice(0, 1);
-      return { ...draft, assetId: allowedIds[0] || "", assetIds: allowedIds };
+      return { ...draft, role, layout: role, assetId: allowedIds[0] || "", assetIds: allowedIds };
     });
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|\bvs\.?\b)/i;
     const pagesWithComparisonAssets = normalizedPages.map((draft, index, allDrafts) => {
