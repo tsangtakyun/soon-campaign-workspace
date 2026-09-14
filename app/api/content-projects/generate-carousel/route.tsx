@@ -379,12 +379,16 @@ async function renderClearMagazinePage(
   const adaptiveHeadlineSize = (preferred: number) => headlineLength > 21
     ? Math.max(47, preferred - 13)
     : headlineLength > 15 ? preferred - 7 : preferred;
-  const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean; bodyLines?: number; maxWidth?: number | string }) =>
-    box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
-      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontFamily: fonts.family, fontSize: 24, fontWeight: 700, marginBottom: 18, maxWidth: options.maxWidth } }, clean(draft.subheadline) || "重點整理"),
-      React.createElement("strong", { key: "head", style: { display: "flex", fontFamily: fonts.family, fontSize: adaptiveHeadlineSize(options.headlineSize || 62), fontWeight: 700, lineHeight: 1.12, letterSpacing: "-2px", maxWidth: options.maxWidth } }, clean(draft.headline)),
+  const textBlock = (options: { color: string; headlineSize?: number; bodySize?: number; align?: "left" | "center"; showBody?: boolean; bodyLines?: number; maxWidth?: number | string }) => {
+    // Satori calls `.trim()` on CSS values. Never pass optional properties with
+    // an undefined value, otherwise only page roles without maxWidth will fail.
+    const widthStyle = options.maxWidth == null ? {} : { maxWidth: options.maxWidth };
+    return box({ display: "flex", flexDirection: "column", color: options.color, textAlign: options.align || "left" }, [
+      React.createElement("span", { key: "eye", style: { display: "flex", color: accent, fontFamily: fonts.family, fontSize: 24, fontWeight: 700, marginBottom: 18, ...widthStyle } }, clean(draft.subheadline) || "重點整理"),
+      React.createElement("strong", { key: "head", style: { display: "flex", fontFamily: fonts.family, fontSize: adaptiveHeadlineSize(options.headlineSize || 62), fontWeight: 700, lineHeight: 1.12, letterSpacing: "-2px", ...widthStyle } }, clean(draft.headline)),
       ...(options.showBody === false ? [] : body.slice(0, options.bodyLines ?? 3).map((line, bodyIndex) => React.createElement("span", { key: `body-${bodyIndex}`, style: { display: "flex", fontSize: options.bodySize || 31, lineHeight: 1.42, marginTop: bodyIndex === 0 ? 28 : 10 } }, line))),
     ]);
+  };
   const chrome = (color: string) => [
     React.createElement("div", { key: "logo", style: { position: "absolute", display: "flex", left: 58, top: 48, color } }, logo),
     React.createElement("span", { key: "page", style: { position: "absolute", display: "flex", right: 58, top: 55, color, fontSize: 20 } }, page),
@@ -558,6 +562,7 @@ export async function POST(req: Request) {
       ),
     );
     const outputs = await Promise.all(drafts.map(async (draft, index) => {
+      try {
       const requestedAssetIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && Boolean(id));
       const assetIds = [...new Set(requestedAssetIds)];
@@ -587,6 +592,11 @@ export async function POST(req: Request) {
         width: 1080,
         height: 1350,
       };
+      } catch (pageError) {
+        const message = pageError instanceof Error ? pageError.message : String(pageError);
+        console.error(`[content-projects/generate-carousel] page ${index + 1}`, pageError);
+        throw new Error(`第 ${index + 1} 頁生成失敗：${message}`);
+      }
     }));
     const production = {
       ...project.production,
