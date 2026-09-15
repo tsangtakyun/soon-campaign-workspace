@@ -134,19 +134,20 @@ type DirectionRecommendation = {
   version?: string;
 };
 
-type StudioStep = "brief" | "format" | "style" | "structure" | "assets" | "drafts" | "carousel";
+type StudioStep = "brief" | "format" | "structure" | "assets" | "style" | "drafts" | "carousel";
 
 type StylePreviewProps = {
   angle: string;
   summary: string;
+  storyPages?: Array<Record<string, unknown>>;
   brandName?: string;
-  imageUrl?: string;
+  imageUrls?: string[];
   imageLoading?: boolean;
   expanded?: boolean;
   onExpand?: () => void;
 };
 
-function sharedPreviewCopy(angle: string, summary: string) {
+function sharedPreviewCopy(angle: string, summary: string, storyPages: Array<Record<string, unknown>> = []) {
   const topic = angle && angle !== "交由 AI 決定" ? angle : "今次內容主題";
   const cleanSummary = summary
     .replace(/https?:\/\/\S+/giu, " ")
@@ -155,17 +156,25 @@ function sharedPreviewCopy(angle: string, summary: string) {
     .replace(/\s+/gu, " ")
     .trim();
   const sentences = cleanSummary.split(/[。！？!?\n]+/u).map((part) => part.trim()).filter(Boolean);
-  return {
-    topic,
-    contentTitle: sentences[0]?.slice(0, 32) || "內容重點",
-    body: (sentences.slice(0, 2).join("。") || "內容將根據你提供的 Brief 及來源資料整理").slice(0, 150),
-    endTitle: "重點總結",
-  };
+  const fallback = [
+    { headline: topic, body: sentences.slice(0, 2).join("。") || "內容將根據你提供的 Brief 及來源資料整理" },
+    { headline: sentences[0]?.slice(0, 32) || "內容重點", body: sentences.slice(0, 2).join("。") || "內容將根據你提供的 Brief 及來源資料整理" },
+    { headline: "重點總結", body: sentences.slice(0, 2).join("。") || "內容將根據你提供的 Brief 及來源資料整理" },
+  ];
+  if (!storyPages.length) return fallback;
+  const indexes = [...new Set([0, Math.floor((storyPages.length - 1) / 2), storyPages.length - 1])];
+  return indexes.map((index) => {
+    const page = storyPages[index] || {};
+    return {
+      headline: String(page.headline || fallback[Math.min(index, 2)].headline).slice(0, 36),
+      body: String(page.copyDirection || page.purpose || fallback[Math.min(index, 2)].body).slice(0, 180),
+    };
+  });
 }
 
 function PreviewVisual({ imageUrl, loading }: { imageUrl?: string; loading?: boolean }) {
-  return <div className={`shared-preview-visual ${imageUrl ? "has-image" : ""}`} style={imageUrl ? { backgroundImage: `url(${JSON.stringify(imageUrl).slice(1, -1)})` } : undefined} aria-label={imageUrl ? "今次內容的共同預覽圖片" : "圖片將於 STEP 5 選擇"}>
-    {!imageUrl ? <><i/><i/><i/><span>圖片將於 STEP 5 選擇</span></> : null}
+  return <div className={`shared-preview-visual ${imageUrl ? "has-image" : ""}`} style={imageUrl ? { backgroundImage: `url(${JSON.stringify(imageUrl).slice(1, -1)})` } : undefined} aria-label={imageUrl ? "今次內容的共同預覽圖片" : "請先於 STEP 4 準備圖片素材"}>
+    {!imageUrl ? <><i/><i/><i/><span>請先於 STEP 4 準備圖片素材</span></> : null}
     {imageUrl && !loading ? <b className="preview-image-status">AI 題材圖</b> : null}
     {loading ? <span className="preview-image-generating"><i/>AI 正在生成題材圖</span> : null}
   </div>;
@@ -181,54 +190,42 @@ function PreviewControls({ pageIndex, count, label, move, onExpand }: { pageInde
   </>;
 }
 
-function ClearMagazinePreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
+function ClearMagazinePreview({ angle, summary, storyPages, brandName, imageUrls, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
-  const copy = sharedPreviewCopy(angle, summary);
-  const pages = [
-    { eyebrow: "今次主題", headline: copy.topic, body: copy.body, role: "cover" },
-    { eyebrow: "重點整理", headline: copy.contentTitle, body: copy.body, role: "content" },
-    { eyebrow: "內容總結", headline: copy.endTitle, body: copy.body, role: "end" },
-  ];
+  const copy = sharedPreviewCopy(angle, summary, storyPages);
+  const pages = copy.map((page, index) => ({ ...page, eyebrow: index === 0 ? "今次主題" : index === copy.length - 1 ? "內容總結" : "重點整理", role: index === 0 ? "cover" : index === copy.length - 1 ? "end" : "content" }));
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`clear-magazine-preview ${current.role} ${expanded ? "expanded" : ""}`}>
-    <PreviewVisual imageUrl={imageUrl} loading={imageLoading}/>
+    <PreviewVisual imageUrl={imageUrls?.[pageIndex % Math.max(imageUrls.length, 1)]} loading={imageLoading}/>
     <div className="clear-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><p>{current.body}</p></div>
     <div className="unified-preview-brand"><span>{brandName || "BRAND"}</span><b>P.{String(pageIndex + 1).padStart(2, "0")}</b></div>
     <PreviewControls pageIndex={pageIndex} count={pages.length} label="清晰雜誌風" move={move} onExpand={onExpand}/>
   </div>;
 }
 
-function ProductFocusPreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
+function ProductFocusPreview({ angle, summary, storyPages, brandName, imageUrls, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
-  const copy = sharedPreviewCopy(angle, summary);
-  const pages = [
-    { eyebrow: "產品重點", headline: copy.topic, body: copy.body, page: "01" },
-    { eyebrow: "資料重點", headline: copy.contentTitle, body: copy.body, page: "02" },
-    { eyebrow: "內容總結", headline: copy.endTitle, body: copy.body, page: "03" },
-  ];
+  const copy = sharedPreviewCopy(angle, summary, storyPages);
+  const pages = copy.map((page, index) => ({ ...page, eyebrow: index === 0 ? "產品重點" : index === copy.length - 1 ? "內容總結" : "資料重點", page: String(index + 1).padStart(2, "0") }));
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`product-focus-preview ${expanded ? "expanded" : ""}`}>
     <div className="product-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><i/><p>{current.body}</p></div>
-    <div className="product-preview-image"><PreviewVisual imageUrl={imageUrl} loading={imageLoading}/></div>
+    <div className="product-preview-image"><PreviewVisual imageUrl={imageUrls?.[pageIndex % Math.max(imageUrls.length, 1)]} loading={imageLoading}/></div>
     <div className="product-preview-footer"><span>{brandName || "BRAND"}</span><b>P.{current.page}</b></div>
     <PreviewControls pageIndex={pageIndex} count={pages.length} label="產品主角" move={move} onExpand={onExpand}/>
   </div>;
 }
 
-function RankingReviewPreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
+function RankingReviewPreview({ angle, summary, storyPages, brandName, imageUrls, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
-  const copy = sharedPreviewCopy(angle, summary);
-  const pages = [
-    { cover: true, headline: copy.topic, body: copy.body, page: "01" },
-    { cover: false, headline: `1. ${copy.contentTitle}`, body: copy.body, page: "02" },
-    { cover: false, headline: `2. ${copy.endTitle}`, body: copy.body, page: "03" },
-  ];
+  const copy = sharedPreviewCopy(angle, summary, storyPages);
+  const pages = copy.map((page, index) => ({ ...page, cover: index === 0, headline: index === 0 ? page.headline : `${index}. ${page.headline}`, page: String(index + 1).padStart(2, "0") }));
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`ranking-review-preview ${current.cover ? "cover" : "entry"} ${expanded ? "expanded" : ""}`}>
-    <div className="ranking-preview-photo"><PreviewVisual imageUrl={imageUrl} loading={imageLoading}/></div>
+    <div className="ranking-preview-photo"><PreviewVisual imageUrl={imageUrls?.[pageIndex % Math.max(imageUrls.length, 1)]} loading={imageLoading}/></div>
     <div className="ranking-preview-copy">
       <strong>{current.headline}</strong>
       <p>{current.body}</p>
@@ -241,9 +238,9 @@ function RankingReviewPreview({ angle, summary, brandName, imageUrl, imageLoadin
 const studioSteps: { id: StudioStep; label: string }[] = [
   { id: "brief", label: "Brief" },
   { id: "format", label: "格式" },
-  { id: "style", label: "風格" },
   { id: "structure", label: "故事結構" },
   { id: "assets", label: "圖片素材" },
+  { id: "style", label: "內容風格" },
   { id: "drafts", label: "逐頁草稿" },
   { id: "carousel", label: "Carousel" },
 ];
@@ -483,21 +480,22 @@ export default function ContentStudioPage() {
     if (!chosen || shortlist.some((item) => item.code === chosen.code)) return shortlist;
     return [chosen, ...displayStyles.filter((item) => item.code !== chosen.code).slice(0, 2)];
   }, [displayStyles, selectedStyleCode]);
-  const previewImageUrl = useMemo(() => {
+  const previewImageUrls = useMemo(() => {
     const productionAssets = Array.isArray(selected?.production?.assets)
       ? selected.production.assets as ProjectAsset[]
       : [];
-    const preferred = [...productionAssets].reverse().find((asset) => asset.isCover)
-      || [...productionAssets].reverse().find((asset) => asset.assignedPage === "P.1")
-      || productionAssets[productionAssets.length - 1];
-    return typeof preferred?.url === "string" ? preferred.url : undefined;
+    const preferred = [...productionAssets].sort((left, right) => Number(right.isCover) - Number(left.isCover));
+    return preferred.map((asset) => asset.url).filter((url): url is string => typeof url === "string" && Boolean(url));
   }, [selected?.production]);
   const renderStylePreview = (code: string, expanded = false) => {
     const props: StylePreviewProps = {
       angle: brief.angle,
       summary: brief.summary,
+      storyPages: Array.isArray(selected?.production?.pages)
+        ? selected.production.pages as Array<Record<string, unknown>>
+        : [],
       brandName: workspace?.brandName || workspace?.name || "BRAND",
-      imageUrl: previewImageUrl,
+      imageUrls: previewImageUrls,
       imageLoading: generatingAssetPage === "P.1",
       expanded,
       onExpand: expanded ? undefined : () => setExpandedStyleCode(code),
@@ -525,14 +523,11 @@ export default function ContentStudioPage() {
     if (project.stage === "brief") return "brief";
     if (project.stage === "format") return "format";
     const production = project.production;
-    if (!production?.status && typeof project.format_decision?.templateCode !== "string") return "style";
     if (!production?.status || production.status === "structure_ready") return "structure";
     if (production.status !== "structure_confirmed") return "structure";
-    if (project.selected_format === "short_video") {
-      if (!production.productionStatus) return "drafts";
-      return production.productionStatus === "drafts_ready" ? "drafts" : "carousel";
-    }
-    if (production.assetStatus !== "confirmed" || !production.productionStatus) return "assets";
+    if (project.selected_format !== "short_video" && production.assetStatus !== "confirmed") return "assets";
+    if (typeof project.format_decision?.templateCode !== "string" || !project.format_decision.templateCode) return "style";
+    if (!production.productionStatus) return "style";
     if (production.productionStatus === "drafts_ready") return "drafts";
     return "carousel";
   }
@@ -1018,9 +1013,9 @@ export default function ContentStudioPage() {
         },
       },
       selected.selected_format === "short_video"
-        ? "短片結構已確認，下一步建立製作包"
+        ? "短片結構已確認，下一步選擇內容風格"
         : "故事結構已確認，下一步可以準備圖片素材",
-      selected.selected_format === "short_video" ? "drafts" : "assets",
+      selected.selected_format === "short_video" ? "style" : "assets",
     );
   }
 
@@ -1385,9 +1380,10 @@ export default function ContentStudioPage() {
           assetsConfirmedAt: new Date().toISOString(),
         },
       },
-      "圖片素材已確認，SOON 現正開始逐頁製作…",
+      "圖片素材已確認，下一步可用真實素材比較內容風格",
+      "style",
     );
-    if (confirmed) await generatePageDrafts();
+    if (confirmed) setMessage("圖片素材已確認，下一步可用真實素材比較內容風格");
   }
 
   async function generatePageDrafts() {
@@ -1964,12 +1960,17 @@ export default function ContentStudioPage() {
                         disabled={
                           saving || !selectedFormat || !permissions?.canEdit
                         }
-                        onClick={() =>
-                          saveProject(
+                        onClick={async () => {
+                          const saved = await saveProject(
                             {
                               formatDecision: {
                                 ...(selected.format_decision || {}),
                                 videoMethod: selectedFormat === "short_video" ? videoMethod : null,
+                                templateCode: null,
+                                renderTemplateCode: null,
+                                templateSource: null,
+                                templateName: null,
+                                templateSelectedAt: null,
                                 ...(selectedFormat === "carousel" ? {
                                   slideCount: carouselSlideCount,
                                   slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
@@ -1979,8 +1980,8 @@ export default function ContentStudioPage() {
                               selectedFormat,
                               stage: "production",
                             },
-                            "格式已確認，請選擇內容風格",
-                            "style",
+                            "格式已確認，SOON 正在整理故事結構",
+                            "structure",
                             [
                               {
                                 eventType: selected.selected_format && selected.selected_format !== selectedFormat ? "changed" : "selected",
@@ -1997,8 +1998,9 @@ export default function ContentStudioPage() {
                                 metadata: { source: "content_studio" },
                               }] : []),
                             ],
-                          )
-                        }
+                          );
+                          if (saved) await generateStructure();
+                        }}
                       >
                         確認格式 →
                       </button>
@@ -2008,16 +2010,13 @@ export default function ContentStudioPage() {
                   <div className="editor-card">
                     <div className="section-title">
                       <div>
-                        <span>STEP 3</span>
+                        <span>STEP {studioSteps.findIndex((step) => step.id === "style") + 1}</span>
                         <h3>選擇內容風格</h3>
                       </div>
                       <em>SOON 已按內容格式篩選合適款式</em>
                     </div>
                     <div className="style-intro">
-                      <div><b>同一題材、同一素材，直接比較版面</b><span>三款均使用「{brief.angle}」及相同三頁示意：封面、主要內容、結尾。{previewImageUrl ? "目前已同步使用同一張題材圖片。" : "可先生成一張寫實題材圖，亦可留待 STEP 5 再選擇圖片。"}</span></div>
-                      <button type="button" disabled={Boolean(generatingAssetPage) || !permissions?.canEdit} onClick={() => void generateProjectAsset("P.1")}>
-                        {generatingAssetPage === "P.1" ? "AI 生成中…" : previewImageUrl ? "重新生成共同預覽圖" : "AI 生成共同預覽圖"}
-                      </button>
+                      <div><b>用同一故事、同一組素材，直接比較版面</b><span>三款均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。</span></div>
                     </div>
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
@@ -2058,11 +2057,11 @@ export default function ContentStudioPage() {
                       <div className="style-preview-modal-panel" onClick={(event) => event.stopPropagation()}>
                         <div className="style-preview-modal-head"><div><small>共同題材 · 三頁示意</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
                         {renderStylePreview(expandedStyleCode, true)}
-                        <p>預覽使用目前 Topic 及同一組圖片來源；正式頁數會在下一步按內容決定。</p>
+                        <p>預覽使用已確認的故事結構及同一組圖片素材；正式製作會沿用你選定的風格。</p>
                       </div>
                     </div> : null}
                     <div className="actions">
-                      <button className="secondary" type="button" onClick={() => goToStep("format")}>← 修改格式</button>
+                      <button className="secondary" type="button" onClick={() => goToStep(selected.selected_format === "short_video" ? "structure" : "assets")}>← 返回{selected.selected_format === "short_video" ? "故事結構" : "圖片素材"}</button>
                       <button type="button" disabled={saving || !selectedStyleCode} onClick={async () => {
                         const template = displayStyles.find((item) => item.code === selectedStyleCode);
                         const core = template?.core;
@@ -2092,7 +2091,7 @@ export default function ContentStudioPage() {
                             templateCreatorCommit: coreTemplate?.version.creatorCommit || null,
                             templateSelectedAt: new Date().toISOString(),
                           },
-                        }, "", "structure", [{
+                        }, "", undefined, [{
                           eventType: selected.format_decision?.templateCode && selected.format_decision.templateCode !== selectedStyleCode ? "changed" : "selected",
                           dimension: "template",
                           value: selectedStyleCode,
@@ -2107,7 +2106,7 @@ export default function ContentStudioPage() {
                             format: selected.selected_format,
                           },
                         }]);
-                        if (saved) await generateStructure();
+                        if (saved) await generatePageDrafts();
                       }}>{saving ? "儲存中…" : "使用這個風格 →"}</button>
                     </div>
                   </div>
@@ -2287,16 +2286,6 @@ export default function ContentStudioPage() {
                         {selected.production.status ===
                         "structure_confirmed" ? (
                           <>
-                            {selected.selected_format === "short_video" && !selected.production.productionStatus ? (
-                              <div className="video-draft-start">
-                                <div>
-                                  <small>{selected.format_decision?.videoMethod === "ai_video_generation" ? "AI 生成影片" : "真人拍攝"}</small>
-                                  <b>{selected.format_decision?.videoMethod === "ai_video_generation" ? "建立影片生成計劃" : "建立完整拍攝製作包"}</b>
-                                  <p>{selected.format_decision?.videoMethod === "ai_video_generation" ? "SOON 會整理開場句、逐鏡畫面、旁白及影片生成指示。" : "SOON 會整理開場句、逐鏡腳本、人物動作、拍攝清單及貼文文案。"}</p>
-                                </div>
-                                <button type="button" disabled={saving} onClick={() => void generatePageDrafts()}>{saving ? "正在製作…" : "開始建立 →"}</button>
-                              </div>
-                            ) : null}
                             <div className="next-production">
                               <div className="asset-upload-head">
                                 <div>
@@ -2469,33 +2458,32 @@ export default function ContentStudioPage() {
                                     <span className="asset-generation-status">
                                       <b aria-hidden="true" />
                                       <span>
-                                        <strong>SOON 正在製作逐頁內容</strong>
-                                        正在生成文案、配對圖片及建立版面草稿，完成後會自動進入下一頁。
+                                        <strong>SOON 正在確認圖片素材</strong>
+                                        完成後會進入內容風格，讓你用同一組素材直接比較版面。
                                       </span>
                                     </span>
                                   ) : selected.production.assetStatus ===
                                     "confirmed" ? (
-                                    <span>✓ 圖片素材已確認，可以繼續製作</span>
+                                    <span>✓ 圖片素材已確認，可以比較內容風格</span>
                                   ) : (
                                     <span>
-                                      確認後，SOON 會立即開始逐頁製作
+                                      確認後，下一步會用同一組素材比較內容風格
                                     </span>
                                   )}
                                   <button
                                     disabled={saving}
                                     onClick={
-                                      selected.production.assetStatus ===
-                                      "confirmed"
-                                        ? generatePageDrafts
+                                      selected.production.assetStatus === "confirmed"
+                                        ? () => goToStep("style")
                                         : confirmAssets
                                     }
                                   >
                                     {saving
-                                      ? "製作中，毋須再按"
+                                      ? "確認中，毋須再按"
                                       : selected.production.assetStatus ===
                                     "confirmed"
-                                        ? "繼續逐頁製作 →"
-                                        : "確認圖片並開始製作 →"}
+                                        ? "選擇內容風格 →"
+                                        : "確認圖片素材 →"}
                                   </button>
                                 </div>
                               ) : null}
