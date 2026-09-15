@@ -580,7 +580,7 @@ async function renderClearMagazinePage(
       ...chrome("white"),
       picture(rectStyle(l.image)),
       textLayer("eye", { ...l.eyebrow, width: 430 }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
-      textLayer("head", l.headline, formatTwoLineHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 58, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("head", l.headline, formatTwoLineHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 75, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
       textLayer("body", l.body, featureBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 29, lineHeight: 1.35 }),
       swipeCue,
     ]);
