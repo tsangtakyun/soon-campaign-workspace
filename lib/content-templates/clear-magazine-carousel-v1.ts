@@ -58,11 +58,11 @@ export const clearMagazineCarouselV1 = {
     },
     end: {
       eyebrow: { x: 75, y: 163, width: 156, height: 37 },
-      headline: { x: 65, y: 254, width: 641, height: 138 },
-      body: { x: 64, y: 425, width: 765, height: 247 },
-      image: { x: -26, y: 668, width: 878, height: 913 },
-      ctaBox: { x: 692, y: 1241, width: 311, height: 71 },
-      ctaText: { x: 722, y: 1257, width: 258, height: 31 },
+      headline: { x: 65, y: 235, width: 935, height: 155 },
+      body: { x: 64, y: 405, width: 765, height: 247 },
+      image: { x: 72, y: 752, width: 690, height: 535 },
+      ctaBox: { x: 829, y: 1195, width: 179, height: 70 },
+      ctaText: { x: 839, y: 1214, width: 159, height: 31 },
     },
   },
   pages: [

@@ -498,12 +498,18 @@ async function renderClearMagazinePage(
     ]);
   } else if (role === "end") {
     const l = layout.end;
+    const endEyebrowRaw = cleanBodyLine(draft.subheadline);
+    const endEyebrow = !endEyebrowRaw || /重點整理/.test(endEyebrowRaw) ? "店舖資料" : endEyebrowRaw;
+    const endHeadline = formatTwoLineHeadline(clean(draft.headline).replace(/[|｜]/g, "，"));
+    const endBody = body.slice(0, 4).join("\n");
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 58, bodySize: 28, headlineWidth: 935 }),
-      picture(rectStyle(l.image)),
+      textLayer("eye", { ...l.eyebrow, width: 400 }, endEyebrow, { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", l.headline, endHeadline, { color: "white", whiteSpace: "pre-wrap", fontSize: 58, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", l.body, endBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 28, lineHeight: 1.35 }),
+      box({ ...rectStyle(l.image), background: "white" }, picture({ width: "100%", height: "100%", objectFit: "contain" })),
       box({ ...rectStyle(l.ctaBox), background: accent, borderRadius: 22 }, null),
-      textLayer("cta", l.ctaText, "了解更多 →", { color: dark, fontSize: 24, lineHeight: 1.25, justifyContent: "center" }),
+      textLayer("cta", l.ctaText, "了解更多 →", { color: dark, fontSize: 22, lineHeight: 1.25, justifyContent: "center" }),
     ]);
   } else if (role === "comparison") {
     const l = layout.comparison;
@@ -697,7 +703,7 @@ export async function POST(req: Request) {
         if (!isClearMagazineCarousel(templateCode)) return false;
         const role = resolveClearMagazineRole(draft, index, drafts.length);
         return draft.imageTreatment === "cutout"
-          || (draft.imageTreatment !== "full-bleed" && ["comparison", "end"].includes(role));
+          || (draft.imageTreatment !== "full-bleed" && role === "comparison");
       })
       .flatMap((draft) => [...(draft.assetIds || []), draft.assetId])
       .map((id) => assets.find((asset) => asset.id === id)?.url)
@@ -718,7 +724,7 @@ export async function POST(req: Request) {
         ? resolveClearMagazineRole(draft, index, drafts.length)
         : null;
       const preparedAsset = asset?.url
-        ? { ...asset, url: (draft.imageTreatment === "cutout" || role === "comparison" || role === "end") && preparedCutoutUrls.has(asset.url)
+        ? { ...asset, url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
           : preparedImageUrls.get(asset.url) || asset.url }
         : asset;
