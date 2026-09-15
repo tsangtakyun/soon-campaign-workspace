@@ -546,10 +546,18 @@ async function renderClearMagazinePage(
     ]);
   } else if (role === "feature") {
     const l = layout.feature;
+    const featureBody = (Array.isArray(draft.body) ? draft.body : [])
+      .flatMap((line) => String(line || "").split(/[，,。．；;：:！？!?—]+/u))
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .join("\n");
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       ...chrome("white"),
       picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 58, bodySize: 29 }),
+      textLayer("eye", { ...l.eyebrow, width: 430 }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", l.headline, formatTwoLineHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 58, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", l.body, featureBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 29, lineHeight: 1.35 }),
       swipeCue,
     ]);
   } else {
@@ -689,7 +697,7 @@ export async function POST(req: Request) {
         if (!isClearMagazineCarousel(templateCode)) return false;
         const role = resolveClearMagazineRole(draft, index, drafts.length);
         return draft.imageTreatment === "cutout"
-          || (draft.imageTreatment !== "full-bleed" && ["comparison", "feature", "end"].includes(role));
+          || (draft.imageTreatment !== "full-bleed" && ["comparison", "end"].includes(role));
       })
       .flatMap((draft) => [...(draft.assetIds || []), draft.assetId])
       .map((id) => assets.find((asset) => asset.id === id)?.url)
@@ -710,13 +718,13 @@ export async function POST(req: Request) {
         ? resolveClearMagazineRole(draft, index, drafts.length)
         : null;
       const preparedAsset = asset?.url
-        ? { ...asset, url: role && preparedCutoutUrls.has(asset.url)
+        ? { ...asset, url: (draft.imageTreatment === "cutout" || role === "comparison" || role === "end") && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
           : preparedImageUrls.get(asset.url) || asset.url }
         : asset;
       const secondarySource = assets.find((item) => item.id === assetIds[1] && item.url);
       const secondaryAsset = secondarySource?.url
-        ? { ...secondarySource, url: role && preparedCutoutUrls.has(secondarySource.url)
+        ? { ...secondarySource, url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(secondarySource.url)
           ? preparedCutoutUrls.get(secondarySource.url) || preparedImageUrls.get(secondarySource.url) || secondarySource.url
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;

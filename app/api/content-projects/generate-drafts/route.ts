@@ -215,6 +215,7 @@ export async function POST(req: Request) {
             "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 最多兩個重點，避免加入會令版面鬆散的第三段補充或免責文字。",
             "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
             "imageTreatment 按畫面決定：包裝、獨立產品或人物全身而背景雜亂可用 cutout；場景、製作過程或環境氣氛用 full-bleed 或 card；無法可靠退地時用 card。不要要求所有圖片退地。",
+            "feature 頁如使用食物、環境或製作場景相片，必須保留原圖並用 card，不可退地；只有清晰獨立產品相片才可用 cutout。feature headline 不可包含標點並最多兩行。",
           ] : []),
         ];
     const input = [
