@@ -599,6 +599,8 @@ async function renderClearMagazinePage(
     const l = layout.cover;
     const sourceText = [draft.headline, draft.subheadline, ...body].join(" ");
     const requestedEyebrow = cleanBodyLine(draft.subheadline);
+    const coverBody = body[0] || "";
+    const coverBodyIsLong = Array.from(coverBody).length > 32;
     const coverEyebrow = Array.from(requestedEyebrow).length <= 10
       ? requestedEyebrow
       : /台南/.test(sourceText) ? "台南街頭小吃" : "重點故事";
@@ -608,7 +610,7 @@ async function renderClearMagazinePage(
       ...chrome("white"),
       textLayer("eye", { ...l.eyebrow, width: 500 }, coverEyebrow || "重點故事", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
       textLayer("head", { ...l.headline, width: 935, height: 205 }, formatCoverHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 88, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
-      textLayer("body", { ...l.body, y: 1206, width: 780 }, body[0] || "", { color: "white", whiteSpace: "nowrap", fontSize: 29, lineHeight: 1.2 }),
+      textLayer("body", { ...l.body, y: coverBodyIsLong ? 1184 : 1206, width: 780, height: coverBodyIsLong ? 70 : l.body.height }, coverBody, { color: "white", whiteSpace: coverBodyIsLong ? "pre-wrap" : "nowrap", fontSize: coverBodyIsLong ? 24 : 29, lineHeight: coverBodyIsLong ? 1.3 : 1.2 }),
       swipeCue,
     ]);
   } else if (role === "end") {
