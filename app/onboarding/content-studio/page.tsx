@@ -1,7 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import NextImage from "next/image";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -137,93 +136,102 @@ type DirectionRecommendation = {
 
 type StudioStep = "brief" | "format" | "style" | "structure" | "assets" | "drafts" | "carousel";
 
-function ClearMagazinePreview() {
-  const [pageIndex, setPageIndex] = useState(0);
-  const pages = clearMagazineCarouselV1.previewPages;
-  const move = (direction: -1 | 1) => {
-    setPageIndex((current) => (current + direction + pages.length) % pages.length);
+type StylePreviewProps = {
+  angle: string;
+  summary: string;
+  brandName?: string;
+  imageUrl?: string;
+  expanded?: boolean;
+  onExpand?: () => void;
+};
+
+function sharedPreviewCopy(angle: string, summary: string) {
+  const topic = angle && angle !== "交由 AI 決定" ? angle : "今次內容主題";
+  const cleanSummary = summary
+    .replace(/https?:\/\/\S+/giu, " ")
+    .replace(/(?:%[0-9a-f]{2}){2,}/giu, " ")
+    .replace(/\[\d+\]\s*\(?/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  const sentences = cleanSummary.split(/[。！？!?\n]+/u).map((part) => part.trim()).filter(Boolean);
+  return {
+    topic,
+    contentTitle: sentences[0]?.slice(0, 32) || "內容重點",
+    body: (sentences.slice(0, 2).join("。") || "內容將根據你提供的 Brief 及來源資料整理").slice(0, 150),
+    endTitle: "重點總結",
   };
-  const handleKey = (event: KeyboardEvent<HTMLSpanElement>, direction: -1 | 1) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    event.stopPropagation();
-    move(direction);
-  };
-  return (
-    <div className="actual-style-preview">
-      <NextImage
-        key={pages[pageIndex]}
-        src={pages[pageIndex]}
-        alt={`清晰雜誌風實際預覽，第 ${pageIndex + 1} 頁，共 ${pages.length} 頁`}
-        fill
-        sizes="(max-width: 700px) 100vw, 360px"
-        priority={pageIndex === 0}
-      />
-      <span
-        className="style-preview-arrow previous"
-        role="button"
-        tabIndex={0}
-        aria-label="查看上一頁"
-        onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(-1); }}
-        onKeyDown={(event) => handleKey(event, -1)}
-      >←</span>
-      <span
-        className="style-preview-arrow next"
-        role="button"
-        tabIndex={0}
-        aria-label="查看下一頁"
-        onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(1); }}
-        onKeyDown={(event) => handleKey(event, 1)}
-      >→</span>
-      <span className="style-preview-count">{String(pageIndex + 1).padStart(2, "0")} / {String(pages.length).padStart(2, "0")}</span>
-      <span className="style-preview-dots" aria-hidden="true">
-        {pages.map((page, index) => <i key={page} className={index === pageIndex ? "active" : ""} />)}
-      </span>
-    </div>
-  );
 }
 
-function ProductFocusPreview({ angle }: { angle: string }) {
-  const [pageIndex, setPageIndex] = useState(0);
-  const topic = angle && angle !== "交由 AI 決定" ? angle : "產品核心賣點";
-  const pages = [
-    { eyebrow: "產品重點", headline: topic, body: "先讓產品成為畫面主角", page: "01" },
-    { eyebrow: "使用情境", headline: "一眼看懂產品價值", body: "以清楚資料連接功能與實際需要", page: "02" },
-    { eyebrow: "了解更多", headline: "由賣點帶到行動", body: "保留品牌、產品與主要行動", page: "03" },
-  ];
-  const current = pages[pageIndex];
-  const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
-  return <div className="product-focus-preview">
-    <div className="product-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><i/><p>{current.body}</p></div>
-    <div className="product-preview-image" aria-hidden="true"><span>PRODUCT</span><b>YOUR<br/>BRAND</b></div>
-    <div className="product-preview-footer"><span>SOON BRAND</span><b>P.{current.page}</b></div>
-    <button type="button" className="style-preview-arrow previous" aria-label="查看產品主角上一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(-1); }}>←</button>
-    <button type="button" className="style-preview-arrow next" aria-label="查看產品主角下一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(1); }}>→</button>
-    <span className="style-preview-count">{current.page} / 03</span>
-    <span className="style-preview-dots" aria-hidden="true">{pages.map((page, index) => <i key={page.page} className={index === pageIndex ? "active" : ""}/>)}</span>
+function PreviewVisual({ imageUrl }: { imageUrl?: string }) {
+  return <div className={`shared-preview-visual ${imageUrl ? "has-image" : ""}`} style={imageUrl ? { backgroundImage: `url(${JSON.stringify(imageUrl).slice(1, -1)})` } : undefined} aria-label={imageUrl ? "今次內容的共同預覽圖片" : "圖片將於 STEP 5 選擇"}>
+    {!imageUrl ? <><i/><i/><i/><span>圖片將於 STEP 5 選擇</span></> : null}
   </div>;
 }
 
-function RankingReviewPreview({ angle }: { angle: string }) {
+function PreviewControls({ pageIndex, count, label, move, onExpand }: { pageIndex: number; count: number; label: string; move: (direction: -1 | 1) => void; onExpand?: () => void }) {
+  return <>
+    <button type="button" className="style-preview-arrow previous" aria-label={`查看${label}上一頁`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(-1); }}>←</button>
+    <button type="button" className="style-preview-arrow next" aria-label={`查看${label}下一頁`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(1); }}>→</button>
+    <span className="style-preview-count">示意 {String(pageIndex + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}</span>
+    <span className="style-preview-dots" aria-hidden="true">{Array.from({ length: count }, (_, index) => <i key={index} className={index === pageIndex ? "active" : ""}/>)}</span>
+    {onExpand ? <button type="button" className="style-preview-expand" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onExpand(); }}>⤢ 放大</button> : null}
+  </>;
+}
+
+function ClearMagazinePreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
-  const topic = angle && angle !== "交由 AI 決定" ? angle : "年度產品排行榜";
+  const copy = sharedPreviewCopy(angle, summary);
   const pages = [
-    { cover: true, headline: topic, body: "精選排行榜與編輯評測", page: "01" },
-    { cover: false, headline: "1. 第一名產品", body: "以來源素材已有的特點、使用情境及證據，整理成容易閱讀的評測。", page: "02" },
-    { cover: false, headline: "2. 第二名產品", body: "每頁沿用相同圖片比例、排名層級及正文結構。", page: "03" },
+    { eyebrow: "今次主題", headline: copy.topic, body: copy.body, role: "cover" },
+    { eyebrow: "重點整理", headline: copy.contentTitle, body: copy.body, role: "content" },
+    { eyebrow: "內容總結", headline: copy.endTitle, body: copy.body, role: "end" },
   ];
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
-  return <div className={`ranking-review-preview ${current.cover ? "cover" : "entry"}`}>
-    <div className="ranking-preview-photo" aria-hidden="true"><i/><i/><i/></div>
+  return <div className={`clear-magazine-preview ${current.role} ${expanded ? "expanded" : ""}`}>
+    <PreviewVisual imageUrl={imageUrl}/>
+    <div className="clear-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><p>{current.body}</p></div>
+    <div className="unified-preview-brand"><span>{brandName || "BRAND"}</span><b>P.{String(pageIndex + 1).padStart(2, "0")}</b></div>
+    <PreviewControls pageIndex={pageIndex} count={pages.length} label="清晰雜誌風" move={move} onExpand={onExpand}/>
+  </div>;
+}
+
+function ProductFocusPreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const copy = sharedPreviewCopy(angle, summary);
+  const pages = [
+    { eyebrow: "產品重點", headline: copy.topic, body: copy.body, page: "01" },
+    { eyebrow: "資料重點", headline: copy.contentTitle, body: copy.body, page: "02" },
+    { eyebrow: "內容總結", headline: copy.endTitle, body: copy.body, page: "03" },
+  ];
+  const current = pages[pageIndex];
+  const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
+  return <div className={`product-focus-preview ${expanded ? "expanded" : ""}`}>
+    <div className="product-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><i/><p>{current.body}</p></div>
+    <div className="product-preview-image"><PreviewVisual imageUrl={imageUrl}/></div>
+    <div className="product-preview-footer"><span>{brandName || "BRAND"}</span><b>P.{current.page}</b></div>
+    <PreviewControls pageIndex={pageIndex} count={pages.length} label="產品主角" move={move} onExpand={onExpand}/>
+  </div>;
+}
+
+function RankingReviewPreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const copy = sharedPreviewCopy(angle, summary);
+  const pages = [
+    { cover: true, headline: copy.topic, body: copy.body, page: "01" },
+    { cover: false, headline: `1. ${copy.contentTitle}`, body: copy.body, page: "02" },
+    { cover: false, headline: `2. ${copy.endTitle}`, body: copy.body, page: "03" },
+  ];
+  const current = pages[pageIndex];
+  const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
+  return <div className={`ranking-review-preview ${current.cover ? "cover" : "entry"} ${expanded ? "expanded" : ""}`}>
+    <div className="ranking-preview-photo"><PreviewVisual imageUrl={imageUrl}/></div>
     <div className="ranking-preview-copy">
       <strong>{current.headline}</strong>
       <p>{current.body}</p>
     </div>
-    <button type="button" className="style-preview-arrow previous" aria-label="查看排行榜評測上一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(-1); }}>←</button>
-    <button type="button" className="style-preview-arrow next" aria-label="查看排行榜評測下一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(1); }}>→</button>
-    <span className="style-preview-count">{current.page} / 03</span>
-    <span className="style-preview-dots" aria-hidden="true">{pages.map((page, index) => <i key={page.page} className={index === pageIndex ? "active" : ""}/>)}</span>
+    <div className="unified-preview-brand"><span>{brandName || "BRAND"}</span><b>P.{current.page}</b></div>
+    <PreviewControls pageIndex={pageIndex} count={pages.length} label="排行榜評測" move={move} onExpand={onExpand}/>
   </div>;
 }
 
@@ -394,6 +402,7 @@ export default function ContentStudioPage() {
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
   const [videoMethod, setVideoMethod] = useState("human_filming");
   const [selectedStyleCode, setSelectedStyleCode] = useState("");
+  const [expandedStyleCode, setExpandedStyleCode] = useState<string | null>(null);
   const [coreStyles, setCoreStyles] = useState<CorePublishedStyle[]>([]);
   const [loadingStyles, setLoadingStyles] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
@@ -471,6 +480,27 @@ export default function ContentStudioPage() {
     if (!chosen || shortlist.some((item) => item.code === chosen.code)) return shortlist;
     return [chosen, ...displayStyles.filter((item) => item.code !== chosen.code).slice(0, 2)];
   }, [displayStyles, selectedStyleCode]);
+  const previewImageUrl = useMemo(() => {
+    const productionAssets = Array.isArray(selected?.production?.assets)
+      ? selected.production.assets as ProjectAsset[]
+      : [];
+    const preferred = productionAssets.find((asset) => asset.isCover || asset.assignedPage === "P.1") || productionAssets[0];
+    return typeof preferred?.url === "string" ? preferred.url : undefined;
+  }, [selected?.production]);
+  const renderStylePreview = (code: string, expanded = false) => {
+    const props: StylePreviewProps = {
+      angle: brief.angle,
+      summary: brief.summary,
+      brandName: workspace?.brandName || workspace?.name || "BRAND",
+      imageUrl: previewImageUrl,
+      expanded,
+      onExpand: expanded ? undefined : () => setExpandedStyleCode(code),
+    };
+    if (isClearMagazineCarousel(code)) return <ClearMagazinePreview {...props}/>;
+    if (code === "product-focus") return <ProductFocusPreview {...props}/>;
+    if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
+    return null;
+  };
 
   function stepLabel(step: StudioStep) {
     if (step === "structure" && selected?.selected_format === "short_video") return "短片結構";
@@ -1976,20 +2006,14 @@ export default function ContentStudioPage() {
                       <em>SOON 已按內容格式篩選合適款式</em>
                     </div>
                     <div className="style-intro">
-                      <div><b>看看今次內容套用不同風格後的效果</b><span>以下預覽已使用「{brief.angle}」，讓你比較版面節奏，而非盲選風格名稱。</span></div>
+                      <div><b>同一題材、同一素材，直接比較版面</b><span>三款均使用「{brief.angle}」及相同三頁示意：封面、主要內容、結尾。圖片會在 STEP 5 選擇，選好後回到此頁會同步代入。</span></div>
                     </div>
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
                         return (
                         <article key={template.code} className={selectedStyleCode === template.code ? "active" : ""}>
-                          {isClearMagazineCarousel(template.code) ? (
-                            <ClearMagazinePreview />
-                          ) : template.code === "product-focus" ? (
-                            <ProductFocusPreview angle={brief.angle} />
-                          ) : template.code === "ranking-review" ? (
-                            <RankingReviewPreview angle={brief.angle} />
-                          ) : <div className="contextual-preview" data-style={template.code}>
+                          {renderStylePreview(template.code) || <div className="contextual-preview" data-style={template.code}>
                             {slides.map((slide, slideIndex) => (
                               <div key={`${slide.role}-${slideIndex}`} className={slide.role} data-layout={slide.layout || "standard"} style={{ background: template.palette[0], color: template.palette[1] }}>
                                 <span className="preview-page-role">{slide.label}</span>
@@ -2019,6 +2043,13 @@ export default function ContentStudioPage() {
                       return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>{rules.source === "soon_core" ? "已連接 SOON 最新製作規格" : "SOON 經典風格"}</small></details>;
                     })() : null}
                     {loadingStyles ? <p className="style-loading">正在載入最新風格…</p> : null}
+                    {expandedStyleCode ? <div className="style-preview-modal" role="dialog" aria-modal="true" aria-label="放大風格預覽" onClick={() => setExpandedStyleCode(null)}>
+                      <div className="style-preview-modal-panel" onClick={(event) => event.stopPropagation()}>
+                        <div className="style-preview-modal-head"><div><small>共同題材 · 三頁示意</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
+                        {renderStylePreview(expandedStyleCode, true)}
+                        <p>預覽使用目前 Topic 及同一組圖片來源；正式頁數會在下一步按內容決定。</p>
+                      </div>
+                    </div> : null}
                     <div className="actions">
                       <button className="secondary" type="button" onClick={() => goToStep("format")}>← 修改格式</button>
                       <button type="button" disabled={saving || !selectedStyleCode} onClick={async () => {
@@ -3138,6 +3169,7 @@ export default function ContentStudioPage() {
 }
 
 const styles = `
+  .shared-preview-visual{position:absolute;inset:0;overflow:hidden;background:linear-gradient(145deg,#ddd2c6,#95867a);background-position:center;background-size:cover}.shared-preview-visual>i{position:absolute;display:block;border-radius:999px;background:#dec06b;box-shadow:0 4px 10px rgba(55,32,20,.18)}.shared-preview-visual>i:nth-child(1){width:48%;height:12%;left:20%;top:37%;transform:rotate(10deg)}.shared-preview-visual>i:nth-child(2){width:39%;height:12%;left:34%;top:49%;transform:rotate(-8deg)}.shared-preview-visual>i:nth-child(3){width:30%;height:11%;left:25%;top:60%;transform:rotate(5deg)}.shared-preview-visual>span{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:max-content;border-radius:999px;background:rgba(17,17,17,.68);color:#fff;padding:5px 8px;font-size:7px;font-weight:750}.unified-preview-brand{position:absolute;z-index:2;left:25px;right:25px;bottom:19px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.45);padding-top:8px;color:inherit;font-size:7px}.unified-preview-brand span{font-weight:850}.style-preview-expand{position:absolute;z-index:5;top:10px;left:10px;border:1px solid rgba(255,255,255,.72);border-radius:999px;background:rgba(17,17,17,.7);color:#fff;padding:6px 8px;font-size:8px;font-weight:800;cursor:pointer;backdrop-filter:blur(5px)}.style-preview-expand:hover{background:#fff;color:#202126}.clear-magazine-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#050505;color:#fff}.clear-magazine-preview .shared-preview-visual{inset:0 0 42%}.clear-preview-copy{position:absolute;z-index:2;left:24px;right:24px;bottom:56px;display:flex;flex-direction:column;align-items:flex-start;text-align:left}.clear-preview-copy small{color:#f1d443;font-size:8px;font-weight:800}.clear-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.08;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-preview-copy p{display:-webkit-box;overflow:hidden;margin:9px 0 0;font-size:9px;line-height:1.45;opacity:.78;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-magazine-preview.cover:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.05) 72%)}.clear-magazine-preview.cover .shared-preview-visual{inset:0}.clear-magazine-preview.cover .clear-preview-copy strong{background:#050505;padding:5px 8px}.clear-magazine-preview.content,.clear-magazine-preview.end{background:#050505}.clear-magazine-preview.end .shared-preview-visual{opacity:.35}.clear-magazine-preview .style-preview-dots{bottom:8px}.clear-magazine-preview .unified-preview-brand{bottom:36px}.style-preview-modal{position:fixed;z-index:80;inset:0;display:grid;place-items:center;background:rgba(20,18,17,.72);padding:24px;backdrop-filter:blur(8px)}.style-preview-modal-panel{width:min(470px,92vw);border-radius:18px;background:#fff;padding:14px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.style-preview-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 2px 11px}.style-preview-modal-head>div{display:grid;gap:2px}.style-preview-modal-head small{color:#777b83;font-size:9px}.style-preview-modal-head strong{font-size:18px}.style-preview-modal-head button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:#f1ebe4;color:#202126;font-size:22px;cursor:pointer}.style-preview-modal-panel>p{margin:10px 3px 1px;color:#777b83;font-size:9px;line-height:1.45}.style-preview-modal-panel .style-preview-expand{display:none}.style-preview-modal-panel .style-preview-arrow{width:39px;height:39px}.style-preview-modal-panel .style-preview-count{font-size:9px}
   .ranking-review-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#fff;color:#111}.ranking-preview-photo{position:relative;height:58%;overflow:hidden;background:radial-gradient(circle at 50% 46%,#eac267 0 16%,#9d542c 17% 29%,#eee2cf 30% 48%,#776356 49% 100%)}.ranking-preview-photo>i{position:absolute;display:block;border-radius:999px;background:#e9c56f}.ranking-preview-photo>i:nth-child(1){width:35%;height:12%;left:23%;top:42%;transform:rotate(12deg)}.ranking-preview-photo>i:nth-child(2){width:28%;height:11%;left:39%;top:51%;transform:rotate(-10deg)}.ranking-preview-photo>i:nth-child(3){width:22%;height:10%;left:31%;top:59%;transform:rotate(6deg)}.ranking-preview-copy{position:relative;box-sizing:border-box;height:42%;padding:21px 23px 18px 34px;text-align:left}.ranking-preview-copy:before{content:"";position:absolute;left:23px;top:21px;bottom:22px;width:2px;background:#111}.ranking-preview-copy strong{display:-webkit-box;overflow:hidden;font-size:18px;line-height:1.08;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:2}.ranking-preview-copy p{display:-webkit-box;overflow:hidden;margin:13px 0 0;font-size:9px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:5}.ranking-review-preview.cover .ranking-preview-photo{height:100%;background:radial-gradient(circle at 50% 48%,#d78337 0 15%,#6d321d 16% 29%,#1a1715 30% 100%)}.ranking-review-preview.cover .ranking-preview-copy{position:absolute;left:21px;right:21px;bottom:31px;height:auto;padding:0;color:#fff}.ranking-review-preview.cover .ranking-preview-copy:before{display:none}.ranking-review-preview.cover .ranking-preview-copy strong{width:max-content;max-width:94%;background:#050505;padding:5px 8px;font-size:20px;line-height:1.12}.ranking-review-preview.cover .ranking-preview-copy p{width:max-content;max-width:90%;margin-top:7px;background:#050505;padding:4px 7px;font-size:9px;font-weight:700}.ranking-review-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.ranking-review-preview .style-preview-dots{bottom:8px}
   .product-focus-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#f8f6f0;color:#171717;padding:34px 28px 25px;box-sizing:border-box}.product-preview-copy{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;width:68%;text-align:left}.product-preview-copy small{color:#8e6f68;font-size:8px;font-weight:850;letter-spacing:.09em}.product-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.1;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-copy i{display:block;width:38px;height:3px;margin:12px 0 9px;background:#d9bbb5}.product-preview-copy p{display:-webkit-box;overflow:hidden;margin:0;color:#62636a;font-size:9px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-image{position:absolute;right:-14%;bottom:12%;width:80%;height:48%;display:flex;align-items:center;justify-content:center;transform:rotate(-5deg);border-radius:48% 0 0 48%;background:linear-gradient(145deg,#eadcd4,#d9bbb5);box-shadow:0 14px 30px rgba(80,54,48,.16)}.product-preview-image>span{position:absolute;top:11%;left:20%;color:#6b2c30;font-size:7px;font-weight:900;letter-spacing:.12em}.product-preview-image>b{display:grid;place-items:center;width:40%;aspect-ratio:.8;border:2px solid rgba(107,44,48,.48);border-radius:9px;background:#fffaf4;color:#6b2c30;text-align:center;font-size:13px;line-height:1.05;box-shadow:0 8px 18px rgba(107,44,48,.14)}.product-preview-footer{position:absolute;z-index:2;left:28px;right:28px;bottom:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ddd2ca;padding-top:9px;color:#68686d;font-size:7px}.product-preview-footer span{font-weight:800}.product-preview-footer b{font-size:7px}.product-focus-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.product-focus-preview .style-preview-dots{bottom:49px}
   .caption-draft{display:grid!important;gap:9px;white-space:normal!important;background:#fff;border-radius:10px;padding:13px!important}.caption-draft label{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:0!important}.caption-draft label span{color:#747880;font-size:10px}.caption-draft textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;border:1px solid #d9dcdf!important;border-radius:9px;background:#fff!important;color:#202126!important;padding:11px!important;font:inherit;font-size:12px;line-height:1.55}.caption-draft>div{display:flex;align-items:center;justify-content:flex-end;gap:8px}.caption-draft button,.download-all-button{border:0;border-radius:8px;background:#6b2c30;color:#fff!important;padding:9px 12px;font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}.caption-draft button:disabled{opacity:.45;cursor:not-allowed}.download-all-button{margin-right:auto;background:#202126}@media(max-width:700px){.caption-draft>div{align-items:stretch;flex-direction:column}.download-all-button{text-align:center;margin-right:0}}
