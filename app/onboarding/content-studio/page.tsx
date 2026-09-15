@@ -141,6 +141,7 @@ type StylePreviewProps = {
   summary: string;
   brandName?: string;
   imageUrl?: string;
+  imageLoading?: boolean;
   expanded?: boolean;
   onExpand?: () => void;
 };
@@ -162,9 +163,11 @@ function sharedPreviewCopy(angle: string, summary: string) {
   };
 }
 
-function PreviewVisual({ imageUrl }: { imageUrl?: string }) {
+function PreviewVisual({ imageUrl, loading }: { imageUrl?: string; loading?: boolean }) {
   return <div className={`shared-preview-visual ${imageUrl ? "has-image" : ""}`} style={imageUrl ? { backgroundImage: `url(${JSON.stringify(imageUrl).slice(1, -1)})` } : undefined} aria-label={imageUrl ? "今次內容的共同預覽圖片" : "圖片將於 STEP 5 選擇"}>
     {!imageUrl ? <><i/><i/><i/><span>圖片將於 STEP 5 選擇</span></> : null}
+    {imageUrl && !loading ? <b className="preview-image-status">AI 題材圖</b> : null}
+    {loading ? <span className="preview-image-generating"><i/>AI 正在生成題材圖</span> : null}
   </div>;
 }
 
@@ -178,7 +181,7 @@ function PreviewControls({ pageIndex, count, label, move, onExpand }: { pageInde
   </>;
 }
 
-function ClearMagazinePreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
+function ClearMagazinePreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const copy = sharedPreviewCopy(angle, summary);
   const pages = [
@@ -189,14 +192,14 @@ function ClearMagazinePreview({ angle, summary, brandName, imageUrl, expanded, o
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`clear-magazine-preview ${current.role} ${expanded ? "expanded" : ""}`}>
-    <PreviewVisual imageUrl={imageUrl}/>
+    <PreviewVisual imageUrl={imageUrl} loading={imageLoading}/>
     <div className="clear-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><p>{current.body}</p></div>
     <div className="unified-preview-brand"><span>{brandName || "BRAND"}</span><b>P.{String(pageIndex + 1).padStart(2, "0")}</b></div>
     <PreviewControls pageIndex={pageIndex} count={pages.length} label="清晰雜誌風" move={move} onExpand={onExpand}/>
   </div>;
 }
 
-function ProductFocusPreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
+function ProductFocusPreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const copy = sharedPreviewCopy(angle, summary);
   const pages = [
@@ -208,13 +211,13 @@ function ProductFocusPreview({ angle, summary, brandName, imageUrl, expanded, on
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`product-focus-preview ${expanded ? "expanded" : ""}`}>
     <div className="product-preview-copy"><small>{current.eyebrow}</small><strong>{current.headline}</strong><i/><p>{current.body}</p></div>
-    <div className="product-preview-image"><PreviewVisual imageUrl={imageUrl}/></div>
+    <div className="product-preview-image"><PreviewVisual imageUrl={imageUrl} loading={imageLoading}/></div>
     <div className="product-preview-footer"><span>{brandName || "BRAND"}</span><b>P.{current.page}</b></div>
     <PreviewControls pageIndex={pageIndex} count={pages.length} label="產品主角" move={move} onExpand={onExpand}/>
   </div>;
 }
 
-function RankingReviewPreview({ angle, summary, brandName, imageUrl, expanded, onExpand }: StylePreviewProps) {
+function RankingReviewPreview({ angle, summary, brandName, imageUrl, imageLoading, expanded, onExpand }: StylePreviewProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const copy = sharedPreviewCopy(angle, summary);
   const pages = [
@@ -225,7 +228,7 @@ function RankingReviewPreview({ angle, summary, brandName, imageUrl, expanded, o
   const current = pages[pageIndex];
   const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
   return <div className={`ranking-review-preview ${current.cover ? "cover" : "entry"} ${expanded ? "expanded" : ""}`}>
-    <div className="ranking-preview-photo"><PreviewVisual imageUrl={imageUrl}/></div>
+    <div className="ranking-preview-photo"><PreviewVisual imageUrl={imageUrl} loading={imageLoading}/></div>
     <div className="ranking-preview-copy">
       <strong>{current.headline}</strong>
       <p>{current.body}</p>
@@ -484,7 +487,9 @@ export default function ContentStudioPage() {
     const productionAssets = Array.isArray(selected?.production?.assets)
       ? selected.production.assets as ProjectAsset[]
       : [];
-    const preferred = productionAssets.find((asset) => asset.isCover || asset.assignedPage === "P.1") || productionAssets[0];
+    const preferred = [...productionAssets].reverse().find((asset) => asset.isCover)
+      || [...productionAssets].reverse().find((asset) => asset.assignedPage === "P.1")
+      || productionAssets[productionAssets.length - 1];
     return typeof preferred?.url === "string" ? preferred.url : undefined;
   }, [selected?.production]);
   const renderStylePreview = (code: string, expanded = false) => {
@@ -493,6 +498,7 @@ export default function ContentStudioPage() {
       summary: brief.summary,
       brandName: workspace?.brandName || workspace?.name || "BRAND",
       imageUrl: previewImageUrl,
+      imageLoading: generatingAssetPage === "P.1",
       expanded,
       onExpand: expanded ? undefined : () => setExpandedStyleCode(code),
     };
@@ -1221,7 +1227,9 @@ export default function ContentStudioPage() {
       );
       setMessage(payload?.promptAdjusted
         ? `${page} 原畫面涉及敏感表達，AI 已自動調整成合規視覺並完成生成`
-        : `${page} AI 圖片已生成並加入素材`);
+        : activeStep === "style"
+          ? "共同預覽圖已生成，三款 Style 已同步更新"
+          : `${page} AI 圖片已生成並加入素材`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能生成圖片");
     } finally {
@@ -3172,7 +3180,7 @@ export default function ContentStudioPage() {
 }
 
 const styles = `
-  .shared-preview-visual{position:absolute;inset:0;overflow:hidden;background:linear-gradient(145deg,#ddd2c6,#95867a);background-position:center;background-size:cover}.shared-preview-visual>i{position:absolute;display:block;border-radius:999px;background:#dec06b;box-shadow:0 4px 10px rgba(55,32,20,.18)}.shared-preview-visual>i:nth-child(1){width:48%;height:12%;left:20%;top:37%;transform:rotate(10deg)}.shared-preview-visual>i:nth-child(2){width:39%;height:12%;left:34%;top:49%;transform:rotate(-8deg)}.shared-preview-visual>i:nth-child(3){width:30%;height:11%;left:25%;top:60%;transform:rotate(5deg)}.shared-preview-visual>span{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:max-content;border-radius:999px;background:rgba(17,17,17,.68);color:#fff;padding:5px 8px;font-size:7px;font-weight:750}.unified-preview-brand{position:absolute;z-index:2;left:25px;right:25px;bottom:19px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.45);padding-top:8px;color:inherit;font-size:7px}.unified-preview-brand span{font-weight:850}.style-preview-expand{position:absolute;z-index:5;top:10px;left:10px;border:1px solid rgba(255,255,255,.72);border-radius:999px;background:rgba(17,17,17,.7);color:#fff;padding:6px 8px;font-size:8px;font-weight:800;cursor:pointer;backdrop-filter:blur(5px)}.style-preview-expand:hover{background:#fff;color:#202126}.clear-magazine-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#050505;color:#fff}.clear-magazine-preview .shared-preview-visual{inset:0 0 42%}.clear-preview-copy{position:absolute;z-index:2;left:24px;right:24px;bottom:56px;display:flex;flex-direction:column;align-items:flex-start;text-align:left}.clear-preview-copy small{color:#f1d443;font-size:8px;font-weight:800}.clear-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.08;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-preview-copy p{display:-webkit-box;overflow:hidden;margin:9px 0 0;font-size:9px;line-height:1.45;opacity:.78;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-magazine-preview.cover:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.05) 72%)}.clear-magazine-preview.cover .shared-preview-visual{inset:0}.clear-magazine-preview.cover .clear-preview-copy strong{background:#050505;padding:5px 8px}.clear-magazine-preview.content,.clear-magazine-preview.end{background:#050505}.clear-magazine-preview.end .shared-preview-visual{opacity:.35}.clear-magazine-preview .style-preview-dots{bottom:8px}.clear-magazine-preview .unified-preview-brand{bottom:36px}.style-preview-modal{position:fixed;z-index:80;inset:0;display:grid;place-items:center;background:rgba(20,18,17,.72);padding:24px;backdrop-filter:blur(8px)}.style-preview-modal-panel{width:min(470px,92vw);border-radius:18px;background:#fff;padding:14px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.style-preview-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 2px 11px}.style-preview-modal-head>div{display:grid;gap:2px}.style-preview-modal-head small{color:#777b83;font-size:9px}.style-preview-modal-head strong{font-size:18px}.style-preview-modal-head button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:#f1ebe4;color:#202126;font-size:22px;cursor:pointer}.style-preview-modal-panel>p{margin:10px 3px 1px;color:#777b83;font-size:9px;line-height:1.45}.style-preview-modal-panel .style-preview-expand{display:none}.style-preview-modal-panel .style-preview-arrow{width:39px;height:39px}.style-preview-modal-panel .style-preview-count{font-size:9px}
+  .shared-preview-visual{position:absolute;inset:0;overflow:hidden;background:linear-gradient(145deg,#ddd2c6,#95867a);background-position:center;background-size:cover}.shared-preview-visual>i{position:absolute;display:block;border-radius:999px;background:#dec06b;box-shadow:0 4px 10px rgba(55,32,20,.18)}.shared-preview-visual>i:nth-child(1){width:48%;height:12%;left:20%;top:37%;transform:rotate(10deg)}.shared-preview-visual>i:nth-child(2){width:39%;height:12%;left:34%;top:49%;transform:rotate(-8deg)}.shared-preview-visual>i:nth-child(3){width:30%;height:11%;left:25%;top:60%;transform:rotate(5deg)}.shared-preview-visual>span{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:max-content;border-radius:999px;background:rgba(17,17,17,.68);color:#fff;padding:5px 8px;font-size:7px;font-weight:750}.preview-image-status{position:absolute;z-index:2;right:10px;bottom:10px;border-radius:999px;background:rgba(17,17,17,.72);color:#fff;padding:5px 8px;font-size:7px;font-weight:850;backdrop-filter:blur(5px)}.shared-preview-visual>.preview-image-generating{z-index:8;inset:0;display:flex;align-items:center;justify-content:center;gap:7px;width:auto;transform:none;border-radius:0;background:rgba(24,21,19,.72);font-size:9px;backdrop-filter:blur(7px)}.preview-image-generating>i{display:block;width:14px;height:14px;border:2px solid rgba(255,255,255,.38);border-top-color:#fff;border-radius:50%;animation:studio-loading-spin .8s linear infinite}.unified-preview-brand{position:absolute;z-index:2;left:25px;right:25px;bottom:19px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,.45);padding-top:8px;color:inherit;font-size:7px}.unified-preview-brand span{font-weight:850}.style-preview-expand{position:absolute;z-index:5;top:10px;left:10px;border:1px solid rgba(255,255,255,.72);border-radius:999px;background:rgba(17,17,17,.7);color:#fff;padding:6px 8px;font-size:8px;font-weight:800;cursor:pointer;backdrop-filter:blur(5px)}.style-preview-expand:hover{background:#fff;color:#202126}.clear-magazine-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#050505;color:#fff}.clear-magazine-preview .shared-preview-visual{inset:0 0 42%}.clear-preview-copy{position:absolute;z-index:2;left:24px;right:24px;bottom:56px;display:flex;flex-direction:column;align-items:flex-start;text-align:left}.clear-preview-copy small{color:#f1d443;font-size:8px;font-weight:800}.clear-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.08;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-preview-copy p{display:-webkit-box;overflow:hidden;margin:9px 0 0;font-size:9px;line-height:1.45;opacity:.78;-webkit-box-orient:vertical;-webkit-line-clamp:3}.clear-magazine-preview.cover:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.05) 72%)}.clear-magazine-preview.cover .shared-preview-visual{inset:0}.clear-magazine-preview.cover .clear-preview-copy strong{background:#050505;padding:5px 8px}.clear-magazine-preview.content,.clear-magazine-preview.end{background:#050505}.clear-magazine-preview.end .shared-preview-visual{opacity:.35}.clear-magazine-preview .style-preview-dots{bottom:8px}.clear-magazine-preview .unified-preview-brand{bottom:36px}.style-preview-modal{position:fixed;z-index:80;inset:0;display:grid;place-items:center;background:rgba(20,18,17,.72);padding:24px;backdrop-filter:blur(8px)}.style-preview-modal-panel{width:min(470px,92vw);border-radius:18px;background:#fff;padding:14px;box-shadow:0 24px 80px rgba(0,0,0,.35)}.style-preview-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 2px 11px}.style-preview-modal-head>div{display:grid;gap:2px}.style-preview-modal-head small{color:#777b83;font-size:9px}.style-preview-modal-head strong{font-size:18px}.style-preview-modal-head button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:#f1ebe4;color:#202126;font-size:22px;cursor:pointer}.style-preview-modal-panel>p{margin:10px 3px 1px;color:#777b83;font-size:9px;line-height:1.45}.style-preview-modal-panel .style-preview-expand{display:none}.style-preview-modal-panel .style-preview-arrow{width:39px;height:39px}.style-preview-modal-panel .style-preview-count{font-size:9px}
   .ranking-review-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#fff;color:#111}.ranking-preview-photo{position:relative;height:58%;overflow:hidden;background:radial-gradient(circle at 50% 46%,#eac267 0 16%,#9d542c 17% 29%,#eee2cf 30% 48%,#776356 49% 100%)}.ranking-preview-photo>i{position:absolute;display:block;border-radius:999px;background:#e9c56f}.ranking-preview-photo>i:nth-child(1){width:35%;height:12%;left:23%;top:42%;transform:rotate(12deg)}.ranking-preview-photo>i:nth-child(2){width:28%;height:11%;left:39%;top:51%;transform:rotate(-10deg)}.ranking-preview-photo>i:nth-child(3){width:22%;height:10%;left:31%;top:59%;transform:rotate(6deg)}.ranking-preview-copy{position:relative;box-sizing:border-box;height:42%;padding:21px 23px 18px 34px;text-align:left}.ranking-preview-copy:before{content:"";position:absolute;left:23px;top:21px;bottom:22px;width:2px;background:#111}.ranking-preview-copy strong{display:-webkit-box;overflow:hidden;font-size:18px;line-height:1.08;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:2}.ranking-preview-copy p{display:-webkit-box;overflow:hidden;margin:13px 0 0;font-size:9px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:5}.ranking-review-preview.cover .ranking-preview-photo{height:100%;background:radial-gradient(circle at 50% 48%,#d78337 0 15%,#6d321d 16% 29%,#1a1715 30% 100%)}.ranking-review-preview.cover .ranking-preview-copy{position:absolute;left:21px;right:21px;bottom:31px;height:auto;padding:0;color:#fff}.ranking-review-preview.cover .ranking-preview-copy:before{display:none}.ranking-review-preview.cover .ranking-preview-copy strong{width:max-content;max-width:94%;background:#050505;padding:5px 8px;font-size:20px;line-height:1.12}.ranking-review-preview.cover .ranking-preview-copy p{width:max-content;max-width:90%;margin-top:7px;background:#050505;padding:4px 7px;font-size:9px;font-weight:700}.ranking-review-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.ranking-review-preview .style-preview-dots{bottom:8px}
   .product-focus-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#f8f6f0;color:#171717;padding:34px 28px 25px;box-sizing:border-box}.product-preview-copy{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;width:68%;text-align:left}.product-preview-copy small{color:#8e6f68;font-size:8px;font-weight:850;letter-spacing:.09em}.product-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.1;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-copy i{display:block;width:38px;height:3px;margin:12px 0 9px;background:#d9bbb5}.product-preview-copy p{display:-webkit-box;overflow:hidden;margin:0;color:#62636a;font-size:9px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-image{position:absolute;right:-14%;bottom:12%;width:80%;height:48%;display:flex;align-items:center;justify-content:center;transform:rotate(-5deg);border-radius:48% 0 0 48%;background:linear-gradient(145deg,#eadcd4,#d9bbb5);box-shadow:0 14px 30px rgba(80,54,48,.16)}.product-preview-image>span{position:absolute;top:11%;left:20%;color:#6b2c30;font-size:7px;font-weight:900;letter-spacing:.12em}.product-preview-image>b{display:grid;place-items:center;width:40%;aspect-ratio:.8;border:2px solid rgba(107,44,48,.48);border-radius:9px;background:#fffaf4;color:#6b2c30;text-align:center;font-size:13px;line-height:1.05;box-shadow:0 8px 18px rgba(107,44,48,.14)}.product-preview-footer{position:absolute;z-index:2;left:28px;right:28px;bottom:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ddd2ca;padding-top:9px;color:#68686d;font-size:7px}.product-preview-footer span{font-weight:800}.product-preview-footer b{font-size:7px}.product-focus-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.product-focus-preview .style-preview-dots{bottom:49px}
   .caption-draft{display:grid!important;gap:9px;white-space:normal!important;background:#fff;border-radius:10px;padding:13px!important}.caption-draft label{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:0!important}.caption-draft label span{color:#747880;font-size:10px}.caption-draft textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;border:1px solid #d9dcdf!important;border-radius:9px;background:#fff!important;color:#202126!important;padding:11px!important;font:inherit;font-size:12px;line-height:1.55}.caption-draft>div{display:flex;align-items:center;justify-content:flex-end;gap:8px}.caption-draft button,.download-all-button{border:0;border-radius:8px;background:#6b2c30;color:#fff!important;padding:9px 12px;font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}.caption-draft button:disabled{opacity:.45;cursor:not-allowed}.download-all-button{margin-right:auto;background:#202126}@media(max-width:700px){.caption-draft>div{align-items:stretch;flex-direction:column}.download-all-button{text-align:center;margin-right:0}}
