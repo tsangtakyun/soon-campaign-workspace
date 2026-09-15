@@ -19,6 +19,12 @@ type Recommendation = {
   version?: string
 }
 
+type FormatRecommendation = {
+  recommendedFormat: 'carousel' | 'single_image' | 'short_video'
+  recommendedVideoMethod: 'human_filming' | 'ai_video_generation' | null
+  formatReason: string
+}
+
 const clean = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : ''
 const normalizeSlideCount = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
@@ -48,6 +54,32 @@ function fallback(summary: string): Recommendation[] {
   ]
 }
 
+function fallbackFormat(summary: string): FormatRecommendation {
+  const normalized = summary.toLowerCase()
+  if (/(示範|過程|幕後|訪問|對話|動作|教學影片|短片|reel|video)/i.test(normalized)) {
+    return { recommendedFormat: 'short_video', recommendedVideoMethod: 'human_filming', formatReason: '內容包含動作、過程或人物表達，以真人短片最容易說清楚。' }
+  }
+  if (/(優惠|開業|公告|一句|主視覺|海報|活動日期|限時)/i.test(normalized) && summary.length < 220) {
+    return { recommendedFormat: 'single_image', recommendedVideoMethod: null, formatReason: '訊息集中而明確，以單張主視覺最快讓受眾掌握。' }
+  }
+  return { recommendedFormat: 'carousel', recommendedVideoMethod: null, formatReason: '題材包含多個重點或需要逐步解釋，以輪播最容易建立清晰脈絡。' }
+}
+
+function normalizeFormatRecommendation(value: unknown, summary: string): FormatRecommendation {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const recommendedFormat = source.recommendedFormat === 'single_image' || source.recommendedFormat === 'short_video' || source.recommendedFormat === 'carousel'
+    ? source.recommendedFormat
+    : fallbackFormat(summary).recommendedFormat
+  const recommendedVideoMethod = recommendedFormat === 'short_video'
+    ? source.recommendedVideoMethod === 'ai_video_generation' ? 'ai_video_generation' : 'human_filming'
+    : null
+  return {
+    recommendedFormat,
+    recommendedVideoMethod,
+    formatReason: clean(source.formatReason, 180) || fallbackFormat(summary).formatReason,
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
@@ -55,6 +87,7 @@ export async function POST(request: Request) {
     const projectId = clean(body.projectId, 80)
     const summary = clean(body.summary, 5000)
     const format = clean(body.format, 80)
+    const fallbackFormatRecommendation = fallbackFormat(summary)
     if (!isUuid(workspaceId) || !isUuid(projectId) || !summary) {
       return NextResponse.json({ error: 'Missing recommendation context' }, { status: 400 })
     }
@@ -88,10 +121,14 @@ export async function POST(request: Request) {
           coreSlideCount = normalizeSlideCount(payload?.recommendedSlideCount)
           coreSlideCountReason = clean(payload?.slideCountReason, 180)
           if (coreRecommendations.length && (format !== 'carousel' || coreSlideCount)) {
+            const coreFormatRecommendation = format
+              ? { recommendedFormat: format, recommendedVideoMethod: format === 'short_video' ? 'human_filming' : null, formatReason: '沿用已選擇的內容格式。' }
+              : normalizeFormatRecommendation(payload, summary)
             return NextResponse.json({
               recommendations: coreRecommendations,
               recommendedSlideCount: coreSlideCount,
               slideCountReason: coreSlideCountReason,
+              ...coreFormatRecommendation,
               source: 'soon_core',
             })
           }
@@ -106,6 +143,7 @@ export async function POST(request: Request) {
       recommendations: coreRecommendations.length ? coreRecommendations : fallback(summary),
       recommendedSlideCount: coreSlideCount,
       slideCountReason: coreSlideCountReason,
+      ...fallbackFormatRecommendation,
       source: coreRecommendations.length ? 'soon_core' : 'fallback',
     })
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -114,7 +152,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL), max_tokens: 1200, temperature: 0.3,
         system: 'You are SOON, a senior Hong Kong content strategist. Return valid JSON only. Use concise polished Traditional Chinese. Never invent claims or facts.',
-        messages: [{ role: 'user', content: `根據以下資料推薦剛好 3 個明顯不同、可直接製作的內容方向。每個方向只需一個核心概念。\n格式：${format}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n${format === 'carousel' ? '同時按題材可拆成的獨立內容重點，建議 3 至 10 張輪播圖片。張數必須足以完整講清故事，但不可為湊數而重複內容。recommendedSlideCount 必須是 3 至 10 的整數。' : 'recommendedSlideCount 必須是 null。'}\n只輸出 {"recommendations":[{"id":"stable-slug","title":"最多14字","concept":"一句具體構想","reason":"一句適合原因","hook":"示例開場句","category":"內容分類","version":"ai-v1"}],"recommendedSlideCount":${format === 'carousel' ? '6' : 'null'},"slideCountReason":"一句具體解釋內容可如何分頁"}` }],
+        messages: [{ role: 'user', content: `根據以下資料推薦剛好 3 個明顯不同、可直接製作的內容方向。每個方向只需一個核心概念。\n${format ? `用家已選格式：${format}` : '用家尚未選擇格式。請先按題材判斷 carousel、single_image 或 short_video 哪一種最能說清楚。'}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n${format === 'carousel' || !format ? '如建議或已選 carousel，同時按題材可拆成的獨立內容重點，建議 3 至 10 張輪播圖片；否則 recommendedSlideCount 為 null。' : 'recommendedSlideCount 必須是 null。'}\n只輸出 {"recommendations":[{"id":"stable-slug","title":"最多14字","concept":"一句具體構想","reason":"一句適合原因","hook":"示例開場句","category":"內容分類","version":"ai-v1"}],"recommendedFormat":"carousel|single_image|short_video","recommendedVideoMethod":"human_filming|ai_video_generation|null","formatReason":"一句說明為何此格式最適合","recommendedSlideCount":6,"slideCountReason":"一句具體解釋內容可如何分頁"}` }],
       }),
     })
     const data = await response.json()
@@ -122,11 +160,15 @@ export async function POST(request: Request) {
     const output = Array.isArray(data.content) ? data.content.find((item: any) => item.type === 'text')?.text : ''
     const parsed = JSON.parse(String(output || '').replace(/^```json\s*|\s*```$/g, ''))
     const recommendations = normalize(parsed?.recommendations)
-    const recommendedSlideCount = format === 'carousel' ? normalizeSlideCount(parsed?.recommendedSlideCount) : null
+    const formatRecommendation = format
+      ? { recommendedFormat: format, recommendedVideoMethod: format === 'short_video' ? normalizeFormatRecommendation(parsed, summary).recommendedVideoMethod : null, formatReason: clean(parsed?.formatReason, 180) || '沿用已選擇的內容格式。' }
+      : normalizeFormatRecommendation(parsed, summary)
+    const recommendedSlideCount = formatRecommendation.recommendedFormat === 'carousel' ? normalizeSlideCount(parsed?.recommendedSlideCount) : null
     return NextResponse.json({
       recommendations: recommendations.length ? recommendations : (coreRecommendations.length ? coreRecommendations : fallback(summary)),
       recommendedSlideCount,
       slideCountReason: recommendedSlideCount ? clean(parsed?.slideCountReason, 180) : '',
+      ...formatRecommendation,
       source: recommendations.length ? 'creator_ai' : (coreRecommendations.length ? 'soon_core' : 'fallback'),
     })
   } catch (error) {

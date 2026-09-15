@@ -89,6 +89,7 @@ export async function POST(req: Request) {
     const videoMethod = body.videoMethod === 'ai_video_generation'
       ? 'ai_video_generation'
       : body.videoMethod === 'human_filming' ? 'human_filming' : null
+    const initialBrief = body.brief && typeof body.brief === 'object' ? body.brief : {}
     const { data: prompt } = await access.admin
       .from('workspace_prompt_versions')
       .select('id')
@@ -108,6 +109,7 @@ export async function POST(req: Request) {
         source_url: typeof body.sourceUrl === 'string' ? body.sourceUrl : null,
         source_name: typeof body.sourceName === 'string' ? body.sourceName.slice(0, 200) : null,
         source_note: typeof body.sourceNote === 'string' ? body.sourceNote.slice(0, 3000) : null,
+        brief: initialBrief,
         selected_format: selectedFormat,
         format_decision: selectedFormat ? { videoMethod: selectedFormat === 'short_video' ? videoMethod || 'human_filming' : null } : {},
         stage: 'brief',

@@ -178,8 +178,8 @@ function ClearMagazinePreview() {
 }
 
 const studioSteps: { id: StudioStep; label: string }[] = [
-  { id: "format", label: "格式" },
   { id: "brief", label: "Brief" },
+  { id: "format", label: "格式" },
   { id: "style", label: "風格" },
   { id: "structure", label: "故事結構" },
   { id: "assets", label: "圖片素材" },
@@ -337,6 +337,8 @@ export default function ContentStudioPage() {
   const [recommendingDirections, setRecommendingDirections] = useState(false);
   const [recommendedSlideCount, setRecommendedSlideCount] = useState<number | null>(null);
   const [slideCountReason, setSlideCountReason] = useState("");
+  const [recommendedFormat, setRecommendedFormat] = useState("");
+  const [formatReason, setFormatReason] = useState("");
   const [customDirectionsOpen, setCustomDirectionsOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState("");
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
@@ -366,7 +368,7 @@ export default function ContentStudioPage() {
     productionPrompt: "",
   });
   const [promptVersion, setPromptVersion] = useState<number | null>(null);
-  const [activeStep, setActiveStep] = useState<StudioStep>("format");
+  const [activeStep, setActiveStep] = useState<StudioStep>("brief");
   const studioLoadedRef = useRef(false);
 
   const selected = useMemo(
@@ -433,9 +435,9 @@ export default function ContentStudioPage() {
   }
 
   function latestAvailableStep(project: Project): StudioStep {
-    if (!project.selected_format) return "format";
-    if (project.stage === "format") return "format";
+    if (!project.selected_format) return project.stage === "format" ? "format" : "brief";
     if (project.stage === "brief") return "brief";
+    if (project.stage === "format") return "format";
     const production = project.production;
     if (!production?.status && typeof project.format_decision?.templateCode !== "string") return "style";
     if (!production?.status || production.status === "structure_ready") return "structure";
@@ -586,7 +588,12 @@ export default function ContentStudioPage() {
   function openNewContent() {
     setSelectedId(null);
     setMessage("");
-    setActiveStep("format");
+    setBrief({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
+    setDirectionRecommendations([]);
+    setRecommendedFormat("");
+    setFormatReason("");
+    setSelectedFormat("");
+    setActiveStep("brief");
     const url = new URL(window.location.href);
     url.searchParams.delete("project");
     url.searchParams.delete("step");
@@ -594,8 +601,10 @@ export default function ContentStudioPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function recommendDirections() {
-    if (!workspaceId || !selected || !String(brief.summary || "").trim() || recommendingDirections) return;
+  async function recommendDirections(projectOverride?: Project, summaryOverride?: string) {
+    const project = projectOverride || selected;
+    const summary = String(summaryOverride ?? brief.summary ?? "").trim();
+    if (!workspaceId || !project || !summary || recommendingDirections) return;
     setRecommendingDirections(true);
     setMessage("");
     try {
@@ -604,9 +613,9 @@ export default function ContentStudioPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           workspaceId,
-          projectId: selected.id,
-          summary: brief.summary,
-          format: selected.selected_format || selectedFormat,
+          projectId: project.id,
+          summary,
+          format: project.selected_format || selectedFormat,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -620,7 +629,16 @@ export default function ContentStudioPage() {
         : null;
       setRecommendedSlideCount(normalizedSlideCount);
       setSlideCountReason(typeof payload?.slideCountReason === "string" ? payload.slideCountReason : "");
-      if ((selected.selected_format || selectedFormat) === "carousel" && normalizedSlideCount) {
+      const nextRecommendedFormat = typeof payload?.recommendedFormat === "string" ? payload.recommendedFormat : "";
+      setRecommendedFormat(nextRecommendedFormat);
+      setFormatReason(typeof payload?.formatReason === "string" ? payload.formatReason : "");
+      if (!project.selected_format && nextRecommendedFormat) {
+        setSelectedFormat(nextRecommendedFormat);
+        if (payload?.recommendedVideoMethod === "ai_video_generation" || payload?.recommendedVideoMethod === "human_filming") {
+          setVideoMethod(payload.recommendedVideoMethod);
+        }
+      }
+      if ((project.selected_format || nextRecommendedFormat || selectedFormat) === "carousel" && normalizedSlideCount) {
         setCarouselSlideCount(normalizedSlideCount);
       }
       if (recommendations[0]) {
@@ -745,26 +763,32 @@ export default function ContentStudioPage() {
     }
   }
 
-  async function startNewProject(format: (typeof formats)[number]) {
-    if (!workspaceId || startingProject || !permissions?.canEdit) return;
+  async function startNewProject() {
+    const summary = String(brief.summary || "").trim();
+    if (!workspaceId || !summary || startingProject || !permissions?.canEdit) return;
     setStartingProject(true);
     setMessage("");
     try {
       const response = await fetch("/api/content-projects", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId, title: "新內容", selectedFormat: format.outputFormat, videoMethod: format.videoMethod }),
+        body: JSON.stringify({
+          workspaceId,
+          title: summary.replace(/\s+/g, " ").slice(0, 40),
+          sourceNote: summary,
+          brief: { ...brief, summary },
+        }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.project?.id) throw new Error(payload?.detail || payload?.error || "未能建立內容");
       setProjects((current) => [payload.project, ...current.filter((item) => item.id !== payload.project.id)]);
       setSelectedId(payload.project.id);
-      setSelectedFormat(format.outputFormat);
-      if (format.videoMethod) setVideoMethod(format.videoMethod);
+      setSelectedFormat("");
       const url = new URL(window.location.href);
       url.searchParams.set("project", payload.project.id);
       window.history.replaceState(null, "", url);
       goToStep("brief");
+      await recommendDirections(payload.project, summary);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能建立內容");
     } finally {
@@ -1618,12 +1642,13 @@ export default function ContentStudioPage() {
                   <div className="editor-card">
                     <div className="section-title">
                       <div>
-                        <span>STEP 2</span>
-                        <h3>提供內容資料</h3>
+                        <span>STEP 1</span>
+                        <h3>你今次想講甚麼？</h3>
                       </div>
+                      <em>不需要先懂得寫 Brief，零碎想法也可以</em>
                     </div>
                     <label className="brief-source-field">
-                      <span>貼上資料或描述今次想製作的內容</span>
+                      <span>寫下你知道的事情</span>
                       <textarea
                         value={brief.summary}
                         onChange={(event) => {
@@ -1632,9 +1657,9 @@ export default function ContentStudioPage() {
                           setRecommendedSlideCount(null);
                           setSlideCountReason("");
                         }}
-                        placeholder={"例如：貼上文章、產品資料、活動詳情或你的想法。\n資料未完整亦可以，SOON 會協助整理。"}
+                        placeholder={"例如：我想介紹新產品，但不確定應該突出功能、使用方法還是顧客感受。\n亦可以直接貼上文章、產品資料、活動詳情或任何零碎想法。"}
                       />
-                      <small>可以直接貼上原文，毋須先整理成 Brief。</small>
+                      <small>毋須整理語句或決定格式，SOON 會先找出值得說的重點。</small>
                     </label>
                     <div className="angle-field">
                       <div className="direction-heading">
@@ -1680,26 +1705,6 @@ export default function ContentStudioPage() {
                           ))}
                         </div>
                       ) : null}
-                      {(selected.selected_format || selectedFormat) === "carousel" && directionRecommendations.length ? (
-                        <section className="slide-count-recommendation" aria-label="輪播張數">
-                          <div>
-                            <strong>{recommendedSlideCount ? `SOON 建議製作 ${recommendedSlideCount} 張` : "選擇輪播張數"}</strong>
-                            <small>{slideCountReason || "你可以按今次需要選擇 3–10 張。"}</small>
-                          </div>
-                          <div className="quantity-options" aria-label="選擇輪播圖片數量">
-                            {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
-                              <button
-                                type="button"
-                                key={count}
-                                className={carouselSlideCount === count ? "active" : ""}
-                                onClick={() => setCarouselSlideCount(count)}
-                              >
-                                {count} 張{count === recommendedSlideCount ? <small>SOON 建議</small> : null}
-                              </button>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
                       <button type="button" className="custom-directions-toggle" onClick={() => setCustomDirectionsOpen((open) => !open)}>
                         自行選擇方向 <SoonIcon name="chevron-down" size={14} />
                       </button>
@@ -1737,18 +1742,10 @@ export default function ContentStudioPage() {
                           saveProject(
                             {
                               brief,
-                              stage: "production",
-                              formatDecision: {
-                                ...(selected.format_decision || {}),
-                                ...(selected.selected_format === "carousel" ? {
-                                  slideCount: carouselSlideCount,
-                                  slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
-                                  slideCountReason: slideCountReason || null,
-                                } : {}),
-                              },
+                              stage: "format",
                             },
-                            "Brief 已確認，請選擇內容風格",
-                            "style",
+                            "內容方向已確認，請選擇合適格式",
+                            "format",
                             [{
                               eventType: "selected",
                               dimension: "copy",
@@ -1762,7 +1759,7 @@ export default function ContentStudioPage() {
                           )
                         }
                       >
-                        {directionRecommendations.length ? "確認 Brief →" : "請先分析內容"}
+                        {directionRecommendations.length ? "確認方向，選擇格式 →" : "請先分析內容"}
                       </button>
                     </div>
                   </div>
@@ -1770,10 +1767,10 @@ export default function ContentStudioPage() {
                   <div className="editor-card">
                     <div className="section-title">
                       <div>
-                        <span>STEP 1</span>
-                        <h3>今次想製作甚麼？</h3>
+                        <span>STEP 2</span>
+                        <h3>用甚麼形式最能說清楚？</h3>
                       </div>
-                      <em>每次製作一項內容，之後仍可修改</em>
+                      <em>{formatReason || "SOON 已按內容重點提供建議，你仍可自行選擇"}</em>
                     </div>
                     <div className="format-grid">
                       {formats.map((format) => (
@@ -1791,16 +1788,34 @@ export default function ContentStudioPage() {
                           }}
                         >
                           <i><SoonIcon name={format.icon} size={24} /></i>
-                          <span><strong>{format.label}</strong><small>{format.note}</small></span>
+                          <span>
+                            <strong>{format.label}{recommendedFormat === format.outputFormat && (format.outputFormat !== "short_video" || format.videoMethod === videoMethod) ? <em className="soon-recommended-badge">SOON 建議</em> : null}</strong>
+                            <small>{format.note}</small>
+                          </span>
                         </button>
                       ))}
                     </div>
+                    {selectedFormat === "carousel" && recommendedSlideCount ? (
+                      <section className="slide-count-recommendation" aria-label="輪播張數">
+                        <div>
+                          <strong>{`SOON 建議製作 ${recommendedSlideCount} 張`}</strong>
+                          <small>{slideCountReason || "你可以按今次需要選擇 3–10 張。"}</small>
+                        </div>
+                        <div className="quantity-options" aria-label="選擇輪播圖片數量">
+                          {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
+                            <button type="button" key={count} className={carouselSlideCount === count ? "active" : ""} onClick={() => setCarouselSlideCount(count)}>
+                              {count} 張{count === recommendedSlideCount ? <small>SOON 建議</small> : null}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
                     <div className="actions">
                       <button
                         className="secondary"
-                        onClick={() => window.location.assign("/onboarding/topic-library")}
+                        onClick={() => goToStep("brief")}
                       >
-                        ← 返回題材庫
+                        ← 修改內容方向
                       </button>
                       <button
                         disabled={
@@ -1812,12 +1827,17 @@ export default function ContentStudioPage() {
                               formatDecision: {
                                 ...(selected.format_decision || {}),
                                 videoMethod: selectedFormat === "short_video" ? videoMethod : null,
+                                ...(selectedFormat === "carousel" ? {
+                                  slideCount: carouselSlideCount,
+                                  slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
+                                  slideCountReason: slideCountReason || null,
+                                } : {}),
                               },
                               selectedFormat,
-                              stage: "brief",
+                              stage: "production",
                             },
-                            "格式已確認，請完成內容 Brief",
-                            "brief",
+                            "格式已確認，請選擇內容風格",
+                            "style",
                             [
                               {
                                 eventType: selected.selected_format && selected.selected_format !== selectedFormat ? "changed" : "selected",
@@ -2902,18 +2922,24 @@ export default function ContentStudioPage() {
               <div className="new-content-entry">
                 <div className="new-content-head">
                   <span>建立新內容</span>
-                  <h2>今次想製作甚麼？</h2>
-                  <p>先選擇一種格式，下一步再提供題材或想法。</p>
+                  <h2>你今次想講甚麼？</h2>
+                  <p>不用先想好怎樣說，也不用先選格式。寫下你知道的資料，SOON 會協助整理。</p>
                 </div>
-                <div className="format-grid entry-format-grid">
-                  {formats.map((format) => (
-                    <button key={format.id} data-format={format.id} type="button" disabled={startingProject || !permissions?.canEdit} onClick={() => void startNewProject(format)}>
-                      <i><SoonIcon name={format.icon} size={24} /></i>
-                      <span><strong>{format.label}</strong><small>{format.note}</small></span>
-                    </button>
-                  ))}
+                <label className="brief-source-field entry-brief-field">
+                  <span>任何想法、資料或連結內容</span>
+                  <textarea
+                    value={brief.summary}
+                    onChange={(event) => setBrief({ ...brief, summary: event.target.value })}
+                    placeholder={"例如：下個月會推出一款方便小店使用的新服務，但我不知道應該從功能、價錢還是顧客問題開始說。"}
+                  />
+                  <small>一句話、幾個重點或完整資料都可以。</small>
+                </label>
+                <div className="new-content-actions">
+                  <div className="entry-topic-link"><span>未有想法？</span><Link href="/onboarding/topic-library">到題材庫找靈感 →</Link></div>
+                  <button type="button" disabled={!String(brief.summary || "").trim() || startingProject || !permissions?.canEdit} onClick={() => void startNewProject()}>
+                    {startingProject ? "SOON 正在整理…" : "讓 SOON 幫我整理 →"}
+                  </button>
                 </div>
-                <div className="entry-topic-link"><span>已有題材但未決定格式？</span><Link href="/onboarding/topic-library">先到題材庫查看 →</Link></div>
                 {startingProject ? (
                   <p className="studio-message loading" role="status">正在建立內容…</p>
                 ) : studioLoadError ? (
@@ -3075,4 +3101,5 @@ const editingStyles = `
   .studio-load-error{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dbc8c1;border-radius:12px;background:#f7eee9;padding:13px 15px;color:var(--soon-oxblood);font-size:13px;font-weight:750}.studio-load-error button{flex:none;border:1px solid var(--soon-oxblood);border-radius:9px;background:#fff;color:var(--soon-oxblood);padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}@media(max-width:560px){.studio-load-error{align-items:flex-start;flex-direction:column}.studio-load-error button{width:100%}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
   .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}
+  .entry-brief-field{margin:0!important}.entry-brief-field textarea{min-height:210px!important;font-size:16px!important}.new-content-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-top:22px}.new-content-actions>button{flex:none;border:0;border-radius:11px;background:var(--soon-oxblood);color:#fff;padding:13px 18px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.new-content-actions>button:disabled{opacity:.42;cursor:not-allowed}.new-content-actions .entry-topic-link{margin:0;padding:0;border:0;display:flex;gap:8px}.soon-recommended-badge{display:inline-flex;margin-left:7px;border-radius:999px;background:var(--soon-chartreuse);color:var(--soon-oxblood);padding:3px 6px;font-size:8px;font-style:normal;font-weight:900;vertical-align:middle}.format-grid button.active .soon-recommended-badge{background:var(--soon-chartreuse);color:var(--soon-oxblood)}@media(max-width:700px){.new-content-actions{align-items:stretch;flex-direction:column}.new-content-actions>button{width:100%}}
 `;
