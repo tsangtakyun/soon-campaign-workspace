@@ -7,6 +7,7 @@ type WorkspaceRow = {
   id: string
   name: string | null
   description: string | null
+  font_style: string | null
   created_at: string | null
 }
 
@@ -51,13 +52,13 @@ export async function GET() {
     const { data: memberWorkspaces, error: memberWorkspacesError } = memberWorkspaceIds.length
       ? await supabase
           .from('workspaces')
-          .select('id,name,description,created_at')
+          .select('id,name,description,font_style,created_at')
           .in('id', memberWorkspaceIds)
       : { data: [], error: null }
 
     const { data: ownedWorkspaces, error: ownedWorkspacesError } = await supabase
       .from('workspaces')
-      .select('id,name,description,created_at')
+      .select('id,name,description,font_style,created_at')
       .eq('owner_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -110,6 +111,7 @@ export async function GET() {
         name: workspace.name || '未命名工作台',
         brandName: brandByWorkspace.get(workspace.id) || workspace.name || null,
         description: workspace.description || null,
+        fontStyle: workspace.font_style || null,
         logoUrl: profileByWorkspace.get(workspace.id)?.logo_url || brandLogoByWorkspace.get(workspace.id) || null,
         promptProfileKey: profileByWorkspace.get(workspace.id)?.prompt_profile_key || null,
         role: roleByWorkspace.get(workspace.id) || null,

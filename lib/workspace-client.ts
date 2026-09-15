@@ -10,6 +10,7 @@ export type WorkspaceSummary = {
   brandName?: string | null
   description?: string | null
   logoUrl?: string | null
+  fontStyle?: string | null
   promptProfileKey?: string | null
   role?: 'owner' | 'admin' | 'member' | 'client_approver' | 'viewer' | null
 }

@@ -77,8 +77,15 @@ function exactArrayBuffer(bytes: Uint8Array) {
 function findSelectedTypeface(value?: string | null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return null;
+  const legacyAlias: Record<string, string> = {
+    "gensenrounded2": "swei-gothic",
+    "gensenrounded2 / 系統圓體": "swei-gothic",
+    "系統圓體": "swei-gothic",
+    "nanifont": "nani",
+  };
+  const resolved = legacyAlias[normalized] || normalized;
   return typefaces.find((typeface) =>
-    typeface.id.toLowerCase() === normalized || typeface.fontFamily.toLowerCase() === normalized,
+    typeface.id.toLowerCase() === resolved || typeface.fontFamily.toLowerCase() === resolved,
   ) || null;
 }
 
@@ -512,8 +519,15 @@ async function renderClearMagazinePage(
   const clean = (value: string | undefined) => String(value || "").trim();
   const cleanHeadline = (value: string | undefined) => clean(value)
     .replace(/[，,。．；;：:、！？!?]+$/u, "");
+  const normalizeHeadlineSpacing = (value: string) => value
+    .replace(/([0-9A-Za-z])\s+(?=\p{Script=Han})/gu, "$1")
+    .replace(/(\p{Script=Han})\s+(?=[0-9A-Za-z])/gu, "$1");
   const formatCoverHeadline = (value: string | undefined) => {
-    const raw = clean(value);
+    const raw = normalizeHeadlineSpacing(clean(value));
+    const explicitLines = raw.split(/\s*\n+\s*/u).map((part) => part.trim()).filter(Boolean);
+    if (explicitLines.length >= 2) {
+      return `${explicitLines[0]}\n${explicitLines.slice(1).join("")}`;
+    }
     const clauses = raw.split(/[，,。．；;：:、！？!?]+/u).map((part) => part.trim()).filter(Boolean);
     if (clauses.length >= 2) return `${clauses[0]}\n${clauses.slice(1).join("")}`;
     const glyphs = Array.from(clauses[0] || raw.replace(/[，,。．；;：:、！？!?]/gu, ""));
@@ -773,7 +787,10 @@ export async function POST(req: Request) {
     const assets = (project.production.assets || []) as Asset[];
     if (!drafts.length)
       return NextResponse.json({ error: "沒有逐頁草稿" }, { status: 400 });
-    const configuredTypeface = workspace?.font_style || brandKit?.typeface_family || brandKit?.typeface_id;
+    const workspaceTypefaceFallback = /egg[.\s_-]*soon/i.test(workspaceName)
+      ? "GenSenRounded2"
+      : /bechill|bunchill/i.test(workspaceName) ? "NaniFont" : null;
+    const configuredTypeface = workspace?.font_style || brandKit?.typeface_family || brandKit?.typeface_id || workspaceTypefaceFallback;
     const fonts = await loadCarouselFonts(configuredTypeface);
     const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
     const preparedImageUrls = new Map(

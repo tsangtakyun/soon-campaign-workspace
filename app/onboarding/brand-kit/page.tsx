@@ -368,6 +368,9 @@ function visualStyleDisplayName(value: string | null | undefined, brand: BrandKi
 
 function typefaceDisplayName(value: string | null | undefined, brand: BrandKit) {
   if (!value) return typefaceLabel(brand)
+  const normalized = value.trim().toLowerCase()
+  if (normalized.includes('gensenrounded') || normalized.includes('系統圓體')) return eggSoonTypeface
+  if (normalized === 'nanifont') return typefaces.find((typeface) => typeface.id === 'nani')?.name || value
   const font = typefaces.find((typeface) => typeface.id === value || typeface.fontFamily === value || typeface.name === value)
   return font?.name || value
 }
@@ -716,7 +719,13 @@ export default function BrandKitPage() {
   }
 
   function openTypefacePicker() {
-    setTypefaceDraft(workspaceStyle?.font_style || '')
+    const current = workspaceStyle?.font_style || ''
+    const normalized = current.toLowerCase()
+    setTypefaceDraft(
+      normalized.includes('gensenrounded') || normalized.includes('系統圓體')
+        ? 'swei-gothic'
+        : normalized === 'nanifont' ? 'nani' : current,
+    )
     setEditingTypeface(true)
   }
 

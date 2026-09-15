@@ -2788,12 +2788,12 @@ export default function ContentStudioPage() {
                                                             workspace?.name ||
                                                             "",
                                                           workspaceFont:
-                                                            /egg[.\s_-]*soon/i.test(
+                                                            workspace?.fontStyle || (/egg[.\s_-]*soon/i.test(
                                                               workspace?.name ||
                                                                 "",
                                                             )
                                                               ? "GenSenRounded2"
-                                                              : "",
+                                                              : ""),
                                                         }),
                                                       );
                                                     }}
