@@ -205,7 +205,8 @@ export async function POST(req: Request) {
           ...(isClearMagazine ? [
             "頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。",
             "每頁必須保存固定 templateArtboardId：cover=01_COVER、longform=02_FULL_BLEED_TEXT、split=03_IMAGE_TOP_TEXT_BOTTOM、comparison=04_COMPARISON、feature=05_LEFT_TEXT_RIGHT_IMAGE、end=06_END_CTA。",
-            "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘頁面最多 4 段，每段只寫一個重點。不得以縮小字體容納過長內容。",
+            "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘內容頁，尤其 P.2 至 P.5，body 應忠實保留已確認 copyDirection 的具體資料，通常拆成 3 至 5 個短段，每段只寫一個重點。不得為了變短而刪走有來源支持的重要細節，亦不得以縮小字體容納過長內容。",
+            "逐頁文案只可整理及改寫已確認故事結構、Brief 與來源資料。不得新增任何數字、背景、因果、影響、例子或評價；資料不足時寧可較短，不可以常識或套話填充。報道及當事人說法必須保留歸因字眼。",
             "cover 的 subheadline 是短 Eyebrow，最多 10 個中文字；headline 不可含任何標點並須能平衡分成最多兩行；body 只可有一個短句，建議不超過 28 個中文字。",
             "end 頁 subheadline 使用短分類如『店舖資料』或『出發前留意』；headline 不可用直線或其他標點作分隔，最多兩行；場景或帶白底的產品相預設保留原圖，不可自動退地。",
             "longform 的 headline 不可含標點並應寫成兩個可獨立斷行的短語；body 每個短句獨立成一行，最多七行，不可用逗號將多個重點塞進同一行。longform 全頁必須使用自然、簡潔的繁體中文書面語，不可使用『唔係、係、嘅、拎、睇、薯仔』等廣東話口語。",
@@ -214,7 +215,7 @@ export async function POST(req: Request) {
             "comparison 頁 headline 不可包含標點；左右說明各自最多四個短句，每句獨立成行，避免段內逗號及句號。",
             "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；右圖在內容相關的前提下，優先選擇 cutoutSuitability 為 high 的獨立產品或包裝圖片，其次才使用 medium；不可為了退地而選擇不相關圖片。不足兩張合適素材時只填合適的一張，不可隨機補圖。",
             "split 頁只在兩張圖片分別支持兩項互補內容時使用一至兩張素材；其他頁只需一張主要素材。不可為了填滿版面而增加第二張圖片。assetId 必須等於 assetIds 第一項。",
-            "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 最多兩個重點，避免加入會令版面鬆散的第三段補充或免責文字。",
+            "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 分成兩個主要段落，每段可包含一至兩個有來源支持的短句，避免加入無資料支持的補充或免責文字。",
             "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
             "imageTreatment 按畫面決定：包裝、獨立產品或人物全身而背景雜亂可用 cutout；場景、製作過程或環境氣氛用 full-bleed 或 card；無法可靠退地時用 card。不要要求所有圖片退地。",
             "feature 頁如使用食物、環境或製作場景相片，必須保留原圖並用 card，不可退地；只有清晰獨立產品相片才可用 cutout。feature headline 不可包含標點並最多兩行。",
