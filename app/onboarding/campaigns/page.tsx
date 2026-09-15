@@ -225,6 +225,7 @@ export default function CampaignsPage() {
   const [deletingIdea, setDeletingIdea] = useState(false)
   const [creatingProjectId, setCreatingProjectId] = useState<string | null>(null)
   const [centralIdeas, setCentralIdeas] = useState<ReferenceIdea[]>([])
+  const [libraryScope, setLibraryScope] = useState<'central' | 'workspace'>('central')
   const [centralFeedStatus, setCentralFeedStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [contentDirections, setContentDirections] = useState<string[]>([])
   const [generatingTopics, setGeneratingTopics] = useState(false)
@@ -233,16 +234,10 @@ export default function CampaignsPage() {
     let cancelled = false
     async function loadCentralTopics() {
       try {
-        const feeds = await Promise.allSettled([
-          fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60'),
-          fetch('https://egg.sooncreator.network/api/public/topics'),
-        ])
-        const payloads = await Promise.all(feeds.map(async (result) => {
-          if (result.status !== 'fulfilled' || !result.value.ok) return [] as CentralTopic[]
-          const payload = await result.value.json().catch(() => null)
-          return Array.isArray(payload?.topics) ? payload.topics as CentralTopic[] : []
-        }))
-        const mergedTopics = Array.from(new Map(payloads.flat().map((topic) => [topic.id, topic])).values())
+        const response = await fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60', { cache: 'no-store' })
+        if (!response.ok) throw new Error('未能載入中央題材')
+        const payload = await response.json().catch(() => null)
+        const mergedTopics = Array.isArray(payload?.topics) ? payload.topics as CentralTopic[] : []
         if (!mergedTopics.length) throw new Error('未能載入中央題材')
         if (!cancelled) {
           setCentralIdeas(mergedTopics.map(centralTopicToIdea))
@@ -360,19 +355,15 @@ export default function CampaignsPage() {
     return () => window.removeEventListener('resize', updateColumnCount)
   }, [])
 
-  const centralFilters = ['全部', ...Array.from(new Set(centralIdeas.map((idea) => idea.category)))]
-  const filters = workspaceLoading || centralFeedStatus === 'loading'
+  const scopedIdeas = libraryScope === 'central' ? centralIdeas : userIdeas
+  const centralFilters = ['全部', ...Array.from(new Set(scopedIdeas.map((idea) => idea.category)))]
+  const filters = workspaceLoading || (libraryScope === 'central' && centralFeedStatus === 'loading')
     ? ['全部']
-    : centralFeedStatus === 'ready' ? centralFilters : ['全部']
-  const baseReferenceIdeas = workspaceLoading
-    ? []
-    : centralFeedStatus === 'ready'
-      ? centralIdeas
-      : []
-  const referenceIdeas = [...userIdeas, ...baseReferenceIdeas]
+    : libraryScope === 'central' && centralFeedStatus === 'error' ? ['全部'] : centralFilters
+  const referenceIdeas = (workspaceLoading ? [] : scopedIdeas)
     .filter((idea) => !dismissedIdeaIds.includes(idea.id))
     .map((idea, index) => ({ idea, index, score: topicRelevanceScore(idea, contentDirections) }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .sort((a, b) => libraryScope === 'central' ? a.index - b.index : b.score - a.score || a.index - b.index)
     .map(({ idea, score }) => ({ ...idea, recommended: score > 0 }))
   const locations = ['全部地區', ...Array.from(new Set(referenceIdeas.flatMap((idea) => [
     ...(idea.localities || []),
@@ -545,11 +536,13 @@ export default function CampaignsPage() {
           <div>
             <h1>題材庫</h1>
             <span>
-              {workspaceLoading || centralFeedStatus === 'loading'
+              {workspaceLoading || (libraryScope === 'central' && centralFeedStatus === 'loading')
                 ? '正在載入 SOON 最新題材'
-                : centralFeedStatus === 'error'
-                  ? '中央題材暫時未能更新，現正顯示工作台已保存的內容'
-                  : 'SOON 每日整理新題材，並按目前工作台的內容方向優先排列'}
+                : libraryScope === 'central' && centralFeedStatus === 'error'
+                  ? '中央題材暫時未能更新；品牌專屬題材仍可正常使用'
+                  : libraryScope === 'central'
+                    ? '由 SOON Core 發布，三個平台共用並按最新更新排列'
+                    : '只顯示目前工作台建立及保存的品牌專屬題材'}
             </span>
           </div>
           <div className="topic-actions">
@@ -583,7 +576,7 @@ export default function CampaignsPage() {
         </header>
 
         <section className="library-body">
-          {workspaceLoading || centralFeedStatus === 'loading' ? (
+          {workspaceLoading || (libraryScope === 'central' && centralFeedStatus === 'loading') ? (
             <div className="library-loading" aria-label="正在載入題材庫">
               <div className="library-loading-search" />
               <div className="library-loading-filters">
@@ -603,6 +596,10 @@ export default function CampaignsPage() {
             </div>
           ) : (
             <>
+              <div className="library-sources" aria-label="題材來源">
+                <button type="button" className={libraryScope === 'central' ? 'active' : ''} onClick={() => { setLibraryScope('central'); setActiveFilter('全部'); setActiveLocation('全部地區') }}>SOON 中央題材 ({centralIdeas.length})</button>
+                <button type="button" className={libraryScope === 'workspace' ? 'active' : ''} onClick={() => { setLibraryScope('workspace'); setActiveFilter('全部'); setActiveLocation('全部地區') }}>品牌專屬題材 ({userIdeas.length})</button>
+              </div>
               <div className="library-tools">
                 <label className="library-search">
                   <span>⌕</span>
@@ -761,6 +758,31 @@ const libraryStyles = `
   .library-shell {
     min-width: 0;
     background: #ffffff;
+  }
+
+  .library-sources {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f4f4f5;
+  }
+
+  .library-sources button {
+    border: 0;
+    border-radius: 9px;
+    padding: 10px 12px;
+    background: transparent;
+    color: #71717a;
+    font-weight: 700;
+  }
+
+  .library-sources button.active {
+    background: #18181b;
+    color: white;
   }
 
   .library-topbar {
