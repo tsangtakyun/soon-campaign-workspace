@@ -5,10 +5,12 @@ import { ImageResponse } from "next/og";
 import { NextResponse } from "next/server";
 import React from "react";
 import sharp from "sharp";
+import { decompress } from "wawoff2";
 
 import { isUuid } from "@/lib/oauth-connections";
 import { clearMagazineCarouselV1, isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import { createServerSupabase } from "@/lib/server-supabase";
+import { typefaces } from "@/lib/typefaces";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 
 export const runtime = "nodejs";
@@ -46,6 +48,100 @@ const box = (style: React.CSSProperties, children: React.ReactNode) =>
 
 const DEFAULT_CAROUSEL_FONT = "SOON Rounded CJK";
 const EDITORIAL_CAROUSEL_FONT = "SOON Editorial CJK";
+const BRAND_CAROUSEL_FONT = "SOON Selected Brand Font";
+
+const localTypefaceFiles: Record<string, string> = {
+  "jason-handwriting": "JasonHandwriting1-Regular.woff2",
+  naikai: "NaikaiFont-Regular.woff2",
+  nani: "NaniFont-Regular.woff2",
+  "swei-gothic": "SweiGothicCJKtc-Regular.ttf",
+  "swei-fan-sans": "SweiFanSansCJKtc-Regular.woff2",
+  "fake-pearl": "FakePearl-Regular.woff2",
+  "swei-fan-sans-gothic": "SweiFanSansCJKtc-Regular.woff2",
+  "swei-jay-serif": "SweiJaySerifCJKtc-Regular.woff2",
+  "max-hana": "B2Hana-Regular.woff2",
+  "hana-meatball": "HanaMeatball-Regular.woff2",
+  "swei-jay-serif-editorial": "SweiJaySerifCJKtc-Regular.woff2",
+  bakudai: "Bakudai-Bold.woff2",
+  "swei-gothic-bold": "SweiGothicCJKtc-Bold.woff2",
+  "hana-meatball-bold": "HanaMeatball-Regular.woff2",
+  "swei-gothic-extrabold-impact": "SweiGothicCJKtc-Bold.woff2",
+};
+
+const fontBufferCache = new Map<string, Promise<ArrayBuffer>>();
+
+function exactArrayBuffer(bytes: Uint8Array) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+function findSelectedTypeface(value?: string | null) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return null;
+  return typefaces.find((typeface) =>
+    typeface.id.toLowerCase() === normalized || typeface.fontFamily.toLowerCase() === normalized,
+  ) || null;
+}
+
+async function fetchTypefaceWoff2(url: string) {
+  let fontUrl = url;
+  if (/fonts\.googleapis\.com/i.test(url)) {
+    const cssResponse = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!cssResponse.ok) throw new Error(`字型樣式下載失敗（HTTP ${cssResponse.status}）`);
+    const css = await cssResponse.text();
+    const matches = [...css.matchAll(/url\((https:[^)]+\.woff2)\)/g)];
+    fontUrl = matches.at(-1)?.[1] || "";
+    if (!fontUrl) throw new Error("找不到可供出圖使用的字型檔案");
+  }
+  const response = await fetch(fontUrl, { signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) throw new Error(`字型下載失敗（HTTP ${response.status}）`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
+async function loadTypefaceBuffer(typefaceId: string, cdnUrl: string) {
+  const cacheKey = `${typefaceId}:${cdnUrl}`;
+  const cached = fontBufferCache.get(cacheKey);
+  if (cached) return cached;
+  const pending = (async () => {
+    const localFile = localTypefaceFiles[typefaceId];
+    const bytes = localFile
+      ? await readFile(path.join(process.cwd(), "public/fonts/max32002", localFile))
+      : await fetchTypefaceWoff2(cdnUrl);
+    if (!localFile?.endsWith(".ttf") && !localFile?.endsWith(".otf")) {
+      return exactArrayBuffer(await decompress(bytes));
+    }
+    return exactArrayBuffer(bytes);
+  })();
+  fontBufferCache.set(cacheKey, pending);
+  try {
+    return await pending;
+  } catch (error) {
+    fontBufferCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function loadCarouselFonts(fontStyle?: string | null) {
+  const [defaultFile, editorialFile] = await Promise.all([
+    readFile(path.join(process.cwd(), "public/fonts/max32002/SweiGothicCJKtc-Regular.ttf")),
+    readFile(path.join(process.cwd(), "public/fonts/max32002/NotoSerifCJKtc-Regular.otf")),
+  ]);
+  const fallback = exactArrayBuffer(defaultFile);
+  const editorial = exactArrayBuffer(editorialFile);
+  const selectedTypeface = findSelectedTypeface(fontStyle);
+  if (!selectedTypeface) {
+    return { regular: fallback, bold: fallback, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
+  }
+  try {
+    const selected = await loadTypefaceBuffer(selectedTypeface.id, selectedTypeface.cdnUrl);
+    return { regular: selected, bold: selected, family: BRAND_CAROUSEL_FONT, editorial, hasBrandFont: true };
+  } catch (error) {
+    console.warn(`[content-projects/generate-carousel] font fallback for ${selectedTypeface.id}`, error);
+    return { regular: fallback, bold: fallback, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
+  }
+}
 
 async function prepareImageSource(url: string) {
   const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
@@ -118,19 +214,6 @@ async function prepareReliableLightBackgroundCutout(url: string) {
   } catch {
     return url;
   }
-}
-
-function resolveCarouselFontFamily(fontStyle?: string | null) {
-  const normalized = String(fontStyle || "").toLowerCase();
-  if (
-    !normalized ||
-    normalized.includes("gensenrounded") ||
-    normalized.includes("系統圓體") ||
-    normalized.includes("sweigothic")
-  ) {
-    return DEFAULT_CAROUSEL_FONT;
-  }
-  return DEFAULT_CAROUSEL_FONT;
 }
 
 async function renderPage(
@@ -641,7 +724,7 @@ export async function POST(req: Request) {
       .eq("workspace_id", workspaceId)
       .single();
     if (error) throw error;
-    const [{ data: workspace }, { data: brandProfile }] = await Promise.all([
+    const [{ data: workspace }, { data: brandProfile }, { data: brandKit }] = await Promise.all([
       access.admin
         .from("workspaces")
         .select("name,logo_url,font_style,brand_colors")
@@ -650,6 +733,11 @@ export async function POST(req: Request) {
       access.admin
         .from("brand_profiles")
         .select("business_name")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle(),
+      access.admin
+        .from("brand_kits")
+        .select("typeface_family,typeface_id")
         .eq("workspace_id", workspaceId)
         .maybeSingle(),
     ]);
@@ -685,31 +773,8 @@ export async function POST(req: Request) {
     const assets = (project.production.assets || []) as Asset[];
     if (!drafts.length)
       return NextResponse.json({ error: "沒有逐頁草稿" }, { status: 400 });
-    const fontFile = await readFile(
-      path.join(
-        process.cwd(),
-        "public/fonts/max32002/SweiGothicCJKtc-Regular.ttf",
-      ),
-    );
-    const font = fontFile.buffer.slice(
-      fontFile.byteOffset,
-      fontFile.byteOffset + fontFile.byteLength,
-    ) as ArrayBuffer;
-    const editorialFontFile = await readFile(
-      path.join(process.cwd(), "public/fonts/max32002/NotoSerifCJKtc-Regular.otf"),
-    );
-    const editorialFont = editorialFontFile.buffer.slice(
-      editorialFontFile.byteOffset,
-      editorialFontFile.byteOffset + editorialFontFile.byteLength,
-    ) as ArrayBuffer;
-    const fonts = {
-      regular: font,
-      // ImageResponse/Satori cannot parse WOFF2. Register only local TTF/OTF
-      // buffers so the renderer never receives a webfont with that signature.
-      bold: font,
-      family: resolveCarouselFontFamily(workspace?.font_style),
-      editorial: editorialFont,
-    };
+    const configuredTypeface = workspace?.font_style || brandKit?.typeface_family || brandKit?.typeface_id;
+    const fonts = await loadCarouselFonts(configuredTypeface);
     const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
     const preparedImageUrls = new Map(
       await Promise.all(
@@ -753,7 +818,7 @@ export async function POST(req: Request) {
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
       const response = isClearMagazineCarousel(templateCode)
-        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, Boolean(workspace?.font_style))
+        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, fonts.hasBrandFont)
         : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;

@@ -332,6 +332,7 @@ export async function POST(req: Request) {
     const contentModification = firstString(body.contentModification)
     const visualStyle = asRecord(body.visualStyle)
     const typeface = asRecord(body.typeface)
+    const selectedFontStyle = firstString(typeface.fontFamily, typeface.typefaceId, typeface.id)
     const photoControl = asRecord(body.photoControl)
     const topicReview = body.topicReview
     const topicReviewItems = asArray(topicReview)
@@ -391,6 +392,7 @@ export async function POST(req: Request) {
               type: 'brand',
               owner: user?.email ?? null,
               owner_id: userId,
+              font_style: selectedFontStyle || null,
               content_modification: contentModification || null,
               description: firstString(businessProfile.elevatorPitch, websiteAnalysisData.elevatorPitch),
               content_directions: contentDirections,
@@ -409,6 +411,7 @@ export async function POST(req: Request) {
             type: 'brand',
             owner: user?.email ?? null,
             owner_id: userId,
+            font_style: selectedFontStyle || null,
             content_modification: contentModification || null,
             description: firstString(businessProfile.elevatorPitch, websiteAnalysisData.elevatorPitch),
             content_directions: contentDirections,
