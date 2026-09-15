@@ -2979,7 +2979,7 @@ export default function ContentStudioPage() {
                       <div className="production-ready">
                         <b>!</b>
                         <h4>尚未建立內容順序</h4>
-                        <p>請返回風格頁重新選擇內容風格。</p>
+                        <p>SOON 會先根據已確認的 Brief 及格式整理故事結構，內容風格會在圖片素材準備好後才選擇。</p>
                       </div>
                     )}
                     {generatingStructure ? null : <div className="actions">
