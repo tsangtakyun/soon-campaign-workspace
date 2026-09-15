@@ -429,6 +429,15 @@ async function renderClearMagazinePage(
   const clean = (value: string | undefined) => String(value || "").trim();
   const cleanHeadline = (value: string | undefined) => clean(value)
     .replace(/[，,。．；;：:、！？!?]+$/u, "");
+  const formatCoverHeadline = (value: string | undefined) => {
+    const raw = clean(value);
+    const clauses = raw.split(/[，,。．；;：:、！？!?]+/u).map((part) => part.trim()).filter(Boolean);
+    if (clauses.length >= 2) return `${clauses[0]}\n${clauses.slice(1).join("")}`;
+    const glyphs = Array.from(clauses[0] || raw.replace(/[，,。．；;：:、！？!?]/gu, ""));
+    if (glyphs.length <= 10) return glyphs.join("");
+    const splitAt = Math.ceil(glyphs.length / 2);
+    return `${glyphs.slice(0, splitAt).join("")}\n${glyphs.slice(splitAt).join("")}`;
+  };
   const cleanBodyLine = (value: unknown) => String(value || "")
     .trim()
     .replace(/[，,。．；;：:、]+$/u, "");
@@ -464,11 +473,18 @@ async function renderClearMagazinePage(
   let content: React.ReactNode;
   if (role === "cover") {
     const l = layout.cover;
+    const sourceText = [draft.headline, draft.subheadline, ...body].join(" ");
+    const requestedEyebrow = cleanBodyLine(draft.subheadline);
+    const coverEyebrow = Array.from(requestedEyebrow).length <= 10
+      ? requestedEyebrow
+      : /台南/.test(sourceText) ? "台南街頭小吃" : "重點故事";
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture(rectStyle(l.image)),
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 68, bodySize: 29, headlineWidth: 935 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, coverEyebrow || "重點故事", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", { ...l.headline, width: 935 }, formatCoverHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 68, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", { ...l.body, y: 1206, width: 780 }, body[0] || "", { color: "white", whiteSpace: "nowrap", fontSize: 29, lineHeight: 1.2 }),
       swipeCue,
     ]);
   } else if (role === "end") {
