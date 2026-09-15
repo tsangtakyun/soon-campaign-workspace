@@ -27,7 +27,7 @@ type Draft = {
   imageTreatment?: "auto" | "cutout" | "full-bleed" | "card";
 };
 
-type Asset = { id: string; url: string; width?: number; height?: number };
+type Asset = { id: string; url: string; width?: number; height?: number; isCutout?: boolean };
 
 const templateThemes: Record<string, { background: string; ink: string; accent: string; label: string }> = {
   "editorial-clear": { background: "#f6f2eb", ink: "#6b2c30", accent: "#c7e63a", label: "重點整理" },
@@ -547,10 +547,10 @@ async function renderClearMagazinePage(
       textLayer("head", l.headline, comparisonHeadline, { color: "white", fontSize: adaptiveHeadlineSize(62), lineHeight: 1.12, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
       box({ ...rectStyle(l.leftCard), background: "#f36a2d", borderRadius: 20 }, null),
       box({ ...rectStyle(l.rightCard), background: "#477877", borderRadius: 20 }, null),
-      picture({ ...rectStyle(l.leftImage), objectFit: "contain", transform: "scale(1.55)", transformOrigin: "center" }),
-      picture({ ...rectStyle(l.rightImage), objectFit: "cover" }, secondaryAsset?.url),
-      textLayer("ll", l.leftLabel, body[0] || "比較一", { color: "white", fontSize: 25 }),
-      textLayer("rl", l.rightLabel, body[1] || "比較二", { color: "white", fontSize: 25 }),
+      picture({ ...rectStyle(l.leftImage), objectFit: "contain", transform: "scale(1.78)", transformOrigin: "center" }),
+      picture({ ...rectStyle(l.rightImage), objectFit: secondaryAsset?.isCutout ? "contain" : "cover" }, secondaryAsset?.url),
+      textLayer("ll", l.leftLabel, body[0] || "比較一", { color: "white", fontSize: 25, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
+      textLayer("rl", l.rightLabel, body[1] || "比較二", { color: "white", fontSize: 25, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
       textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, leftComparisonBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
       textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, rightComparisonBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
       ...(body[4] ? [textLayer("summary", { x: 158, y: 1125, width: 755, height: 70 }, body[4], { color: "white", fontSize: 23, textAlign: "center", justifyContent: "center" })] : []),
@@ -742,13 +742,13 @@ export async function POST(req: Request) {
         ? resolveClearMagazineRole(draft, index, drafts.length)
         : null;
       const preparedAsset = asset?.url
-        ? { ...asset, url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(asset.url)
+        ? { ...asset, isCutout: Boolean((draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
           : preparedImageUrls.get(asset.url) || asset.url }
         : asset;
       const secondarySource = assets.find((item) => item.id === assetIds[1] && item.url);
       const secondaryAsset = secondarySource?.url
-        ? { ...secondarySource, url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(secondarySource.url)
+        ? { ...secondarySource, isCutout: Boolean((draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.get(secondarySource.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(secondarySource.url) !== preparedImageUrls.get(secondarySource.url)), url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(secondarySource.url)
           ? preparedCutoutUrls.get(secondarySource.url) || preparedImageUrls.get(secondarySource.url) || secondarySource.url
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
