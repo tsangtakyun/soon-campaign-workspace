@@ -568,6 +568,33 @@ export default function ContentStudioPage() {
   }
 
   useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const imported = hashParams.get("coreImport");
+    if (imported) {
+      try {
+        const payload = JSON.parse(imported) as {
+          version?: number;
+          source?: string;
+          sourceUrl?: string;
+          content?: string;
+          classification?: string;
+          analysisReason?: string;
+        };
+        if (payload.version === 1 && payload.source === "soon_core_intelligence" && typeof payload.content === "string") {
+          const summary = [
+            payload.content.trim(),
+            payload.sourceUrl ? `來源：${payload.sourceUrl}` : "",
+            payload.classification ? `SOON Core 分類：${payload.classification}` : "",
+            payload.analysisReason ? `分析摘要：${payload.analysisReason}` : "",
+          ].filter(Boolean).join("\n\n").slice(0, 12000);
+          setBrief((current) => ({ ...current, summary }));
+          setMessage("已由 SOON Core 帶入研究內容，請確認後讓 SOON 整理。");
+          window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+        }
+      } catch {
+        setMessage("未能讀取 SOON Core 內容，請返回 Core 再試一次。");
+      }
+    }
     void loadStudio();
     const changed = () => void loadStudio();
     window.addEventListener(WORKSPACE_CHANGED_EVENT, changed);
