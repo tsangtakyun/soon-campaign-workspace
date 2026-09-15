@@ -477,12 +477,7 @@ export default function ContentStudioPage() {
     }));
     return [...canonical, ...local.filter((item) => !canonical.some((core) => core.code === item.code))];
   }, [coreStyles, selected?.selected_format, selectedFormat]);
-  const visibleDisplayStyles = useMemo(() => {
-    const chosen = displayStyles.find((item) => item.code === selectedStyleCode);
-    const shortlist = displayStyles.slice(0, 3);
-    if (!chosen || shortlist.some((item) => item.code === chosen.code)) return shortlist;
-    return [chosen, ...displayStyles.filter((item) => item.code !== chosen.code).slice(0, 2)];
-  }, [displayStyles, selectedStyleCode]);
+  const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
   const previewImageUrls = useMemo(() => {
     const productionAssets = Array.isArray(selected?.production?.assets)
       ? selected.production.assets as ProjectAsset[]
@@ -842,9 +837,7 @@ export default function ContentStudioPage() {
           const styles = Array.isArray(payload?.styles) ? payload.styles as CorePublishedStyle[] : [];
           setCoreStyles(styles);
           setStyleCandidateCount(Number(payload?.candidateCount) || styles.length);
-          if (styles[0] && typeof selected?.format_decision?.templateSource !== "string") {
-            setSelectedStyleCode(styles[0].code);
-          }
+          if (styles[0]) setSelectedStyleCode((current) => styles.some((style) => style.code === current) ? current : styles[0].code);
         }
       })
       .catch(() => {
