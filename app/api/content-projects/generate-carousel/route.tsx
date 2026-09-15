@@ -438,6 +438,15 @@ async function renderClearMagazinePage(
     const splitAt = Math.ceil(glyphs.length / 2);
     return `${glyphs.slice(0, splitAt).join("")}\n${glyphs.slice(splitAt).join("")}`;
   };
+  const formatTwoLineHeadline = (value: string | undefined) => {
+    const raw = clean(value);
+    const clauses = raw.split(/[，,。．；;：:、！？!?]+/u).map((part) => part.trim()).filter(Boolean);
+    if (clauses.length >= 2) return `${clauses[0]}\n${clauses.slice(1).join("")}`;
+    const glyphs = Array.from(raw.replace(/[，,。．；;：:、！？!?]/gu, ""));
+    if (glyphs.length <= 8) return glyphs.join("");
+    const splitAt = Math.ceil(glyphs.length / 2);
+    return `${glyphs.slice(0, splitAt).join("")}\n${glyphs.slice(splitAt).join("")}`;
+  };
   const cleanBodyLine = (value: unknown) => String(value || "")
     .trim()
     .replace(/[，,。．；;：:、]+$/u, "");
@@ -531,10 +540,18 @@ async function renderClearMagazinePage(
     ]);
   } else {
     const l = layout.longform;
+    const longformBody = (Array.isArray(draft.body) ? draft.body : [])
+      .flatMap((line) => String(line || "").split(/[，,。．；;：:、！？!?—]+/u))
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 7)
+      .join("\n");
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture({ ...rectStyle(l.image), objectFit: "cover" }),
       ...chrome("white"),
-      ...commonText(l, { headlineSize: 62, bodySize: body.join("").length > 115 ? 27 : 30 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", l.headline, formatTwoLineHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 62, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", l.body, longformBody, { color: "white", whiteSpace: "pre-wrap", fontSize: longformBody.length > 115 ? 27 : 30, lineHeight: 1.35 }),
       swipeCue,
     ]);
   }
