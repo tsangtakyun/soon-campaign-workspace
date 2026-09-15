@@ -534,10 +534,14 @@ async function renderClearMagazinePage(
     ]);
   } else if (role === "split") {
     const l = layout.split;
+    const splitHeadline = clean(draft.headline).replace(/[，,。．；;：:、！？!?]/gu, "");
+    const splitBody = body.slice(0, 2).join("\n");
     content = box({ width: "100%", height: "100%", position: "relative", flexDirection: "column", background: dark }, [
       ...chrome("white"),
       secondaryAsset?.url ? box({ ...rectStyle(l.image), gap: 20 }, [picture({ width: 458, height: "100%" }), picture({ width: 458, height: "100%" }, secondaryAsset.url)]) : picture(rectStyle(l.image)),
-      ...commonText(l, { headlineSize: 58, bodySize: 29, headlineWidth: 900 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", { ...l.headline, width: 900 }, splitHeadline, { color: "white", whiteSpace: "pre-wrap", fontSize: adaptiveHeadlineSize(58), lineHeight: 1.1, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", l.body, splitBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 29, lineHeight: 1.4 }),
       swipeCue,
     ]);
   } else if (role === "feature") {

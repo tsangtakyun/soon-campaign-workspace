@@ -35,7 +35,7 @@ export const clearMagazineCarouselV1 = {
     },
     split: {
       image: { x: 72, y: 145, width: 936, height: 545 },
-      eyebrow: { x: 74, y: 163, width: 218, height: 38 },
+      eyebrow: { x: 74, y: 738, width: 218, height: 38 },
       headline: { x: 74, y: 785, width: 900, height: 100 },
       body: { x: 74, y: 885, width: 900, height: 260 },
     },

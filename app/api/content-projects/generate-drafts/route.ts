@@ -212,6 +212,7 @@ export async function POST(req: Request) {
             "comparison 頁 headline 不可包含標點；左右說明各自最多四個短句，每句獨立成行，避免段內逗號及句號。",
             "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；不足兩張合適素材時只填合適的一張，不可隨機補圖。",
             "split 頁只在兩張圖片分別支持兩項互補內容時使用一至兩張素材；其他頁只需一張主要素材。不可為了填滿版面而增加第二張圖片。assetId 必須等於 assetIds 第一項。",
+            "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 最多兩個重點，避免加入會令版面鬆散的第三段補充或免責文字。",
             "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
             "imageTreatment 按畫面決定：包裝、獨立產品或人物全身而背景雜亂可用 cutout；場景、製作過程或環境氣氛用 full-bleed 或 card；無法可靠退地時用 card。不要要求所有圖片退地。",
           ] : []),
