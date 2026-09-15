@@ -33,7 +33,7 @@ type Asset = { id: string; url: string; width?: number; height?: number; isCutou
 
 const templateThemes: Record<string, { background: string; ink: string; accent: string; label: string }> = {
   "editorial-clear": { background: "#f6f2eb", ink: "#6b2c30", accent: "#c7e63a", label: "重點整理" },
-  "product-focus": { background: "#ffffff", ink: "#202126", accent: "#d9bbb5", label: "產品重點" },
+  "product-focus": { background: "#f8f6f0", ink: "#202126", accent: "#d9bbb5", label: "產品重點" },
   "problem-solution": { background: "#fff4cf", ink: "#202126", accent: "#b46a61", label: "問題與解決方案" },
   "creator-natural": { background: "#efe8df", ink: "#4d2023", accent: "#8ca67a", label: "日常分享" },
   "bold-social": { background: "#202126", ink: "#ffffff", accent: "#f6d260", label: "你需要知道" },
