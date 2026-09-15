@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from("content_projects")
-      .select("id,title,production")
+      .select("id,title,brief,production")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -125,11 +125,17 @@ export async function POST(request: Request) {
     const pages = Array.isArray((production as any).pages) ? (production as any).pages : [];
     const pageIndex = Math.max(0, pages.findIndex((item: any, index: number) => (item?.page || `P.${index + 1}`) === page));
     const pageData = pages[pageIndex] || {};
-    const originalVisualDirection = pageData.visualDirection || pageData.copyDirection || "";
+    const brief = project.brief && typeof project.brief === "object" ? project.brief as Record<string, unknown> : {};
+    const briefAngle = typeof brief.angle === "string" && brief.angle !== "交由 AI 決定" ? brief.angle : "";
+    const briefSummary = typeof brief.summary === "string" ? brief.summary.slice(0, 600) : "";
+    const originalVisualDirection = pageData.visualDirection
+      || pageData.copyDirection
+      || [briefAngle, briefSummary].filter(Boolean).join("。")
+      || project.title;
     const cleanedDirection = imageOnlyDirection(originalVisualDirection);
     const prompt = [
       "Create a premium editorial social media photograph in portrait 4:5 composition.",
-      `The editorial subject is ${project.title}. The words are context only and must never appear in the image.`,
+      `The editorial subject is ${briefAngle || project.title}. The words are context only and must never appear in the image.`,
       `Image-only visual direction: ${cleanedDirection}.`,
       "Leave generous clean negative space for typography that will be added later by the layout system.",
       "ABSOLUTELY NO visible text, letters, words, numbers, captions, typography, logos, signage, labels, watermarks or UI anywhere in the image.",
