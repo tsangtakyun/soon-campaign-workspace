@@ -450,6 +450,24 @@ async function renderClearMagazinePage(
   const cleanBodyLine = (value: unknown) => String(value || "")
     .trim()
     .replace(/[，,。．；;：:、]+$/u, "");
+  const toWrittenChinese = (value: unknown) => String(value || "")
+    .replace(/有冇/g, "是否有")
+    .replace(/係咪/g, "是否")
+    .replace(/唔係/g, "並非")
+    .replace(/你親眼/g, "親眼")
+    .replace(/睇住/g, "看著")
+    .replace(/睇/g, "看")
+    .replace(/拎/g, "拿")
+    .replace(/薯仔/g, "馬鈴薯")
+    .replace(/落油鍋/g, "放入油鍋")
+    .replace(/落調味粉/g, "灑上調味粉")
+    .replace(/落鍋/g, "下鍋")
+    .replace(/即場/g, "現場")
+    .replace(/暖嘅/g, "溫熱")
+    .replace(/嘅/g, "的")
+    .replace(/唔/g, "不")
+    .replace(/係/g, "是")
+    .replace(/^整個馬鈴薯/u, "整顆馬鈴薯");
   const body = (Array.isArray(draft.body) ? draft.body : [])
     .filter(Boolean)
     .slice(0, 5)
@@ -570,16 +588,16 @@ async function renderClearMagazinePage(
     const l = layout.longform;
     const longformBody = (Array.isArray(draft.body) ? draft.body : [])
       .flatMap((line) => String(line || "").split(/[，,。．；;：:、！？!?—]+/u))
-      .map((line) => line.trim())
+      .map((line) => toWrittenChinese(line).trim())
       .filter(Boolean)
       .slice(0, 7)
       .join("\n");
     content = box({ width: "100%", height: "100%", position: "relative", overflow: "hidden", background: dark }, [
       picture({ ...rectStyle(l.image), objectFit: "cover" }),
       ...chrome("white"),
-      textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
-      textLayer("head", l.headline, formatTwoLineHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 62, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
-      textLayer("body", l.body, longformBody, { color: "white", whiteSpace: "pre-wrap", fontSize: longformBody.length > 115 ? 27 : 30, lineHeight: 1.35 }),
+      textLayer("eye", { ...l.eyebrow, width: 500 }, toWrittenChinese(cleanBodyLine(draft.subheadline)) || "重點整理", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
+      textLayer("head", { ...l.headline, height: 190 }, formatTwoLineHeadline(toWrittenChinese(draft.headline)), { color: "white", whiteSpace: "pre-wrap", fontSize: 81, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("body", l.body, longformBody, { color: "white", whiteSpace: "pre-wrap", fontSize: longformBody.length > 115 ? 35 : 39, lineHeight: 1.35 }),
       swipeCue,
     ]);
   }
