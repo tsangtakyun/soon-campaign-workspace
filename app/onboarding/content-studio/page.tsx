@@ -204,6 +204,29 @@ function ProductFocusPreview({ angle }: { angle: string }) {
   </div>;
 }
 
+function RankingReviewPreview({ angle }: { angle: string }) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const topic = angle && angle !== "交由 AI 決定" ? angle : "年度產品排行榜";
+  const pages = [
+    { cover: true, headline: topic, body: "精選排行榜與編輯評測", page: "01" },
+    { cover: false, headline: "1. 第一名產品", body: "以來源素材已有的特點、使用情境及證據，整理成容易閱讀的評測。", page: "02" },
+    { cover: false, headline: "2. 第二名產品", body: "每頁沿用相同圖片比例、排名層級及正文結構。", page: "03" },
+  ];
+  const current = pages[pageIndex];
+  const move = (direction: -1 | 1) => setPageIndex((value) => (value + direction + pages.length) % pages.length);
+  return <div className={`ranking-review-preview ${current.cover ? "cover" : "entry"}`}>
+    <div className="ranking-preview-photo" aria-hidden="true"><i/><i/><i/></div>
+    <div className="ranking-preview-copy">
+      <strong>{current.headline}</strong>
+      <p>{current.body}</p>
+    </div>
+    <button type="button" className="style-preview-arrow previous" aria-label="查看排行榜評測上一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(-1); }}>←</button>
+    <button type="button" className="style-preview-arrow next" aria-label="查看排行榜評測下一頁" onClick={(event) => { event.preventDefault(); event.stopPropagation(); move(1); }}>→</button>
+    <span className="style-preview-count">{current.page} / 03</span>
+    <span className="style-preview-dots" aria-hidden="true">{pages.map((page, index) => <i key={page.page} className={index === pageIndex ? "active" : ""}/>)}</span>
+  </div>;
+}
+
 const studioSteps: { id: StudioStep; label: string }[] = [
   { id: "brief", label: "Brief" },
   { id: "format", label: "格式" },
@@ -1964,6 +1987,8 @@ export default function ContentStudioPage() {
                             <ClearMagazinePreview />
                           ) : template.code === "product-focus" ? (
                             <ProductFocusPreview angle={brief.angle} />
+                          ) : template.code === "ranking-review" ? (
+                            <RankingReviewPreview angle={brief.angle} />
                           ) : <div className="contextual-preview" data-style={template.code}>
                             {slides.map((slide, slideIndex) => (
                               <div key={`${slide.role}-${slideIndex}`} className={slide.role} data-layout={slide.layout || "standard"} style={{ background: template.palette[0], color: template.palette[1] }}>
@@ -1978,7 +2003,7 @@ export default function ContentStudioPage() {
                             ))}
                           </div>}
                           <div className="template-copy">
-                            <span>{template.code === "product-focus" ? "STYLE 02" : index === 0 ? "SOON 建議" : "可選風格"}</span>
+                            <span>{template.code === "product-focus" ? "STYLE 02" : template.code === "ranking-review" ? "STYLE 03" : index === 0 ? "SOON 建議" : "可選風格"}</span>
                             <strong>{template.name}</strong>
                             <small>{template.note}</small>
                             <em>{template.source === "soon_core" ? `參考 ${template.core?.evidence?.confirmedReferenceCount || 0} 個已確認案例` : "SOON 基本品牌模板"}</em>
@@ -3113,6 +3138,7 @@ export default function ContentStudioPage() {
 }
 
 const styles = `
+  .ranking-review-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#fff;color:#111}.ranking-preview-photo{position:relative;height:58%;overflow:hidden;background:radial-gradient(circle at 50% 46%,#eac267 0 16%,#9d542c 17% 29%,#eee2cf 30% 48%,#776356 49% 100%)}.ranking-preview-photo>i{position:absolute;display:block;border-radius:999px;background:#e9c56f}.ranking-preview-photo>i:nth-child(1){width:35%;height:12%;left:23%;top:42%;transform:rotate(12deg)}.ranking-preview-photo>i:nth-child(2){width:28%;height:11%;left:39%;top:51%;transform:rotate(-10deg)}.ranking-preview-photo>i:nth-child(3){width:22%;height:10%;left:31%;top:59%;transform:rotate(6deg)}.ranking-preview-copy{position:relative;box-sizing:border-box;height:42%;padding:21px 23px 18px 34px;text-align:left}.ranking-preview-copy:before{content:"";position:absolute;left:23px;top:21px;bottom:22px;width:2px;background:#111}.ranking-preview-copy strong{display:-webkit-box;overflow:hidden;font-size:18px;line-height:1.08;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:2}.ranking-preview-copy p{display:-webkit-box;overflow:hidden;margin:13px 0 0;font-size:9px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:5}.ranking-review-preview.cover .ranking-preview-photo{height:100%;background:radial-gradient(circle at 50% 48%,#d78337 0 15%,#6d321d 16% 29%,#1a1715 30% 100%)}.ranking-review-preview.cover .ranking-preview-copy{position:absolute;left:21px;right:21px;bottom:31px;height:auto;padding:0;color:#fff}.ranking-review-preview.cover .ranking-preview-copy:before{display:none}.ranking-review-preview.cover .ranking-preview-copy strong{width:max-content;max-width:94%;background:#050505;padding:5px 8px;font-size:20px;line-height:1.12}.ranking-review-preview.cover .ranking-preview-copy p{width:max-content;max-width:90%;margin-top:7px;background:#050505;padding:4px 7px;font-size:9px;font-weight:700}.ranking-review-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.ranking-review-preview .style-preview-dots{bottom:8px}
   .product-focus-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#f8f6f0;color:#171717;padding:34px 28px 25px;box-sizing:border-box}.product-preview-copy{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-start;width:68%;text-align:left}.product-preview-copy small{color:#8e6f68;font-size:8px;font-weight:850;letter-spacing:.09em}.product-preview-copy strong{display:-webkit-box;overflow:hidden;margin-top:8px;font-size:22px;line-height:1.1;letter-spacing:-.035em;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-copy i{display:block;width:38px;height:3px;margin:12px 0 9px;background:#d9bbb5}.product-preview-copy p{display:-webkit-box;overflow:hidden;margin:0;color:#62636a;font-size:9px;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.product-preview-image{position:absolute;right:-14%;bottom:12%;width:80%;height:48%;display:flex;align-items:center;justify-content:center;transform:rotate(-5deg);border-radius:48% 0 0 48%;background:linear-gradient(145deg,#eadcd4,#d9bbb5);box-shadow:0 14px 30px rgba(80,54,48,.16)}.product-preview-image>span{position:absolute;top:11%;left:20%;color:#6b2c30;font-size:7px;font-weight:900;letter-spacing:.12em}.product-preview-image>b{display:grid;place-items:center;width:40%;aspect-ratio:.8;border:2px solid rgba(107,44,48,.48);border-radius:9px;background:#fffaf4;color:#6b2c30;text-align:center;font-size:13px;line-height:1.05;box-shadow:0 8px 18px rgba(107,44,48,.14)}.product-preview-footer{position:absolute;z-index:2;left:28px;right:28px;bottom:22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ddd2ca;padding-top:9px;color:#68686d;font-size:7px}.product-preview-footer span{font-weight:800}.product-preview-footer b{font-size:7px}.product-focus-preview .style-preview-arrow{width:31px;height:31px;font-size:14px}.product-focus-preview .style-preview-dots{bottom:49px}
   .caption-draft{display:grid!important;gap:9px;white-space:normal!important;background:#fff;border-radius:10px;padding:13px!important}.caption-draft label{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:0!important}.caption-draft label span{color:#747880;font-size:10px}.caption-draft textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;border:1px solid #d9dcdf!important;border-radius:9px;background:#fff!important;color:#202126!important;padding:11px!important;font:inherit;font-size:12px;line-height:1.55}.caption-draft>div{display:flex;align-items:center;justify-content:flex-end;gap:8px}.caption-draft button,.download-all-button{border:0;border-radius:8px;background:#6b2c30;color:#fff!important;padding:9px 12px;font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}.caption-draft button:disabled{opacity:.45;cursor:not-allowed}.download-all-button{margin-right:auto;background:#202126}@media(max-width:700px){.caption-draft>div{align-items:stretch;flex-direction:column}.download-all-button{text-align:center;margin-right:0}}
   .studio-progress{position:sticky;top:0;z-index:12;margin-bottom:18px;border:1px solid #ded5cd;border-radius:14px;background:rgba(246,242,235,.97);padding:10px;backdrop-filter:blur(10px)}.studio-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:1px 4px 9px}.studio-progress-head strong{font-size:11px;color:#202126}.studio-progress-head span{display:flex;align-items:center;gap:5px;color:#6f737d;font-size:9px}.studio-progress .studio-step-nav{position:static!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;backdrop-filter:none!important}.studio-step-nav button b{font:inherit}.studio-step-nav button em{display:flex;align-items:center;gap:3px;margin-left:auto;font-size:8px;font-style:normal;opacity:.78}.studio-step-nav button.done{border:1px solid #d8e6ae!important}.studio-step-nav button.done:hover{border-color:#6b2c30!important;background:#fff!important;color:#6b2c30!important;box-shadow:0 2px 0 #ddc6c1}.studio-step-nav button.active em{color:#fff}.studio-step-nav button:disabled em{display:none}@media(max-width:700px){.studio-progress-head span{display:none}.studio-progress{overflow:hidden}.studio-progress .studio-step-nav{display:flex!important}.studio-step-nav button{min-width:115px!important}}

@@ -34,6 +34,7 @@ type Asset = { id: string; url: string; width?: number; height?: number; isCutou
 const templateThemes: Record<string, { background: string; ink: string; accent: string; label: string }> = {
   "editorial-clear": { background: "#f6f2eb", ink: "#6b2c30", accent: "#c7e63a", label: "重點整理" },
   "product-focus": { background: "#f8f6f0", ink: "#202126", accent: "#d9bbb5", label: "產品重點" },
+  "ranking-review": { background: "#ffffff", ink: "#111111", accent: "#777777", label: "排行榜評測" },
   "problem-solution": { background: "#fff4cf", ink: "#202126", accent: "#b46a61", label: "問題與解決方案" },
   "creator-natural": { background: "#efe8df", ink: "#4d2023", accent: "#8ca67a", label: "日常分享" },
   "bold-social": { background: "#202126", ink: "#ffffff", accent: "#f6d260", label: "你需要知道" },
@@ -468,6 +469,75 @@ async function renderPage(
   );
 }
 
+async function renderRankingReviewPage(
+  draft: Draft,
+  asset: Asset | undefined,
+  index: number,
+  total: number,
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string },
+  branding: { logoUrl?: string | null; swipeUrl: string; name: string },
+) {
+  const cover = index === 0 || draft.layout === "cover";
+  const clean = (value: unknown) => String(value || "").trim();
+  const headline = clean(draft.headline).replace(/[，,。．；;：:、！？!?]+$/u, "");
+  const rankedHeadline = cover || /^\s*(?:#?\d+|第[一二三四五六七八九十百]+)[.、．:：\s]/u.test(headline)
+    ? headline
+    : `${index}. ${headline}`;
+  const body = (Array.isArray(draft.body) ? draft.body : [])
+    .map(clean)
+    .filter(Boolean)
+    .slice(0, 4);
+  const pageLabel = `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+  const photo = asset?.url
+    ? React.createElement("img", {
+        src: asset.url,
+        width: Math.max(1, Number(asset.width) || 1080),
+        height: Math.max(1, Number(asset.height) || 780),
+        style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" },
+      })
+    : box({ position: "absolute", inset: 0, background: "linear-gradient(145deg,#2a211b,#a35c2f 52%,#e2b663)" }, null);
+  const chrome = [
+    ...(branding.logoUrl ? [React.createElement("img", {
+      key: "logo", src: branding.logoUrl, width: 48, height: 48,
+      style: { position: "absolute", zIndex: 5, top: 40, left: 44, width: 48, height: 48, objectFit: "contain" },
+    })] : []),
+    box({ position: "absolute", zIndex: 5, top: 34, right: 38, borderRadius: 999, background: "rgba(35,35,35,.72)", color: "white", padding: "12px 18px", fontSize: 22, fontWeight: 700 }, pageLabel),
+  ];
+  const swipe = React.createElement("img", {
+    src: branding.swipeUrl, width: 105, height: 65,
+    style: { position: "absolute", zIndex: 6, right: 35, bottom: 24, width: 105, height: 65, objectFit: "contain" },
+  });
+  const content = cover
+    ? box({ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#111" }, [
+        photo,
+        box({ position: "absolute", inset: 0, background: "linear-gradient(0deg,rgba(0,0,0,.82),rgba(0,0,0,0) 72%)" }, null),
+        ...chrome,
+        box({ position: "absolute", left: 50, right: 50, bottom: 125, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10, color: "white" }, [
+          React.createElement("div", { key: "h", style: { display: "flex", maxWidth: 960, background: "#050505", padding: "10px 16px", fontSize: 58, fontWeight: 700, lineHeight: 1.16, letterSpacing: -2 } }, rankedHeadline),
+          ...(draft.subheadline ? [React.createElement("div", { key: "s", style: { display: "flex", maxWidth: 900, background: "#050505", padding: "7px 14px", fontSize: 31, fontWeight: 700, lineHeight: 1.25 } }, clean(draft.subheadline))] : []),
+        ]),
+        swipe,
+      ])
+    : box({ position: "relative", width: "100%", height: "100%", flexDirection: "column", background: "#fff", color: "#111" }, [
+        box({ position: "relative", width: "100%", height: 755, overflow: "hidden", background: "#e9e5df" }, [photo, ...chrome]),
+        box({ position: "relative", width: "100%", height: 595, flexDirection: "column", padding: "50px 62px 38px 88px", background: "#fff" }, [
+          box({ position: "absolute", left: 51, top: 50, bottom: 44, width: 3, background: "#111" }, null),
+          React.createElement("div", { key: "h", style: { display: "flex", fontSize: 48, fontWeight: 700, lineHeight: 1.13, letterSpacing: -1.2, marginBottom: 24 } }, rankedHeadline),
+          ...body.map((paragraph, paragraphIndex) => React.createElement("div", { key: `body-${paragraphIndex}`, style: { display: "flex", fontSize: 29, lineHeight: 1.48, marginBottom: 12 } }, paragraph)),
+          React.createElement("div", { key: "brand", style: { position: "absolute", left: 88, bottom: 26, display: "flex", color: "#777", fontSize: 18, fontWeight: 700 } }, branding.name || "SOON"),
+          swipe,
+        ]),
+      ]);
+  return new ImageResponse(content, {
+    width: 1080,
+    height: 1350,
+    fonts: [
+      { name: fonts.family, data: fonts.regular, weight: 400 },
+      { name: fonts.family, data: fonts.bold, weight: 700 },
+    ],
+  });
+}
+
 type ClearMagazineRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
 function resolveClearMagazineRole(draft: Draft, index: number, total: number): ClearMagazineRole {
@@ -838,6 +908,8 @@ export async function POST(req: Request) {
         : undefined;
       const response = isClearMagazineCarousel(templateCode)
         ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, fonts.hasBrandFont)
+        : templateCode === "ranking-review"
+          ? await renderRankingReviewPage(draft, preparedAsset, index, drafts.length, fonts, branding)
         : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;
