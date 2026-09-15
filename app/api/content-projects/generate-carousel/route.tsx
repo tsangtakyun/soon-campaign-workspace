@@ -507,18 +507,28 @@ async function renderClearMagazinePage(
     ]);
   } else if (role === "comparison") {
     const l = layout.comparison;
+    const comparisonHeadline = clean(draft.headline).replace(/[，,。．；;：:、！？!?]/gu, "");
+    const comparisonCopy = (value: unknown) => String(value || "")
+      .split(/[，,。．；;：:、！？!?—]+/u)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 4)
+      .join("\n");
+    const legacyComparison = String(body[2] || "").split(/[；;]/, 2);
+    const leftComparisonBody = comparisonCopy(body[3] ? body[2] : legacyComparison[0]);
+    const rightComparisonBody = comparisonCopy(body[3] || legacyComparison[1]);
     content = box({ width: "100%", height: "100%", position: "relative", background: dark, color: "white" }, [
       ...chrome("white"),
       textLayer("eye", { ...l.eyebrow, width: 500 }, cleanBodyLine(draft.subheadline) || "真正分別", { color: accent, fontSize: 24, fontWeight: 700 }),
-      textLayer("head", l.headline, cleanHeadline(draft.headline), { color: "white", fontSize: adaptiveHeadlineSize(62), lineHeight: 1.12, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
+      textLayer("head", l.headline, comparisonHeadline, { color: "white", fontSize: adaptiveHeadlineSize(62), lineHeight: 1.12, fontWeight: 700, textAlign: "center", justifyContent: "center" }),
       box({ ...rectStyle(l.leftCard), background: "#f36a2d", borderRadius: 20 }, null),
       box({ ...rectStyle(l.rightCard), background: "#477877", borderRadius: 20 }, null),
-      picture({ ...rectStyle(l.leftImage), objectFit: "contain" }),
+      picture({ ...rectStyle(l.leftImage), objectFit: "contain", transform: "scale(1.55)", transformOrigin: "center" }),
       picture({ ...rectStyle(l.rightImage), objectFit: "cover" }, secondaryAsset?.url),
       textLayer("ll", l.leftLabel, body[0] || "比較一", { color: "white", fontSize: 25 }),
       textLayer("rl", l.rightLabel, body[1] || "比較二", { color: "white", fontSize: 25 }),
-      textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, body[3] ? body[2] : String(body[2] || "").split(/[；;]/, 2)[0], { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
-      textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, body[3] || String(body[2] || "").split(/[；;]/, 2)[1] || "", { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      textLayer("leftBody", { x: l.body.x, y: l.body.y, width: l.leftCard.width, height: l.body.height }, leftComparisonBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
+      textLayer("rightBody", { x: l.rightCard.x, y: l.body.y, width: l.rightCard.width, height: l.body.height }, rightComparisonBody, { color: "white", whiteSpace: "pre-wrap", fontSize: 25, lineHeight: 1.35 }),
       ...(body[4] ? [textLayer("summary", { x: 158, y: 1125, width: 755, height: 70 }, body[4], { color: "white", fontSize: 23, textAlign: "center", justifyContent: "center" })] : []),
       swipeCue,
     ]);
