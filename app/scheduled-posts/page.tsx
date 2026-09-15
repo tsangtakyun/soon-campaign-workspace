@@ -40,6 +40,7 @@ import {
   WORKSPACE_CHANGED_EVENT,
 } from "@/lib/workspace-client";
 import { typefaces } from "@/lib/typefaces";
+import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import type {
   CanvasSize,
   DesignElement,
@@ -460,6 +461,7 @@ type CarouselEditorPayload = {
   page?: string;
   projectId?: string;
   sourceImage?: string;
+  templateCode?: string;
   title?: string;
   workspaceLogo?: string;
   workspaceName?: string;
@@ -480,8 +482,26 @@ function readCarouselEditorPayload(): CarouselEditorPayload | null {
 
 function createCarouselLayerElements(
   payload: CarouselEditorPayload,
-  _fallbackImage: string,
+  fallbackImage: string,
 ): DesignElement[] {
+  if (isClearMagazineCarousel(payload.templateCode)) {
+    return [{
+      id: "carousel-generated-design",
+      kind: "image",
+      item: "background",
+      label: "Style 01 · 清晰雜誌風（完整設計）",
+      x: 50,
+      y: 50,
+      size: 430,
+      width: 430,
+      height: 538,
+      rotation: 0,
+      opacity: 100,
+      color: "#ffffff",
+      zIndex: 1,
+      imageUrl: payload.generatedImage || fallbackImage,
+    }];
+  }
   const cover = payload.draft?.layout === "cover" || payload.page === "P.1";
   const textColor = cover ? "#ffffff" : "#171717";
   const workspaceFont = resolveWorkspaceFontFamily(payload.workspaceFont);

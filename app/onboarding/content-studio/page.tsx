@@ -71,6 +71,12 @@ type Project = {
   updated_at: string;
 };
 
+function downloadProjectUrl(workspaceId: string, projectId: string, page?: string) {
+  const params = new URLSearchParams({ workspaceId, projectId });
+  if (page) params.set("page", page);
+  return `/api/content-projects/download?${params.toString()}`;
+}
+
 type Permissions = {
   canApprove: boolean;
   canEdit: boolean;
@@ -1515,6 +1521,34 @@ export default function ContentStudioPage() {
     }
   }
 
+  function updateCaptionDraft(value: string) {
+    if (!selected) return;
+    setProjects((current) => current.map((project) => project.id === selected.id
+      ? { ...project, production: { ...(project.production || {}), captionDraft: value } }
+      : project));
+  }
+
+  async function saveCaptionDraft() {
+    if (!selected?.production) return false;
+    return saveProject({ production: selected.production }, "Caption 已儲存");
+  }
+
+  async function submitForApproval() {
+    if (!selected?.production) return;
+    const saved = await saveProject(
+      {
+        stage: "approval",
+        production: {
+          ...selected.production,
+          approvalStatus: "pending",
+          submittedForApprovalAt: new Date().toISOString(),
+        },
+      },
+      selected.selected_format === "single_image" ? "單張貼文已提交審批" : "輪播貼文已提交審批",
+    );
+    if (saved) window.location.assign(`/onboarding/content-review?project=${encodeURIComponent(selected.id)}`);
+  }
+
   const messageTone =
     saving ||
     startingProject ||
@@ -2771,6 +2805,10 @@ export default function ContentStudioPage() {
                                                           page: page.page,
                                                           projectId:
                                                             selected.id,
+                                                          templateCode:
+                                                            selected.format_decision?.renderTemplateCode ||
+                                                            selected.format_decision?.templateCode ||
+                                                            "editorial-clear",
                                                           sourceImage:
                                                             sourceAsset?.url ||
                                                             "",
@@ -2802,10 +2840,7 @@ export default function ContentStudioPage() {
                                                   </a>
                                                   <a
                                                     className="generated-download-button"
-                                                    href={page.url}
-                                                    download
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                    href={downloadProjectUrl(workspaceId || "", selected.id, page.page)}
                                                   >
                                                     下載圖片
                                                   </a>
@@ -2815,13 +2850,19 @@ export default function ContentStudioPage() {
                                           ))
                                         : null}
                                     </div>
-                                    <p className="caption-draft">
-                                      <b>IG Caption Draft</b>
-                                      <br />
-                                      {String(
-                                        selected.production.captionDraft || "",
-                                      )}
-                                    </p>
+                                    <div className="caption-draft">
+                                      <label htmlFor="carousel-caption-draft"><b>IG Caption Draft</b><span>可在提交審批前修改</span></label>
+                                      <textarea
+                                        id="carousel-caption-draft"
+                                        value={String(selected.production.captionDraft || "")}
+                                        onChange={(event) => updateCaptionDraft(event.target.value)}
+                                        rows={8}
+                                      />
+                                      <div>
+                                        <a className="download-all-button" href={downloadProjectUrl(workspaceId || "", selected.id)}>一鍵下載全部圖片（ZIP）</a>
+                                        <button type="button" disabled={saving || !String(selected.production.captionDraft || "").trim()} onClick={() => void saveCaptionDraft()}>{saving ? "儲存中…" : "儲存 Caption"}</button>
+                                      </div>
+                                    </div>
                                     {selected.stage === "production" ? (
                                       <div className="generation-next-step">
                                         <div>
@@ -2834,20 +2875,7 @@ export default function ContentStudioPage() {
                                         <button
                                           type="button"
                                           disabled={saving}
-                                          onClick={() =>
-                                            void saveProject(
-                                              {
-                                                stage: "approval",
-                                                production: {
-                                                  ...selected.production,
-                                                  approvalStatus: "pending",
-                                                  submittedForApprovalAt:
-                                                    new Date().toISOString(),
-                                                },
-                                              },
-                                              selected.selected_format === "single_image" ? "單張貼文已提交審批" : "輪播貼文已提交審批",
-                                            )
-                                          }
+                                          onClick={() => void submitForApproval()}
                                         >
                                           {saving
                                             ? "提交中…"
@@ -2857,8 +2885,8 @@ export default function ContentStudioPage() {
                                     ) : selected.stage === "approval" ? (
                                       <div className="carousel-approval-status">
                                         <span>✓ 已提交審批</span>
-                                        <Link href="/onboarding">
-                                          返回「審批」→
+                                        <Link href="/onboarding/content-review">
+                                          前往「內容審批」→
                                         </Link>
                                       </div>
                                     ) : null}
@@ -3062,6 +3090,7 @@ export default function ContentStudioPage() {
 }
 
 const styles = `
+  .caption-draft{display:grid!important;gap:9px;white-space:normal!important;background:#fff;border-radius:10px;padding:13px!important}.caption-draft label{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:0!important}.caption-draft label span{color:#747880;font-size:10px}.caption-draft textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;border:1px solid #d9dcdf!important;border-radius:9px;background:#fff!important;color:#202126!important;padding:11px!important;font:inherit;font-size:12px;line-height:1.55}.caption-draft>div{display:flex;align-items:center;justify-content:flex-end;gap:8px}.caption-draft button,.download-all-button{border:0;border-radius:8px;background:#6b2c30;color:#fff!important;padding:9px 12px;font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}.caption-draft button:disabled{opacity:.45;cursor:not-allowed}.download-all-button{margin-right:auto;background:#202126}@media(max-width:700px){.caption-draft>div{align-items:stretch;flex-direction:column}.download-all-button{text-align:center;margin-right:0}}
   .studio-progress{position:sticky;top:0;z-index:12;margin-bottom:18px;border:1px solid #ded5cd;border-radius:14px;background:rgba(246,242,235,.97);padding:10px;backdrop-filter:blur(10px)}.studio-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:1px 4px 9px}.studio-progress-head strong{font-size:11px;color:#202126}.studio-progress-head span{display:flex;align-items:center;gap:5px;color:#6f737d;font-size:9px}.studio-progress .studio-step-nav{position:static!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;backdrop-filter:none!important}.studio-step-nav button b{font:inherit}.studio-step-nav button em{display:flex;align-items:center;gap:3px;margin-left:auto;font-size:8px;font-style:normal;opacity:.78}.studio-step-nav button.done{border:1px solid #d8e6ae!important}.studio-step-nav button.done:hover{border-color:#6b2c30!important;background:#fff!important;color:#6b2c30!important;box-shadow:0 2px 0 #ddc6c1}.studio-step-nav button.active em{color:#fff}.studio-step-nav button:disabled em{display:none}@media(max-width:700px){.studio-progress-head span{display:none}.studio-progress{overflow:hidden}.studio-progress .studio-step-nav{display:flex!important}.studio-step-nav button{min-width:115px!important}}
   .actual-style-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#171717}.actual-style-preview img{object-fit:cover}.style-preview-arrow{position:absolute;z-index:3;top:50%;display:grid;place-items:center;width:36px;height:36px;transform:translateY(-50%);border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(17,17,17,.72);color:#fff;font-size:18px;font-weight:800;box-shadow:0 3px 12px rgba(0,0,0,.2);cursor:pointer;backdrop-filter:blur(5px)}.style-preview-arrow:hover,.style-preview-arrow:focus-visible{background:#fff;color:#202126;outline:2px solid #fff;outline-offset:2px}.style-preview-arrow.previous{left:10px}.style-preview-arrow.next{right:10px}.style-preview-count{position:absolute;z-index:3;top:10px;right:10px;border-radius:999px;background:rgba(17,17,17,.72);color:#fff;padding:5px 8px;font-size:8px;font-weight:800;letter-spacing:.08em;backdrop-filter:blur(5px)}.style-preview-dots{position:absolute;z-index:3;left:50%;bottom:11px;display:flex;gap:5px;transform:translateX(-50%);border-radius:999px;background:rgba(17,17,17,.56);padding:6px 8px}.style-preview-dots i{display:block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.48)}.style-preview-dots i.active{width:14px;border-radius:4px;background:#fff}.contextual-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;aspect-ratio:4/5;padding:10px;background:#eee8e2}.contextual-preview>div{position:relative;min-width:0;overflow:hidden;border-radius:8px;padding:9px;display:flex;flex-direction:column;align-items:stretch;text-align:left;box-shadow:0 1px 0 rgba(32,33,38,.08)}.preview-page-role{position:absolute;z-index:3;top:7px;right:7px;border-radius:999px;background:rgba(255,255,255,.9);color:#202126;padding:3px 6px;font-size:6px;font-weight:850;letter-spacing:.04em}.preview-image-area{display:block;flex:0 0 48%;margin:-9px -9px 8px;opacity:.78;background-image:linear-gradient(135deg,rgba(255,255,255,.15),rgba(32,33,38,.18))!important}.preview-page-copy{position:relative;z-index:2;display:flex;min-height:0;flex:1;flex-direction:column;justify-content:flex-end;gap:4px}.contextual-preview small{font-size:6px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.contextual-preview strong{display:-webkit-box;overflow:hidden;font-size:10px;line-height:1.16;letter-spacing:-.025em;-webkit-box-orient:vertical;-webkit-line-clamp:3}.contextual-preview p{display:-webkit-box;overflow:hidden;margin:0;font-size:6px;line-height:1.35;opacity:.72;-webkit-box-orient:vertical;-webkit-line-clamp:3}.contextual-preview .cover .preview-image-area{flex-basis:58%}.contextual-preview .cover strong{font-size:13px}.contextual-preview .end{justify-content:center}.contextual-preview .end .preview-image-area{position:absolute;inset:0;margin:0;opacity:.16}.contextual-preview .end .preview-page-copy{justify-content:center}.contextual-preview[data-style*="product"] .preview-image-area{border-radius:0 0 55% 0}.contextual-preview[data-style*="problem"] .content .preview-image-area{clip-path:polygon(0 0,100% 0,88% 100%,0 100%)}.contextual-preview[data-style*="bold"] strong{text-transform:uppercase;font-weight:900}.template-copy em{color:#777b83;font-size:9px;font-style:normal}.template-copy>button{margin-top:3px;border:0;border-radius:8px;background:#f1ebe4;color:#6b2c30;padding:8px;text-align:center;font-size:10px;font-weight:800;cursor:pointer}.style-template-grid>article.active .template-copy>button{background:#6b2c30;color:#fff}
   .direction-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.direction-heading>div{display:grid;gap:5px}.direction-heading>div>span{color:#202126;font-size:14px;font-weight:800}.direction-heading>div>small{color:#6f737d;font-size:11px;line-height:1.45}.direction-recommend-button{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;border:0;border-radius:10px;background:#6b2c30;color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.direction-recommend-button:disabled{opacity:.42;cursor:not-allowed}.direction-hint{margin:4px 0 0;border-radius:9px;background:#f7eee9;color:#7d5554;padding:10px 12px;font-size:11px}.direction-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}.direction-card-grid>button{min-width:0;border:1px solid #ded5cd;border-radius:14px;background:#faf8f4;color:#202126;padding:15px;text-align:left;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;gap:8px}.direction-card-grid>button:hover{border-color:#b46a61}.direction-card-grid>button.active{border-color:#6b2c30;box-shadow:0 0 0 1px #6b2c30,4px 4px 0 #ddc6c1;background:#fff}.direction-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.direction-card-top i{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#edf6d4;color:#52691a}.direction-card-top span{border-radius:999px;background:#f1ebe4;color:#6b2c30;padding:4px 7px;font-size:8px;font-weight:850}.direction-card-grid strong{font-size:15px;line-height:1.35}.direction-card-grid p{margin:0;color:#4f535a;font-size:11px;line-height:1.5}.direction-card-grid small{color:#777b83;font-size:10px;line-height:1.45}.direction-card-grid em{margin-top:auto;border-top:1px solid #eee8e2;padding-top:8px;color:#6b2c30;font-size:10px;font-style:normal;line-height:1.45}.custom-directions-toggle{display:flex;align-items:center;gap:6px;width:max-content;margin-top:4px;border:0;background:transparent;color:#6b2c30;padding:5px 0;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.custom-direction-options{border-top:1px solid #eee8e2;padding-top:10px}@media(max-width:850px){.direction-card-grid{grid-template-columns:1fr}.direction-heading{align-items:stretch;flex-direction:column}.direction-recommend-button{width:100%}}

@@ -74,7 +74,7 @@ export async function POST(req: Request) {
         : typeof jobOutput.asset?.url === 'string' ? [{ page: 'P.1', url: jobOutput.asset.url }] : []
       const savedAssets = jobAssets.length ? jobAssets : assets
       const isVideoProductionPackage = project.selected_format === 'short_video' && production.productionStatus === 'package_ready'
-      if ((!savedAssets.length || generationJob?.status !== 'completed') && !isVideoProductionPackage) return NextResponse.json({ error: '素材尚未完成，不能批准' }, { status: 409 })
+      if ((!savedAssets.length || (generationJob?.id && generationJob.status !== 'completed')) && !isVideoProductionPackage) return NextResponse.json({ error: '素材尚未完成，不能批准' }, { status: 409 })
       if (!isVideoProductionPackage) {
         const sourceKey = project.campaign_id ? `campaign-creative-${projectId}` : `content-project-${projectId}`
         const postValues = {
