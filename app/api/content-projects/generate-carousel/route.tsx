@@ -492,7 +492,7 @@ async function renderClearMagazinePage(
       box({ position: "absolute", inset: 0, width: "100%", height: "100%", background: "linear-gradient(0deg,rgba(0,0,0,.86),rgba(0,0,0,.04) 76%)" }, null),
       ...chrome("white"),
       textLayer("eye", { ...l.eyebrow, width: 500 }, coverEyebrow || "重點故事", { color: accent, fontSize: 24, lineHeight: 1.25, fontWeight: 700 }),
-      textLayer("head", { ...l.headline, width: 935 }, formatCoverHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 68, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
+      textLayer("head", { ...l.headline, width: 935, height: 205 }, formatCoverHeadline(draft.headline), { color: "white", whiteSpace: "pre-wrap", fontSize: 88, lineHeight: 1.08, fontWeight: 700, letterSpacing: "-2px" }),
       textLayer("body", { ...l.body, y: 1206, width: 780 }, body[0] || "", { color: "white", whiteSpace: "nowrap", fontSize: 29, lineHeight: 1.2 }),
       swipeCue,
     ]);
