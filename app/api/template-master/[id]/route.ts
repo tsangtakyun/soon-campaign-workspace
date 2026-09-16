@@ -5,7 +5,9 @@ import { createServerSupabase } from '@/lib/server-supabase'
 
 const coreConfig = () => ({
   baseUrl: (process.env.SOON_CORE_URL || 'https://soon-core.vercel.app').replace(/\/$/, ''),
-  key: process.env.SOON_CORE_BUNDLE_KEY || process.env.SOON_CORE_KNOWLEDGE_KEY || '',
+  // Style Registry integrations historically use the knowledge key. Prefer it
+  // so this proxy matches the already-working Content Studio style feed.
+  key: process.env.SOON_CORE_KNOWLEDGE_KEY || process.env.SOON_CORE_BUNDLE_KEY || '',
 })
 
 async function authenticated() {
