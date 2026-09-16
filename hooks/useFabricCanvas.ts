@@ -362,6 +362,18 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     [snapshotHistory]
   )
 
+  const loadCanvasJSON = useCallback(async (value: Record<string, unknown>) => {
+    const canvas = fabricRef.current
+    if (!canvas) return
+    isRestoringRef.current = true
+    await canvas.loadFromJSON(value)
+    canvas.getObjects().forEach((object) => applyControls(object as FabricElementObject))
+    canvas.discardActiveObject()
+    canvas.renderAll()
+    isRestoringRef.current = false
+    snapshotHistory(canvas)
+  }, [snapshotHistory])
+
   const addDesignElement = useCallback(async (element: DesignElement) => {
     const canvas = fabricRef.current
     if (!canvas) return
@@ -516,6 +528,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       duplicateSelected,
       exportPNG,
       fabricRef,
+      loadCanvasJSON,
       loadDesignElements,
       redo,
       sendBackward,
@@ -528,6 +541,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
       deleteSelected,
       duplicateSelected,
       exportPNG,
+      loadCanvasJSON,
       loadDesignElements,
       redo,
       sendBackward,

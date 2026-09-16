@@ -468,6 +468,18 @@ type CarouselEditorPayload = {
   workspaceFont?: string;
 };
 
+type MasterTemplatePayload = {
+  draft: { id: string; targetVersion: number; status: string; pageDesigns: Record<string, { canvasJson?: Record<string, unknown> }> };
+  template: { code: string; name: string; format: string };
+  style: { code: string; name: string };
+  baseVersion: { number: number; rendererCode: string; contract: Record<string, unknown> };
+};
+
+const MASTER_PAGE_ROLES = ["cover", "longform", "split", "comparison", "feature", "end"] as const;
+const MASTER_PAGE_LABELS: Record<(typeof MASTER_PAGE_ROLES)[number], string> = {
+  cover: "01 Cover", longform: "02 Longform", split: "03 Split", comparison: "04 Comparison", feature: "05 Feature", end: "06 End",
+};
+
 function readCarouselEditorPayload(): CarouselEditorPayload | null {
   if (typeof window === "undefined") return null;
   try {
@@ -1157,6 +1169,13 @@ function ScheduledPostsPageContent() {
   const externalEditImage = searchParams.get("editImage");
   const externalEditTitle = searchParams.get("editTitle") || "Carousel 圖片";
   const externalEditPage = searchParams.get("editPage") || "P.1";
+  const templateMasterId = searchParams.get("templateDraftId") || "";
+  const templateMasterToken = searchParams.get("templateToken") || "";
+  const requestedMasterPage = searchParams.get("masterPage") || "cover";
+  const masterPage = MASTER_PAGE_ROLES.includes(requestedMasterPage as (typeof MASTER_PAGE_ROLES)[number])
+    ? requestedMasterPage as (typeof MASTER_PAGE_ROLES)[number]
+    : "cover";
+  const isTemplateMaster = searchParams.get("mode") === "template-master" && Boolean(templateMasterId && templateMasterToken);
   const carouselEditorPayload = useMemo(() => readCarouselEditorPayload(), []);
   const externalEditorReturnUrl = carouselEditorPayload?.projectId
     ? `/onboarding/content-studio?project=${encodeURIComponent(carouselEditorPayload.projectId)}`
@@ -1248,6 +1267,8 @@ function ScheduledPostsPageContent() {
   const [brandKitLoading, setBrandKitLoading] = useState(true);
   const [isSavingDesign, setIsSavingDesign] = useState(false);
   const [saveDesignMessage, setSaveDesignMessage] = useState("");
+  const [masterTemplate, setMasterTemplate] = useState<MasterTemplatePayload | null>(null);
+  const [masterCanvasJson, setMasterCanvasJson] = useState<Record<string, unknown> | null>(null);
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<
     string | null
@@ -1419,7 +1440,45 @@ function ScheduledPostsPageContent() {
     selectedPost,
   ]);
 
+  useEffect(() => {
+    if (!isTemplateMaster || brandKitLoading) return;
+    let cancelled = false;
+    void fetch(`/api/template-master/${encodeURIComponent(templateMasterId)}?token=${encodeURIComponent(templateMasterToken)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "未能載入標準母版");
+        if (cancelled) return;
+        const master = payload as MasterTemplatePayload;
+        setMasterTemplate(master);
+        const saved = master.draft.pageDesigns?.[masterPage]?.canvasJson || null;
+        setMasterCanvasJson(saved);
+        const previewIndex = Math.max(0, MASTER_PAGE_ROLES.indexOf(masterPage));
+        const previewSuffix = masterPage === "cover" ? "cover" : masterPage === "end" ? "end" : "content";
+        const previewImage = `/templates/clear-magazine-carousel-v1/${String(previewIndex + 1).padStart(2, "0")}-${previewSuffix}.png`;
+        const post: ScheduledPost = { id: `template-master-${master.draft.id}-${masterPage}`, type: "靜態圖片", time: "", title: `${MASTER_PAGE_LABELS[masterPage]} · ${master.style.name} v${master.draft.targetVersion}`, body: "", image: previewImage, status: "草稿" };
+        setSelectedPost(post);
+        const elements = createCarouselLayerElements({
+          draft: { headline: "{{headline}}", subheadline: "{{subheadline}}", body: ["{{body}}"], layout: masterPage === "cover" ? "cover" : "content" },
+          generatedImage: previewImage,
+          page: MASTER_PAGE_LABELS[masterPage],
+          templateCode: "master-editable",
+          workspaceLogo: brandKit.logoUrl,
+          workspaceName: brandKit.businessName,
+          workspaceFont: brandKit.fontFamily,
+        }, previewImage);
+        setDesignElements(elements);
+        setDesignElementsPostId(post.id);
+        setDesignMode(true);
+      })
+      .catch((error) => { if (!cancelled) setSaveDesignMessage(error instanceof Error ? error.message : "未能載入標準母版"); });
+    return () => { cancelled = true; };
+  }, [brandKit.businessName, brandKit.fontFamily, brandKit.logoUrl, brandKitLoading, isTemplateMaster, masterPage, templateMasterId, templateMasterToken]);
+
   const closeDesignEditor = () => {
+    if (isTemplateMaster) {
+      window.location.href = "https://soon-core.vercel.app/content-directions";
+      return;
+    }
     if (externalEditImage) {
       router.push(externalEditorReturnUrl);
       return;
@@ -2637,8 +2696,11 @@ function ScheduledPostsPageContent() {
       const canvasJson = canvas.toObject(["data"]);
 
       const isContentProjectDesign = Boolean(carouselEditorPayload?.projectId && externalEditImage);
+      const isMasterTemplateDesign = Boolean(isTemplateMaster && masterTemplate?.draft.id);
       const response = await fetch(
-        isContentProjectDesign ? "/api/content-projects/save-design" : "/api/posts/save-design",
+        isMasterTemplateDesign
+          ? `/api/template-master/${encodeURIComponent(masterTemplate!.draft.id)}`
+          : isContentProjectDesign ? "/api/content-projects/save-design" : "/api/posts/save-design",
         {
         body: JSON.stringify({
           canvasHeight: canvasSize.h,
@@ -2650,15 +2712,21 @@ function ScheduledPostsPageContent() {
           postId: selectedPost.id,
           projectId: carouselEditorPayload?.projectId,
           workspaceId: activeWorkspaceId,
+          pageRole: isMasterTemplateDesign ? masterPage : undefined,
+          previewImageUrl: isMasterTemplateDesign ? imageUrl : undefined,
         }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
+        headers: { "Content-Type": "application/json", ...(isMasterTemplateDesign ? { "x-template-token": templateMasterToken } : {}) },
+        method: isMasterTemplateDesign ? "PATCH" : "POST",
         },
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.detail || result.error || "儲存失敗");
 
-      if (isContentProjectDesign) {
+      if (isMasterTemplateDesign) {
+        setMasterTemplate((current) => current ? { ...current, draft: { ...current.draft, status: "review", pageDesigns: result.draft?.page_designs || current.draft.pageDesigns } } : current);
+        setSaveDesignMessage(`${MASTER_PAGE_LABELS[masterPage]} 已儲存到 Template v${masterTemplate!.draft.targetVersion} draft。`);
+        return;
+      } else if (isContentProjectDesign) {
         window.sessionStorage.removeItem("soon-carousel-editor-payload-v1");
         router.push(externalEditorReturnUrl);
       } else {
@@ -2905,6 +2973,7 @@ function ScheduledPostsPageContent() {
             <span>▱</span>
             <strong>{selectedPost.title}</strong>
             <em>草稿</em>
+            {isTemplateMaster ? <label className="master-page-picker"><span>標準頁</span><select value={masterPage} onChange={(event) => { const params = new URLSearchParams(searchParams.toString()); params.set("masterPage", event.target.value); router.replace(`/onboarding/scheduled-posts?${params.toString()}`); }}>{MASTER_PAGE_ROLES.map((role) => <option key={role} value={role}>{MASTER_PAGE_LABELS[role]}</option>)}</select></label> : null}
           </div>
 
           <div className="design-account">
@@ -2925,6 +2994,7 @@ function ScheduledPostsPageContent() {
             canvasSize={canvasSize}
             canvasRef={canvasRef}
             designElements={designElements}
+            initialCanvasJson={isTemplateMaster ? masterCanvasJson : null}
             onFabricReady={(controls) => {
               fabricControlsRef.current = controls;
             }}
@@ -5676,6 +5746,24 @@ const styles = `${dashboardSidebarStyles}
     font-size: 13px;
     font-style: normal;
     padding: 5px 10px;
+  }
+
+  .master-page-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    color: #6f737d;
+    font-size: 10px;
+  }
+
+  .master-page-picker select {
+    border: 1px solid #d9dce2;
+    border-radius: 8px;
+    background: #fff;
+    color: #202126;
+    padding: 6px 8px;
+    font: inherit;
   }
 
   .design-account {

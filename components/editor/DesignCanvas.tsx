@@ -24,6 +24,7 @@ type DesignCanvasProps = {
   onSetActiveTool: (tool: DesignTool) => void
   onCloseDesignMode: () => void
   onFabricReady?: (controls: FabricControls) => void
+  initialCanvasJson?: Record<string, unknown> | null
   canvasRef: RefObject<HTMLElement | null>
 }
 
@@ -42,6 +43,7 @@ export function DesignCanvas({
   designElements,
   onDeselectElement,
   onFabricReady,
+  initialCanvasJson,
   onSelectElement,
   canvasRef,
 }: DesignCanvasProps) {
@@ -67,8 +69,9 @@ export function DesignCanvas({
   useEffect(() => {
     if (loadedPostRef.current === selectedPost.id) return
     loadedPostRef.current = selectedPost.id
-    void controls.loadDesignElements(designElements)
-  }, [controls, designElements, selectedPost.id])
+    if (initialCanvasJson) void controls.loadCanvasJSON(initialCanvasJson)
+    else void controls.loadDesignElements(designElements)
+  }, [controls, designElements, initialCanvasJson, selectedPost.id])
 
   useEffect(() => {
     const canvas = controls.fabricRef.current
