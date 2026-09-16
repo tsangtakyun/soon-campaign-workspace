@@ -6,6 +6,7 @@ import { isUuid } from "@/lib/oauth-connections";
 import { createServerSupabase } from "@/lib/server-supabase";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 import { contentStylePromptFromDecision } from "@/lib/content-style-library";
+import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -179,8 +180,9 @@ export async function POST(req: Request) {
       : languageStyle === "conversational"
         ? "使用自然香港廣東話及短句，保持清楚、可信。"
         : "優先遵從 Workspace Prompt 內的品牌慣用語氣。";
-    const isClearMagazine = ["clear-magazine-carousel-v1", "clear_magazine_carousel", "editorial-clear"]
-      .includes(String(project.format_decision?.renderTemplateCode || project.format_decision?.templateCode || ""));
+    const isClearMagazine = isClearMagazineCarousel(
+      String(project.format_decision?.renderTemplateCode || project.format_decision?.templateCode || ""),
+    );
     const videoMethod = project.format_decision?.videoMethod === "ai_video_generation"
       ? "ai_video_generation"
       : "human_filming";

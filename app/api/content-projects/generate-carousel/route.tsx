@@ -9,6 +9,11 @@ import { decompress } from "wawoff2";
 
 import { isUuid } from "@/lib/oauth-connections";
 import { clearMagazineCarouselV1, isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
+import {
+  getCoreMasterPageDesign,
+  hasCoreMasterDesigns,
+  renderCoreMasterPage,
+} from "@/lib/content-templates/core-master-template";
 import { createServerSupabase } from "@/lib/server-supabase";
 import { typefaces } from "@/lib/typefaces";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
@@ -782,6 +787,37 @@ async function renderClearMagazinePage(
   });
 }
 
+function renderPublishedCoreMasterPage(
+  design: NonNullable<ReturnType<typeof getCoreMasterPageDesign>>,
+  draft: Draft,
+  asset: Asset | undefined,
+  secondaryAsset: Asset | undefined,
+  index: number,
+  total: number,
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer },
+  branding: { logoUrl?: string | null; name: string },
+) {
+  const node = renderCoreMasterPage({
+    design,
+    copy: draft,
+    page: `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`,
+    primary: asset,
+    secondary: secondaryAsset,
+    branding,
+    fonts: { family: fonts.family, editorialFamily: EDITORIAL_CAROUSEL_FONT },
+  });
+  return new ImageResponse(node, {
+    width: 1080,
+    height: 1350,
+    fonts: [
+      { name: fonts.family, data: fonts.regular, weight: 400 },
+      { name: fonts.family, data: fonts.bold, weight: 700 },
+      { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 400 },
+      { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 700 },
+    ],
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -848,6 +884,8 @@ export async function POST(req: Request) {
       : typeof project.format_decision?.templateCode === "string"
         ? project.format_decision.templateCode
       : "editorial-clear";
+    const templateContract = project.format_decision?.templateContractSnapshot;
+    const usesPublishedCoreMaster = hasCoreMasterDesigns(templateContract);
     const theme = templateThemes[templateCode] || templateThemes["editorial-clear"];
     const productionStatus = project.production?.productionStatus;
     if (
@@ -895,6 +933,9 @@ export async function POST(req: Request) {
       const role = isClearMagazineCarousel(templateCode)
         ? resolveClearMagazineRole(draft, index, drafts.length)
         : null;
+      const coreMasterDesign = role && usesPublishedCoreMaster
+        ? getCoreMasterPageDesign(templateContract, role)
+        : null;
       const preparedAsset = asset?.url
         ? { ...asset, isCutout: Boolean((draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
@@ -906,7 +947,9 @@ export async function POST(req: Request) {
           ? preparedCutoutUrls.get(secondarySource.url) || preparedImageUrls.get(secondarySource.url) || secondarySource.url
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
-      const response = isClearMagazineCarousel(templateCode)
+      const response = coreMasterDesign
+        ? renderPublishedCoreMasterPage(coreMasterDesign, draft, preparedAsset, secondaryAsset, index, drafts.length, fonts, branding)
+        : isClearMagazineCarousel(templateCode)
         ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, fonts.hasBrandFont)
         : templateCode === "ranking-review"
           ? await renderRankingReviewPage(draft, preparedAsset, index, drafts.length, fonts, branding)
