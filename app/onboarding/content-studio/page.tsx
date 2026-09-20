@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -322,8 +322,13 @@ function corePreviewSlides(template: DisplayStyle, angle: string): ContextualPre
 
 function contextualPreviewSlides(template: DisplayStyle, angle: string): ContextualPreviewSlide[] {
   const coreSlides = corePreviewSlides(template, angle);
+  const isSingleImage = template.formats.includes("single_image");
+  if (isSingleImage && coreSlides.length) return coreSlides.slice(0, 1);
   if (coreSlides.length === 3) return coreSlides;
   const headline = angle && angle !== "交由 AI 決定" ? angle : "由一個重點開始說清故事";
+  if (isSingleImage) return [
+    { role: "cover", label: "單張", eyebrow: template.code.includes("product") ? "產品重點" : "今次主題", title: headline },
+  ];
   if (template.code.includes("product")) return [
     { role: "cover", label: "封面", eyebrow: "產品重點", title: headline },
     { role: "content", label: "內容", eyebrow: "細節 01", title: "先看產品本身" },
@@ -408,6 +413,9 @@ export default function ContentStudioPage() {
   const [coreStyles, setCoreStyles] = useState<CorePublishedStyle[]>([]);
   const [loadingStyles, setLoadingStyles] = useState(false);
   const [styleCandidateCount, setStyleCandidateCount] = useState(0);
+  const [generatingStylePreviews, setGeneratingStylePreviews] = useState<string[]>([]);
+  const stylePreviewRunRef = useRef("");
+  const stylePreviewInFlightRef = useRef(new Set<string>());
   const [promptOpen, setPromptOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
   const [editingDraft, setEditingDraft] = useState<number | null>(null);
@@ -437,6 +445,22 @@ export default function ContentStudioPage() {
     () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId],
   );
+  const isShortVideo = selected?.selected_format === "short_video";
+  const videoScript = useMemo(() => {
+    if (!isShortVideo) return [];
+    const production = selected?.production || {};
+    const source = Array.isArray(production.script) && production.script.length
+      ? production.script
+      : Array.isArray(production.pages) ? production.pages : [];
+    return source.map((segment: any, index: number) => ({
+      section: segment.section || segment.headline || `段落 ${index + 1}`,
+      time: segment.time || segment.timestamp || segment.subheadline || "時間待定",
+      dialogue: segment.dialogue || segment.voiceover || segment.copyDirection || segment.purpose || "",
+      visual: segment.visual || segment.visualDirection || "",
+      caption: segment.caption || "",
+      productionNote: segment.productionNote || segment.shotNote || "",
+    }));
+  }, [isShortVideo, selected?.production]);
   const visibleStudioSteps = useMemo(
     () => selected?.selected_format === "short_video"
       ? studioSteps.filter((step) => step.id !== "assets")
@@ -449,10 +473,13 @@ export default function ContentStudioPage() {
   );
   const displayStyles = useMemo<DisplayStyle[]>(() => {
     const format = selected?.selected_format || selectedFormat;
+    const coreFormat = format === "short_video"
+      ? (videoMethod === "ai_video_generation" ? "ai_video" : "human_video")
+      : format;
     const local = styleTemplates
       .filter((template) => template.formats.includes(format))
       .map((template) => ({ ...template, source: "soon_creator" as const }));
-    if (format !== "carousel" || !coreStyles.length) return local;
+    if (!(["carousel", "single_image", "human_video", "ai_video"].includes(coreFormat)) || !coreStyles.length) return local;
     const palettes: Array<[string, string, string]> = [
       ["#f6f2eb", "#6b2c30", "#c7e63a"],
       ["#fff4cf", "#202126", "#b46a61"],
@@ -463,21 +490,60 @@ export default function ContentStudioPage() {
       version: style.version.number,
       name: style.name,
       note: style.description,
-      formats: ["carousel"],
+      formats: [format],
       tone: "SOON 建議",
       palette: palettes[index % palettes.length],
       rules: {
         structure: ["按照已驗證的內容次序逐頁推進", "每頁集中傳達一個重點"],
         copy: ["使用清晰、可快速閱讀的書面語", "內容聲稱必須有資料支持"],
         visual: ["維持一致網格及清楚對比", "首圖及重點句必須容易辨認"],
-        byFormat: { carousel: ["由開場、背景、證據推進至結論及行動"] },
+        byFormat: format === "single_image"
+          ? { single_image: ["只保留一個主要訊息、單一視覺焦點及必要行動"] }
+          : format === "short_video"
+            ? { short_video: ["按已發布時間軸安排 Hook、主體、證據、轉場及 Ending"] }
+            : { carousel: ["由開場、背景、證據推進至結論及行動"] },
       },
       source: style.creatorSource === "soon_creator" ? "soon_creator" : "soon_core",
       core: style,
     }));
     return [...canonical, ...local.filter((item) => !canonical.some((core) => core.code === item.code))];
-  }, [coreStyles, selected?.selected_format, selectedFormat]);
+  }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
+  useEffect(() => {
+    if (!workspaceId || !selected?.id || !isShortVideo || activeStep !== "style" || !visibleDisplayStyles.length) return;
+    const existing = selected.production?.stylePreviews && typeof selected.production.stylePreviews === "object"
+      ? selected.production.stylePreviews as Record<string, { url?: string }> : {};
+    const missing = visibleDisplayStyles.filter((style) =>
+      !existing[style.code]?.url && !stylePreviewInFlightRef.current.has(style.code));
+    const runKey = `${selected.id}:${selected.updated_at}:${missing.map((style) => `${style.code}:v${style.version}`).join(",")}`;
+    if (!missing.length || stylePreviewRunRef.current === runKey) return;
+    stylePreviewRunRef.current = runKey;
+    void (async () => {
+      for (const style of missing) {
+        stylePreviewInFlightRef.current.add(style.code);
+        setGeneratingStylePreviews((current) => [...new Set([...current, style.code])]);
+        const previewRules = style.core?.version.rules || style.rules;
+        const previewConfig = style.core?.version.rules?.preview as { asset?: string } | undefined;
+        try {
+          const response = await fetch("/api/content-projects/generate-style-preview", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ workspaceId, projectId: selected.id, styleCode: style.code, styleVersion: style.version, rules: previewRules, referenceUrl: previewConfig?.asset || "" }),
+          });
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) throw new Error(payload?.detail || payload?.error || "未能生成預覽");
+          if (payload?.project) {
+            setProjects((current) => current.map((item) => item.id === selected.id ? { ...item, ...payload.project } : item));
+          }
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "未能生成短片首鏡預覽");
+        } finally {
+          stylePreviewInFlightRef.current.delete(style.code);
+          setGeneratingStylePreviews((current) => current.filter((code) => code !== style.code));
+        }
+      }
+    })();
+  }, [activeStep, isShortVideo, selected?.id, selected?.updated_at, selected?.production?.stylePreviews, visibleDisplayStyles, workspaceId]);
   const previewImageUrls = useMemo(() => {
     const productionAssets = Array.isArray(selected?.production?.assets)
       ? selected.production.assets as ProjectAsset[]
@@ -502,6 +568,24 @@ export default function ContentStudioPage() {
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
     return null;
+  };
+  const renderVideoStylePreview = (template: DisplayStyle) => {
+    const previews = selected?.production?.stylePreviews && typeof selected.production.stylePreviews === "object"
+      ? selected.production.stylePreviews as Record<string, { url?: string }> : {};
+    const generatedUrl = previews[template.code]?.url || "";
+    const isGenerating = generatingStylePreviews.includes(template.code);
+    return <div className="video-style-preview" data-style={template.code} style={{
+      "--video-bg": template.palette[0],
+      "--video-ink": template.palette[1],
+      "--video-accent": template.palette[2],
+      backgroundImage: generatedUrl
+        ? `url(${JSON.stringify(generatedUrl)})`
+        : previewImageUrls[0]
+          ? `url(${JSON.stringify(previewImageUrls[0])})`
+        : undefined,
+    } as CSSProperties}>
+      <div className={`video-preview-scene${isGenerating ? " generating" : ""}`} aria-hidden="true">{isGenerating ? <><i /><small>正在按 reference 生成首鏡…</small></> : null}</div>
+    </div>;
   };
 
   function stepLabel(step: StudioStep) {
@@ -798,7 +882,11 @@ export default function ContentStudioPage() {
   }, [selected?.id]);
 
   useEffect(() => {
-    if (!workspaceId || !selected || (selected.selected_format || selectedFormat) !== "carousel") {
+    const activeFormat = selected?.selected_format || selectedFormat;
+    const coreFormat = activeFormat === "short_video"
+      ? (videoMethod === "ai_video_generation" ? "ai_video" : "human_video")
+      : activeFormat;
+    if (!workspaceId || !selected || !["carousel", "single_image", "human_video", "ai_video"].includes(coreFormat)) {
       setCoreStyles([]);
       setStyleCandidateCount(0);
       return;
@@ -824,7 +912,7 @@ export default function ContentStudioPage() {
       body: JSON.stringify({
         workspaceId,
         projectId: selected.id,
-        format: "carousel",
+        format: coreFormat,
         brief: [selected.brief?.angle, selected.brief?.summary || selected.source_note].filter(Boolean).join("\n"),
         story,
         assets,
@@ -850,7 +938,7 @@ export default function ContentStudioPage() {
         if (!cancelled) setLoadingStyles(false);
       });
     return () => { cancelled = true; };
-  }, [workspaceId, selected?.id, selected?.updated_at, selected?.selected_format, selectedFormat]);
+  }, [workspaceId, selected?.id, selected?.updated_at, selected?.selected_format, selectedFormat, videoMethod]);
 
   async function saveProject(
     updates: Record<string, unknown>,
@@ -1018,7 +1106,9 @@ export default function ContentStudioPage() {
           item.id === selected.id ? { ...item, ...payload.project } : item,
         ),
       );
-      setMessage("資料核查及內容順序已完成，請檢查後確認");
+      setMessage(selected.selected_format === "short_video"
+        ? "資料核查及短片劇本已完成，請檢查後確認"
+        : "資料核查及內容順序已完成，請檢查後確認");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能生成故事結構");
     } finally {
@@ -1046,9 +1136,11 @@ export default function ContentStudioPage() {
   }
 
   function updateStoryPage(index: number, field: string, value: string) {
-    if (!selected?.production || !Array.isArray(selected.production.pages))
-      return;
-    const pages = selected.production.pages.map((page: any, pageIndex) =>
+    if (!selected?.production) return;
+    const editingVideo = selected.selected_format === "short_video";
+    const current = editingVideo ? videoScript : selected.production.pages;
+    if (!Array.isArray(current)) return;
+    const updated = current.map((page: any, pageIndex: number) =>
       pageIndex === index ? { ...page, [field]: value } : page,
     );
     setProjects((current) =>
@@ -1058,7 +1150,7 @@ export default function ContentStudioPage() {
               ...item,
               production: {
                 ...selected.production,
-                pages,
+                ...(editingVideo ? { script: updated, pages: [] } : { pages: updated }),
                 status: "structure_ready",
                 confirmedAt: null,
               },
@@ -1072,7 +1164,7 @@ export default function ContentStudioPage() {
     if (!selected?.production) return;
     await saveProject(
       { production: selected.production },
-      "故事結構修改已儲存",
+      selected.selected_format === "short_video" ? "短片劇本修改已儲存" : "故事結構修改已儲存",
       undefined,
       [
         { eventType: "edited", dimension: "copy", value: "story_structure", metadata: { step: "structure" } },
@@ -1083,28 +1175,29 @@ export default function ContentStudioPage() {
   }
 
   async function deleteStoryPage(index: number) {
-    if (!selected?.production || !Array.isArray(selected.production.pages))
-      return;
+    if (!selected?.production) return;
+    const deletingVideo = selected.selected_format === "short_video";
+    const current = deletingVideo ? videoScript : selected.production.pages;
+    if (!Array.isArray(current)) return;
     if (
-      !window.confirm(`確定刪除 P.${index + 1}？刪除後其餘頁面會自動重新編號`)
+      !window.confirm(deletingVideo
+        ? `確定刪除「${current[index]?.section || `段落 ${index + 1}`}」？`
+        : `確定刪除 P.${index + 1}？刪除後其餘頁面會自動重新編號`)
     )
       return;
-    const pages = selected.production.pages
+    const remaining = current
       .filter((_: unknown, pageIndex: number) => pageIndex !== index)
-      .map((page: any, pageIndex: number) => ({
-        ...page,
-        page: `P.${pageIndex + 1}`,
-      }));
+      .map((page: any, pageIndex: number) => deletingVideo ? page : ({ ...page, page: `P.${pageIndex + 1}` }));
     await saveProject(
       {
         production: {
           ...selected.production,
-          pages,
+          ...(deletingVideo ? { script: remaining, pages: [] } : { pages: remaining }),
           status: "structure_ready",
           confirmedAt: null,
         },
       },
-      `P.${index + 1} 已刪除，頁碼已重新排列`,
+      deletingVideo ? "劇本段落已刪除" : `P.${index + 1} 已刪除，頁碼已重新排列`,
     );
     setEditingPage(null);
   }
@@ -2042,18 +2135,18 @@ export default function ContentStudioPage() {
                       <em>{loadingStyles ? "SOON AI 正在配對合適風格…" : styleCandidateCount > 3 ? `SOON AI 已從 ${styleCandidateCount} 款中選出最適合的 3 款` : "SOON 已按內容格式篩選合適款式"}</em>
                     </div>
                     <div className="style-intro">
-                      <div><b>用同一故事、同一組素材，直接比較版面</b><span>三款均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。</span></div>
+                      <div><b>{isShortVideo ? "用同一份劇本，直接比較短片視覺" : "用同一故事、同一組素材，直接比較版面"}</b><span>{isShortVideo ? "三款均使用已確認劇本生成一張無字 9:16 首幀 preview，讓你比較構圖、鏡頭感及整體氣氛。" : "三款均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。"}</span></div>
                     </div>
                     <div className="style-preview-notice" role="note">
                       <b>目前只屬風格預覽</b>
-                      <span>選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。</span>
+                      <span>{isShortVideo ? "這張無字圖片只模擬短片首鏡；選擇後，SOON 會按完整劇本建立逐鏡製作包。" : "選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。"}</span>
                     </div>
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
                         return (
                         <article key={template.code} className={selectedStyleCode === template.code ? "active" : ""}>
-                          {renderStylePreview(template.code) || <div className="contextual-preview" data-style={template.code}>
+                          {isShortVideo ? renderVideoStylePreview(template) : renderStylePreview(template.code) || <div className="contextual-preview" data-style={template.code}>
                             {slides.map((slide, slideIndex) => (
                               <div key={`${slide.role}-${slideIndex}`} className={slide.role} data-layout={slide.layout || "standard"} style={{ background: template.palette[0], color: template.palette[1] }}>
                                 <span className="preview-page-role">{slide.label}</span>
@@ -2091,9 +2184,9 @@ export default function ContentStudioPage() {
                     {loadingStyles ? <p className="style-loading">正在載入最新風格…</p> : null}
                     {expandedStyleCode ? <div className="style-preview-modal" role="dialog" aria-modal="true" aria-label="放大風格預覽" onClick={() => setExpandedStyleCode(null)}>
                       <div className="style-preview-modal-panel" onClick={(event) => event.stopPropagation()}>
-                        <div className="style-preview-modal-head"><div><small>共同題材 · 三頁示意</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
-                        {renderStylePreview(expandedStyleCode, true)}
-                        <p>預覽使用已確認的故事結構及同一組圖片素材；正式製作會沿用你選定的風格。</p>
+                        <div className="style-preview-modal-head"><div><small>{isShortVideo ? "共同劇本 · 9:16 首幀示意" : selected.selected_format === "single_image" ? "共同題材 · 單張示意" : "共同題材 · 三頁示意"}</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
+                        {isShortVideo ? renderVideoStylePreview(displayStyles.find((item) => item.code === expandedStyleCode)!) : renderStylePreview(expandedStyleCode, true)}
+                        <p>{isShortVideo ? "預覽使用已確認劇本的 Hook、首鏡及字幕；正式製作會沿用你選定的短片風格。" : "預覽使用已確認的故事結構及同一組圖片素材；正式製作會沿用你選定的風格。"}</p>
                       </div>
                     </div> : null}
                     <div className="actions">
@@ -2158,7 +2251,7 @@ export default function ContentStudioPage() {
                     {generatingStructure ? (
                       <div className="production-ready is-generating" role="status" aria-live="polite">
                         <b className="working" />
-                        <h4>{`正在重新整理 ${carouselSlideCount} 頁內容`}</h4>
+                        <h4>{isShortVideo ? "正在整理短片劇本" : `正在重新整理 ${carouselSlideCount} 頁內容`}</h4>
                         <p>SOON 正在重新核對資料</p>
                       </div>
                     ) : selected.production?.status ? (
@@ -2169,10 +2262,10 @@ export default function ContentStudioPage() {
                             <h4>
                               {selected.production.status ===
                               "structure_confirmed"
-                                ? "故事結構已確認"
-                                : "資料核查＋故事結構"}
+                                ? isShortVideo ? "短片劇本已確認" : "故事結構已確認"
+                                : isShortVideo ? "資料核查＋短片劇本" : "資料核查＋故事結構"}
                             </h4>
-                            <p>SOON 已完成資料核查，請確認以下內容順序是否合適。</p>
+                            <p>SOON 已完成資料核查，請確認以下{isShortVideo ? "劇本及鏡頭安排" : "內容順序"}是否合適。</p>
                           </div>
                         </div>
                         <details className="structure-evidence">
@@ -2204,33 +2297,35 @@ export default function ContentStudioPage() {
                         </div>
                         </details>
                         <div className="story-pages">
-                          <h4>內容順序</h4>
-                          {(Array.isArray(selected.production.pages)
-                            ? selected.production.pages
-                            : []
-                          ).map((page: any, index) => (
+                          <h4>{isShortVideo ? "短片劇本" : "內容順序"}</h4>
+                          {(isShortVideo ? videoScript : Array.isArray(selected.production.pages)
+                            ? selected.production.pages : []).map((page: any, index: number) => (
                             <article key={index}>
-                              <span>{page.page || `P.${index + 1}`}</span>
+                              <span>{isShortVideo ? page.time : page.page || `P.${index + 1}`}</span>
                               <div>
                                 {editingPage === index ? (
                                   <div className="page-editor">
                                     <label>
-                                      <span>Headline</span>
+                                      <span>{isShortVideo ? "劇本段落" : "Headline"}</span>
                                       <input
-                                        value={page.headline || ""}
+                                        value={isShortVideo ? page.section || "" : page.headline || ""}
                                         onChange={(event) =>
                                           updateStoryPage(
                                             index,
-                                            "headline",
+                                            isShortVideo ? "section" : "headline",
                                             event.target.value,
                                           )
                                         }
                                       />
                                     </label>
+                                    {isShortVideo ? <label>
+                                      <span>時間碼</span>
+                                      <input value={page.time || ""} onChange={(event) => updateStoryPage(index, "time", event.target.value)} />
+                                    </label> : null}
                                     <label>
-                                      <span>內容方向</span>
+                                      <span>{isShortVideo ? "旁白／對白" : "內容方向"}</span>
                                       <textarea
-                                        value={
+                                        value={isShortVideo ? page.dialogue || "" :
                                           page.copyDirection ||
                                           page.purpose ||
                                           ""
@@ -2238,25 +2333,29 @@ export default function ContentStudioPage() {
                                         onChange={(event) =>
                                           updateStoryPage(
                                             index,
-                                            "copyDirection",
+                                            isShortVideo ? "dialogue" : "copyDirection",
                                             event.target.value,
                                           )
                                         }
                                       />
                                     </label>
                                     <label>
-                                      <span>畫面方向</span>
+                                      <span>{isShortVideo ? "畫面／人物動作" : "畫面方向"}</span>
                                       <textarea
-                                        value={page.visualDirection || ""}
+                                        value={isShortVideo ? page.visual || "" : page.visualDirection || ""}
                                         onChange={(event) =>
                                           updateStoryPage(
                                             index,
-                                            "visualDirection",
+                                            isShortVideo ? "visual" : "visualDirection",
                                             event.target.value,
                                           )
                                         }
                                       />
                                     </label>
+                                    {isShortVideo ? <>
+                                      <label><span>畫面字幕</span><textarea value={page.caption || ""} onChange={(event) => updateStoryPage(index, "caption", event.target.value)} /></label>
+                                      <label><span>拍攝／生成提示</span><textarea value={page.productionNote || ""} onChange={(event) => updateStoryPage(index, "productionNote", event.target.value)} /></label>
+                                    </> : null}
                                     <div className="page-editor-actions">
                                       <button
                                         className="secondary"
@@ -2275,7 +2374,7 @@ export default function ContentStudioPage() {
                                 ) : (
                                   <>
                                     <div className="page-card-head">
-                                      <h5>{page.headline || "未命名頁面"}</h5>
+                                      <h5>{isShortVideo ? page.section || "未命名段落" : page.headline || "未命名頁面"}</h5>
                                       <div>
                                         <button
                                           onClick={() => setEditingPage(index)}
@@ -2290,10 +2389,15 @@ export default function ContentStudioPage() {
                                         </button>
                                       </div>
                                     </div>
-                                    <p>
-                                      {page.copyDirection || page.purpose || ""}
-                                    </p>
-                                    {page.visualDirection ? <details className="page-visual-detail"><summary>查看畫面建議</summary><p>{page.visualDirection}</p></details> : null}
+                                    {isShortVideo ? <>
+                                      <p><strong>旁白／對白：</strong>{page.dialogue || "—"}</p>
+                                      <p><strong>畫面：</strong>{page.visual || "—"}</p>
+                                      {page.caption ? <p><strong>字幕：</strong>{page.caption}</p> : null}
+                                      {page.productionNote ? <details className="page-visual-detail"><summary>查看拍攝／生成提示</summary><p>{page.productionNote}</p></details> : null}
+                                    </> : <>
+                                      <p>{page.copyDirection || page.purpose || ""}</p>
+                                      {page.visualDirection ? <details className="page-visual-detail"><summary>查看畫面建議</summary><p>{page.visualDirection}</p></details> : null}
+                                    </>}
                                   </>
                                 )}
                               </div>
@@ -3213,6 +3317,8 @@ const styles = `
   .direction-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.direction-heading>div{display:grid;gap:5px}.direction-heading>div>span{color:#202126;font-size:14px;font-weight:800}.direction-heading>div>small{color:#6f737d;font-size:11px;line-height:1.45}.direction-recommend-button{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;border:0;border-radius:10px;background:#6b2c30;color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.direction-recommend-button:disabled{opacity:.42;cursor:not-allowed}.direction-hint{margin:4px 0 0;border-radius:9px;background:#f7eee9;color:#7d5554;padding:10px 12px;font-size:11px}.direction-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}.direction-card-grid>button{min-width:0;border:1px solid #ded5cd;border-radius:14px;background:#faf8f4;color:#202126;padding:15px;text-align:left;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;gap:8px}.direction-card-grid>button:hover{border-color:#b46a61}.direction-card-grid>button.active{border-color:#6b2c30;box-shadow:0 0 0 1px #6b2c30,4px 4px 0 #ddc6c1;background:#fff}.direction-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.direction-card-top i{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#edf6d4;color:#52691a}.direction-card-top span{border-radius:999px;background:#f1ebe4;color:#6b2c30;padding:4px 7px;font-size:8px;font-weight:850}.direction-card-grid strong{font-size:15px;line-height:1.35}.direction-card-grid p{margin:0;color:#4f535a;font-size:11px;line-height:1.5}.direction-card-grid small{color:#777b83;font-size:10px;line-height:1.45}.direction-card-grid em{margin-top:auto;border-top:1px solid #eee8e2;padding-top:8px;color:#6b2c30;font-size:10px;font-style:normal;line-height:1.45}.custom-directions-toggle{display:flex;align-items:center;gap:6px;width:max-content;margin-top:4px;border:0;background:transparent;color:#6b2c30;padding:5px 0;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.custom-direction-options{border-top:1px solid #eee8e2;padding-top:10px}@media(max-width:850px){.direction-card-grid{grid-template-columns:1fr}.direction-heading{align-items:stretch;flex-direction:column}.direction-recommend-button{width:100%}}
   .project-list>.new-project-button{display:block!important;width:100%!important;min-height:42px;margin:0 0 13px!important;border:1px solid #c9aaa5!important;border-radius:10px!important;background:#f7eee9!important;color:#6b2c30!important;-webkit-text-fill-color:#6b2c30!important;padding:10px 12px!important;font:inherit;font-size:12px!important;font-weight:800!important;text-align:left;cursor:pointer}.project-list>.new-project-button:hover{border-color:#6b2c30!important;background:#f2e3de!important}
   .site-nav{display:none}.studio-page{min-height:100vh;background:#f7f7f8;color:#202126;display:grid;grid-template-columns:240px minmax(0,1fr)}.studio-shell{min-width:0;background:#fff}.studio-topbar{min-height:72px;border-bottom:1px solid #ebecef;padding:0 28px;display:flex;align-items:center;justify-content:space-between}.studio-topbar h1{font-size:22px;margin:0}.studio-topbar p{font-size:13px;color:#777b84;margin:4px 0 0}.studio-topbar button,.actions button,.prompt-modal footer button{border:0;border-radius:10px;padding:11px 17px;background:#111;color:#fff;font-weight:750;cursor:pointer}.secondary{background:#f0f1f3!important;color:#27292e!important}.studio-layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 72px)}.project-list{min-width:0;background:#f7f7f8;border-right:1px solid #e8e9ec;padding:20px 14px}.project-list>div{display:flex;justify-content:space-between;padding:0 8px 12px}.project-list>div span{color:#8a8e96}.project-list>button{width:100%;border:1px solid transparent;background:transparent;border-radius:12px;text-align:left;padding:13px;margin-bottom:7px;display:grid;gap:5px;cursor:pointer}.project-list>button.active{background:#fff;border-color:#dedfe3;box-shadow:0 5px 18px rgba(0,0,0,.05)}.project-list button span{font-size:11px;color:#777b84}.project-list button strong{font-size:14px;line-height:1.35}.project-list button em{font-style:normal;font-size:11px;color:#a0a3aa}.empty{font-size:13px;color:#8a8e96;padding:20px 8px;line-height:1.6}.studio-workspace{min-width:0;padding:30px;max-width:1050px;width:100%;box-sizing:border-box}.project-head{display:flex;justify-content:space-between;gap:30px;align-items:flex-start;margin-bottom:26px}.project-head>div>span{font-size:12px;font-weight:750;color:#777b84}.project-head h2{font-size:25px;line-height:1.3;margin:6px 0}.project-head a{font-size:12px;color:#555961}.stage-track{display:flex;align-items:center;gap:8px;white-space:nowrap;padding-top:8px}.stage-track b{font-size:11px;color:#a4a7ae}.stage-track b.done{color:#111}.stage-track i{display:block;width:26px;height:1px;background:#d9dadd}.editor-card{min-width:0;border:1px solid #e1e2e5;border-radius:18px;padding:26px;box-shadow:0 10px 35px rgba(20,22,26,.05)}.section-title{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ededee;padding-bottom:18px;margin-bottom:22px}.section-title span{font-size:10px;font-weight:800;letter-spacing:.1em;color:#888c94}.section-title h3{margin:4px 0 0;font-size:20px}.section-title em{font-size:11px;color:#8c9098;font-style:normal}.editor-card label,.prompt-modal label{display:grid;gap:7px;margin:15px 0}.editor-card label>span,.prompt-modal label>span{font-size:12px;font-weight:750;color:#555961}.editor-card input,.editor-card textarea,.prompt-modal input,.prompt-modal textarea{appearance:none;border:1px solid #dfe1e5;border-radius:10px;padding:12px 13px;font:inherit;resize:vertical;background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important;color-scheme:light}.editor-card input::placeholder,.editor-card textarea::placeholder,.prompt-modal input::placeholder,.prompt-modal textarea::placeholder{color:#8b8e95!important;-webkit-text-fill-color:#8b8e95!important;opacity:1}.editor-card textarea{min-height:90px}.two-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.angle-field{display:grid;gap:9px;margin:18px 0}.angle-field>span{font-size:12px;font-weight:750;color:#555961}.angle-field small{color:#8b8f97;font-size:11px}.angle-options{display:flex;gap:8px;flex-wrap:wrap}.angle-options button{border:1px solid #dfe1e5;background:#fff;color:#2b2d31;border-radius:999px;padding:9px 13px;font-weight:700;cursor:pointer}.angle-options button.active{background:#111;color:#fff;border-color:#111}.actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px;flex-wrap:wrap}.actions button:disabled{opacity:.45;cursor:not-allowed}.format-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.format-grid button{border:1px solid #dedfe3;background:#fafafa;border-radius:13px;padding:17px;text-align:left;display:grid;gap:5px;cursor:pointer}.format-grid button.active{background:#111;color:#fff;border-color:#111}.format-grid span{font-size:12px;color:#7d8189}.format-grid .active span{color:#ccc}.production-ready{text-align:center;padding:45px 20px}.production-ready b{display:grid;place-items:center;margin:auto;width:44px;height:44px;border-radius:50%;background:#e8f8ed;color:#20813d;font-size:20px}.production-ready h4{font-size:19px;margin:14px 0 7px}.production-ready p{max-width:500px;margin:auto;color:#737780;line-height:1.6}.structure-result{display:grid;gap:22px}.structure-status{display:flex;gap:14px;align-items:flex-start;background:#f5faf6;border-radius:13px;padding:16px}.structure-status>b{display:grid;place-items:center;flex:0 0 32px;height:32px;border-radius:50%;background:#dff4e5;color:#20813d}.structure-status h4,.story-pages>h4{margin:2px 0 6px;font-size:16px}.structure-status p{margin:0;color:#646971;line-height:1.55}.fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fact-grid section{background:#f7f7f8;border-radius:12px;padding:14px}.fact-grid h5,.structure-sources h5{margin:0 0 9px;font-size:12px}.fact-grid ul{margin:0;padding-left:17px;color:#5f636b;font-size:12px;line-height:1.55}.story-pages{display:grid;gap:9px}.story-pages article{display:grid;grid-template-columns:48px 1fr;gap:12px;border:1px solid #e4e5e8;border-radius:12px;padding:13px}.story-pages article>span{font-size:11px;font-weight:800;background:#111;color:#fff;border-radius:8px;padding:7px;height:max-content;text-align:center}.story-pages h5{margin:1px 0 6px}.story-pages p{font-size:12px;color:#656a72;line-height:1.5;margin:3px 0}.story-pages p strong{color:#2b2e33}.structure-sources{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.structure-sources h5{width:100%}.structure-sources a{font-size:11px;color:#454951;background:#f1f2f4;padding:7px 10px;border-radius:999px;text-decoration:none}.next-production{border:1px dashed #cfd2d7;border-radius:12px;padding:15px}.next-production p{margin:5px 0 0;color:#747880;font-size:12px}.studio-message{background:#f4f4f5;border-radius:9px;padding:10px 13px;font-size:12px}.welcome{text-align:center;padding:100px 20px}.welcome>span{font-size:40px}.welcome h2{margin:14px 0 8px}.welcome p{color:#777b84}.welcome a{display:inline-block;background:#111;color:#fff;border-radius:10px;padding:11px 16px;text-decoration:none;margin-top:10px}.welcome small{display:block;margin-top:18px;color:#a33}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.46);z-index:100;display:grid;place-items:center;padding:22px}.prompt-modal{background:#fff!important;color:#111!important;color-scheme:light;width:min(760px,100%);max-height:90vh;overflow:auto;border-radius:18px;padding:24px}.prompt-modal header{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:15px}.prompt-modal header span{font-size:10px;font-weight:800;background:#fff0c2;padding:4px 7px;border-radius:6px}.prompt-modal h2{margin:8px 0 3px;color:#111}.prompt-modal header p{margin:0;color:#777;font-size:12px}.prompt-modal header button{border:0;background:transparent;color:#111;font-size:25px;cursor:pointer}.prompt-modal textarea{min-height:130px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.prompt-modal footer{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}@media(max-width:900px){.studio-page{display:block;width:100%;max-width:100vw}.studio-shell,.studio-layout,.project-list,.studio-workspace,.editor-card{min-width:0;max-width:100%}.studio-layout{display:block}.project-list{border-right:0;border-bottom:1px solid #ddd}.project-head{display:block}.stage-track{max-width:100%;margin-top:18px;overflow-x:auto;padding-bottom:6px}.two-fields,.format-grid,.fact-grid{grid-template-columns:1fr}.studio-workspace{padding:20px;overflow:hidden}}
+  @media(max-width:900px){.project-list{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:10px 12px}.project-list>div{flex:0 0 auto;align-items:center;padding:0 5px}.project-list>.new-project-button{flex:0 0 132px;width:132px!important;margin:0!important}.project-list-card{flex:0 0 220px;margin:0}.project-select-button{min-height:54px;padding-top:9px;padding-bottom:9px}.project-list .empty{padding:10px}}
+  @media(max-width:560px){.studio-progress{overflow:visible}.studio-progress .studio-step-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible!important}.studio-step-nav button{min-width:0!important;padding:8px 4px!important;gap:4px!important}.studio-step-nav button b{font-size:9px;overflow:hidden;text-overflow:ellipsis}.studio-step-nav button em{display:none}.studio-step-nav button span{width:18px;height:18px}}
 `;
 
 const editingStyles = `
@@ -3268,6 +3374,7 @@ const editingStyles = `
   .video-package-ready{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;border:1px solid #d9e5b5;border-radius:14px;background:#f3f8e3;padding:18px}.video-package-ready>div{display:grid;gap:6px}.video-package-ready small{color:var(--soon-oxblood);font-size:10px;font-weight:850;letter-spacing:.08em}.video-package-ready h4{margin:0;font-size:18px}.video-package-ready p{margin:0;color:var(--soon-muted);font-size:11px}.video-package-ready ul{margin:4px 0 0;padding-left:18px;color:#565b62;font-size:11px;line-height:1.55}.video-package-ready>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.video-package-ready>span{color:#397552;font-size:11px;font-weight:800}@media(max-width:700px){.video-package-ready{flex-direction:column}.video-package-ready>button{width:100%}}
   .video-draft-start{display:flex;align-items:center;justify-content:space-between;gap:22px;border:1px solid var(--soon-line);border-radius:14px;background:#faf8f4;padding:18px}.video-draft-start>div{display:grid;gap:5px}.video-draft-start small{color:var(--soon-oxblood);font-size:10px;font-weight:850}.video-draft-start b{font-size:16px}.video-draft-start p{margin:0;color:var(--soon-muted);font-size:11px}.video-draft-start>button{flex:none;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}@media(max-width:700px){.video-draft-start{align-items:stretch;flex-direction:column}}
   .style-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:10px;border-radius:11px;background:#f3f8e3;padding:13px 15px}.style-intro>div{display:grid;gap:3px;min-width:0}.style-intro b{font-size:12px}.style-intro span{color:var(--soon-muted);font-size:10px}.style-intro>button{flex:0 0 auto;border:0;border-radius:9px;background:var(--soon-oxblood);color:#fff;padding:10px 13px;font-size:10px;font-weight:850;cursor:pointer;box-shadow:0 4px 10px rgba(107,44,48,.16)}.style-intro>button:hover{filter:brightness(.94)}.style-intro>button:disabled{cursor:not-allowed;opacity:.55}.style-preview-notice{display:flex;align-items:flex-start;gap:9px;margin:0 0 14px;border:1px solid #ead8b0;border-radius:10px;background:#fff8e8;color:#604b22;padding:10px 12px}.style-preview-notice>b{flex:0 0 auto;font-size:10px}.style-preview-notice>span{font-size:10px;line-height:1.5}.style-template-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.style-template-grid>article{min-width:0;overflow:hidden;border:1px solid var(--soon-line);border-radius:14px;background:#fff;color:var(--soon-ink);padding:0;text-align:left;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.style-template-grid>article:hover{transform:translateY(-2px)}.style-template-grid>article.active{border-color:var(--soon-oxblood);box-shadow:0 0 0 1px var(--soon-oxblood),4px 4px 0 #ddc6c1}.template-preview{position:relative;height:150px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;gap:7px;padding:17px;overflow:hidden}.template-preview>i{position:absolute;width:78px;height:78px;right:-16px;top:-20px;border-radius:50%}.template-preview>small{position:relative;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.template-preview>strong{position:relative;max-width:88%;font-size:22px;line-height:1.05;letter-spacing:-.045em}.template-preview>p{position:relative;margin:0;font-size:9px;line-height:1.35;opacity:.75}.template-preview[data-style="product-focus"]{justify-content:center}.template-preview[data-style="product-focus"]>i{width:54px;height:88px;right:22px;top:26px;border-radius:8px;box-shadow:9px 9px 0 rgba(0,0,0,.08)}.template-preview[data-style="product-focus"]>strong,.template-preview[data-style="product-focus"]>p{max-width:58%}.template-preview[data-style="problem-solution"]>strong{font-size:20px}.template-preview[data-style="bold-social"]>strong{font-size:25px;text-transform:uppercase}.template-copy{display:grid;gap:5px;padding:13px}.template-copy>span{width:max-content;border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:850}.template-copy>strong{font-size:14px}.template-copy>small{min-height:30px;color:var(--soon-muted);font-size:10px;line-height:1.45}@media(max-width:850px){.style-template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){.style-intro{align-items:flex-start;flex-direction:column}.style-intro>button{width:100%}.style-preview-notice{display:grid}.style-template-grid{grid-template-columns:1fr}}
+  .video-style-preview{--video-bg:#171719;--video-ink:#fff;--video-accent:#c7e63a;position:relative;width:min(190px,72%);aspect-ratio:9/16;margin:12px auto;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;background-color:var(--video-bg);background-position:center;background-size:cover;color:var(--video-ink);box-shadow:0 10px 25px rgba(25,20,18,.18)}.video-preview-top{display:flex;justify-content:space-between;align-items:center;padding:10px}.video-preview-top span,.video-preview-top b{border-radius:999px;background:rgba(0,0,0,.52);color:#fff;padding:4px 7px;font-size:7px;letter-spacing:.06em}.video-preview-scene{flex:1;display:grid;place-items:center;text-align:center;padding:14px}.video-preview-scene>i{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--video-accent);color:var(--video-bg);font-size:13px;font-style:normal;box-shadow:0 5px 15px rgba(0,0,0,.2)}.video-preview-scene.generating{align-content:center;gap:10px;background:rgba(246,242,235,.62);backdrop-filter:blur(5px)}.video-preview-scene.generating>i{box-sizing:border-box;width:26px;height:26px;border:3px solid rgba(107,44,48,.2);border-top-color:var(--soon-oxblood);background:transparent;animation:studio-loading-spin .8s linear infinite}.video-preview-scene small{max-width:145px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;padding:6px 9px;font-size:7px;line-height:1.35}.video-preview-caption{display:grid;gap:4px;padding:12px 12px 9px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.88))}.video-preview-caption small{color:var(--video-accent);font-size:7px;font-weight:900;letter-spacing:.1em}.video-preview-caption strong{color:#fff;font-size:15px;line-height:1.15;letter-spacing:-.025em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.video-preview-timeline{display:flex;gap:3px;padding:0 12px 10px}.video-preview-timeline i{height:3px;flex:1;border-radius:99px;background:rgba(255,255,255,.35)}.video-preview-timeline i:first-child{background:var(--video-accent)}.video-style-preview[data-style*="diary"] .video-preview-caption strong{font-weight:600}.video-style-preview[data-style*="news"] .video-preview-caption{border-top:3px solid var(--video-accent)}.video-style-preview[data-style*="hook"] .video-preview-caption strong{font-size:17px;text-transform:uppercase}.style-preview-modal-panel .video-style-preview{width:min(300px,78vw);margin:18px auto}.style-template-grid>article:has(.video-style-preview){background:#f4f0ea}
   .brief-source-field textarea{min-height:150px;font-size:15px;line-height:1.65}.brief-source-field>small{color:var(--soon-muted);font-size:11px}.structure-evidence{border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:13px 15px}.structure-evidence>summary,.page-visual-detail>summary{cursor:pointer;font-size:11px;font-weight:800;color:var(--soon-oxblood)}.structure-evidence>p{color:var(--soon-muted);font-size:11px;line-height:1.55}.structure-evidence .fact-grid{margin-top:12px}.story-pages article:not(:has(.page-editor))>div>p{max-width:1100px;white-space:pre-line;line-height:1.65}.page-visual-detail{margin-top:8px}.page-visual-detail p{display:block!important;margin-top:8px!important}.studio-message{position:fixed;z-index:90;top:22px;right:24px;width:min(430px,calc(100vw - 48px));box-sizing:border-box;margin:0!important;border:1px solid #d7dfbf;border-radius:12px!important;background:#f5f8eb!important;color:#334418!important;box-shadow:0 12px 34px rgba(31,25,20,.14);padding:15px 16px 15px 46px!important;font-size:13px!important;font-weight:750;line-height:1.45}.studio-message:before{content:"✓";position:absolute;left:16px;top:13px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#58731e;color:#fff;font-size:12px;font-weight:900}.studio-message.loading{border-color:#dbc8c1;background:#f7eee9!important;color:var(--soon-oxblood)!important}.studio-message.loading:before{content:"";box-sizing:border-box;top:15px;width:16px;height:16px;border:2px solid #c9aaa5;border-top-color:var(--soon-oxblood);background:transparent;animation:studio-loading-spin .8s linear infinite}.studio-message.error{border-color:#d9aaa7;background:#fff1ef!important;color:#742b30!important}.studio-message.error:before{content:"!";background:#742b30}@media(max-width:700px){.studio-message{top:12px;right:12px;width:calc(100vw - 24px)}}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .production-ready b.working{box-sizing:border-box;background:transparent;border:3px solid #dce8b6;border-top-color:var(--soon-oxblood);animation:studio-loading-spin .8s linear infinite}

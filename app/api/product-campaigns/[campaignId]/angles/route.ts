@@ -5,6 +5,7 @@ import { anthropicModel } from '@/lib/anthropic-models'
 import { createServerSupabase } from '@/lib/server-supabase'
 import { getPublishedStrategies } from '@/lib/strategy-registry'
 import { getWorkspaceAccess } from '@/lib/workspace-access'
+import { loadCoreIndustryKnowledge } from '@/lib/core-knowledge'
 
 type RouteProps = { params: Promise<{ campaignId: string }> }
 type JsonRecord = Record<string, unknown>
@@ -55,13 +56,16 @@ export async function POST(_req: Request, { params }: RouteProps) {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'AI service is not configured' }, { status: 500 })
 
-    const [patterns, strategies, experienceResponse] = await Promise.all([
+    const industryQuery = `${clean(data.product.kind)} ${clean(data.product.name)} ${clean(data.campaign.market_region)} ${clean(data.campaign.objective)} ${JSON.stringify(understanding)}`
+    const [patterns, strategies, experienceResponse, coreKnowledge, clientDnaResult] = await Promise.all([
       getPublishedStrategies('angle_pattern'),
       getPublishedStrategies('content_strategy'),
       process.env.SOON_CORE_KNOWLEDGE_KEY ? fetch('https://soon-core.vercel.app/api/campaign-experiences/search', {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-soon-knowledge-key': process.env.SOON_CORE_KNOWLEDGE_KEY },
         body: JSON.stringify({ product: data.product.name, kind: data.product.kind, market: data.campaign.market_region, objective: data.campaign.objective, audience: data.campaign.target_audience }),
       }).then((response) => response.ok ? response.json() : { experiences: [] }).catch(() => ({ experiences: [] })) : Promise.resolve({ experiences: [] }),
+      loadCoreIndustryKnowledge(industryQuery),
+      data.access.admin.from('client_dna_profiles').select('primary_industry_code,secondary_industry_codes,campaign_objectives,audience_summary,brand_tone,preferred_formats,restrictions,profile_status,profile_version').eq('workspace_id', data.campaign.workspace_id).maybeSingle(),
     ])
     const experiences = Array.isArray(experienceResponse.experiences) ? experienceResponse.experiences.slice(0, 5) : []
     const patternMap = new Map(patterns.map((item) => [item.id, item]))
@@ -71,6 +75,10 @@ export async function POST(_req: Request, { params }: RouteProps) {
       '只可使用已確認claims及proof points。unverified claims不可當成事實。',
       `Campaign: ${JSON.stringify({ objective: data.campaign.objective, primaryMetric: data.campaign.primary_metric, targetAudience: data.campaign.target_audience })}`,
       `Product understanding: ${JSON.stringify(understanding)}`,
+      `SOON Core industry fit and reusable knowledge: ${JSON.stringify(coreKnowledge || { industries: [], assets: [] })}`,
+      `Client DNA: ${JSON.stringify(clientDnaResult.data || {})}`,
+      'Client DNA 的 profile_status 若為 confirmed，可主導行業、語氣、格式及限制配對；若為 draft，只可作低權重提示，必須以今次已確認的 Campaign brief、Product understanding 及用戶輸入為準。',
+      'Industry taxonomy可以有一個主要分類及最多兩個次要分類。只採用與本客戶、目標及受眾真正吻合的知識；regulated分類必須保守表述並列出claim risks。',
       `Available angle patterns: ${JSON.stringify(patterns.map((item) => ({ id: item.id, name: item.name, definition: item.definition })))}`,
       `Available strategy building blocks: ${JSON.stringify(strategies.map((item) => ({ id: item.id, name: item.name, description: item.description, definition: item.definition })))}`,
       `Relevant past campaign experiences: ${JSON.stringify(experiences)}`,

@@ -165,7 +165,9 @@ export async function POST(req: Request) {
         { status: 500 },
       );
 
-    const pages = project.production.pages || [];
+    const structure = isVideo && Array.isArray(project.production.script) && project.production.script.length
+      ? project.production.script
+      : project.production.pages || [];
     const assets: VisualAsset[] = project.production.assets || [];
     const analyzedAssets = isVideo ? assets : await analyzeVisualAssets(apiKey, assets);
     const { data: contentPreferences } = await access.admin
@@ -230,7 +232,7 @@ export async function POST(req: Request) {
       "\n【Project】\n" + project.title,
       "Brief：" + JSON.stringify(project.brief || {}),
       "已選內容風格：" + JSON.stringify(project.format_decision || {}),
-      "已確認故事結構：" + JSON.stringify(pages),
+      (isVideo ? "已確認短片劇本：" : "已確認故事結構：") + JSON.stringify(structure),
       isVideo ? "參考圖片素材：" + JSON.stringify(analyzedAssets) : "圖片素材及畫面分析（必須用 asset id 引用）：" + JSON.stringify(analyzedAssets),
       "圖片必須按每頁主題及畫面用途配對，不可按照上載次序機械分配。",
       "配圖時必須比較該頁完整意圖與 visualAnalysis，不可只因兩者共有產品名稱或單一名詞便配對。",
@@ -239,6 +241,7 @@ export async function POST(req: Request) {
       "若素材 assignedPage 不是 auto，必須優先遵從用家的指定頁面。除非版面需要，不要在不同頁重複使用同一素材。",
       languageInstruction,
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
+      isVideo ? "短片逐鏡對白、字幕及效果描述必須逐字沿用已確認短片劇本，不可改寫、延伸或新增痛點、功效及使用場景。" : "",
     ].join("\n");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -270,7 +273,23 @@ export async function POST(req: Request) {
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
     const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
     const artboardByRole: Record<string, string> = { cover: "01_COVER", longform: "02_FULL_BLEED_TEXT", split: "03_IMAGE_TOP_TEXT_BOTTOM", comparison: "04_COMPARISON", feature: "05_LEFT_TEXT_RIGHT_IMAGE", end: "06_END_CTA" };
-    const normalizedPages = (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
+    const normalizedPages = isVideo ? structure.map((segment: Record<string, unknown>, index: number) => {
+      const body = [segment.dialogue, segment.caption]
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+      return {
+        page: `S.${index + 1}`,
+        headline: String(segment.section || `鏡頭 ${index + 1}`),
+        subheadline: String(segment.time || ""),
+        body,
+        assetId: "",
+        assetIds: [],
+        assetStatus: "missing",
+        layout: videoMethod === "ai_video_generation" ? "ai_scene" : "human_scene",
+        designDirection: [segment.visual, segment.productionNote].filter(Boolean).join("；"),
+        sourceEvidence: String(segment.sourceEvidence || ""),
+        groundingStatus: String(segment.groundingStatus || "needs_confirmation"),
+      };
+    }) : (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
       const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
       const assetIds = [...new Set(requestedIds)];
@@ -303,11 +322,12 @@ export async function POST(req: Request) {
       pageDrafts: normalizedPages,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
+        captionDraft: structure.flatMap((segment: Record<string, unknown>) => [segment.dialogue, segment.caption]).filter((item): item is string => typeof item === "string" && item.trim().length > 0).join("\n"),
         videoPlan: {
           method: videoMethod,
-          hook: drafts.hook || "",
+          hook: String(structure[0]?.dialogue || structure[0]?.caption || ""),
           durationSeconds: Number(drafts.durationSeconds) || 20,
-          shotList: Array.isArray(drafts.shotList) ? drafts.shotList : [],
+          shotList: structure.map((segment: Record<string, unknown>) => [segment.visual, segment.productionNote].filter(Boolean).join("；")).filter(Boolean),
         },
       } : {}),
       productionStatus: "drafts_ready",

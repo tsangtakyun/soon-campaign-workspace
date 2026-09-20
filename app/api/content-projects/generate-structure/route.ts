@@ -18,6 +18,13 @@ function parseJsonObject(text: string) {
   }
 }
 
+const normalizeEvidence = (value: unknown) => String(value || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '')
+
+function evidenceIsSupported(evidence: unknown, corpus: string) {
+  const normalized = normalizeEvidence(evidence)
+  return normalized.length >= 4 && normalizeEvidence(corpus).includes(normalized)
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -117,13 +124,28 @@ export async function POST(req: Request) {
           '這一步只決定故事次序，不決定視覺風格。除 cover 必須在首頁、end 必須在末頁外，中段須按內容語意選擇 longform、split、comparison 或 feature。',
         ].join('\n')
       : ''
+    const isShortVideo = project.selected_format === 'short_video'
     const formatInstruction = project.selected_format === 'single_image'
       ? '這是單張貼文。pages 必須只輸出 P.1，集中一個最清晰的視覺訊息。'
-      : project.selected_format === 'short_video'
+      : isShortVideo
         ? formatDecision.videoMethod === 'ai_video_generation'
-          ? '這是 AI 生成短片。pages 代表連續鏡頭，並為每個鏡頭提供可供影片生成使用的 visualDirection。不要聲稱影片已經生成。'
-          : '這是真人拍攝短片。pages 代表連續鏡頭，內容必須實際可拍攝；提供人物動作、畫面及說話重點。'
+          ? '這是 AI 生成短片。script 必須是連續、有時間碼的劇本段落；每段提供旁白／字幕、具體畫面及可供影片模型使用的生成提示。不要聲稱影片已經生成。'
+          : '這是真人拍攝短片。script 必須剛好 9 段，對應 S.1 至 S.9，並是連續、有時間碼的可拍攝劇本；每段提供自然對白／旁白、人物動作、鏡頭畫面、字幕及拍攝提示。'
         : `這是輪播貼文。pages 必須剛好輸出 ${slideCount} 頁，由 P.1 至 P.${slideCount}。`
+
+    const outputSchema = isShortVideo
+      ? [
+          '  "script": [{',
+          '    "section": "HOOK|SETUP|DEVELOPMENT|PROOF|PAYOFF|ENDING",',
+          '    "time": "0:00–0:03",',
+          '    "dialogue": "旁白／對白；沒有則留空字串",',
+          '    "visual": "畫面、人物動作及鏡頭方向",',
+          '    "caption": "畫面字幕；沒有則留空字串",',
+          '    "productionNote": "真人拍攝提示或 AI 生成提示",',
+          '    "sourceEvidence": "從來源內容或 Brief 原文複製、可直接支持本段訊息的短句"',
+          '  }]',
+        ]
+      : ['  "pages": [{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]']
 
     const userPrompt = [
       '你正在 SOON Content Studio 執行已確認格式之後的「資料核查＋故事結構」階段。',
@@ -155,18 +177,24 @@ export async function POST(req: Request) {
       '  "selfReportedClaims": ["當事人或原帖自述"],',
       '  "unverifiedClaims": ["未能獨立核實或需要再查證的說法"],',
       '  "sources": [{"label":"來源名稱","url":"https://..."}],',
-      '  "pages": [{"page":"P.1","role":"cover|longform|split|comparison|feature|end","headline":"頁面標題","purpose":"該頁功能","copyDirection":"內容重點／文案方向","visualDirection":"圖片方向"}]',
+      ...outputSchema,
       '}',
-      'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
+      isShortVideo
+        ? 'script 必須由首三秒 Hook 開始，時間碼連續而不重疊，最後包含明確收結或 CTA。不得輸出 pages 或 P.1、P.2 等頁碼。不要把未核實內容寫成事實。'
+        : 'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
       '這一步不得輸出或假設任何 templateArtboardId；版型會在用家準備圖片素材並選擇內容風格後才決定。',
-      `輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 應遵從上述文字語氣設定，建議不超過 18 個中文字。`,
-      '輪播 P.1 封面及 role=end 的結尾頁保持精簡；其餘內容頁，尤其 P.2 至 P.5，copyDirection 應有足夠資訊密度：使用 3 至 5 個完整短句，目標約 100 至 160 個中文字，並包含 2 至 4 個互不重複的具體重點。',
+      isShortVideo
+        ? '每個劇本段落只推進一個訊息；dialogue 必須是可直接讀出的旁白／對白，不可只寫「介紹背景」之類製作指示。visual 與 productionNote 必須可直接交付拍攝或生成。每段 sourceEvidence 必須逐字抄錄一段來源內容或 Brief 原文，並足以支持該段的具體效果、痛點及場景；資料不足時只可寫中性描述或「資料待確認」。'
+        : '輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 應遵從上述文字語氣設定，建議不超過 18 個中文字。',
+      isShortVideo
+        ? '短片劇本應以節奏及口語可讀性為先，不套用輪播頁面字數規則。'
+        : '輪播 P.1 封面及 role=end 的結尾頁保持精簡；其餘內容頁，尤其 P.2 至 P.5，copyDirection 應有足夠資訊密度：使用 3 至 5 個完整短句，目標約 100 至 160 個中文字，並包含 2 至 4 個互不重複的具體重點。',
       '增加篇幅只可透過整理、拆解及忠實改寫「來源內容」與 Brief 已提供的資料。每一句事實陳述都必須可直接追溯至本次 Project 的來源內容或 Brief；不得加入來源沒有提及的背景知識、數字、原因、影響、例子、評價或推測。',
       '若現有資料不足以寫到建議長度，必須以較短而準確的內容為先，不可用常識、套話或相似事件補足字數。對報道或當事人說法應清楚使用「據報」「報道指出」「當事人表示」等歸因字眼，不可把自述改寫成已核實事實。',
       '地址、價格、營業時間及免責資料不要分散重複。copyDirection 應直接提供可用的頁面正文，而不只寫「介紹背景」「解釋原因」之類製作指示。',
       '不得使用過度絕對或來源未支持的標題，例如「不是工廠製作」；應改為準確的比較或描述。',
       'confirmedFacts 只可包含來源內容或來源連結明確支持的事實；品牌自述必須放入 selfReportedClaims。',
-      '如沒有外部來源連結，confirmedFacts 必須是空陣列。不得以一般常識補充解剖、生物力學、醫療或訓練原理；這些內容只能列為待核實，亦不得寫入 pages。',
+      `如沒有外部來源連結，confirmedFacts 必須是空陣列。不得以一般常識補充解剖、生物力學、醫療或訓練原理；這些內容只能列為待核實，亦不得寫入 ${isShortVideo ? 'script' : 'pages'}。`,
     ].join('\n')
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -190,14 +218,44 @@ export async function POST(req: Request) {
       ? data.content.filter((item: any) => item.type === 'text').map((item: any) => item.text || '').join('\n')
       : ''
     const generated = parseJsonObject(text)
+    const sourceCorpus = [project.source_note || '', JSON.stringify(project.brief || {})].join('\n')
     const hasExternalSource = Boolean(project.source_url?.trim())
     const unsupportedConfirmedFacts = hasExternalSource
       ? []
       : Array.isArray(generated.confirmedFacts)
         ? generated.confirmedFacts
         : []
+    const normalizedScript = isShortVideo
+      ? (Array.isArray(generated.script) ? generated.script : Array.isArray(generated.pages) ? generated.pages : [])
+          .map((segment: Record<string, unknown>, index: number) => {
+            const sourceEvidence = String(segment.sourceEvidence || '')
+            const grounded = evidenceIsSupported(sourceEvidence, sourceCorpus)
+            return grounded ? {
+              section: String(segment.section || segment.headline || `段落 ${index + 1}`),
+              time: String(segment.time || segment.timestamp || segment.subheadline || ''),
+              dialogue: evidenceIsSupported(segment.dialogue || segment.voiceover || segment.copyDirection || segment.purpose, sourceCorpus)
+                ? String(segment.dialogue || segment.voiceover || segment.copyDirection || segment.purpose || '')
+                : sourceEvidence,
+              visual: `拍攝與以下已確認資料直接相關的中性畫面：${sourceEvidence}`,
+              caption: evidenceIsSupported(segment.caption, sourceCorpus) ? String(segment.caption) : sourceEvidence,
+              productionNote: '只呈現 Brief 或來源已明確提供的產品、人物及動作；其他細節拍攝前確認。',
+              sourceEvidence,
+              groundingStatus: 'grounded',
+            } : {
+              section: String(segment.section || segment.headline || `段落 ${index + 1}`),
+              time: String(segment.time || segment.timestamp || segment.subheadline || ''),
+              dialogue: '這部分內容需要確認後再補充。',
+              visual: '保留中性產品或主持人畫面，不展示未經確認的效果。',
+              caption: '資料待確認',
+              productionNote: '拍攝前請先核對相關產品資料。',
+              sourceEvidence: '',
+              groundingStatus: 'needs_confirmation',
+            }
+          })
+      : undefined
     const production = {
       ...generated,
+      ...(isShortVideo ? { script: normalizedScript, pages: [] } : {}),
       confirmedFacts: hasExternalSource && Array.isArray(generated.confirmedFacts)
         ? generated.confirmedFacts
         : [],

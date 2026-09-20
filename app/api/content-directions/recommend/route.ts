@@ -65,6 +65,30 @@ function fallbackFormat(summary: string): FormatRecommendation {
   return { recommendedFormat: 'carousel', recommendedVideoMethod: null, formatReason: '題材包含多個重點或需要逐步解釋，以輪播最容易建立清晰脈絡。' }
 }
 
+function explicitFormatIntent(summary: string): FormatRecommendation | null {
+  if (/(?:真人(?:示範|拍攝|短片|影片|出鏡)|主持人.{0,12}(?:示範|介紹|講解)|human[ -]?(?:video|filming))/i.test(summary)) {
+    return { recommendedFormat: 'short_video', recommendedVideoMethod: 'human_filming', formatReason: 'Brief 已明確要求真人示範或真人拍攝，因此優先採用真人短片。' }
+  }
+  if (/(?:AI\s*(?:短片|影片|生成影片)|人工智能生成影片|ai[ -]?(?:video|generated video))/i.test(summary)) {
+    return { recommendedFormat: 'short_video', recommendedVideoMethod: 'ai_video_generation', formatReason: 'Brief 已明確要求 AI 生成影片，因此優先採用 AI 短片。' }
+  }
+  if (/(?:輪播貼文|IG\s*carousel|carousel)/i.test(summary)) {
+    return { recommendedFormat: 'carousel', recommendedVideoMethod: null, formatReason: 'Brief 已明確指定輪播貼文。' }
+  }
+  if (/(?:單張貼文|單圖貼文|單張主視覺)/i.test(summary)) {
+    return { recommendedFormat: 'single_image', recommendedVideoMethod: null, formatReason: 'Brief 已明確指定單張貼文。' }
+  }
+  return null
+}
+
+function resolveFormatRecommendation(value: unknown, summary: string, selectedFormat = ''): FormatRecommendation {
+  if (selectedFormat === 'carousel' || selectedFormat === 'single_image' || selectedFormat === 'short_video') {
+    const normalized = normalizeFormatRecommendation(value, summary)
+    return { recommendedFormat: selectedFormat, recommendedVideoMethod: selectedFormat === 'short_video' ? normalized.recommendedVideoMethod : null, formatReason: '沿用已選擇的內容格式。' }
+  }
+  return explicitFormatIntent(summary) || normalizeFormatRecommendation(value, summary)
+}
+
 function normalizeFormatRecommendation(value: unknown, summary: string): FormatRecommendation {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   const recommendedFormat = source.recommendedFormat === 'single_image' || source.recommendedFormat === 'short_video' || source.recommendedFormat === 'carousel'
@@ -87,7 +111,7 @@ export async function POST(request: Request) {
     const projectId = clean(body.projectId, 80)
     const summary = clean(body.summary, 5000)
     const format = clean(body.format, 80)
-    const fallbackFormatRecommendation = fallbackFormat(summary)
+    const fallbackFormatRecommendation = resolveFormatRecommendation({}, summary, format)
     if (!isUuid(workspaceId) || !isUuid(projectId) || !summary) {
       return NextResponse.json({ error: 'Missing recommendation context' }, { status: 400 })
     }
@@ -121,9 +145,7 @@ export async function POST(request: Request) {
           coreSlideCount = normalizeSlideCount(payload?.recommendedSlideCount)
           coreSlideCountReason = clean(payload?.slideCountReason, 180)
           if (coreRecommendations.length && (format !== 'carousel' || coreSlideCount)) {
-            const coreFormatRecommendation = format
-              ? { recommendedFormat: format, recommendedVideoMethod: format === 'short_video' ? 'human_filming' : null, formatReason: '沿用已選擇的內容格式。' }
-              : normalizeFormatRecommendation(payload, summary)
+            const coreFormatRecommendation = resolveFormatRecommendation(payload, summary, format)
             return NextResponse.json({
               recommendations: coreRecommendations,
               recommendedSlideCount: coreSlideCount,
@@ -160,9 +182,7 @@ export async function POST(request: Request) {
     const output = Array.isArray(data.content) ? data.content.find((item: any) => item.type === 'text')?.text : ''
     const parsed = JSON.parse(String(output || '').replace(/^```json\s*|\s*```$/g, ''))
     const recommendations = normalize(parsed?.recommendations)
-    const formatRecommendation = format
-      ? { recommendedFormat: format, recommendedVideoMethod: format === 'short_video' ? normalizeFormatRecommendation(parsed, summary).recommendedVideoMethod : null, formatReason: clean(parsed?.formatReason, 180) || '沿用已選擇的內容格式。' }
-      : normalizeFormatRecommendation(parsed, summary)
+    const formatRecommendation = resolveFormatRecommendation(parsed, summary, format)
     const recommendedSlideCount = formatRecommendation.recommendedFormat === 'carousel' ? normalizeSlideCount(parsed?.recommendedSlideCount) : null
     return NextResponse.json({
       recommendations: recommendations.length ? recommendations : (coreRecommendations.length ? coreRecommendations : fallback(summary)),

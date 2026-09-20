@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 
 import { DashboardSidebar, dashboardSidebarStyles } from '@/components/dashboard/DashboardSidebar'
 import { ClaimOnboardingSession } from '@/components/onboarding/ClaimOnboardingSession'
+import { ClientIndustryDNA } from '@/components/settings/ClientIndustryDNA'
 
 const AVATAR_MAX_DIMENSION = 1024
 const AVATAR_TARGET_BYTES = 2 * 1024 * 1024
@@ -168,6 +169,7 @@ export default function SettingsPage() {
         </header>
 
         <div className="settings-body">
+          <ClientIndustryDNA />
           <form className="profile-card" onSubmit={saveProfile}>
             <div className="profile-head">
               <div className="profile-avatar">
@@ -217,6 +219,7 @@ const styles = `
   .site-nav {
     display: none;
   }
+  .dna-card{display:grid;gap:16px;border:1px solid #ddd6fe;border-radius:18px;background:#f5f3ff;padding:22px;margin-bottom:18px}.dna-card h2{margin:4px 0}.dna-card p{margin:0;color:#68646f;font-size:13px}.dna-card small{color:#6d28d9;font-weight:850;letter-spacing:.15em}.dna-card label{display:grid;gap:7px;font-size:12px;font-weight:800}.dna-card select{border:1px solid #ddd;border-radius:10px;background:#fff;padding:11px}.dna-tags{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.dna-tags b{width:100%;font-size:12px}.dna-tags button,.dna-card footer button{border:1px solid #ddd;border-radius:999px;background:#fff;padding:8px 11px;font-weight:750;cursor:pointer}.dna-tags button.on{border-color:#6d28d9;background:#6d28d9;color:#fff}.dna-card footer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.dna-card footer .confirm{border-color:#202126;border-radius:10px;background:#202126;color:#fff}.dna-card footer span{margin-left:auto;font-size:12px;font-weight:800}.dna-card em{color:#5b21b6;font-size:12px;font-style:normal;font-weight:800}
 
   .dashboard-page {
     min-height: 100vh;
