@@ -234,18 +234,26 @@ export default function CampaignsPage() {
     let cancelled = false
     async function loadCentralTopics() {
       try {
-        const response = await fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60', { cache: 'no-store' })
+        const response = await fetch('https://soon-core.vercel.app/api/topics?language=zh-HK&limit=60&consumer=creator', { cache: 'no-store' })
         if (!response.ok) throw new Error('未能載入中央題材')
         const payload = await response.json().catch(() => null)
         const mergedTopics = Array.isArray(payload?.topics) ? payload.topics as CentralTopic[] : []
-        if (!mergedTopics.length) throw new Error('未能載入中央題材')
+        if (!Array.isArray(payload?.topics)) throw new Error('未能載入中央題材')
         if (!cancelled) {
           setCentralIdeas(mergedTopics.map(centralTopicToIdea))
           setCentralFeedStatus('ready')
+          if (typeof payload?.delivery?.token === 'string') {
+            void fetch('/api/topic-delivery', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: payload.delivery.token }) })
+              .then(result => { if (!result.ok) console.warn('Topic delivery receipt was not recorded') })
+              .catch(() => console.warn('Topic delivery receipt unavailable'))
+          }
         }
       } catch (error) {
         console.error('Central topic feed unavailable', error)
-        if (!cancelled) setCentralFeedStatus('error')
+        if (!cancelled) {
+          setCentralFeedStatus('error')
+          void fetch('/api/topic-delivery', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ failed: true }) }).catch(() => undefined)
+        }
       }
     }
     void loadCentralTopics()
