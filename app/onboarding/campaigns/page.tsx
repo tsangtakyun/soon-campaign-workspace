@@ -669,8 +669,7 @@ export default function CampaignsPage() {
                           ) : idea.title}
                         </h2>
                         <span>{idea.note}</span>
-                        {idea.whyNow ? <span className="idea-why-now"><b>點解值得留意：</b>{idea.whyNow}</span> : null}
-                        {idea.hook ? <span className="idea-hook"><b>開場 Hook：</b>{idea.hook}</span> : null}
+                        {idea.whyNow && !idea.whyNow.includes("由 EGG 創作者社群共享") ? <span className="idea-why-now"><b>製作價值：</b>{idea.whyNow}</span> : null}
                         <div className="idea-tags">
                           {idea.tags.map((tag) => (
                             <em key={tag}>{tag}</em>
