@@ -1,5 +1,6 @@
 "use client";
 
+import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -2920,7 +2921,7 @@ export default function ContentStudioPage() {
                                     <div>
                                       <small>{selected.format_decision?.videoMethod === "ai_video_generation" ? "AI 影片生成計劃" : "真人拍攝製作包"}</small>
                                       <h4>{String((selected.production.videoPlan as any)?.hook || "短片製作資料已準備")}</h4>
-                                      <p>建議片長：{String((selected.production.videoPlan as any)?.durationSeconds || 20)} 秒</p>
+                                      <p>建議片長：{String(approvedVideoDuration(selected.production.script || []) ?? ((selected.production.videoPlan as any)?.durationSeconds || 20))} 秒</p>
                                       {Array.isArray((selected.production.videoPlan as any)?.shotList) && (selected.production.videoPlan as any).shotList.length ? <ul>{(selected.production.videoPlan as any).shotList.map((item: string) => <li key={item}>{item}</li>)}</ul> : null}
                                     </div>
                                     {selected.stage === "production" ? <button type="button" disabled={saving} onClick={() => void submitVideoPackage()}>{saving ? "提交中…" : "提交製作包審批 →"}</button> : <span>✓ 已提交審批</span>}

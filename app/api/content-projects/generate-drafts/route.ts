@@ -1,3 +1,4 @@
+import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { projectStyleContext, projectBrand } from '@/lib/project-style-context';
@@ -349,7 +350,7 @@ export async function POST(req: Request) {
         videoPlan: {
           method: videoMethod,
           hook: styledVideo ? String(drafts.hook || normalizedPages[0]?.body?.[0] || "") : String(structure[0]?.dialogue || structure[0]?.caption || ""),
-          durationSeconds: Number(drafts.durationSeconds) || 20,
+          durationSeconds: approvedVideoDuration(structure) ?? (Number(drafts.durationSeconds) || 20),
           shotList: styledVideo ? normalizedPages.map((page: Record<string,unknown>) => page.designDirection).filter(Boolean) : structure.map((segment: Record<string, unknown>) => [segment.visual, segment.productionNote].filter(Boolean).join("；")).filter(Boolean),
         },
       } : {}),
