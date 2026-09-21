@@ -107,7 +107,7 @@ type CorePublishedStyle = {
     rules: Record<string, unknown>;
   };
   evidence?: { confirmedReferenceCount?: number };
-  recommendation?: { score?: number; reason?: string };
+  recommendation?: { score?: number; reason?: string; angle?: string; gaps?: string[] };
   templates?: Array<{
     templateId: string;
     code: string;
@@ -410,6 +410,9 @@ export default function ContentStudioPage() {
   const [videoMethod, setVideoMethod] = useState("human_filming");
   const [selectedStyleCode, setSelectedStyleCode] = useState("");
   const [expandedStyleCode, setExpandedStyleCode] = useState<string | null>(null);
+  const [styleRecommendationId, setStyleRecommendationId] = useState("");
+  const [styleMessage, setStyleMessage] = useState("");
+  const [styleRetry, setStyleRetry] = useState(0);
   const [coreStyles, setCoreStyles] = useState<CorePublishedStyle[]>([]);
   const [loadingStyles, setLoadingStyles] = useState(false);
   const [styleCandidateCount, setStyleCandidateCount] = useState(0);
@@ -479,7 +482,7 @@ export default function ContentStudioPage() {
     const local = styleTemplates
       .filter((template) => template.formats.includes(format))
       .map((template) => ({ ...template, source: "soon_creator" as const }));
-    if (!(["carousel", "single_image", "human_video", "ai_video"].includes(coreFormat)) || !coreStyles.length) return local;
+    if (!(["carousel", "single_image", "human_video", "ai_video"].includes(coreFormat))) return local;
     const palettes: Array<[string, string, string]> = [
       ["#f6f2eb", "#6b2c30", "#c7e63a"],
       ["#fff4cf", "#202126", "#b46a61"],
@@ -506,7 +509,7 @@ export default function ContentStudioPage() {
       source: style.creatorSource === "soon_creator" ? "soon_creator" : "soon_core",
       core: style,
     }));
-    return [...canonical, ...local.filter((item) => !canonical.some((core) => core.code === item.code))];
+    return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
   useEffect(() => {
@@ -891,8 +894,13 @@ export default function ContentStudioPage() {
       setStyleCandidateCount(0);
       return;
     }
+    if (activeStep !== "style") return;
     let cancelled = false;
     setLoadingStyles(true);
+    setCoreStyles([]);
+    setSelectedStyleCode("");
+    setStyleRecommendationId("");
+    setStyleMessage("");
     const production = selected.production || {};
     const story = Array.isArray(production.pages) ? production.pages : [];
     const assets = Array.isArray(production.assets)
@@ -919,17 +927,20 @@ export default function ContentStudioPage() {
       }),
       cache: "no-store",
     })
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("未能載入最新風格")))
+      .then(async (response) => { const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "未能載入最新風格"); return payload; })
       .then((payload) => {
         if (!cancelled) {
           const styles = Array.isArray(payload?.styles) ? payload.styles as CorePublishedStyle[] : [];
           setCoreStyles(styles);
+          setStyleRecommendationId(payload.id || "");
+          setStyleMessage(styles.length ? "" : payload.emptyReason || "暫未有適合這個題材及素材的風格，請補充資料後重試。");
           setStyleCandidateCount(Number(payload?.candidateCount) || styles.length);
-          if (styles[0]) setSelectedStyleCode((current) => styles.some((style) => style.code === current) ? current : styles[0].code);
+          setSelectedStyleCode("");
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
+          setStyleMessage(error.message || "未能分析風格，請重試。");
           setCoreStyles([]);
           setStyleCandidateCount(0);
         }
@@ -938,7 +949,7 @@ export default function ContentStudioPage() {
         if (!cancelled) setLoadingStyles(false);
       });
     return () => { cancelled = true; };
-  }, [workspaceId, selected?.id, selected?.updated_at, selected?.selected_format, selectedFormat, videoMethod]);
+  }, [workspaceId, selected?.id, selected?.selected_format, selectedFormat, videoMethod, activeStep, styleRetry, JSON.stringify(selected?.format_decision?.confirmedMaterials)]);
 
   async function saveProject(
     updates: Record<string, unknown>,
@@ -2169,6 +2180,7 @@ export default function ContentStudioPage() {
                             <strong>{template.name}</strong>
                             <small>{template.note}</small>
                             {template.core?.recommendation?.reason ? <p className="style-recommendation-reason"><b>AI 推薦原因</b>{template.core.recommendation.reason}</p> : null}
+                            {template.core?.recommendation?.gaps?.length ? <details><summary>製作前需補充</summary><ul>{template.core.recommendation.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></details> : null}
                             <em>{template.source === "soon_core" ? `參考 ${template.core?.evidence?.confirmedReferenceCount || 0} 個已確認案例` : "SOON 基本品牌模板"}</em>
                             <button type="button" onClick={() => setSelectedStyleCode(template.code)}>
                               {selectedStyleCode === template.code ? "✓ 已選擇" : "選用這款"}
@@ -2181,7 +2193,9 @@ export default function ContentStudioPage() {
                       const rules = displayStyles.find((template) => template.code === selectedStyleCode)!;
                       return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>{rules.source === "soon_core" ? "已連接 SOON 最新製作規格" : "SOON 經典風格"}</small></details>;
                     })() : null}
-                    {loadingStyles ? <p className="style-loading">正在載入最新風格…</p> : null}
+                    <fieldset><legend>已確認可用的素材</legend>{[["photos","可用圖片"],["footage","現場影片"],["presenter","可出鏡主持"],["research","已核實資料"]].map(([id,label]) => <label key={id} style={{display:"inline-flex",alignItems:"center",gap:6,marginRight:12}}><input type="checkbox" style={{width:"auto"}} disabled={saving} checked={Array.isArray(selected.format_decision?.confirmedMaterials) && selected.format_decision.confirmedMaterials.includes(id)} onChange={async event => { const current = Array.isArray(selected.format_decision?.confirmedMaterials) ? selected.format_decision.confirmedMaterials as string[] : []; await saveProject({formatDecision:{...selected.format_decision,confirmedMaterials:event.target.checked?[...current,id]:current.filter(value=>value!==id)}},""); }} />{label}</label>)}</fieldset>
+                    {loadingStyles ? <p className="style-loading">正在分析合適風格…</p> : null}
+                    {styleMessage ? <p role="status">{styleMessage} <button type="button" onClick={() => setStyleRetry(value => value + 1)}>重新分析</button></p> : null}
                     {expandedStyleCode ? <div className="style-preview-modal" role="dialog" aria-modal="true" aria-label="放大風格預覽" onClick={() => setExpandedStyleCode(null)}>
                       <div className="style-preview-modal-panel" onClick={(event) => event.stopPropagation()}>
                         <div className="style-preview-modal-head"><div><small>{isShortVideo ? "共同劇本 · 9:16 首幀示意" : selected.selected_format === "single_image" ? "共同題材 · 單張示意" : "共同題材 · 三頁示意"}</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
@@ -2191,13 +2205,14 @@ export default function ContentStudioPage() {
                     </div> : null}
                     <div className="actions">
                       <button className="secondary" type="button" onClick={() => goToStep(selected.selected_format === "short_video" ? "structure" : "assets")}>← 返回{selected.selected_format === "short_video" ? "故事結構" : "圖片素材"}</button>
-                      <button type="button" disabled={saving || !selectedStyleCode} onClick={async () => {
+                      <button type="button" disabled={saving || loadingStyles || !styleRecommendationId || !selectedStyleCode} onClick={async () => {
                         const template = displayStyles.find((item) => item.code === selectedStyleCode);
                         const core = template?.core;
                         const coreTemplate = core?.templates?.[0];
                         const saved = await saveProject({
                           formatDecision: {
                             ...(selected.format_decision || {}),
+                            recommendationId: styleRecommendationId,
                             templateCode: selectedStyleCode,
                             templateVersion: template?.version || 1,
                             templateSource: template?.source || "soon_creator",

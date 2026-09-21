@@ -1,3 +1,5 @@
+import { coreCode, object, styleSnapshot, validateSelection, type StyleResult } from '@/lib/production-style'
+import { projectStyleContext, projectBrand } from '@/lib/project-style-context'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -142,6 +144,34 @@ export async function PATCH(req: Request) {
     const access = await getWorkspaceAccess({ email: user.email, userId: user.id, workspaceId })
     if (!access || (access.role !== 'owner' && access.role !== 'admin')) {
       return NextResponse.json({ error: '內容製作只限 Workspace Owner 或 Admin' }, { status: 403 })
+    }
+
+    const { data: existing } = await access.admin.from('content_projects').select('id,title,source_note,brief,production,format_decision,selected_format').eq('id',projectId).eq('workspace_id',workspaceId).maybeSingle()
+    if (!existing) return NextResponse.json({ error:'找不到專案' },{ status:404 })
+    if (body.formatDecision && typeof body.formatDecision === 'object') {
+      const requested = object(body.formatDecision), old = object(existing.format_decision)
+      if (requested.recommendationId) {
+        if (requested.recommendationId === old.recommendationId && requested.templateCode === old.templateCode) {
+          // Clients may edit production settings but cannot rewrite an already locked snapshot.
+          body.formatDecision = { ...requested, ...old, confirmedMaterials: requested.confirmedMaterials ?? old.confirmedMaterials, videoMethod: requested.videoMethod ?? old.videoMethod }
+        } else {
+          const input=projectStyleContext(existing,await projectBrand(access.admin,workspaceId))
+          const {data:run}=await access.admin.from('content_project_style_runs').select('result').eq('project_id',projectId).eq('workspace_id',workspaceId).eq('input_hash',input.inputHash).eq('result->>id',requested.recommendationId).maybeSingle()
+          const result=run?.result as StyleResult | undefined
+          const selected=result?.styles.find(style=>style.code===coreCode(requested.templateCode))
+          if(!selected || !result) return NextResponse.json({error:'題材或素材已改變，請重新分析風格。'},{status:409})
+          try { await validateSelection(selected) } catch(error) { return NextResponse.json({error:error instanceof Error?error.message:"請重新選擇風格。"},{status:409}) }
+          const snapshot=styleSnapshot(selected,result,input.inputHash,input.topicVersion), template=selected.templates[0]
+          body.formatDecision={...requested,...snapshot,templateCode:requested.templateCode,templateName:selected.name,templateSource:'soon_core',templateVersion:selected.version.number,
+            renderTemplateCode:template?.version.rendererCode || selected.code,templateContractSnapshot:template?.version.contract || null,
+            templateRegistryId:template?.templateId || null,templateRegistryCode:template?.code || null,templateRegistryVersion:template?.version.number || null,
+            templateContentHash:template?.version.contentHash || null,templateCreatorCommit:template?.version.creatorCommit || null}
+        }
+      } else if(old.styleVersionRef && requested.templateCode === old.templateCode) {
+        body.formatDecision={...requested,...old,confirmedMaterials:requested.confirmedMaterials ?? old.confirmedMaterials};
+      } else if(requested.templateSource === 'soon_core' || requested.styleRulesSnapshot) {
+        return NextResponse.json({error:'請從最新建議中確認風格。'},{status:409})
+      }
     }
 
     const allowedStages = new Set(['brief', 'format', 'production', 'approval', 'scheduled', 'archived'])

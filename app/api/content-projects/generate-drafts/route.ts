@@ -1,3 +1,4 @@
+import { projectStyleContext, projectBrand } from '@/lib/project-style-context';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -131,11 +132,14 @@ export async function POST(req: Request) {
 
     const { data: project, error } = await access.admin
       .from("content_projects")
-      .select("id,title,brief,production,prompt_version_id,selected_format,format_decision")
+      .select("id,title,source_note,brief,production,prompt_version_id,selected_format,format_decision")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
     if (error) throw error;
+    if (project.format_decision?.inputHash && project.format_decision.inputHash !== projectStyleContext(project,await projectBrand(access.admin,workspaceId)).inputHash) {
+      return NextResponse.json({ error: "題材、故事或素材已改變，請重新確認風格。" }, { status: 409 });
+    }
     const isVideo = project.selected_format === "short_video";
     if (
       project.production?.status !== "structure_confirmed" ||
@@ -241,7 +245,7 @@ export async function POST(req: Request) {
       "若素材 assignedPage 不是 auto，必須優先遵從用家的指定頁面。除非版面需要，不要在不同頁重複使用同一素材。",
       languageInstruction,
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
-      isVideo ? "短片逐鏡對白、字幕及效果描述必須逐字沿用已確認短片劇本，不可改寫、延伸或新增痛點、功效及使用場景。" : "",
+      isVideo ? "以已確認短片結構為事實依據，按選定風格調整開場、對白及視覺節奏；不得新增痛點、功效、親身經驗或使用場景。" : "",
     ].join("\n");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
