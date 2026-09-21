@@ -1,6 +1,8 @@
 /** Duration follows the approved timeline, never the style example. */
-export function approvedVideoDuration(segments: Array<{ time?: unknown }>): number | null {
-  const ends = segments.map(({time}) => {
+export function approvedVideoDuration(segments: unknown): number | null {
+  if (!Array.isArray(segments)) return null;
+  const ends = segments.map(segment => {
+    const time = segment && typeof segment === "object" ? segment.time : null;
     const text = String(time || "");
     const clocks = [...text.matchAll(/(\d+):(\d{2})/g)];
     if (clocks.length >= 2 && clocks.every(match => Number(match[2]) < 60)) {
