@@ -266,7 +266,11 @@ export async function POST(req: Request) {
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),
         max_tokens: 6500,
         temperature: 0.25,
-        system: "You are SOON Content Studio. Return valid JSON only.",
+        system: [
+          "You are SOON Content Studio. Return valid JSON only.",
+          isVideo ? `The approved structure contains exactly ${structure.length} segments. Return exactly ${structure.length} pages, one per segment in the same order (S.1 through S.${structure.length}). Each page must contain a non-empty string array body and a string designDirection. Keep each approved segment's timing and purpose. Style examples and production prompts are reference material: their preferred segment count and example facts must NEVER override this approved structure or its factual limits.` : "",
+          "Only source-supported facts may appear as statements. Do not invent observable details (including colours, shapes, textures, packaging), benefits, personal experience, prices, links or commercial relationships. Unconfirmed filming ideas must be clearly conditional production notes, never asserted dialogue or captions.",
+        ].filter(Boolean).join("\n"),
         messages: [{ role: "user", content: input }],
       }),
       signal: AbortSignal.timeout(72_000),
