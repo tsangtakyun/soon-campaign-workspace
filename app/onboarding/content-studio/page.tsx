@@ -2143,10 +2143,10 @@ export default function ContentStudioPage() {
                         <span>STEP {studioSteps.findIndex((step) => step.id === "style") + 1}</span>
                         <h3>選擇內容風格</h3>
                       </div>
-                      <em>{loadingStyles ? "SOON AI 正在配對合適風格…" : styleCandidateCount > 3 ? `SOON AI 已從 ${styleCandidateCount} 款中選出最適合的 3 款` : "SOON 已按內容格式篩選合適款式"}</em>
+                      <em>{loadingStyles ? "SOON AI 正在配對合適風格…" : styleCandidateCount > 3 ? `已評估 ${styleCandidateCount} 款，找到 ${coreStyles.length} 款合適風格` : "SOON 已按內容格式篩選合適款式"}</em>
                     </div>
                     <div className="style-intro">
-                      <div><b>{isShortVideo ? "用同一份劇本，直接比較短片視覺" : "用同一故事、同一組素材，直接比較版面"}</b><span>{isShortVideo ? "三款均使用已確認劇本生成一張無字 9:16 首幀 preview，讓你比較構圖、鏡頭感及整體氣氛。" : "三款均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。"}</span></div>
+                      <div><b>{isShortVideo ? "用同一份劇本，直接比較短片視覺" : "用同一故事、同一組素材，直接比較版面"}</b><span>{isShortVideo ? "候選風格均使用已確認劇本生成一張無字 9:16 首幀 preview，讓你比較構圖、鏡頭感及整體氣氛。" : "候選風格均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。"}</span></div>
                     </div>
                     <div className="style-preview-notice" role="note">
                       <b>目前只屬風格預覽</b>

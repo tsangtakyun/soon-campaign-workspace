@@ -16,7 +16,7 @@ export async function POST(request:Request) {
  const {data:{user}}=await supabase.auth.getUser()
  if(!user) return NextResponse.json({error:'Unauthorized'},{status:401})
  const access=await getWorkspaceAccess({email:user.email,userId:user.id,workspaceId:body.workspaceId})
- if(!access) return NextResponse.json({error:'Forbidden'},{status:403})
+ if(!access || !['owner','admin'].includes(access.role)) return NextResponse.json({error:'Forbidden'},{status:403})
  try {
   const {data:project}=await access.admin.from('content_projects').select('id,title,source_note,brief,production,format_decision,selected_format').eq('id',body.projectId).eq('workspace_id',body.workspaceId).maybeSingle()
   if(!project) return NextResponse.json({error:'找不到專案'},{status:404})

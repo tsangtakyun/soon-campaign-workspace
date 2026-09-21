@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { projectStyleContext, projectBrand } from '@/lib/project-style-context';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -105,6 +107,8 @@ async function analyzeVisualAssets(apiKey: string, assets: VisualAsset[]) {
 }
 
 export async function POST(req: Request) {
+  let generationId = "";
+  let generationAdmin: SupabaseClient | null = null;
   try {
     const body = await req.json().catch(() => ({}));
     const workspaceId =
@@ -247,6 +251,10 @@ export async function POST(req: Request) {
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
       isVideo ? "以已確認短片結構為事實依據，按選定風格調整開場、對白及視覺節奏；不得新增痛點、功效、親身經驗或使用場景。" : "",
     ].join("\n");
+    generationId = randomUUID();
+    generationAdmin = access.admin;
+    const {error:recordError}=await access.admin.from('content_project_generation_runs').insert({id:generationId,project_id:projectId,workspace_id:workspaceId,actor_id:user.id,status:'pending',model:anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),input:{prompt:input,style:project.format_decision}});
+    if(recordError) throw recordError;
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -264,6 +272,8 @@ export async function POST(req: Request) {
       signal: AbortSignal.timeout(72_000),
     });
     const data = await response.json();
+    const {error:outputError}=await access.admin.from('content_project_generation_runs').update({output:data,updated_at:new Date().toISOString()}).eq('id',generationId);
+    if(outputError) throw outputError;
     if (!response.ok)
       throw new Error(data?.error?.message || "AI request failed");
     const text = Array.isArray(data.content)
@@ -277,19 +287,24 @@ export async function POST(req: Request) {
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
     const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
     const artboardByRole: Record<string, string> = { cover: "01_COVER", longform: "02_FULL_BLEED_TEXT", split: "03_IMAGE_TOP_TEXT_BOTTOM", comparison: "04_COMPARISON", feature: "05_LEFT_TEXT_RIGHT_IMAGE", end: "06_END_CTA" };
+    const styledVideo = isVideo && Boolean(project.format_decision?.recommendationId);
+    if (styledVideo && (!Array.isArray(drafts.pages) || drafts.pages.length !== structure.length || drafts.pages.some((page: Record<string,unknown>) => !Array.isArray(page.body) || !page.body.length || typeof page.designDirection !== 'string'))) {
+      throw new Error('風格劇本未完整生成，請重試。');
+    }
     const normalizedPages = isVideo ? structure.map((segment: Record<string, unknown>, index: number) => {
       const body = [segment.dialogue, segment.caption]
         .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+      const styled = styledVideo ? drafts.pages[index] as Record<string,unknown> : null;
       return {
         page: `S.${index + 1}`,
         headline: String(segment.section || `鏡頭 ${index + 1}`),
         subheadline: String(segment.time || ""),
-        body,
+        body: styled ? (styled.body as unknown[]).filter((line): line is string => typeof line === "string") : body,
         assetId: "",
         assetIds: [],
         assetStatus: "missing",
         layout: videoMethod === "ai_video_generation" ? "ai_scene" : "human_scene",
-        designDirection: [segment.visual, segment.productionNote].filter(Boolean).join("；"),
+        designDirection: styled ? String(styled.designDirection) : [segment.visual, segment.productionNote].filter(Boolean).join("；"),
         sourceEvidence: String(segment.sourceEvidence || ""),
         groundingStatus: String(segment.groundingStatus || "needs_confirmation"),
       };
@@ -326,16 +341,17 @@ export async function POST(req: Request) {
       pageDrafts: normalizedPages,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
-        captionDraft: structure.flatMap((segment: Record<string, unknown>) => [segment.dialogue, segment.caption]).filter((item): item is string => typeof item === "string" && item.trim().length > 0).join("\n"),
+        captionDraft: styledVideo ? String(drafts.captionDraft || "") : structure.flatMap((segment: Record<string, unknown>) => [segment.dialogue, segment.caption]).filter((item): item is string => typeof item === "string" && item.trim().length > 0).join("\n"),
         videoPlan: {
           method: videoMethod,
-          hook: String(structure[0]?.dialogue || structure[0]?.caption || ""),
+          hook: styledVideo ? String(drafts.hook || normalizedPages[0]?.body?.[0] || "") : String(structure[0]?.dialogue || structure[0]?.caption || ""),
           durationSeconds: Number(drafts.durationSeconds) || 20,
-          shotList: structure.map((segment: Record<string, unknown>) => [segment.visual, segment.productionNote].filter(Boolean).join("；")).filter(Boolean),
+          shotList: styledVideo ? normalizedPages.map((page: Record<string,unknown>) => page.designDirection).filter(Boolean) : structure.map((segment: Record<string, unknown>) => [segment.visual, segment.productionNote].filter(Boolean).join("；")).filter(Boolean),
         },
       } : {}),
       productionStatus: "drafts_ready",
       draftsGeneratedAt: new Date().toISOString(),
+      draftGenerationId: generationId,
     };
     const { data: saved, error: saveError } = await access.admin
       .from("content_projects")
@@ -349,12 +365,27 @@ export async function POST(req: Request) {
       .select("id,production,updated_at")
       .single();
     if (saveError) throw saveError;
+    const {error:completeError}=await access.admin.from("content_project_generation_runs").update({status:"ready",updated_at:new Date().toISOString()}).eq("id",generationId);
+    if(completeError) throw completeError;
     return NextResponse.json({ success: true, project: saved });
   } catch (error) {
     console.error("[content-projects/generate-drafts]", error);
+    if(generationId && generationAdmin) await generationAdmin.from("content_project_generation_runs").update({status:"failed",error:"生成未完成，請重試。",updated_at:new Date().toISOString()}).eq("id",generationId);
     return NextResponse.json(
       { error: "未能生成逐頁文案及版面草稿", detail: String(error) },
       { status: 500 },
     );
   }
+}
+
+export async function GET(req:Request) {
+ const url=new URL(req.url),workspaceId=url.searchParams.get('workspaceId') || '',id=url.searchParams.get('id') || '';
+ if(!isUuid(workspaceId)||!isUuid(id))return NextResponse.json({error:'Invalid request'},{status:400});
+ const {data:{user}}=await createServerSupabase(await cookies()).auth.getUser();
+ if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});
+ const access=await getWorkspaceAccess({email:user.email,userId:user.id,workspaceId});
+ if(!access || !['owner','admin'].includes(access.role))return NextResponse.json({error:'Forbidden'},{status:403});
+ const {data,error}=await access.admin.from('content_project_generation_runs').select('id,project_id,status,model,output,error,created_at').eq('id',id).eq('workspace_id',workspaceId).maybeSingle();
+ if(error)return NextResponse.json({error:'Unavailable'},{status:503});
+ return NextResponse.json(data || {error:'Not found'},{status:data?200:404,headers:{'Cache-Control':'private, no-store'}});
 }
