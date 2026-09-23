@@ -136,19 +136,36 @@ function comparisonCopy(body: string[], side: "left" | "right") {
 
 function bindingValue(role: string, fallback: string, copy: MasterCopy, page: string) {
   const body = Array.isArray(copy.body) ? copy.body.filter(Boolean) : [];
+  const pageNumber = page.split(/[\s/]+/u)[0] || page;
   const values: Record<string, string> = {
     eyebrow: clean(copy.subheadline),
     headline: clean(copy.headline),
     body: body.join("\n"),
     subheadline: clean(copy.subheadline),
-    left_body: comparisonCopy(body, "left"),
-    right_body: comparisonCopy(body, "right"),
+    body_1: body[0] || "",
+    body_2: body[1] || "",
+    body_3: body[2] || "",
+    body_4: body[3] || "",
+    body_5: body[4] || "",
+    body_6: body[5] || "",
+    body_7: body[6] || "",
+    left_body: body[2] || comparisonCopy(body, "left"),
+    right_body: body[3] || comparisonCopy(body, "right"),
     option_a: body[0] || "",
     option_b: body[1] || "",
     label_left: body[0] || "",
     label_right: body[1] || "",
-    cta: body.at(-1) || "了解更多",
-    page_number: page,
+    highlight: body.length >= 5 ? body[4] : body[2] || "",
+    source: body.at(-1) || "",
+    question: body[1] || "",
+    cta: body[2] || body.at(-1) || "了解更多",
+    feature_title_1: body[0] || "",
+    feature_body_1: body[1] || "",
+    feature_title_2: body[2] || "",
+    feature_body_2: body[3] || "",
+    feature_title_3: body[4] || "",
+    feature_body_3: body[5] || "",
+    page_number: pageNumber,
   };
   const direct = values[role];
   if (direct != null && direct !== "") return direct;

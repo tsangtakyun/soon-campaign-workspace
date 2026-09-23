@@ -13,6 +13,7 @@ import { SoonLoading } from "@/components/ui/SoonLoading";
 import { SoonIcon, type SoonIconName } from "@/components/ui/SoonIcon";
 import { contentStyleTemplates as styleTemplates, type ContentStyleTemplate } from "@/lib/content-style-library";
 import { clearMagazineCarouselV1, isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
+import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
 import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
@@ -1608,6 +1609,10 @@ export default function ContentStudioPage() {
   async function deletePageDraft(index: number) {
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
+    if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
+      setMessage("這個標準母版固定為六頁；你可以修改內容，但不能刪除必要頁面。");
+      return;
+    }
     if (!window.confirm(`確定刪除 P.${index + 1} 草稿？其餘頁面會自動重新編號`))
       return;
     const pageDrafts = selected.production.pageDrafts
@@ -1639,6 +1644,14 @@ export default function ContentStudioPage() {
     if (editingDraft !== null) {
       setMessage("請先儲存正在編輯的頁面");
       return;
+    }
+    const requiredRoles = coreTemplatePageRoles(selected.format_decision?.templateContractSnapshot);
+    if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
+      const actualRoles = selected.production.pageDrafts.map((draft: any) => String(draft.role || draft.layout || ""));
+      if (actualRoles.length !== requiredRoles.length || requiredRoles.some((item, index) => item.role !== actualRoles[index])) {
+        setMessage("逐頁草稿與已選標準母版的六頁角色不一致，請重新生成。");
+        return;
+      }
     }
     const isVideo = selected.selected_format === "short_video";
     await saveProject(
@@ -2210,6 +2223,15 @@ export default function ContentStudioPage() {
                         const template = displayStyles.find((item) => item.code === selectedStyleCode);
                         const core = template?.core;
                         const coreTemplate = core?.templates?.[0];
+                        const templateContract = coreTemplate?.version.contract || null;
+                        const nextProduction = isFixedCoreTemplate(templateContract)
+                          ? {
+                              ...(selected.production || {}),
+                              pages: applyCoreTemplateStructure(selected.production?.pages, templateContract),
+                              templateStructureVersion: coreTemplate?.version.number || null,
+                              templateStructureHash: coreTemplate?.version.contentHash || null,
+                            }
+                          : selected.production;
                         const saved = await saveProject({
                           formatDecision: {
                             ...(selected.format_decision || {}),
@@ -2232,10 +2254,11 @@ export default function ContentStudioPage() {
                             templateRegistryCode: coreTemplate?.code || null,
                             templateRegistryVersion: coreTemplate?.version.number || null,
                             templateContentHash: coreTemplate?.version.contentHash || null,
-                            templateContractSnapshot: coreTemplate?.version.contract || null,
+                            templateContractSnapshot: templateContract,
                             templateCreatorCommit: coreTemplate?.version.creatorCommit || null,
                             templateSelectedAt: new Date().toISOString(),
                           },
+                          ...(nextProduction ? { production: nextProduction } : {}),
                         }, "", undefined, [{
                           eventType: selected.format_decision?.templateCode && selected.format_decision.templateCode !== selectedStyleCode ? "changed" : "selected",
                           dimension: "template",

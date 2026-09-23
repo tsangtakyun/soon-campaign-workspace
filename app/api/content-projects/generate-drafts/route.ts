@@ -11,6 +11,7 @@ import { createServerSupabase } from "@/lib/server-supabase";
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 import { contentStylePromptFromDecision } from "@/lib/content-style-library";
 import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
+import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -174,9 +175,15 @@ export async function POST(req: Request) {
         { status: 500 },
       );
 
-    const structure = isVideo && Array.isArray(project.production.script) && project.production.script.length
+    const baseStructure = isVideo && Array.isArray(project.production.script) && project.production.script.length
       ? project.production.script
       : project.production.pages || [];
+    const templateContract = project.format_decision?.templateContractSnapshot;
+    const fixedTemplate = !isVideo && isFixedCoreTemplate(templateContract);
+    const expectedTemplateRoles = fixedTemplate ? coreTemplatePageRoles(templateContract) : [];
+    const structure = fixedTemplate
+      ? applyCoreTemplateStructure(baseStructure, templateContract)
+      : baseStructure;
     const assets: VisualAsset[] = project.production.assets || [];
     const analyzedAssets = isVideo ? assets : await analyzeVisualAssets(apiKey, assets);
     const { data: contentPreferences } = await access.admin
@@ -216,7 +223,12 @@ export async function POST(req: Request) {
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
           '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","templateArtboardId":"01_COVER|02_FULL_BLEED_TEXT|03_IMAGE_TOP_TEXT_BOTTOM|04_COMPARISON|05_LEFT_TEXT_RIGHT_IMAGE|06_END_CTA","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"imageTreatment":"auto|cutout|full-bleed|card","assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
-            "頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。",
+            ...(fixedTemplate ? [
+              `已發布母版固定為 ${expectedTemplateRoles.length} 頁，只可依次輸出 ${expectedTemplateRoles.map((item) => item.role).join("、")}；不可改頁數、重排、刪除或重複角色。`,
+              "內容必須適應已發布頁型，不可因文案語意另行更換 role。",
+              "固定 body 欄位：cover=[副標]；longform/split=[段落一,段落二,重點句,資料來源]；comparison=[左標籤,右標籤,左內容,右內容,結論,資料來源]；feature=[重點一標題,重點一說明,重點二標題,重點二說明,重點三標題,重點三說明,資料來源]；end=[總結副文,提問,留言提示]。沒有資料須標示待補，不可編造。",
+            ] : []),
+            ...(!fixedTemplate ? ["頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。"] : []),
             "每頁必須保存固定 templateArtboardId：cover=01_COVER、longform=02_FULL_BLEED_TEXT、split=03_IMAGE_TOP_TEXT_BOTTOM、comparison=04_COMPARISON、feature=05_LEFT_TEXT_RIGHT_IMAGE、end=06_END_CTA。",
             "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘內容頁，尤其 P.2 至 P.5，body 應忠實保留已確認 copyDirection 的具體資料，通常拆成 3 至 5 個短段，每段只寫一個重點。不得為了變短而刪走有來源支持的重要細節，亦不得以縮小字體容納過長內容。",
             "逐頁文案只可整理及改寫已確認故事結構、Brief 與來源資料。不得新增任何數字、背景、因果、影響、例子或評價；資料不足時寧可較短，不可以常識或套話填充。報道及當事人說法必須保留歸因字眼。",
@@ -296,6 +308,9 @@ export async function POST(req: Request) {
     if (styledVideo && (!Array.isArray(drafts.pages) || drafts.pages.length !== structure.length || drafts.pages.some((page: Record<string,unknown>) => !Array.isArray(page.body) || !page.body.length || typeof page.designDirection !== 'string'))) {
       throw new Error('風格劇本未完整生成，請重試。');
     }
+    if (fixedTemplate && (!Array.isArray(drafts.pages) || drafts.pages.length !== expectedTemplateRoles.length)) {
+      throw new Error(`標準母版需要完整生成 ${expectedTemplateRoles.length} 頁，請重試。`);
+    }
     const normalizedPages = isVideo ? structure.map((segment: Record<string, unknown>, index: number) => {
       const body = [segment.dialogue, segment.caption]
         .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
@@ -312,6 +327,35 @@ export async function POST(req: Request) {
         designDirection: styled ? String(styled.designDirection) : [segment.visual, segment.productionNote].filter(Boolean).join("；"),
         sourceEvidence: String(segment.sourceEvidence || ""),
         groundingStatus: String(segment.groundingStatus || "needs_confirmation"),
+      };
+    }) : fixedTemplate ? expectedTemplateRoles.map((templatePage, index) => {
+      const draft = Array.isArray(drafts.pages) && drafts.pages[index] && typeof drafts.pages[index] === "object"
+        ? drafts.pages[index] as Record<string, unknown>
+        : {};
+      const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
+        .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
+      const role = templatePage.role;
+      const assetIds = [...new Set(requestedIds)].slice(0, role === "comparison" || role === "split" ? 2 : 1);
+      const needsAnotherImage = role === "comparison" && assetIds.length < 2;
+      const assetStatus = draft.assetStatus === "missing" || assetIds.length === 0 || needsAnotherImage ? "missing" : "matched";
+      const assetRequest = draft.assetRequest && typeof draft.assetRequest === "object"
+        ? draft.assetRequest
+        : {
+            reason: needsAnotherImage ? "這一頁需要兩張能清楚呈現比較雙方的圖片。" : "現有圖片未能清楚支持這一頁的內容。",
+            suggestions: needsAnotherImage ? ["比較項目左方的清晰圖片", "比較項目右方的清晰圖片"] : ["能直接呈現這一頁主題的產品、服務或場景圖片"],
+          };
+      return {
+        ...draft,
+        page: `P.${index + 1}`,
+        role,
+        layout: role,
+        templatePosition: templatePage.position,
+        templateRequired: templatePage.required !== false,
+        templateArtboardId: artboardByRole[role],
+        assetId: assetIds[0] || "",
+        assetIds,
+        assetStatus,
+        assetRequest: assetStatus === "missing" ? assetRequest : undefined,
       };
     }) : (Array.isArray(drafts.pages) ? drafts.pages : []).map((draft: Record<string, unknown>) => {
       const requestedIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
