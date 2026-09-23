@@ -3,15 +3,28 @@
 import { useState } from 'react';
 import { validSubjectFocus, type SubjectFocus, type FocusAsset } from '@/lib/subject-crop';
 
-export function SubjectFocusEditor({ asset, disabled, onSave }: {
+export function SubjectFocusEditor({ asset, disabled, onSave, onAnalyze }: {
   asset: FocusAsset & { id: string; url: string };
   disabled?: boolean;
   onSave: (id: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) => Promise<boolean>;
+  onAnalyze?: (id: string) => Promise<{ focus: SubjectFocus | null; label: string; reason: string; cached: boolean }>;
 }) {
   const [focus, setFocus] = useState<SubjectFocus>(validSubjectFocus(asset.subjectFocus) ? asset.subjectFocus : { x: .5, y: .5, width: .3, height: .3 });
   const [size, setSize] = useState({ width: asset.width || 0, height: asset.height || 0 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  async function analyze() {
+    if (!onAnalyze) return;
+    setBusy(true); setMessage('AI 正在找主體，通常需十幾秒…');
+    try {
+      const result = await onAnalyze(asset.id);
+      if (validSubjectFocus(result.focus)) {
+        setFocus(result.focus);
+        setMessage(`${result.cached ? '已讀取上次辨識' : 'AI 已框選'}：${result.label}。請檢查綠框，可微調，再按「儲存焦點」套用。`);
+      } else setMessage(`AI 未能可靠地找出單一主體：${result.reason || '請手動點選。'} 原本焦點未改。`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : '辨識失敗，原本焦點未改。'); }
+    finally { setBusy(false); }
+  }
   async function save(value: SubjectFocus | null) {
     setBusy(true); setMessage('');
     try { setMessage(await onSave(asset.id, { subjectFocus: value, ...size }) ? value ? '焦點已儲存，預覽會按文字安全區重新裁切。' : '已恢復原本定位。' : '未能儲存，請重試。'); }
@@ -21,6 +34,7 @@ export function SubjectFocusEditor({ asset, disabled, onSave }: {
   return <details style={{ padding: '8px 12px', fontSize: 12 }}>
     <summary style={{ cursor: 'pointer' }}>主體焦點 {validSubjectFocus(asset.subjectFocus) ? '✓' : '設定'}</summary>
     <p>點選原圖主體，再調整保護範圍。系統只移動裁切，唔會改圖或生成新像素。</p>
+    {onAnalyze ? <><button type="button" disabled={disabled || busy} onClick={() => void analyze()}>AI 自動找主體</button><p>會將此圖交 AI 分析（消耗少量 token）；重用已保存結果不會再次分析。只提出建議，儲存後先套用。</p></> : null}
     <div style={{ position: 'relative', lineHeight: 0 }}>
       <img src={asset.url} alt="原圖；可用下方滑桿設定主體位置" style={{ display: 'block', width: '100%', height: 'auto', cursor: 'crosshair' }}
         onLoad={event => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}

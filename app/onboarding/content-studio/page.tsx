@@ -582,7 +582,8 @@ export default function ContentStudioPage() {
       return <CoreMasterPreview key={`${selected?.id}-${code}`} contract={contract} pages={props.storyPages || []}
         assets={Array.isArray(selected?.production?.assets) ? selected.production.assets as ProjectAsset[] : []}
         brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}
-        saving={saving} onSaveFocus={permissions?.canEdit ? saveAssetFocus : undefined}/>;
+        saving={saving} onSaveFocus={permissions?.canEdit ? saveAssetFocus : undefined}
+        onAnalyzeFocus={permissions?.canEdit ? analyzeAssetFocus : undefined}/>;
     }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
@@ -1439,6 +1440,14 @@ export default function ContentStudioPage() {
       },
       `已加入 ${assetTargetPage} 授權圖片；發佈前請核對授權及署名要求`,
     );
+  }
+
+  async function analyzeAssetFocus(assetId: string) {
+    const response = await fetch('/api/content-projects/detect-subject', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId }), signal: AbortSignal.timeout(55_000) });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || '辨識未完成，請稍後重試。');
+    return { focus: payload.focus as SubjectFocus | null, label: String(payload.detection?.label || '圖片主體'), reason: String(payload.detection?.reason || ''), cached: Boolean(payload.cached) };
   }
 
   async function saveAssetFocus(assetId: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) {
