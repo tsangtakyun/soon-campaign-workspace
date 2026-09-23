@@ -2,6 +2,7 @@
 
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
+import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -572,7 +573,12 @@ export default function ContentStudioPage() {
       expanded,
       onExpand: expanded ? undefined : () => setExpandedStyleCode(code),
     };
-    if (isClearMagazineCarousel(code)) return <ClearMagazinePreview {...props}/>;
+    if (isClearMagazineCarousel(code)) {
+      const contract = displayStyles.find(style => style.code === code)?.core?.templates?.[0]?.version.contract;
+      return <CoreMasterPreview key={`${selected?.id}-${code}`} contract={contract} pages={props.storyPages || []}
+        assets={Array.isArray(selected?.production?.assets) ? selected.production.assets as ProjectAsset[] : []}
+        brandName={props.brandName || 'BRAND'} onExpand={props.onExpand}/>;
+    }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
     return null;
@@ -2188,7 +2194,7 @@ export default function ContentStudioPage() {
                       <b>目前只屬風格預覽</b>
                       <span>{isShortVideo ? "這張無字圖片只模擬短片首鏡；選擇後，SOON 會按完整劇本建立逐鏡製作包。" : "選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。"}</span>
                     </details>
-                    <div className="style-template-grid">
+                    <div className="style-template-grid" style={visibleDisplayStyles.length === 1 ? {gridTemplateColumns:'minmax(0, 520px)',justifyContent:'center'} : undefined}>
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
                         return (
@@ -2241,7 +2247,7 @@ export default function ContentStudioPage() {
                     {styleMessage ? <p role="status">{styleMessage} <button type="button" onClick={() => setStyleRetry(value => value + 1)}>重新分析</button></p> : null}
                     {expandedStyleCode ? <div className="style-preview-modal" role="dialog" aria-modal="true" aria-label="放大風格預覽" onClick={() => setExpandedStyleCode(null)}>
                       <div className="style-preview-modal-panel" onClick={(event) => event.stopPropagation()}>
-                        <div className="style-preview-modal-head"><div><small>{isShortVideo ? "共同劇本 · 9:16 首幀示意" : selected.selected_format === "single_image" ? "共同題材 · 單張示意" : "共同題材 · 三頁示意"}</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
+                        <div className="style-preview-modal-head"><div><small>{isShortVideo ? "共同劇本 · 9:16 首幀示意" : selected.selected_format === "single_image" ? "共同題材 · 單張示意" : isClearMagazineCarousel(expandedStyleCode) ? "共同題材 · 母版排版預覽" : "共同題材 · 三頁示意"}</small><strong>{displayStyles.find((item) => item.code === expandedStyleCode)?.name || "風格預覽"}</strong></div><button type="button" onClick={() => setExpandedStyleCode(null)} aria-label="關閉預覽">×</button></div>
                         {isShortVideo ? renderVideoStylePreview(displayStyles.find((item) => item.code === expandedStyleCode)!) : renderStylePreview(expandedStyleCode, true)}
                         <p>{isShortVideo ? "預覽使用已確認劇本的 Hook、首鏡及字幕；正式製作會沿用你選定的短片風格。" : "預覽使用已確認的故事結構及同一組圖片素材；正式製作會沿用你選定的風格。"}</p>
                       </div>
