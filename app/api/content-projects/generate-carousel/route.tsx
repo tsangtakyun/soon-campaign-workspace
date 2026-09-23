@@ -17,6 +17,7 @@ import {
 import { createServerSupabase } from "@/lib/server-supabase";
 import { resolveContentBranding, readerFacingCopy, findBrandTypeface, localTypefaceFiles } from '@/lib/content-branding';
 import { getWorkspaceAccess } from "@/lib/workspace-access";
+import type { FocusAsset } from '@/lib/subject-crop';
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,7 +37,7 @@ type Draft = {
   secondaryImagePosition?: "center" | "top" | "bottom" | "left" | "right";
 };
 
-type Asset = { id: string; url: string; width?: number; height?: number; isCutout?: boolean };
+type Asset = FocusAsset & { id: string; url: string; isCutout?: boolean };
 
 const templateThemes: Record<string, { background: string; ink: string; accent: string; label: string }> = {
   "editorial-clear": { background: "#f6f2eb", ink: "#6b2c30", accent: "#c7e63a", label: "重點整理" },

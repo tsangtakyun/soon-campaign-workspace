@@ -13,14 +13,14 @@ function compile(file, deps = {}) {
 }
 async function main() {
   const brand = compile('lib/content-branding.ts', { './typefaces': compile('lib/typefaces.ts') });
-  const renderer = compile('lib/content-templates/core-master-template.tsx', { '../content-branding': brand });
+  const renderer = compile('lib/content-templates/core-master-template.tsx', { '../content-branding': brand, '../subject-crop': compile('lib/subject-crop.ts') });
   const contract = JSON.parse(fs.readFileSync('tests/fixtures/clear-magazine-v3.contract.json', 'utf8'));
   const logo = 'data:image/png;base64,' + (await sharp({ create: { width: 100, height: 60, channels: 4, background: '#ec6234' } }).png().toBuffer()).toString('base64');
   const photo = 'data:image/png;base64,' + fs.readFileSync('public/templates/clear-magazine-carousel-v3/longform-bear-clean.png').toString('base64');
   const node = renderer.renderCoreMasterPage({
     design: renderer.getCoreMasterPageDesign(contract, 'cover'),
     copy: { headline: '胖熊週是甚麼', subheadline: '', body: ['副題點明，介紹賽事'], fields: { 'asset.credit': '' } },
-    page: '01', primary: { url: photo }, branding: { name: 'TEST', logoUrl: logo },
+    page: '01', primary: { url: photo, width: 1080, height: 1800, subjectFocus: { x: .5, y: .45, width: .3, height: .3 } }, branding: { name: 'TEST', logoUrl: logo },
     fonts: { family: 'Brand Test', editorialFamily: 'Brand Test' },
   });
   const html = renderToStaticMarkup(node);

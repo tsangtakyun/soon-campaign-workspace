@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { getCoreMasterPageDesign, renderCoreMasterPage, type CoreMasterRole } from '@/lib/content-templates/core-master-template';
+import { getCoreMasterPageDesign, renderCoreMasterPage, coreMasterSubjectLayout, type CoreMasterRole } from '@/lib/content-templates/core-master-template';
+import { SubjectFocusEditor } from './SubjectFocusEditor';
+import type { FocusAsset, SubjectFocus } from '@/lib/subject-crop';
 import { findBrandTypeface, readerFacingCopy, localTypefaceFiles } from '@/lib/content-branding';
 import { stylePreviewPages } from '@/lib/style-preview-pages';
 
 type Page = Record<string, unknown>;
-type Asset = { url: string; assignedPage?: string; isCover?: boolean; sourceType?: string };
+type Asset = FocusAsset & { id?: string; url: string; assignedPage?: string; isCover?: boolean; sourceType?: string };
 const roles = new Set(['cover', 'longform', 'split', 'comparison', 'feature', 'end']);
 
-export function CoreMasterPreview({ contract, pages, assets, brandName, branding, onExpand }: {
+export function CoreMasterPreview({ contract, pages, assets, brandName, branding, onExpand, onSaveFocus, saving }: {
   contract: unknown; pages: Page[]; assets: Asset[]; brandName: string;
   branding?: { logoUrl: string | null; fontStyle: string | null }; onExpand?: () => void;
+  saving?: boolean;
+  onSaveFocus?: (id: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) => Promise<boolean>;
 }) {
   const [index, setIndex] = useState(0);
   const [width, setWidth] = useState(320);
@@ -103,6 +107,7 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
     for (const [key, value] of Object.entries(page.fields)) if (typeof value === 'string') fields[key] = readerFacingCopy(value);
   }
   fields.page_number = String(sourceIndex + 1).padStart(2, '0');
+  const crops = design ? Object.values(coreMasterSubjectLayout({ design, copy: { headline: fields.headline, body, fields }, page: fields.page_number, primary, secondary: assigned[1] })) : [];
   return <section className="master-preview" data-preview-version="three-samples-v3">
     <div ref={frame} style={{ width: '100%', aspectRatio: '4 / 5', overflow: 'hidden', position: 'relative', background: '#f4f0e8' }}>
       {design ? <div style={{ width: 1080, height: 1350, transform: `scale(${width / 1080})`, transformOrigin: 'top left' }}>
@@ -116,6 +121,9 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
       {onExpand ? <button type="button" onClick={onExpand}>放大</button> : null}
     </nav>
     <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>風格示範 · {sample.label}{!primary ? ' · 此頁未配圖' : ''} · 選定後再製作完整內容</p>
+    {crops.some(crop => crop.active) ? <p style={{fontSize:11,margin:'8px 12px',color:'#6b2c30'}}>{crops.some(crop => crop.constrained) ? '圖片比例限制：主體仍可能被裁切或與文字重疊，建議換圖或改用圖文分區版面。' : '已按主體焦點及文字安全區調整裁切。'}</p> : null}
+    {onSaveFocus && primary?.id ? <SubjectFocusEditor key={`${primary.id}-${primary.url}-${JSON.stringify(primary.subjectFocus)}`} asset={{ ...primary, id: primary.id }} disabled={saving} onSave={onSaveFocus}/> : null}
+    {onSaveFocus && assigned[1]?.id ? <SubjectFocusEditor key={`${assigned[1].id}-${assigned[1].url}-${JSON.stringify(assigned[1].subjectFocus)}`} asset={{ ...assigned[1], id: assigned[1].id! }} disabled={saving} onSave={onSaveFocus}/> : null}
     <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>{activeFont ? '已套用品牌字型' : branding?.fontStyle ? fontError || !typeface ? '品牌字型未能載入，暫用風格字型' : '品牌字型載入中…' : '未設定品牌字型，使用風格字型'}</p>
     <style>{`
       @font-face{font-family:'SOON Preview Serif';src:url('/fonts/magazine/Serif-Regular.otf');font-weight:400;font-display:swap}

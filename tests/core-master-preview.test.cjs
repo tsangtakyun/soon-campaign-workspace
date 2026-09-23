@@ -2,13 +2,14 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const {renderToStaticMarkup}=require('react-dom/server');
 function compile(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports}
 const branding=compile('lib/content-branding.ts',{'./typefaces':compile('lib/typefaces.ts')});
-const renderer=compile('lib/content-templates/core-master-template.tsx',{'../content-branding':branding});
+const crop=compile('lib/subject-crop.ts');
+const renderer=compile('lib/content-templates/core-master-template.tsx',{'../content-branding':branding,'../subject-crop':crop});
 const samples=compile('lib/style-preview-pages.ts');
 const contract=JSON.parse(fs.readFileSync('tests/fixtures/clear-magazine-v3.contract.json','utf8'));
 const roles=['cover','longform','split','comparison','feature','end'];
 const pages=roles.map((role,i)=>({page:`P.${i+1}`,role,headline:'胖熊週是甚麼？',copyDirection:'每年秋天，棕熊會大量進食。脂肪是過冬的重要儲備。這場賽事讓大家認識棕熊。'}));
 const assets=roles.map((_,i)=>({assignedPage:`P.${i+1}`,url:`/test-asset/${i+1}`,sourceType:'upload'})).reverse();
-function render(index,withAssets=true,brand){let call=0;const hooks={...React,useState:(initial)=>[call++===0?index:call===2?320:initial,()=>{}],useEffect:()=>{},useRef:()=>({current:null})};const component=compile('components/content/CoreMasterPreview.tsx',{'react':hooks,'@/lib/style-preview-pages':samples,'@/lib/content-branding':branding,'@/lib/content-templates/core-master-template':renderer});return renderToStaticMarkup(component.CoreMasterPreview({contract,pages,assets:withAssets?assets:[],brandName:'TEST',branding:brand}));}
+function render(index,withAssets=true,brand){let call=0;const hooks={...React,useState:(initial)=>[call++===0?index:call===2?320:initial,()=>{}],useEffect:()=>{},useRef:()=>({current:null})};const component=compile('components/content/CoreMasterPreview.tsx',{'react':hooks,'./SubjectFocusEditor':{SubjectFocusEditor:()=>null},'@/lib/style-preview-pages':samples,'@/lib/content-branding':branding,'@/lib/content-templates/core-master-template':renderer});return renderToStaticMarkup(component.CoreMasterPreview({contract,pages,assets:withAssets?assets:[],brandName:'TEST',branding:brand}));}
 assert.equal(JSON.stringify(samples.stylePreviewPages([1,2,3,4,5,6,7]).map(x=>x.page)), '[1,2,7]');
 assert.equal(samples.stylePreviewPages([]).length,0);
 assert.equal(samples.stylePreviewPages([1]).length,1);

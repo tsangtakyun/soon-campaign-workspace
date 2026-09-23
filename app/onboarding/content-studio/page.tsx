@@ -3,6 +3,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
+import type { SubjectFocus } from '@/lib/subject-crop';
 import { resolveContentBranding } from '@/lib/content-branding';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -25,6 +26,7 @@ import {
 import { createClient } from "@/lib/supabase";
 
 type ProjectAsset = {
+  subjectFocus?: SubjectFocus | null;
   id: string;
   url: string;
   filename: string;
@@ -579,7 +581,8 @@ export default function ContentStudioPage() {
       const contract = displayStyles.find(style => style.code === code)?.core?.templates?.[0]?.version.contract;
       return <CoreMasterPreview key={`${selected?.id}-${code}`} contract={contract} pages={props.storyPages || []}
         assets={Array.isArray(selected?.production?.assets) ? selected.production.assets as ProjectAsset[] : []}
-        brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}/>;
+        brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}
+        saving={saving} onSaveFocus={permissions?.canEdit ? saveAssetFocus : undefined}/>;
     }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
@@ -1436,6 +1439,13 @@ export default function ContentStudioPage() {
       },
       `已加入 ${assetTargetPage} 授權圖片；發佈前請核對授權及署名要求`,
     );
+  }
+
+  async function saveAssetFocus(assetId: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) {
+    if (!selected?.production || !Array.isArray(selected.production.assets)) return false;
+    return saveProject({ production: { ...selected.production,
+      assets: (selected.production.assets as ProjectAsset[]).map(asset => asset.id === assetId ? { ...asset, ...updates } : asset),
+    } }, '圖片焦點已儲存；現有輸出圖片不會被覆寫，下次製作會套用新裁切');
   }
 
   async function updateAsset(assetId: string, updates: Partial<ProjectAsset>) {

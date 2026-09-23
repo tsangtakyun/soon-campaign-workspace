@@ -1,5 +1,6 @@
 import React from "react";
 import { readerFacingCopy } from '../content-branding';
+import { subjectCrop, type FocusAsset, type CropRect } from '../subject-crop';
 
 export type CoreMasterRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
@@ -59,9 +60,8 @@ type MasterCopy = {
   fields?: Record<string, string>;
 };
 
-type MasterAsset = {
+type MasterAsset = FocusAsset & {
   url?: string;
-  position?: "center" | "top" | "bottom" | "left" | "right";
 };
 
 type MasterBranding = {
@@ -199,6 +199,7 @@ function renderObject(options: {
   secondary?: MasterAsset;
   branding: MasterBranding;
   fonts: MasterFonts;
+  crops: Record<string, ReturnType<typeof subjectCrop>>;
 }): React.ReactNode {
   const { object, key, scaleX, scaleY, copy, page, primary, secondary, branding, fonts } = options;
   if (object.visible === false) return null;
@@ -234,7 +235,7 @@ function renderObject(options: {
       src: dynamicAsset.url,
       width,
       height,
-      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" ? "contain" : "cover", objectPosition: dynamicAsset.position || "center" },
+      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" ? "contain" : "cover", objectPosition: options.crops[key]?.position || dynamicAsset.position || "center" },
     });
   }
 
@@ -333,6 +334,7 @@ export function renderCoreMasterPage(options: {
   const scaleX = OUTPUT_WIDTH / coordinate.width;
   const scaleY = OUTPUT_HEIGHT / coordinate.height;
   const objects = Array.isArray(design.canvasJson?.objects) ? design.canvasJson.objects : [];
+  const crops = coreMasterSubjectLayout(options);
   return React.createElement("div", {
     style: {
       width: "100%",
@@ -343,5 +345,27 @@ export function renderCoreMasterPage(options: {
       background: design.canvasJson?.background || "#F4F0E8",
       fontFamily: options.fonts.family,
     },
-  }, objects.map((object, index) => renderObject({ ...options, object, key: `master-${index}`, scaleX, scaleY })));
+  }, objects.map((object, index) => renderObject({ ...options, crops, object, key: `master-${index}`, scaleX, scaleY })));
+}
+
+export function coreMasterSubjectLayout(options: {
+  design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset;
+}) {
+  const coordinate = inferCoordinateSize(options.design);
+  const sx = OUTPUT_WIDTH / coordinate.width, sy = OUTPUT_HEIGHT / coordinate.height;
+  const textZones: CropRect[] = [];
+  const images: Array<{ key: string; rect: CropRect; asset: MasterAsset }> = [];
+  const visit = (objects: FabricObjectJson[], prefix: string, ox = 0, oy = 0) => objects.forEach((o, i) => {
+    if (o.visible === false || o.opacity === 0) return;
+    const key = `${prefix}-${i}`, role = clean(o.data?.role).toLowerCase();
+    const rect = { x: ox + finite(o.left) * sx, y: oy + finite(o.top) * sy,
+      width: finite(o.width) * finite(o.scaleX, 1) * sx, height: finite(o.height) * finite(o.scaleY, 1) * sy };
+    const asset = roleAsset(role, options.primary, options.secondary);
+    if (asset && o.data?.binding !== 'content.asset.contain') images.push({ key, rect, asset });
+    else if (['textbox', 'text', 'itext'].includes(clean(o.type).toLowerCase())
+      && readerFacingCopy(bindingValue(role, clean(o.text), options.copy, options.page, o.data?.binding))) textZones.push(rect);
+    if (o.objects) visit(o.objects, key, rect.x, rect.y);
+  });
+  visit(options.design.canvasJson?.objects || [], 'master');
+  return Object.fromEntries(images.map(({ key, rect, asset }) => [key, subjectCrop(asset, rect, textZones)]));
 }
