@@ -1,7 +1,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { projectStyleContext, projectBrand } from '@/lib/project-style-context';
+import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context';
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -143,7 +143,12 @@ export async function POST(req: Request) {
       .eq("workspace_id", workspaceId)
       .single();
     if (error) throw error;
-    if (project.format_decision?.inputHash && project.format_decision.inputHash !== projectStyleContext(project,await projectBrand(access.admin,workspaceId)).inputHash) {
+    const brand=await projectBrand(access.admin,workspaceId);
+    const decision=project.format_decision;
+    const stale=decision?.confirmedInputHash
+      ? decision.confirmedInputHash !== confirmedStyleHash(project,brand)
+      : decision?.inputHash && decision.inputHash !== projectStyleContext(project,brand).inputHash;
+    if (stale) {
       return NextResponse.json({ error: "題材、故事或素材已改變，請重新確認風格。" }, { status: 409 });
     }
     const isVideo = project.selected_format === "short_video";

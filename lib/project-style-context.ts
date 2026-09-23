@@ -11,6 +11,17 @@ export function projectStyleContext(project: Record<string, unknown>, brand?:unk
 }
 export const CREATOR_RENDERERS=['clear-magazine-carousel-v1','product-focus','ranking-review','editorial-clear','problem-solution','creator-natural','bold-social']
 
+// JSONB may reorder object keys. Confirmation compares content, not key order.
+function canonical(value: unknown): unknown {
+ if (Array.isArray(value)) return value.map(canonical)
+ if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)]))
+ return value
+}
+export function confirmedStyleHash(project: Record<string, unknown>, brand?: unknown) {
+ const {inputHash, ...context}=projectStyleContext(project,brand)
+ return fingerprint(canonical({...context,topicVersion:fingerprint(canonical({source:project.source_note,brief:project.brief}))}))
+}
+
 export async function projectBrand(admin: import('@supabase/supabase-js').SupabaseClient,workspaceId:string) {
  const [{data:workspace},{data:brandKit}]=await Promise.all([
  admin.from('workspaces').select('name,description,content_directions,market_locations').eq('id',workspaceId).maybeSingle(),

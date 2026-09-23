@@ -1,5 +1,6 @@
 import { coreCode, object, styleSnapshot, validateSelection, type StyleResult } from '@/lib/production-style'
-import { projectStyleContext, projectBrand } from '@/lib/project-style-context'
+import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context'
+import { applyCoreTemplateStructure, isFixedCoreTemplate } from '@/lib/core-template-contract'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -155,7 +156,8 @@ export async function PATCH(req: Request) {
           // Clients may edit production settings but cannot rewrite an already locked snapshot.
           body.formatDecision = { ...requested, ...old, confirmedMaterials: requested.confirmedMaterials ?? old.confirmedMaterials, videoMethod: requested.videoMethod ?? old.videoMethod }
         } else {
-          const input=projectStyleContext(existing,await projectBrand(access.admin,workspaceId))
+          const brand=await projectBrand(access.admin,workspaceId)
+          const input=projectStyleContext(existing,brand)
           const {data:run}=await access.admin.from('content_project_style_runs').select('result').eq('project_id',projectId).eq('workspace_id',workspaceId).eq('input_hash',input.inputHash).eq('result->>id',requested.recommendationId).maybeSingle()
           const result=run?.result as StyleResult | undefined
           const selected=result?.styles.find(style=>style.code===coreCode(requested.templateCode))
@@ -166,6 +168,18 @@ export async function PATCH(req: Request) {
             renderTemplateCode:template?.version.rendererCode || selected.code,templateContractSnapshot:template?.version.contract || null,
             templateRegistryId:template?.templateId || null,templateRegistryCode:template?.code || null,templateRegistryVersion:template?.version.number || null,
             templateContentHash:template?.version.contentHash || null,templateCreatorCommit:template?.version.creatorCommit || null}
+          // Only a validated recommendation can establish a new confirmation.
+          // Apply the trusted contract to persisted content, never client-authored pages.
+          const contract=template?.version.contract
+          const production=object(existing.production)
+          body.production=isFixedCoreTemplate(contract) ? {...production,
+            pages:applyCoreTemplateStructure(production.pages,contract),
+            templateStructureVersion:template?.version.number || null,
+            templateStructureHash:template?.version.contentHash || null} : production
+          body.formatDecision.confirmedInputHash=confirmedStyleHash({...existing,
+            brief:body.brief || existing.brief,
+            selected_format:typeof body.selectedFormat==='string' ? body.selectedFormat.slice(0,100) : existing.selected_format,
+            production:body.production,format_decision:body.formatDecision},brand)
         }
       } else if(old.styleVersionRef && requested.templateCode === old.templateCode) {
         body.formatDecision={...requested,...old,confirmedMaterials:requested.confirmedMaterials ?? old.confirmedMaterials};
