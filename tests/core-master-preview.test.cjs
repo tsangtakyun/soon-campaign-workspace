@@ -25,6 +25,16 @@ assert.equal(branding.readerFacingCopy('準備過冬的棕熊'),'準備過冬的
 assert.ok(render(0,true,{logoUrl:'/kit.png',fontStyle:null}).includes('/kit.png'));
 pages[0].copyDirection='副題點明，介紹今年賽事';
 assert.ok(!render(0).includes('副題點明'));
+const eggBrand=branding.resolveContentBranding({logo_url:null,font_style:'GenSenRounded2'},null,'Egg.soon');
+assert.equal(eggBrand.logoUrl,'/brand-assets/eggsoon/soon-egg.png');
+assert.equal(branding.findBrandTypeface(eggBrand.fontStyle).id,'swei-gothic');
+assert.equal(branding.resolveContentBranding({logo_url:'/custom.png'},null,'Egg.soon').logoUrl,'/custom.png');
+pages[0].copyDirection='副題點明：這不是網絡迷因，而是美國國家公園每年舉辦的正式網上投票比賽。棕熊參賽，公眾投票，選出年度最胖冠軍。';
+const actualProjectPreview=render(0,true,eggBrand);
+assert.ok(actualProjectPreview.includes('/brand-assets/eggsoon/soon-egg.png'));
+assert.ok(actualProjectPreview.includes('這不是網絡迷因'));
+assert.ok(!actualProjectPreview.includes('副題點明'));
+assert.ok(actualProjectPreview.includes('品牌預覽 v2'));
 console.log('PASS: workspace/kit priority, logo rendering, font aliases, optional subtitle and editorial instruction filtering');
 if(process.argv.includes('--serve')) require('node:http').createServer((req,res)=>{
   if(req.url.startsWith('/fonts/')){const path='public'+req.url;res.end(fs.readFileSync(path));return}

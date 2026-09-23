@@ -703,7 +703,7 @@ export default function ContentStudioPage() {
           2,
         );
         const brandPayload = await brandResponse.json().catch(() => null);
-        setPreviewBrand(brandResponse.ok ? resolveContentBranding(brandPayload?.workspace, brandPayload?.brandKit) : resolveContentBranding());
+        setPreviewBrand(brandResponse.ok ? resolveContentBranding(brandPayload?.workspace, brandPayload?.brandKit, brandPayload?.brandProfile?.business_name || brandPayload?.workspace?.name || '') : resolveContentBranding());
         setBrandLibraryAssets(
           brandResponse.ok && Array.isArray(brandPayload?.assets)
             ? brandPayload.assets

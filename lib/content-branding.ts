@@ -24,9 +24,13 @@ export function findBrandTypeface(value?: string | null) {
   const resolved = aliases[key] || key;
   return typefaces.find(font => font.id.toLowerCase() === resolved || font.fontFamily.toLowerCase() === resolved) || null;
 }
-export function resolveContentBranding(workspace?: BrandSettings | null, kit?: BrandSettings | null) {
+export function resolveContentBranding(workspace?: BrandSettings | null, kit?: BrandSettings | null, name = '') {
+  // Match the built-in identities displayed by the workspace brand library.
+  const label = name.toLowerCase().replace(/\s+/g, '');
+  const fallbackLogo = label.includes('egg.soon') || label.includes('eggsoon') ? '/brand-assets/eggsoon/soon-egg.png'
+    : label.includes('bechilltogether') || label.includes('bunchill') ? '/brand-assets/bechilltogether/bunchill-logo.png' : null;
   return {
-    logoUrl: workspace?.logo_url || kit?.logo_url || null,
+    logoUrl: workspace?.logo_url || kit?.logo_url || fallbackLogo,
     fontStyle: workspace?.font_style || kit?.typeface_family || kit?.typeface_id || null,
   };
 }
@@ -38,7 +42,9 @@ export function readerFacingCopy(value: unknown): string {
     const direction = line.match(/^(?:副題|副標題|主標題|主標|標題|內文|CTA|收尾)(?:點明|說明|帶出|強調|交代|呈現|提醒)[：:，,\s]*(.*)$/iu);
     if (direction) {
       const quoted = direction[1].match(/^[「“](.*)[」”][。.!！]?$/u);
-      return quoted ? quoted[1] : '';
+      if (quoted) return quoted[1];
+      // An explicit colon separates the label from existing reader-facing copy.
+      return /^(?:副題|副標題|主標題|主標|標題)(?:點明|說明|帶出|強調|交代|呈現|提醒)\s*[：:]/u.test(line) ? direction[1] : '';
     }
     return line.replace(/^(?:副題|副標題|主標題|主標)[：:]\s*/u, '');
   }).filter(Boolean).join('\n');

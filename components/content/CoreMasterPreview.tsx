@@ -92,7 +92,8 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
     for (const [key, value] of Object.entries(page.fields)) if (typeof value === 'string') fields[key] = readerFacingCopy(value);
   }
   fields.page_number = String(currentIndex + 1).padStart(2, '0');
-  return <section className="master-preview">
+  return <section className="master-preview" data-preview-version="brand-v2">
+    <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>品牌預覽 v2 · {branding?.logoUrl ? '已套用品牌 Logo' : '未設定 Logo，顯示品牌名稱'}</p>
     <div ref={frame} style={{ width: '100%', aspectRatio: '4 / 5', overflow: 'hidden', position: 'relative', background: '#f4f0e8' }}>
       {design ? <div style={{ width: 1080, height: 1350, transform: `scale(${width / 1080})`, transformOrigin: 'top left' }}>
         {renderCoreMasterPage({ design, copy: { headline: fields.headline, body, fields }, page: fields.page_number,

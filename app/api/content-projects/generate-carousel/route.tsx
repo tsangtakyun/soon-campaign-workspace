@@ -847,9 +847,9 @@ export async function POST(req: Request) {
       brandProfile?.business_name || workspace?.name || "SOON",
     );
     const requestOrigin = new URL(req.url).origin;
-    const brandSettings = resolveContentBranding(workspace, brandKit);
+    const brandSettings = resolveContentBranding(workspace, brandKit, workspaceName);
     const branding = {
-      logoUrl: brandSettings.logoUrl,
+      logoUrl: brandSettings.logoUrl ? new URL(brandSettings.logoUrl, requestOrigin).href : null,
       swipeUrl: `${requestOrigin}/templates/clear-magazine-carousel-v1/cta-arrow.png`,
       name: workspaceName,
       colors: Array.isArray(workspace?.brand_colors)

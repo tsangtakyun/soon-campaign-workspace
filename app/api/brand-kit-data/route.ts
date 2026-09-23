@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const supabase = workspaceAccess.admin
     const { data: workspace } = await supabase
       .from('workspaces')
-      .select('id,owner_id,logo_url,visual_style,font_style,visual_identity_description,brand_colors')
+      .select('id,name,owner_id,logo_url,visual_style,font_style,visual_identity_description,brand_colors')
       .eq('id', workspaceId)
       .maybeSingle()
 
