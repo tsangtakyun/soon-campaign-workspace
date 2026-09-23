@@ -32,6 +32,8 @@ type Draft = {
   role?: string;
   templateArtboardId?: string;
   imageTreatment?: "auto" | "cutout" | "full-bleed" | "card";
+  imagePosition?: "center" | "top" | "bottom" | "left" | "right";
+  secondaryImagePosition?: "center" | "top" | "bottom" | "left" | "right";
 };
 
 type Asset = { id: string; url: string; width?: number; height?: number; isCutout?: boolean };
@@ -801,8 +803,8 @@ function renderPublishedCoreMasterPage(
     design,
     copy: draft,
     page: `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`,
-    primary: asset,
-    secondary: secondaryAsset,
+    primary: asset ? { ...asset, position: draft.imagePosition || "center" } : undefined,
+    secondary: secondaryAsset ? { ...secondaryAsset, position: draft.secondaryImagePosition || "center" } : undefined,
     branding,
     fonts: { family: fonts.family, editorialFamily: EDITORIAL_CAROUSEL_FONT },
   });

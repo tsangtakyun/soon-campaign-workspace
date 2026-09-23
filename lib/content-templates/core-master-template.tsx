@@ -59,6 +59,7 @@ type MasterCopy = {
 
 type MasterAsset = {
   url?: string;
+  position?: "center" | "top" | "bottom" | "left" | "right";
 };
 
 type MasterBranding = {
@@ -173,8 +174,8 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
 }
 
 function roleAsset(role: string, primary?: MasterAsset, secondary?: MasterAsset) {
-  if (["image_right", "image_secondary", "secondary_image"].includes(role)) return secondary?.url || primary?.url;
-  if (["image", "image_main", "image_left", "content_image", "primary_image"].includes(role)) return primary?.url;
+  if (["image_right", "image_secondary", "secondary_image"].includes(role)) return secondary?.url ? secondary : primary;
+  if (["image", "image_main", "image_left", "content_image", "primary_image"].includes(role)) return primary;
   return undefined;
 }
 
@@ -220,10 +221,10 @@ function renderObject(options: {
   if (dynamicAsset) {
     return React.createElement("img", {
       key,
-      src: dynamicAsset,
+      src: dynamicAsset.url,
       width,
       height,
-      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" ? "contain" : "cover" },
+      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" ? "contain" : "cover", objectPosition: dynamicAsset.position || "center" },
     });
   }
 

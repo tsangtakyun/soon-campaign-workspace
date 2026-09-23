@@ -296,6 +296,8 @@ type ContextualPreviewSlide = {
   detail?: string;
   layout?: string;
   imageTreatment?: string;
+  imagePosition?: "center" | "top" | "bottom" | "left" | "right";
+  secondaryImagePosition?: "center" | "top" | "bottom" | "left" | "right";
 };
 
 function corePreviewSlides(template: DisplayStyle, angle: string): ContextualPreviewSlide[] {
@@ -1652,6 +1654,20 @@ export default function ContentStudioPage() {
         setMessage("逐頁草稿與已選標準母版的六頁角色不一致，請重新生成。");
         return;
       }
+      for (const [index, draft] of selected.production.pageDrafts.entries()) {
+        const headlineLength = Array.from(String(draft.headline || "").replace(/\s+/g, "")).length;
+        const bodyLines = Array.isArray(draft.body) ? draft.body : [];
+        const assetIds = Array.isArray(draft.assetIds) ? draft.assetIds.filter(Boolean) : draft.assetId ? [draft.assetId] : [];
+        const requiredImages = actualRoles[index] === "comparison" ? 2 : 1;
+        if (headlineLength > 24 || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > 72)) {
+          setMessage(`P.${index + 1} 文案超出標準母版上限（標題 24 字、每段正文 72 字），請先縮短。`);
+          return;
+        }
+        if (assetIds.length < requiredImages) {
+          setMessage(`P.${index + 1} 尚欠${requiredImages === 2 ? "兩張比較" : "一張"}圖片，補齊後才可製作。`);
+          return;
+        }
+      }
     }
     const isVideo = selected.selected_format === "short_video";
     await saveProject(
@@ -2817,6 +2833,13 @@ export default function ContentStudioPage() {
                                                   </select>
                                                 </label>
                                               ) : null}
+                                              <label>
+                                                <b>圖片裁切焦點</b>
+                                                <select value={draft.imagePosition || "center"} onChange={(event) => updatePageDraft(index, "imagePosition", event.target.value)}>
+                                                  <option value="center">中央</option><option value="top">上方</option><option value="bottom">下方</option><option value="left">左方</option><option value="right">右方</option>
+                                                </select>
+                                              </label>
+                                              {supportsMultipleImages ? <label><b>右側圖片裁切焦點</b><select value={draft.secondaryImagePosition || "center"} onChange={(event) => updatePageDraft(index, "secondaryImagePosition", event.target.value)}><option value="center">中央</option><option value="top">上方</option><option value="bottom">下方</option><option value="left">左方</option><option value="right">右方</option></select></label> : null}
                                               <details className="draft-layout-detail">
                                                 <summary>查看版面設定</summary>
                                                 <p>{draft.designDirection}</p>
