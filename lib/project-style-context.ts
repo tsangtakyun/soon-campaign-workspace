@@ -1,9 +1,10 @@
-import { object, fingerprint, materialFlags } from './production-style'
+import { object, fingerprint } from './production-style'
+import { confirmedProjectMaterials } from './confirmed-project-materials'
 export function projectStyleContext(project: Record<string, unknown>, brand?:unknown) {
  const production=object(project.production), decision=object(project.format_decision)
  const format=project.selected_format==='short_video' ? decision.videoMethod==='ai_video_generation' ? 'ai_short_video' : 'human_short_video' : project.selected_format==='carousel' ? 'instagram_carousel' : 'instagram_single_feed'
  const brief=object(project.brief)
- const context={brand,format,brief:[project.title,brief.summary || project.source_note].filter(Boolean).join('\n'),story:production.script || production.pages || [],assets:production.assets || [],materials:materialFlags(decision.confirmedMaterials),constraints:{angle:brief.angle,videoMethod:decision.videoMethod},topicVersion:fingerprint({source:project.source_note,brief:project.brief})}
+ const context={recommendationEngine:'production-v2',brand,format,brief:[project.title,brief.summary || project.source_note].filter(Boolean).join('\n'),story:production.script || production.pages || [],assets:production.assets || [],materials:confirmedProjectMaterials(production,decision.confirmedMaterials),constraints:{angle:brief.angle,videoMethod:decision.videoMethod},topicVersion:fingerprint({source:project.source_note,brief:project.brief})}
  return {...context,inputHash:fingerprint(context)}
 }
 export const CREATOR_RENDERERS=['clear-magazine-carousel-v1','product-focus','ranking-review','editorial-clear','problem-solution','creator-natural','bold-social']

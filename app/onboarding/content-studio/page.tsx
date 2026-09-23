@@ -1,6 +1,7 @@
 "use client";
 
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -924,6 +925,7 @@ export default function ContentStudioPage() {
       body: JSON.stringify({
         workspaceId,
         projectId: selected.id,
+        retryEmpty: styleRetry > 0,
         format: coreFormat,
         brief: [selected.brief?.angle, selected.brief?.summary || selected.source_note].filter(Boolean).join("\n"),
         story,
@@ -2176,15 +2178,16 @@ export default function ContentStudioPage() {
                         <span>STEP {studioSteps.findIndex((step) => step.id === "style") + 1}</span>
                         <h3>選擇內容風格</h3>
                       </div>
-                      <em>{loadingStyles ? "SOON AI 正在配對合適風格…" : styleCandidateCount > 3 ? `已評估 ${styleCandidateCount} 款，找到 ${coreStyles.length} 款合適風格` : "SOON 已按內容格式篩選合適款式"}</em>
+                      <em>{loadingStyles ? "SOON AI 正在配對合適風格…" : coreStyles.length ? `找到 ${coreStyles.length} 款合適風格` : "風格配對尚未完成"}</em>
                     </div>
                     <div className="style-intro">
                       <div><b>{isShortVideo ? "用同一份劇本，直接比較短片視覺" : "用同一故事、同一組素材，直接比較版面"}</b><span>{isShortVideo ? "候選風格均使用已確認劇本生成一張無字 9:16 首幀 preview，讓你比較構圖、鏡頭感及整體氣氛。" : "候選風格均使用已確認的故事結構及 STEP 4 圖片素材，讓你比較的只有排版、字體層級及視覺處理。"}</span></div>
                     </div>
-                    <div className="style-preview-notice" role="note">
+                    <details className="style-preview-notice">
+                      <summary>預覽與正式版面的分別</summary>
                       <b>目前只屬風格預覽</b>
                       <span>{isShortVideo ? "這張無字圖片只模擬短片首鏡；選擇後，SOON 會按完整劇本建立逐鏡製作包。" : "選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。"}</span>
-                    </div>
+                    </details>
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
@@ -2226,7 +2229,14 @@ export default function ContentStudioPage() {
                       const rules = displayStyles.find((template) => template.code === selectedStyleCode)!;
                       return <details className="style-rule-preview"><summary>查看「{rules.name}」製作規格</summary><div><section><b>內容結構</b>{rules.rules.structure.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>文案</b>{rules.rules.copy.map((rule) => <span key={rule}>✓ {rule}</span>)}</section><section><b>視覺</b>{rules.rules.visual.map((rule) => <span key={rule}>✓ {rule}</span>)}</section></div><small>{rules.source === "soon_core" ? "已連接 SOON 最新製作規格" : "SOON 經典風格"}</small></details>;
                     })() : null}
-                    <fieldset><legend>已確認可用的素材</legend>{[["photos","可用圖片"],["footage","現場影片"],["presenter","可出鏡主持"],["research","已核實資料"]].map(([id,label]) => <label key={id} style={{display:"inline-flex",alignItems:"center",gap:6,marginRight:12}}><input type="checkbox" style={{width:"auto"}} disabled={saving} checked={Array.isArray(selected.format_decision?.confirmedMaterials) && selected.format_decision.confirmedMaterials.includes(id)} onChange={async event => { const current = Array.isArray(selected.format_decision?.confirmedMaterials) ? selected.format_decision.confirmedMaterials as string[] : []; await saveProject({formatDecision:{...selected.format_decision,confirmedMaterials:event.target.checked?[...current,id]:current.filter(value=>value!==id)}},""); }} />{label}</label>)}</fieldset>
+                    <details className="style-rule-preview">
+                      <summary>素材狀態{confirmedPhotoCount(selected.production) ? ` · 已沿用 ${confirmedPhotoCount(selected.production)} 張已確認圖片` : "與補充確認"}</summary>
+                      <p>沿用上一步的素材。以下是補充確認，不代表每項都是必要條件。</p>
+                      {(isShortVideo ? [["photos","可用圖片"],["footage","現場影片"],["presenter","可出鏡主持"],["research","資料已核實"]] : [["photos","可用圖片"],["research","資料已核實"]]).map(([id,label]) => {
+                        const inherited = id === "photos" && confirmedPhotoCount(selected.production) > 0;
+                        return <label key={id} style={{display:"inline-flex",alignItems:"center",gap:6,marginRight:12}}><input type="checkbox" style={{width:"auto"}} disabled={saving || loadingStyles || inherited} checked={inherited || (Array.isArray(selected.format_decision?.confirmedMaterials) && selected.format_decision.confirmedMaterials.includes(id))} onChange={async event => { const current = Array.isArray(selected.format_decision?.confirmedMaterials) ? selected.format_decision.confirmedMaterials as string[] : []; await saveProject({formatDecision:{...selected.format_decision,confirmedMaterials:event.target.checked?[...current,id]:current.filter(value=>value!==id)}},""); }} />{label}{inherited ? "（承接上一步）" : ""}</label>;
+                      })}
+                    </details>
                     {loadingStyles ? <p className="style-loading">正在分析合適風格…</p> : null}
                     {styleMessage ? <p role="status">{styleMessage} <button type="button" onClick={() => setStyleRetry(value => value + 1)}>重新分析</button></p> : null}
                     {expandedStyleCode ? <div className="style-preview-modal" role="dialog" aria-modal="true" aria-label="放大風格預覽" onClick={() => setExpandedStyleCode(null)}>
@@ -3224,7 +3234,7 @@ export default function ContentStudioPage() {
                     </div>}
                   </div>
                 )}
-                <div className="studio-step-footer">
+                {activeStep !== "style" ? <div className="studio-step-footer">
                   <button
                     type="button"
                     className="secondary"
@@ -3253,7 +3263,7 @@ export default function ContentStudioPage() {
                   >
                     下一步 →
                   </button>
-                </div>
+                </div> : null}
                 {message ? <p className={`studio-message ${messageTone}`} role="status">{message}</p> : null}
               </>
             ) : (

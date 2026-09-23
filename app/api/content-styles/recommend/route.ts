@@ -25,8 +25,9 @@ export async function POST(request:Request) {
   const input=projectStyleContext(project,brand), registry=await coreRegistry(input.format)
   const {data:cached,error:readError}=await access.admin.from('content_project_style_runs').select('result').eq('project_id',project.id).eq('input_hash',input.inputHash).eq('registry_version',registry.registryVersion).maybeSingle()
   if(readError) throw readError
-  const result:StyleResult=cached?.result || await rankProduction({...input,consumer:'creator',projectId:project.id,workspaceId:body.workspaceId,brand,renderers:[...CREATOR_RENDERERS,...registry.styles.flatMap(style=>style.templates.filter(t=>hasCoreMasterDesigns(t.version.contract)).map(t=>t.version.rendererCode))]})
-  if(!cached){const {error}=await access.admin.from('content_project_style_runs').upsert({project_id:project.id,workspace_id:body.workspaceId,input_hash:input.inputHash,registry_version:result.registryVersion,result},{onConflict:'project_id,input_hash,registry_version'});if(error)throw error}
+  const reuse = cached?.result && !(body.retryEmpty === true && !cached.result.styles?.length)
+  const result:StyleResult=reuse ? cached.result : await rankProduction({...input,retryEmpty:body.retryEmpty === true,consumer:'creator',projectId:project.id,workspaceId:body.workspaceId,brand,renderers:[...CREATOR_RENDERERS,...registry.styles.flatMap(style=>style.templates.filter(t=>hasCoreMasterDesigns(t.version.contract)).map(t=>t.version.rendererCode))]})
+  if(!reuse){const {error}=await access.admin.from('content_project_style_runs').upsert({project_id:project.id,workspace_id:body.workspaceId,input_hash:input.inputHash,registry_version:result.registryVersion,result},{onConflict:'project_id,input_hash,registry_version'});if(error)throw error}
   return NextResponse.json({...result,inputHash:input.inputHash,styles:result.styles.map(style=>({...style,coreCode:style.code,code:creatorCode(style.code),creatorSource:'soon_core'}))},{headers:{'Cache-Control':'private, no-store'}})
  }catch(error){return NextResponse.json({error:error instanceof Error?error.message:'未能分析風格，請重試。'},{status:503})}
 }
