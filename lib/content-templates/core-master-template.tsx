@@ -345,7 +345,10 @@ export function renderCoreMasterPage(options: {
       background: design.canvasJson?.background || "#F4F0E8",
       fontFamily: options.fonts.family,
     },
-  }, objects.map((object, index) => renderObject({ ...options, crops, object, key: `master-${index}`, scaleX, scaleY })));
+  }, objects.map((object, index) => renderObject({ ...options, crops, object, key: `master-${index}`, scaleX, scaleY })),
+  options.primary?.extensionOriginal || options.secondary?.extensionOriginal ? React.createElement('div', {
+    style: { position: 'absolute', bottom: 12, left: 24, padding: '4px 8px', background: '#000b', color: '#fff', fontSize: 18, display: 'flex' },
+  }, 'AI 延伸背景') : null);
 }
 
 export function coreMasterSubjectLayout(options: {

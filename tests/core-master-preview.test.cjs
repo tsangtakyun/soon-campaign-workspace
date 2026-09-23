@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),React=require('react');
 const {renderToStaticMarkup}=require('react-dom/server');
-function compile(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports}
+function compile(file,deps={}){const box={exports:{},require:n=>n==='./BackgroundExtensionEditor'?{BackgroundExtensionEditor:()=>null}:deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports}
 const branding=compile('lib/content-branding.ts',{'./typefaces':compile('lib/typefaces.ts')});
 const crop=compile('lib/subject-crop.ts');
 const renderer=compile('lib/content-templates/core-master-template.tsx',{'../content-branding':branding,'../subject-crop':crop});

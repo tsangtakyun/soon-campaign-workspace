@@ -26,6 +26,8 @@ import {
 import { createClient } from "@/lib/supabase";
 
 type ProjectAsset = {
+  extensionOriginal?: import('@/lib/extension-asset').ExtensionOriginal;
+  extensionId?: string;
   subjectFocus?: SubjectFocus | null;
   id: string;
   url: string;
@@ -583,7 +585,8 @@ export default function ContentStudioPage() {
         assets={Array.isArray(selected?.production?.assets) ? selected.production.assets as ProjectAsset[] : []}
         brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}
         saving={saving} onSaveFocus={permissions?.canEdit ? saveAssetFocus : undefined}
-        onAnalyzeFocus={permissions?.canEdit ? analyzeAssetFocus : undefined}/>;
+        onAnalyzeFocus={permissions?.canEdit ? analyzeAssetFocus : undefined}
+        extensionActions={permissions?.canEdit ? { generate: generateBackgroundExtension, apply: applyBackgroundExtension } : undefined}/>;
     }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
@@ -1440,6 +1443,23 @@ export default function ContentStudioPage() {
       },
       `已加入 ${assetTargetPage} 授權圖片；發佈前請核對授權及署名要求`,
     );
+  }
+
+  async function generateBackgroundExtension(assetId: string) {
+    const response = await fetch('/api/content-projects/extend-background', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId }), signal: AbortSignal.timeout(175_000) });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || '延伸未完成，原圖未改動。');
+    return payload as import('@/lib/extension-asset').ExtensionPreview;
+  }
+
+  async function applyBackgroundExtension(assetId: string, preview: import('@/lib/extension-asset').ExtensionPreview | null) {
+    if (!selected?.production || !Array.isArray(selected.production.assets)) return false;
+    const { applyExtension, restoreExtension } = await import('@/lib/extension-asset');
+    const assets = (selected.production.assets as ProjectAsset[]).map(asset => asset.id === assetId
+      ? preview ? applyExtension(asset, preview) : restoreExtension(asset) : asset);
+    return saveProject({ production: { ...selected.production, assets } }, preview
+      ? '已套用 AI 延伸背景；原圖保留，現有輸出圖片未覆寫' : '已還原原圖；現有輸出圖片未覆寫');
   }
 
   async function analyzeAssetFocus(assetId: string) {
