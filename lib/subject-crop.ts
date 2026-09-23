@@ -1,5 +1,5 @@
 /** Normalized source-image coordinates; x/y are the centre of the protected area. */
-export type SubjectFocus = { x: number; y: number; width: number; height: number };
+export type SubjectFocus = { x: number; y: number; width: number; height: number; sourceWidth?: number; sourceHeight?: number };
 export type CropRect = { x: number; y: number; width: number; height: number };
 export type FocusAsset = { width?: number; height?: number; subjectFocus?: SubjectFocus | null; position?: string };
 const clamp = (v: number, low = 0, high = 1) => Math.max(low, Math.min(high, v));
@@ -18,10 +18,11 @@ function intersection(a: CropRect, b: CropRect) {
 export function subjectCrop(asset: FocusAsset, frame: CropRect, textZones: CropRect[] = []) {
   const fallback = { position: asset.position || 'center', constrained: false, active: false };
   const f = asset.subjectFocus;
-  if (!validSubjectFocus(f) || !Number.isFinite(asset.width) || !Number.isFinite(asset.height)
-    || !(asset.width! > 0 && asset.height! > 0 && frame.width > 0 && frame.height > 0)) return fallback;
-  const scale = Math.max(frame.width / asset.width!, frame.height / asset.height!);
-  const w = asset.width! * scale, h = asset.height! * scale;
+  const sourceWidth = f?.sourceWidth ?? asset.width, sourceHeight = f?.sourceHeight ?? asset.height;
+  if (!validSubjectFocus(f) || !Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight)
+    || !(sourceWidth! > 0 && sourceHeight! > 0 && frame.width > 0 && frame.height > 0)) return fallback;
+  const scale = Math.max(frame.width / sourceWidth!, frame.height / sourceHeight!);
+  const w = sourceWidth! * scale, h = sourceHeight! * scale;
   const overflowX = Math.max(0, w - frame.width), overflowY = Math.max(0, h - frame.height);
   const left = clamp(f.x - f.width / 2), top = clamp(f.y - f.height / 2);
   const subject = { x: left * w, y: top * h, width: (clamp(f.x + f.width / 2) - left) * w, height: (clamp(f.y + f.height / 2) - top) * h };

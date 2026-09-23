@@ -1444,7 +1444,9 @@ export default function ContentStudioPage() {
   async function saveAssetFocus(assetId: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) {
     if (!selected?.production || !Array.isArray(selected.production.assets)) return false;
     return saveProject({ production: { ...selected.production,
-      assets: (selected.production.assets as ProjectAsset[]).map(asset => asset.id === assetId ? { ...asset, ...updates } : asset),
+      assets: (selected.production.assets as ProjectAsset[]).map(asset => asset.id === assetId ? { ...asset,
+        subjectFocus: updates.subjectFocus ? { ...updates.subjectFocus, sourceWidth: updates.width, sourceHeight: updates.height } : null,
+      } : asset),
     } }, '圖片焦點已儲存；現有輸出圖片不會被覆寫，下次製作會套用新裁切');
   }
 

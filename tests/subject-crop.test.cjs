@@ -33,3 +33,9 @@ assert.ok(html.includes(`object-position:${layout['master-0'].position}`),'share
 design.canvasJson.objects[0].data.binding='content.asset.contain';
 assert.equal(Object.keys(renderer.coreMasterSubjectLayout(options)).length,0,'contain is not cropped');
 console.log('PASS: focal preservation, text avoidance, impossible crops, legacy fallback, contain and shared renderer');
+const context=compile('lib/project-style-context.ts',{'./production-style':{object:v=>v||{},fingerprint:JSON.stringify},'./confirmed-project-materials':{confirmedProjectMaterials:()=>({})}});
+const original={production:{assets:[{id:'a',url:'/a.png',width:500,height:500}]}};
+const changed={production:{assets:[{...original.production.assets[0],subjectFocus:{x:.4,y:.3,width:.2,height:.2,sourceWidth:600,sourceHeight:600}}]}};
+assert.equal(context.projectStyleContext(original).inputHash,context.projectStyleContext(changed).inputHash,'crop metadata must not invalidate recommendations');
+assert.equal(crop.subjectCrop({subjectFocus:{x:.5,y:.5,width:.2,height:.2,sourceWidth:100,sourceHeight:200}},frame).active,true);
+console.log('PASS: crop-only edit preserves recommendation fingerprint');
