@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     console.log('[brand-data-api] fetched workspace:', JSON.stringify(workspace))
     console.log('[brand-data-api] querying brand_profiles for workspace_id:', workspaceId)
 
-    const [sourcesResult, profileResult, voiceResult, assetsResult, contentMoodResult] = await Promise.all([
+    const [sourcesResult, profileResult, voiceResult, assetsResult, contentMoodResult, kitResult] = await Promise.all([
       supabase
         .from('brand_sources')
         .select('id,url,type,status,last_scanned_at,created_at')
@@ -61,9 +61,12 @@ export async function GET(req: Request) {
         .select('content_mood,updated_at')
         .eq('workspace_id', workspaceId)
         .maybeSingle(),
+      supabase.from('brand_kits').select('logo_url,typeface_family,typeface_id').eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
     ])
 
+    const { data: brandKit } = kitResult;
     const result = {
+      brandKit: brandKit || null,
       assets: assetsResult.data || [],
       brandProfile: profileResult.data || null,
       brandVoice: voiceResult.data || null,

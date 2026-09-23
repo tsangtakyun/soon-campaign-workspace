@@ -221,6 +221,7 @@ export async function POST(req: Request) {
             ? "你正在執行單張社交貼文的圖片生成前草稿階段。只可輸出一個 P.1。"
             : "你正在執行 IG 輪播貼文圖片生成前的逐頁製作草稿階段。不要生成圖片。",
           "嚴格遵從 Workspace Production Prompt，但今次只輸出最終文案、圖片配對及版面方向。",
+          "headline、subheadline、body 只可放讀者直接閱讀的成品文案，不可抄入 copyDirection 的編輯指示（例如『副題點明』『主標帶出』）。寫作及排版指示只放 designDirection。副題不是必填；沒有額外資訊時輸出空字串，不要硬加副題或顯示『副題』標籤。",
           '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","templateArtboardId":"01_COVER|02_FULL_BLEED_TEXT|03_IMAGE_TOP_TEXT_BOTTOM|04_COMPARISON|05_LEFT_TEXT_RIGHT_IMAGE|06_END_CTA","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"imageTreatment":"auto|cutout|full-bleed|card","assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
             ...(fixedTemplate ? [

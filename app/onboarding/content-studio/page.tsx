@@ -3,6 +3,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
+import { resolveContentBranding } from '@/lib/content-branding';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
@@ -437,6 +438,7 @@ export default function ContentStudioPage() {
   const [searchingImages, setSearchingImages] = useState(false);
   const [generatingAssetPage, setGeneratingAssetPage] = useState<string | null>(null);
   const [removingAssetId, setRemovingAssetId] = useState<string | null>(null);
+  const [previewBrand, setPreviewBrand] = useState<ReturnType<typeof resolveContentBranding>>(resolveContentBranding());
   const [brandLibraryAssets, setBrandLibraryAssets] = useState<ProjectAsset[]>(
     [],
   );
@@ -577,7 +579,7 @@ export default function ContentStudioPage() {
       const contract = displayStyles.find(style => style.code === code)?.core?.templates?.[0]?.version.contract;
       return <CoreMasterPreview key={`${selected?.id}-${code}`} contract={contract} pages={props.storyPages || []}
         assets={Array.isArray(selected?.production?.assets) ? selected.production.assets as ProjectAsset[] : []}
-        brandName={props.brandName || 'BRAND'} onExpand={props.onExpand}/>;
+        brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}/>;
     }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
@@ -701,6 +703,7 @@ export default function ContentStudioPage() {
           2,
         );
         const brandPayload = await brandResponse.json().catch(() => null);
+        setPreviewBrand(brandResponse.ok ? resolveContentBranding(brandPayload?.workspace, brandPayload?.brandKit) : resolveContentBranding());
         setBrandLibraryAssets(
           brandResponse.ok && Array.isArray(brandPayload?.assets)
             ? brandPayload.assets
@@ -719,6 +722,7 @@ export default function ContentStudioPage() {
       } catch {
         // Brand assets are optional and should not prevent the studio from loading.
         setBrandLibraryAssets([]);
+        setPreviewBrand(resolveContentBranding());
       }
       const requestedProjectId = new URLSearchParams(
         window.location.search,

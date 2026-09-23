@@ -1,4 +1,5 @@
 import React from "react";
+import { readerFacingCopy } from '../content-branding';
 
 export type CoreMasterRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
@@ -170,14 +171,14 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
     page_number: pageNumber,
   };
   const key = binding?.startsWith('content.') ? binding.slice('content.'.length) : role;
-  if (copy.fields?.[key] != null) return copy.fields[key];
+  if (copy.fields?.[key] != null) return readerFacingCopy(copy.fields[key]);
   const row = key.match(/^(left|right)_row_([1-3])$/);
   if (row) {
     const lines = comparisonCopy(body, row[1] as 'left' | 'right').split(/\n|[；;]/u);
     return (lines[Number(row[2])-1] || '').replace(/^(進食|活動|能量來源|能量)[\s：:]+/u, '');
   }
   const direct = values[key];
-  if (direct != null && direct !== "") return direct;
+  if (direct != null) return direct;
   return fallback.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_match, key: string) => values[key.toLowerCase()] ?? "");
 }
 
@@ -237,7 +238,7 @@ function renderObject(options: {
   const type = clean(object.type).toLowerCase();
   if (type === "textbox" || type === "text" || type === "itext") {
     const fallback = clean(object.text);
-    const value = role === 'brand_logo' ? branding.name : bindingValue(role, fallback, copy, page, object.data?.binding);
+    const value = role === 'brand_logo' ? branding.name : readerFacingCopy(bindingValue(role, fallback, copy, page, object.data?.binding));
     const requestedFamily = clean(object.fontFamily).toLowerCase();
     const family = requestedFamily.includes("serif") || requestedFamily.includes("明體")
       ? fonts.editorialFamily

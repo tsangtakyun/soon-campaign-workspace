@@ -15,7 +15,7 @@ import {
   renderCoreMasterPage,
 } from "@/lib/content-templates/core-master-template";
 import { createServerSupabase } from "@/lib/server-supabase";
-import { typefaces } from "@/lib/typefaces";
+import { resolveContentBranding, readerFacingCopy, findBrandTypeface, localTypefaceFiles } from '@/lib/content-branding';
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 
 export const runtime = "nodejs";
@@ -58,23 +58,6 @@ const DEFAULT_CAROUSEL_FONT = "SOON Rounded CJK";
 const EDITORIAL_CAROUSEL_FONT = "SOON Editorial CJK";
 const BRAND_CAROUSEL_FONT = "SOON Selected Brand Font";
 
-const localTypefaceFiles: Record<string, string> = {
-  "jason-handwriting": "JasonHandwriting1-Regular.woff2",
-  naikai: "NaikaiFont-Regular.woff2",
-  nani: "NaniFont-Regular.woff2",
-  "swei-gothic": "SweiGothicCJKtc-Regular.ttf",
-  "swei-fan-sans": "SweiFanSansCJKtc-Regular.woff2",
-  "fake-pearl": "FakePearl-Regular.woff2",
-  "swei-fan-sans-gothic": "SweiFanSansCJKtc-Regular.woff2",
-  "swei-jay-serif": "SweiJaySerifCJKtc-Regular.woff2",
-  "max-hana": "B2Hana-Regular.woff2",
-  "hana-meatball": "HanaMeatball-Regular.woff2",
-  "swei-jay-serif-editorial": "SweiJaySerifCJKtc-Regular.woff2",
-  bakudai: "Bakudai-Bold.woff2",
-  "swei-gothic-bold": "SweiGothicCJKtc-Bold.woff2",
-  "hana-meatball-bold": "HanaMeatball-Regular.woff2",
-  "swei-gothic-extrabold-impact": "SweiGothicCJKtc-Bold.woff2",
-};
 
 const fontBufferCache = new Map<string, Promise<ArrayBuffer>>();
 
@@ -82,20 +65,6 @@ function exactArrayBuffer(bytes: Uint8Array) {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-function findSelectedTypeface(value?: string | null) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) return null;
-  const legacyAlias: Record<string, string> = {
-    "gensenrounded2": "swei-gothic",
-    "gensenrounded2 / 系統圓體": "swei-gothic",
-    "系統圓體": "swei-gothic",
-    "nanifont": "nani",
-  };
-  const resolved = legacyAlias[normalized] || normalized;
-  return typefaces.find((typeface) =>
-    typeface.id.toLowerCase() === resolved || typeface.fontFamily.toLowerCase() === resolved,
-  ) || null;
-}
 
 async function fetchTypefaceWoff2(url: string) {
   let fontUrl = url;
@@ -145,7 +114,7 @@ async function loadCarouselFonts(fontStyle?: string | null) {
   ]);
   const fallback = exactArrayBuffer(defaultFile);
   const editorial = exactArrayBuffer(editorialFile);
-  const selectedTypeface = findSelectedTypeface(fontStyle);
+  const selectedTypeface = findBrandTypeface(fontStyle);
   if (!selectedTypeface) {
     return { regular: fallback, bold: fallback, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
   }
@@ -802,7 +771,7 @@ function renderPublishedCoreMasterPage(
   secondaryAsset: Asset | undefined,
   index: number,
   total: number,
-  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer; editorialBold?: ArrayBuffer },
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer; editorialBold?: ArrayBuffer; hasBrandFont?: boolean },
   branding: { logoUrl?: string | null; name: string },
 ) {
   const node = renderCoreMasterPage({
@@ -812,7 +781,7 @@ function renderPublishedCoreMasterPage(
     primary: asset ? { ...asset, position: draft.imagePosition || "center" } : undefined,
     secondary: secondaryAsset ? { ...secondaryAsset, position: draft.secondaryImagePosition || "center" } : undefined,
     branding,
-    fonts: { family: fonts.family, editorialFamily: EDITORIAL_CAROUSEL_FONT },
+    fonts: { family: fonts.family, editorialFamily: fonts.hasBrandFont ? fonts.family : EDITORIAL_CAROUSEL_FONT },
   });
   return new ImageResponse(node, {
     width: 1080,
@@ -823,6 +792,7 @@ function renderPublishedCoreMasterPage(
       { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 400 },
       { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 700 },
       { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorialBold || fonts.editorial, weight: 900 },
+      { name: fonts.family, data: fonts.bold, weight: 900 },
     ],
   });
 }
@@ -868,19 +838,18 @@ export async function POST(req: Request) {
         .maybeSingle(),
       access.admin
         .from("brand_kits")
-        .select("typeface_family,typeface_id")
+        .select("logo_url,typeface_family,typeface_id")
         .eq("workspace_id", workspaceId)
+        .order("updated_at", { ascending: false }).limit(1)
         .maybeSingle(),
     ]);
     const workspaceName = String(
       brandProfile?.business_name || workspace?.name || "SOON",
     );
     const requestOrigin = new URL(req.url).origin;
-    const fallbackLogoUrl = /egg[.\s_-]*soon/i.test(workspaceName)
-      ? `${requestOrigin}/brand-assets/eggsoon/soon-egg.png`
-      : null;
+    const brandSettings = resolveContentBranding(workspace, brandKit);
     const branding = {
-      logoUrl: workspace?.logo_url || fallbackLogoUrl,
+      logoUrl: brandSettings.logoUrl,
       swipeUrl: `${requestOrigin}/templates/clear-magazine-carousel-v1/cta-arrow.png`,
       name: workspaceName,
       colors: Array.isArray(workspace?.brand_colors)
@@ -902,18 +871,21 @@ export async function POST(req: Request) {
       productionStatus !== "images_ready"
     )
       return NextResponse.json({ error: "請先確認逐頁草稿" }, { status: 400 });
-    const drafts = (project.production.pageDrafts || []) as Draft[];
+    const drafts = ((project.production.pageDrafts || []) as Draft[]).map(draft => ({ ...draft,
+      headline: readerFacingCopy(draft.headline), subheadline: readerFacingCopy(draft.subheadline),
+      body: draft.body?.map(readerFacingCopy),
+    }));
     const assets = (project.production.assets || []) as Asset[];
     if (!drafts.length)
       return NextResponse.json({ error: "沒有逐頁草稿" }, { status: 400 });
-    const workspaceTypefaceFallback = /egg[.\s_-]*soon/i.test(workspaceName)
-      ? "GenSenRounded2"
-      : /bechill|bunchill/i.test(workspaceName) ? "NaniFont" : null;
-    const configuredTypeface = workspace?.font_style || brandKit?.typeface_family || brandKit?.typeface_id || workspaceTypefaceFallback;
+    const configuredTypeface = brandSettings.fontStyle;
     const lockedMagazine = (templateContract as { typography?: { headline?: { family?: string }; locked?: boolean } } | undefined)?.typography;
-    const fonts = lockedMagazine?.locked && lockedMagazine.headline?.family === 'SOON Magazine Serif'
+    const fonts = !configuredTypeface && lockedMagazine?.locked && lockedMagazine.headline?.family === 'SOON Magazine Serif'
       ? await loadMagazineFonts()
       : await loadCarouselFonts(configuredTypeface);
+    if (configuredTypeface && !fonts.hasBrandFont) {
+      return NextResponse.json({ error: "品牌字型未能載入，請檢查品牌素材庫字型設定後重試；未使用其他字型代替。" }, { status: 422 });
+    }
     const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
     const preparedImageUrls = new Map(
       await Promise.all(
