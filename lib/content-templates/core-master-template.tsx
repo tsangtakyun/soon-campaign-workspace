@@ -354,6 +354,13 @@ export function renderCoreMasterPage(options: {
 export function coreMasterSubjectLayout(options: {
   design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset;
 }) {
+  const { images, textZones } = coreMasterLayoutGeometry(options);
+  return Object.fromEntries(images.map(({ key, rect, asset }) => [key, subjectCrop(asset, rect, textZones)]));
+}
+
+export function coreMasterLayoutGeometry(options: {
+  design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset;
+}) {
   const coordinate = inferCoordinateSize(options.design);
   const sx = OUTPUT_WIDTH / coordinate.width, sy = OUTPUT_HEIGHT / coordinate.height;
   const textZones: CropRect[] = [];
@@ -370,5 +377,5 @@ export function coreMasterSubjectLayout(options: {
     if (o.objects) visit(o.objects, key, rect.x, rect.y);
   });
   visit(options.design.canvasJson?.objects || [], 'master');
-  return Object.fromEntries(images.map(({ key, rect, asset }) => [key, subjectCrop(asset, rect, textZones)]));
+  return { images, textZones };
 }

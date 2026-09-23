@@ -6,9 +6,10 @@ export type ExtensionActions = {
   generate: (id: string) => Promise<ExtensionPreview>;
   apply: (id: string, preview: ExtensionPreview | null) => Promise<boolean>;
 };
-export function BackgroundExtensionEditor({ asset, actions, disabled }: {
+export function BackgroundExtensionEditor({ asset, actions, disabled, suggested }: {
   asset: { id: string; url: string; extensionOriginal?: { url: string } };
   actions: ExtensionActions; disabled?: boolean;
+  suggested?: boolean;
 }) {
   const [preview, setPreview] = useState<ExtensionPreview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,12 +26,12 @@ export function BackgroundExtensionEditor({ asset, actions, disabled }: {
     catch (error) { setMessage(error instanceof Error ? error.message : '未能儲存。'); }
     finally { setBusy(false); }
   }
-  return <details style={{ padding: '8px 12px', fontSize: 12 }}>
+  return <details open={suggested || undefined} style={{ padding: '8px 12px', fontSize: 12 }}>
     <summary>AI 延伸背景 · 封面 4:5</summary>
     <p>保留整張原圖置頂，向下延伸背景，避免為填滿直幅而放大裁切。原圖不會變高清；接駁效果需你確認。</p>
     <p>會將圖片交現有 AI 圖片服務處理並產生圖片生成費用。套用後標示「AI 延伸背景」，唔當完整現場原照。</p>
     {asset.extensionOriginal ? <><p>已套用延伸版，原圖仍然保留。</p><button type="button" disabled={disabled || busy} onClick={() => void apply(null)}>還原原圖</button></> :
-      <button type="button" disabled={disabled || busy} onClick={() => void generate()}>{busy ? '處理中…' : '生成／讀取延伸預覽'}</button>}
+      <button type="button" disabled={disabled || busy} onClick={() => void generate()}>{busy ? '處理中…' : suggested ? '按建議生成延伸預覽（會產生費用）' : '生成／讀取延伸預覽'}</button>}
     {preview && !asset.extensionOriginal ? <>
       <img src={preview.url} alt="AI 向下延伸預覽，尚未套用" style={{ display: 'block', width: '100%', marginTop: 12 }}/>
       <p>AI 延伸背景 · 尚未套用</p>

@@ -1467,7 +1467,7 @@ export default function ContentStudioPage() {
       body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId }), signal: AbortSignal.timeout(55_000) });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || '辨識未完成，請稍後重試。');
-    return { focus: payload.focus as SubjectFocus | null, label: String(payload.detection?.label || '圖片主體'), reason: String(payload.detection?.reason || ''), cached: Boolean(payload.cached) };
+    return { focus: payload.focus as SubjectFocus | null, label: String(payload.detection?.label || '圖片主體'), reason: String(payload.detection?.reason || ''), cached: Boolean(payload.cached), background: payload.detection?.background as import('@/lib/composition-advice').CompositionAnalysis['background'] };
   }
 
   async function saveAssetFocus(assetId: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) {
