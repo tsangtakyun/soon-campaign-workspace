@@ -158,6 +158,12 @@ async function loadCarouselFonts(fontStyle?: string | null) {
   }
 }
 
+let magazineFonts: Promise<{regular:ArrayBuffer;bold:ArrayBuffer;family:string;editorial:ArrayBuffer;editorialBold:ArrayBuffer;hasBrandFont:boolean}> | undefined;
+function loadMagazineFonts() {
+  magazineFonts ??= Promise.all(['Sans-Regular.otf','Sans-Bold.otf','Serif-Regular.otf','Serif-Black.otf'].map(file=>readFile(path.join(process.cwd(),'public/fonts/magazine',file)))).then(([regular,bold,editorial,editorialBold])=>({regular:exactArrayBuffer(regular),bold:exactArrayBuffer(bold),editorial:exactArrayBuffer(editorial),editorialBold:exactArrayBuffer(editorialBold),family:'SOON Magazine Sans',hasBrandFont:false}));
+  return magazineFonts;
+}
+
 async function prepareImageSource(url: string) {
   const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
   if (!response.ok) {
@@ -796,7 +802,7 @@ function renderPublishedCoreMasterPage(
   secondaryAsset: Asset | undefined,
   index: number,
   total: number,
-  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer },
+  fonts: { regular: ArrayBuffer; bold: ArrayBuffer; family: string; editorial: ArrayBuffer; editorialBold?: ArrayBuffer },
   branding: { logoUrl?: string | null; name: string },
 ) {
   const node = renderCoreMasterPage({
@@ -816,6 +822,7 @@ function renderPublishedCoreMasterPage(
       { name: fonts.family, data: fonts.bold, weight: 700 },
       { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 400 },
       { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorial, weight: 700 },
+      { name: EDITORIAL_CAROUSEL_FONT, data: fonts.editorialBold || fonts.editorial, weight: 900 },
     ],
   });
 }
@@ -903,7 +910,10 @@ export async function POST(req: Request) {
       ? "GenSenRounded2"
       : /bechill|bunchill/i.test(workspaceName) ? "NaniFont" : null;
     const configuredTypeface = workspace?.font_style || brandKit?.typeface_family || brandKit?.typeface_id || workspaceTypefaceFallback;
-    const fonts = await loadCarouselFonts(configuredTypeface);
+    const lockedMagazine = (templateContract as { typography?: { headline?: { family?: string }; locked?: boolean } } | undefined)?.typography;
+    const fonts = lockedMagazine?.locked && lockedMagazine.headline?.family === 'SOON Magazine Serif'
+      ? await loadMagazineFonts()
+      : await loadCarouselFonts(configuredTypeface);
     const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
     const preparedImageUrls = new Map(
       await Promise.all(

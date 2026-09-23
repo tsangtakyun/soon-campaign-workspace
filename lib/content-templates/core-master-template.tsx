@@ -18,7 +18,7 @@ type FabricObjectJson = {
   angle?: number;
   opacity?: number;
   visible?: boolean;
-  fill?: string;
+  fill?: string | { type?: string; coords?: { x1?: number; y1?: number; x2?: number; y2?: number }; colorStops?: Array<{ offset: number; color: string }> };
   stroke?: string;
   strokeWidth?: number;
   rx?: number;
@@ -55,6 +55,7 @@ type MasterCopy = {
   headline?: string;
   subheadline?: string;
   body?: string[];
+  fields?: Record<string, string>;
 };
 
 type MasterAsset = {
@@ -135,7 +136,7 @@ function comparisonCopy(body: string[], side: "left" | "right") {
   return body[3] || legacy[1] || "";
 }
 
-function bindingValue(role: string, fallback: string, copy: MasterCopy, page: string) {
+function bindingValue(role: string, fallback: string, copy: MasterCopy, page: string, binding?: string) {
   const body = Array.isArray(copy.body) ? copy.body.filter(Boolean) : [];
   const pageNumber = page.split(/[\s/]+/u)[0] || page;
   const values: Record<string, string> = {
@@ -168,7 +169,14 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
     feature_body_3: body[5] || "",
     page_number: pageNumber,
   };
-  const direct = values[role];
+  const key = binding?.startsWith('content.') ? binding.slice('content.'.length) : role;
+  if (copy.fields?.[key] != null) return copy.fields[key];
+  const row = key.match(/^(left|right)_row_([1-3])$/);
+  if (row) {
+    const lines = comparisonCopy(body, row[1] as 'left' | 'right').split(/\n|[；;]/u);
+    return (lines[Number(row[2])-1] || '').replace(/^(進食|活動|能量來源|能量)[\s：:]+/u, '');
+  }
+  const direct = values[key];
   if (direct != null && direct !== "") return direct;
   return fallback.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_match, key: string) => values[key.toLowerCase()] ?? "");
 }
@@ -211,10 +219,8 @@ function renderObject(options: {
     ...(object.angle ? { transform: `rotate(${finite(object.angle)}deg)` } : {}),
   };
 
-  if (role === "brand_logo") {
-    return branding.logoUrl
-      ? React.createElement("img", { key, src: branding.logoUrl, width, height, style: { ...common, objectFit: "contain" } })
-      : React.createElement("div", { key, style: { ...common, alignItems: "center", justifyContent: "center", fontFamily: fonts.family, fontSize: Math.max(14, height * 0.42), fontWeight: 700 } }, branding.name);
+  if (role === "brand_logo" && branding.logoUrl) {
+    return React.createElement("img", { key, src: branding.logoUrl, width, height, style: { ...common, objectFit: "contain" } });
   }
 
   const dynamicAsset = roleAsset(role, primary, secondary);
@@ -231,22 +237,30 @@ function renderObject(options: {
   const type = clean(object.type).toLowerCase();
   if (type === "textbox" || type === "text" || type === "itext") {
     const fallback = clean(object.text);
-    const value = bindingValue(role, fallback, copy, page);
+    const value = role === 'brand_logo' ? branding.name : bindingValue(role, fallback, copy, page, object.data?.binding);
     const requestedFamily = clean(object.fontFamily).toLowerCase();
     const family = requestedFamily.includes("serif") || requestedFamily.includes("明體")
       ? fonts.editorialFamily
       : fonts.family;
+    const fontSize = Math.max(1, finite(object.fontSize, 20) * finite(object.scaleY, 1) * scaleY);
+    const magazine = requestedFamily.startsWith('soon magazine');
+    const lineHeight = finite(object.lineHeight, 1.16) * (magazine ? 1.13 : 1);
+    // Fabric positions glyphs inside a 1.13-em first line; CSS includes half
+    // the leading above it. Compensate without clipping the final baseline.
+    const leading = magazine ? fontSize * (lineHeight - 1) / 2 : 0;
     return React.createElement("div", {
       key,
       style: {
         ...common,
+        top: top - leading,
+        height: height + leading * 2,
         color: typeof object.fill === "string" ? object.fill : "#171717",
         fontFamily: family,
-        fontSize: Math.max(1, finite(object.fontSize, 20) * scaleY),
+        fontSize,
         fontStyle: object.fontStyle || "normal",
         fontWeight: object.fontWeight || 400,
-        letterSpacing: finite(object.charSpacing) * finite(object.fontSize, 20) / 1000 * scaleX,
-        lineHeight: finite(object.lineHeight, 1.16),
+        letterSpacing: finite(object.charSpacing) * finite(object.fontSize, 20) / 1000 * finite(object.scaleX, 1) * scaleX,
+        lineHeight,
         textAlign: object.textAlign || "left",
         whiteSpace: "pre-wrap",
         alignItems: "flex-start",
@@ -275,13 +289,30 @@ function renderObject(options: {
     key,
     style: {
       ...common,
-      background: typeof object.fill === "string" ? object.fill : "transparent",
+      background: fabricFillToCss(object.fill),
+      // Satori's empty one-pixel background paths can collapse to a point.
+      ...(height <= 1 && typeof object.fill === 'string'
+        ? { borderBottom: `1px solid ${object.fill}`, background: 'transparent' }
+        : {}),
+      ...(width <= 1 && typeof object.fill === 'string'
+        ? { borderLeft: `1px solid ${object.fill}`, background: 'transparent' }
+        : {}),
       borderRadius: Math.max(finite(object.rx) * scaleX, finite(object.ry) * scaleY),
       ...(object.stroke && finite(object.strokeWidth) > 0
         ? { border: `${finite(object.strokeWidth) * Math.min(scaleX, scaleY)}px solid ${object.stroke}` }
         : {}),
     },
   });
+}
+
+export function fabricFillToCss(fill: FabricObjectJson['fill']): string {
+  if(typeof fill === 'string') return fill;
+  if(fill?.type === 'linear' && fill.colorStops?.length) {
+    const c=fill.coords;
+    const angle=90+Math.atan2(finite(c?.y2)-finite(c?.y1),finite(c?.x2)-finite(c?.x1))*180/Math.PI;
+    return `linear-gradient(${angle}deg, ${fill.colorStops.map(stop=>`${stop.color} ${stop.offset*100}%`).join(', ')})`;
+  }
+  return 'transparent';
 }
 
 export function renderCoreMasterPage(options: {

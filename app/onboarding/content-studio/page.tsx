@@ -1649,6 +1649,9 @@ export default function ContentStudioPage() {
     }
     const requiredRoles = coreTemplatePageRoles(selected.format_decision?.templateContractSnapshot);
     if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
+      const copyLimits = (selected.format_decision?.templateContractSnapshot as { copy_limits?: { headline_chars_zh_max?: number; body_chars_zh_max_per_block?: number } })?.copy_limits;
+      const maxHeadline = Number(copyLimits?.headline_chars_zh_max || 24);
+      const maxBody = Number(copyLimits?.body_chars_zh_max_per_block || 72);
       const actualRoles = selected.production.pageDrafts.map((draft: any) => String(draft.role || draft.layout || ""));
       if (actualRoles.length !== requiredRoles.length || requiredRoles.some((item, index) => item.role !== actualRoles[index])) {
         setMessage("逐頁草稿與已選標準母版的六頁角色不一致，請重新生成。");
@@ -1659,8 +1662,8 @@ export default function ContentStudioPage() {
         const bodyLines = Array.isArray(draft.body) ? draft.body : [];
         const assetIds = Array.isArray(draft.assetIds) ? draft.assetIds.filter(Boolean) : draft.assetId ? [draft.assetId] : [];
         const requiredImages = actualRoles[index] === "comparison" ? 2 : 1;
-        if (headlineLength > 24 || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > 72)) {
-          setMessage(`P.${index + 1} 文案超出標準母版上限（標題 24 字、每段正文 72 字），請先縮短。`);
+        if (headlineLength > maxHeadline || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > maxBody)) {
+          setMessage(`P.${index + 1} 文案超出標準母版上限（標題 ${maxHeadline} 字、每段正文 ${maxBody} 字），請先縮短。`);
           return;
         }
         if (assetIds.length < requiredImages) {
