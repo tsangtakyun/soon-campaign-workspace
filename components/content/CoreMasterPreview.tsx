@@ -23,8 +23,8 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, onExpand
   const page = pages[currentIndex];
   if (!page) return <p>確認故事結構後即可預覽。</p>;
   const pageId = String(page.page || `P.${currentIndex + 1}`);
-  const requestedRole = String(page.role || page.layout || 'longform');
-  const role = (roles.has(requestedRole) ? requestedRole : 'longform') as CoreMasterRole;
+  const requestedRole = String(page.role || page.layout || 'longform').toLowerCase();
+  const role = (currentIndex === 0 ? 'cover' : currentIndex === pages.length - 1 ? 'end' : roles.has(requestedRole) ? requestedRole : 'longform') as CoreMasterRole;
   const original = getCoreMasterPageDesign(contract, role);
   const assigned = assets.filter(asset => asset.assignedPage === pageId);
   const primary = assigned[0] || (role === 'cover' ? assets.find(asset => asset.isCover && !asset.assignedPage) : undefined);
