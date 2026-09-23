@@ -221,7 +221,10 @@ function renderObject(options: {
   };
 
   if (role === "brand_logo" && branding.logoUrl) {
-    return React.createElement("img", { key, src: branding.logoUrl, width, height, style: { ...common, objectFit: "contain" } });
+    // Image logos need a bounded header area, not the dimensions of the brand-name textbox.
+    const logoWidth = Math.min(width, 180);
+    const logoHeight = Math.min(Math.max(height, 80), 96);
+    return React.createElement("img", { key, src: branding.logoUrl, width: logoWidth, height: logoHeight, style: { ...common, width: logoWidth, height: logoHeight, objectFit: "contain", objectPosition: "left center" } });
   }
 
   const dynamicAsset = roleAsset(role, primary, secondary);

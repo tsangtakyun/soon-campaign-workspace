@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCoreMasterPageDesign, renderCoreMasterPage, type CoreMasterRole } from '@/lib/content-templates/core-master-template';
 import { findBrandTypeface, readerFacingCopy, localTypefaceFiles } from '@/lib/content-branding';
+import { stylePreviewPages } from '@/lib/style-preview-pages';
 
 type Page = Record<string, unknown>;
 type Asset = { url: string; assignedPage?: string; isCover?: boolean; sourceType?: string };
@@ -48,12 +49,15 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
     observer.observe(frame.current);
     return () => observer.disconnect();
   }, [pages.length]);
-  const currentIndex = Math.min(index, Math.max(0, pages.length - 1));
-  const page = pages[currentIndex];
+  const samples = stylePreviewPages(pages);
+  const currentIndex = Math.min(index, Math.max(0, samples.length - 1));
+  const sample = samples[currentIndex];
+  const page = sample?.page;
   if (!page) return <p>確認故事結構後即可預覽。</p>;
-  const pageId = String(page.page || `P.${currentIndex + 1}`);
+  const sourceIndex = sample.sourceIndex;
+  const pageId = String(page.page || `P.${sourceIndex + 1}`);
   const requestedRole = String(page.role || page.layout || 'longform').toLowerCase();
-  const role = (currentIndex === 0 ? 'cover' : currentIndex === pages.length - 1 ? 'end' : roles.has(requestedRole) ? requestedRole : 'longform') as CoreMasterRole;
+  const role = (sourceIndex === 0 ? 'cover' : sourceIndex === pages.length - 1 ? 'end' : roles.has(requestedRole) ? requestedRole : 'longform') as CoreMasterRole;
   const original = getCoreMasterPageDesign(contract, role);
   const assigned = assets.filter(asset => asset.assignedPage === pageId);
   const primary = assigned[0] || (role === 'cover' ? assets.find(asset => asset.isCover && !asset.assignedPage) : undefined);
@@ -71,7 +75,9 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
   if (design) cleanObjects(design.canvasJson?.objects || []);
   const text = readerFacingCopy(page.copyDirection);
   const paragraphs = text.split(/\n+/).filter(Boolean);
-  const body = paragraphs.length > 1 ? paragraphs : (text.match(/[^。！？]+[。！？]?/gu) || []);
+  const sentences = text.match(/[^。！？]+[。！？]?/gu) || [];
+  const shortCoverLine = sentences.find(line => [...line].length <= 24);
+  const body = role === 'cover' ? (shortCoverLine ? [shortCoverLine] : []) : paragraphs.length > 1 ? paragraphs : sentences;
   fields.headline = readerFacingCopy(page.headline);
   fields.body = body.join('\n');
   body.forEach((line, n) => { fields[`body_${n + 1}`] = line; });
@@ -85,15 +91,19 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
     fields[`feature_body_${n + 1}`] = split > 0 && split < 24 ? sentence.slice(split + 1) : sentence;
   }
   fields.highlight = body[2] || '';
+  if (role === 'end') {
+    fields.subheadline = body[0] || '';
+    fields.question = body[1] || '';
+    fields.cta = body[2] || '';
+  }
   fields['asset.credit'] = primary?.sourceType === 'ai_generated' ? 'AI 生成素材' : '';
   fields['asset.secondary.credit'] = assigned[1]?.sourceType === 'ai_generated' ? 'AI 生成素材' : '';
   // Use already prepared editorial fields when present, without changing the project.
   if (page.fields && typeof page.fields === 'object') {
     for (const [key, value] of Object.entries(page.fields)) if (typeof value === 'string') fields[key] = readerFacingCopy(value);
   }
-  fields.page_number = String(currentIndex + 1).padStart(2, '0');
-  return <section className="master-preview" data-preview-version="brand-v2">
-    <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>品牌預覽 v2 · {branding?.logoUrl ? '已套用品牌 Logo' : '未設定 Logo，顯示品牌名稱'}</p>
+  fields.page_number = String(sourceIndex + 1).padStart(2, '0');
+  return <section className="master-preview" data-preview-version="three-samples-v3">
     <div ref={frame} style={{ width: '100%', aspectRatio: '4 / 5', overflow: 'hidden', position: 'relative', background: '#f4f0e8' }}>
       {design ? <div style={{ width: 1080, height: 1350, transform: `scale(${width / 1080})`, transformOrigin: 'top left' }}>
         {renderCoreMasterPage({ design, copy: { headline: fields.headline, body, fields }, page: fields.page_number,
@@ -102,12 +112,10 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
       </div> : <p>此頁型尚未有可用母版，請返回檢查風格規格。</p>}
     </div>
     <nav aria-label="母版預覽頁面" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'10px 12px',background:'#f4f0e8'}}>
-      <button type="button" aria-label="上一頁預覽" disabled={currentIndex === 0} onClick={() => setIndex(currentIndex - 1)}>←</button>
-      <span style={{fontSize:12}}>第 {currentIndex + 1} / {pages.length} 頁</span>
-      <button type="button" aria-label="下一頁預覽" disabled={currentIndex === pages.length - 1} onClick={() => setIndex(currentIndex + 1)}>→</button>
+      {samples.map((item, n) => <button key={item.sourceIndex} type="button" aria-pressed={currentIndex === n} onClick={() => setIndex(n)}>{item.label}</button>)}
       {onExpand ? <button type="button" onClick={onExpand}>放大</button> : null}
     </nav>
-    <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>{primary ? primary.sourceType === 'ai_generated' ? 'AI 生成素材' : '已配對本頁素材' : '此頁未配圖，未使用其他頁圖片替代'} · 母版排版預覽，文案仍待逐頁整理</p>
+    <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>風格示範 · {sample.label}{!primary ? ' · 此頁未配圖' : ''} · 選定後再製作完整內容</p>
     <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>{activeFont ? '已套用品牌字型' : branding?.fontStyle ? fontError || !typeface ? '品牌字型未能載入，暫用風格字型' : '品牌字型載入中…' : '未設定品牌字型，使用風格字型'}</p>
     <style>{`
       @font-face{font-family:'SOON Preview Serif';src:url('/fonts/magazine/Serif-Regular.otf');font-weight:400;font-display:swap}
@@ -116,6 +124,7 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
       @font-face{font-family:'SOON Preview Sans';src:url('/fonts/magazine/Sans-Bold.otf');font-weight:700;font-display:swap}
       .master-preview button{border:1px solid #d8d0c5;border-radius:6px;background:white;color:#53282a;padding:5px 10px;cursor:pointer}
       .master-preview button:disabled{opacity:.35;cursor:default}
+      .master-preview button[aria-pressed=true]{background:#6b2c30;color:white;border-color:#6b2c30}
     `}</style>
   </section>;
 }

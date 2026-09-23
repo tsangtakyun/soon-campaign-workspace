@@ -2198,7 +2198,7 @@ export default function ContentStudioPage() {
                       <b>目前只屬風格預覽</b>
                       <span>{isShortVideo ? "這張無字圖片只模擬短片首鏡；選擇後，SOON 會按完整劇本建立逐鏡製作包。" : "選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。"}</span>
                     </details>
-                    <div className="style-template-grid" style={visibleDisplayStyles.length === 1 ? {gridTemplateColumns:'minmax(0, 520px)',justifyContent:'center'} : undefined}>
+                    <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
                         return (
