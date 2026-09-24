@@ -409,6 +409,7 @@ export default function ContentStudioPage() {
   const [generatingStructure, setGeneratingStructure] = useState(false);
   const autoGenerationProjectRef = useRef<string | null>(null);
   const draftRequestBusy = useRef(false);
+  const preparingImages = useRef(false);
   const [message, setMessage] = useState("");
   const [studioLoadError, setStudioLoadError] = useState(false);
   const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
@@ -1710,7 +1711,8 @@ export default function ContentStudioPage() {
     setEditingDraft(null);
   }
 
-  async function confirmPageDrafts() {
+  async function confirmPageDrafts(optimizeBackground = false) {
+    if (preparingImages.current || saving) return;
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
     if (!selected.production.pageDrafts.length) {
@@ -1747,10 +1749,46 @@ export default function ContentStudioPage() {
       }
     }
     const isVideo = selected.selected_format === "short_video";
+    if (!isVideo && selected.production.productionStatus === 'images_ready' && !window.confirm('將重新製作輸出圖片。若有手動修改，請先備份；確定繼續？')) return;
+    preparingImages.current = true;
+    setSaving(true);
+    try {
+    let preparedAssets = selected.production.assets;
+    if (optimizeBackground && !isVideo) {
+      const [{coreMasterLayoutGeometry,getCoreMasterPageDesign},{resolveClearMagazineRole},{optimizeCarouselAssets}] = await Promise.all([
+        import('@/lib/content-templates/core-master-template'), import('@/lib/content-templates/clear-magazine-carousel-v1'), import('@/lib/optimize-carousel-assets'),
+      ]);
+      const assets = (selected.production.assets || []) as ProjectAsset[];
+      const drafts = selected.production.pageDrafts as any[];
+      const frames = drafts.flatMap((draft,index) => {
+        const design = getCoreMasterPageDesign(selected.format_decision?.templateContractSnapshot, resolveClearMagazineRole(draft,index,drafts.length));
+        if (!design) return [];
+        const ids = [...new Set([...(draft.assetIds || []),draft.assetId].filter(Boolean))];
+        const geometry = coreMasterLayoutGeometry({design,copy:draft,page:`P.${index+1}`,primary:assets.find(a=>a.id===ids[0]),secondary:assets.find(a=>a.id===ids[1])});
+        return geometry.images.flatMap(image => {
+          const asset = assets.find(a=>a.url===image.asset.url);
+          return asset ? [{assetId:asset.id,frame:image.rect,textZones:geometry.textZones,page:`P.${index+1}`}] : [];
+        });
+      });
+      if (!frames.length) throw new Error('此版面暫未支援 AI 構圖分析，請選「直接用現有素材生成」。');
+      preparedAssets = await optimizeCarouselAssets(assets.map(a=>({...a,width:a.width||0,height:a.height||0})),frames,{
+        analyze:analyzeAssetFocus,generate:generateBackgroundExtension,progress:setMessage,
+        dimensions:asset=>new Promise((resolve,reject)=>{
+          const image = new Image();
+          const timer = window.setTimeout(()=>reject(new Error('圖片尺寸載入逾時，請重試。')),15000);
+          image.onload=()=>{clearTimeout(timer);resolve({width:image.naturalWidth,height:image.naturalHeight});};
+          image.onerror=()=>{clearTimeout(timer);reject(new Error('圖片未能載入，請重試。'));};
+          image.src=asset.url;
+        }),
+      });
+    }
+    autoGenerationProjectRef.current = null;
     await saveProject(
       {
         production: {
           ...selected.production,
+          assets: preparedAssets,
+          autoBackgroundExtension: false,
           productionStatus: isVideo ? "package_ready" : "drafts_confirmed",
           draftsConfirmedAt: new Date().toISOString(),
         },
@@ -1758,6 +1796,9 @@ export default function ContentStudioPage() {
       isVideo ? "短片製作包已確認，可以提交審批" : "內容草稿已確認，已進入圖片生成階段",
       "carousel",
     );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '構圖優化未完成，未開始出圖；可重試或直接用現有素材生成。');
+    } finally { preparingImages.current = false; setSaving(false); }
   }
 
   async function submitVideoPackage() {
@@ -3023,8 +3064,8 @@ export default function ContentStudioPage() {
                                   },
                                 )}
                                 {selected.production.productionStatus ===
-                                "drafts_ready" ? (
-                                  <div className="draft-confirm-step">
+                                "drafts_ready" || activeStep === 'drafts' ? (
+                                  <div className="draft-confirm-step" style={{flexDirection:'column',alignItems:'stretch'}}>
                                     <div>
                                       <b>
                                         {selected.selected_format === "short_video"
@@ -3039,12 +3080,17 @@ export default function ContentStudioPage() {
                                           : "請檢查文案、圖片配對及版面指示；確認後會鎖定這個製作版本。"}
                                       </p>
                                     </div>
+                                    {selected.selected_format !== 'short_video' ? <div>
+                                      <p>AI 會先分析各頁，只在有需要時延伸背景，再製作圖片；會使用圖片生成額度。原圖保留，可還原。請勿關閉頁面。</p>
+                                      <button type="button" disabled={saving || editingDraft !== null} onClick={()=>void confirmPageDrafts(true)}>{saving ? '正在處理…' : 'AI 優化構圖並生成圖片 →'}</button>
+                                    </div> : null}
                                     <button
                                       type="button"
+                                      style={selected.selected_format !== 'short_video' ? {background:'transparent',color:'var(--soon-oxblood)',border:'1px solid var(--soon-line)'} : undefined}
                                       disabled={saving || editingDraft !== null}
                                       onClick={() => void confirmPageDrafts()}
                                     >
-                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "確認內容並製作圖片 →"}
+                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "直接用現有素材生成 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus === "package_ready" ? (

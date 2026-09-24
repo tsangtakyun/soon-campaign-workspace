@@ -85,12 +85,13 @@ async function fetchTypefaceWoff2(url: string) {
   return Buffer.from(await response.arrayBuffer());
 }
 
-async function loadTypefaceBuffer(typefaceId: string, cdnUrl: string) {
-  const cacheKey = `${typefaceId}:${cdnUrl}`;
+async function loadTypefaceBuffer(typefaceId: string, cdnUrl: string, weight = 400) {
+  const cacheKey = `${typefaceId}:${cdnUrl}:${weight}`;
   const cached = fontBufferCache.get(cacheKey);
   if (cached) return cached;
   const pending = (async () => {
-    const localFile = localTypefaceFiles[typefaceId];
+    const localFile = weight >= 700 && typefaceId === 'swei-gothic'
+      ? 'SweiGothicCJKtc-Bold.woff2' : localTypefaceFiles[typefaceId];
     const bytes = localFile
       ? await readFile(path.join(process.cwd(), "public/fonts/max32002", localFile))
       : await fetchTypefaceWoff2(cdnUrl);
@@ -109,22 +110,25 @@ async function loadTypefaceBuffer(typefaceId: string, cdnUrl: string) {
 }
 
 async function loadCarouselFonts(fontStyle?: string | null) {
-  const [defaultFile, editorialFile] = await Promise.all([
+  const [defaultFile, defaultBoldFile, editorialFile] = await Promise.all([
     readFile(path.join(process.cwd(), "public/fonts/max32002/SweiGothicCJKtc-Regular.ttf")),
+    readFile(path.join(process.cwd(), "public/fonts/max32002/SweiGothicCJKtc-Bold.woff2")),
     readFile(path.join(process.cwd(), "public/fonts/max32002/NotoSerifCJKtc-Regular.otf")),
   ]);
   const fallback = exactArrayBuffer(defaultFile);
+  const fallbackBold = exactArrayBuffer(await decompress(defaultBoldFile));
   const editorial = exactArrayBuffer(editorialFile);
   const selectedTypeface = findBrandTypeface(fontStyle);
   if (!selectedTypeface) {
-    return { regular: fallback, bold: fallback, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
+    return { regular: fallback, bold: fallbackBold, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
   }
   try {
     const selected = await loadTypefaceBuffer(selectedTypeface.id, selectedTypeface.cdnUrl);
-    return { regular: selected, bold: selected, family: BRAND_CAROUSEL_FONT, editorial, hasBrandFont: true };
+    const bold = await loadTypefaceBuffer(selectedTypeface.id, selectedTypeface.cdnUrl, 700);
+    return { regular: selected, bold, family: BRAND_CAROUSEL_FONT, editorial, hasBrandFont: true };
   } catch (error) {
     console.warn(`[content-projects/generate-carousel] font fallback for ${selectedTypeface.id}`, error);
-    return { regular: fallback, bold: fallback, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
+    return { regular: fallback, bold: fallbackBold, family: DEFAULT_CAROUSEL_FONT, editorial, hasBrandFont: false };
   }
 }
 
