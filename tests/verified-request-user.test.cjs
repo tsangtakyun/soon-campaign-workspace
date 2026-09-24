@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {load}=require('./ts-loader.cjs');
+const {verifiedRequestUser}=load('lib/verified-request-user.ts');
+(async()=>{
+ let calls=0,waits=0;
+ const client={auth:{getUser:async()=>{calls++;if(calls<3)return {data:{user:null},error:{name:'AuthRetryableFetchError',status:0}};return {data:{user:{id:'ok'}},error:null};}}};
+ assert.equal((await verifiedRequestUser(client,async()=>{waits++;})).id,'ok');assert.equal(calls,3);assert.equal(waits,2);
+ calls=0;client.auth.getUser=async()=>{calls++;throw Object.assign(new Error('fetch failed'),{cause:{code:'ECONNRESET'}});};
+ await assert.rejects(()=>verifiedRequestUser(client,async()=>{}),e=>e.status===503);assert.equal(calls,3);
+ calls=0;client.auth.getUser=async()=>{calls++;return {data:{user:null},error:{name:'AuthSessionMissingError',status:400}};};
+ await assert.rejects(()=>verifiedRequestUser(client),e=>e.status===401);assert.equal(calls,1);
+ client.auth.getUser=async()=>({data:{user:null},error:{status:503}});
+ await assert.rejects(()=>verifiedRequestUser(client,async()=>{}),e=>e.status===503);
+ client.auth.getUser=async()=>({data:{user:null},error:{status:401}});
+ await assert.rejects(()=>verifiedRequestUser(client),e=>e.status===401);
+ const source=fs.readFileSync('app/onboarding/content-studio/page.tsx','utf8');
+ const repair=source.slice(source.indexOf("phase:'repair-copy'"));
+ assert.ok(repair.indexOf('savedRevisionRef.current[selected.id]=data.project.updated_at')<repair.indexOf('if(fitted)await confirmPageDrafts'));
+ assert.ok(source.includes('if(throwOnFailure)throw error;'));
+ console.log('PASS auth transient retry, exhausted 503, real 401, revision handoff and checkpoint error propagation');
+})().catch(e=>{console.error(e);process.exit(1);});

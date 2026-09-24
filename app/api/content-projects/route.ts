@@ -1,4 +1,5 @@
 import { coreCode, object, styleSnapshot, validateSelection, type StyleResult } from '@/lib/production-style'
+import {verifiedRequestUser,RequestAuthError} from '@/lib/verified-request-user'
 import {selectCatalogStyle,sameCatalogSelection} from '@/lib/core-catalog-selection'
 import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context'
 import { applyCoreTemplateStructure, isFixedCoreTemplate } from '@/lib/core-template-contract'
@@ -11,8 +12,7 @@ import { getWorkspaceAccess } from '@/lib/workspace-access'
 
 async function currentUser() {
   const supabase = createServerSupabase(await cookies())
-  const { data: { user } } = await supabase.auth.getUser()
-  return user || null
+  return verifiedRequestUser(supabase)
 }
 
 export async function GET(req: Request) {
@@ -86,6 +86,7 @@ export async function GET(req: Request) {
       })),
     })
   } catch (error) {
+    if(error instanceof RequestAuthError)return NextResponse.json({error:error.message},{status:error.status})
     return NextResponse.json({ error: 'Failed to load content projects', detail: String(error) }, { status: 500 })
   }
 }
@@ -149,6 +150,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ project: data, success: true })
   } catch (error) {
+    if(error instanceof RequestAuthError)return NextResponse.json({error:error.message},{status:error.status})
     return NextResponse.json({ error: 'Failed to create content project', detail: String(error) }, { status: 500 })
   }
 }
@@ -248,6 +250,7 @@ export async function PATCH(req: Request) {
     }
     return NextResponse.json({ project: data, success: true })
   } catch (error) {
+    if(error instanceof RequestAuthError)return NextResponse.json({error:error.message},{status:error.status})
     return NextResponse.json({ error: 'Failed to update content project', detail: String(error) }, { status: 500 })
   }
 }

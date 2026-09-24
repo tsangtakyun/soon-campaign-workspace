@@ -1093,6 +1093,7 @@ export default function ContentStudioPage() {
     successMessage: string,
     nextStep?: StudioStep,
     preferenceEvents: PreferenceEvent[] = [],
+    throwOnFailure = false,
   ) {
     if (!workspaceId || !selected || !permissions?.canEdit) return false;
     setSaving(true);
@@ -1129,6 +1130,7 @@ export default function ContentStudioPage() {
       return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能儲存");
+      if(throwOnFailure)throw error;
       return false;
     } finally {
       setSaving(false);
@@ -1868,6 +1870,7 @@ export default function ContentStudioPage() {
           const data=await response.json();
           if(!response.ok)throw new Error(data.error||'文案自動精簡暫未完成，進度已保留。');
           if(data.project){
+            savedRevisionRef.current[selected.id]=data.project.updated_at;
             setProjects(items=>items.map(item=>item.id===selected.id?{...item,...data.project}:item));
             if(data.success)fitted={...selected,...data.project};
           }
@@ -1905,7 +1908,7 @@ export default function ContentStudioPage() {
     }
     const attemptAt=new Date().toISOString();
     const checkpoint=async(assets:unknown,status:string)=>{
-      const ok=await saveProject({production:{...selected.production,generationRequested:status==='needs_attention'?null:selected.production.generationRequested,compositionMode:mode,autoBackgroundExtension:false,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
+      const ok=await saveProject({production:{...selected.production,generationRequested:status==='needs_attention'?null:selected.production.generationRequested,compositionMode:mode,autoBackgroundExtension:false,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。',undefined,[],true);
       if(!ok)throw new Error('未能保存處理進度，已停止，請重新載入後再試。');
       setSaving(true);
     };

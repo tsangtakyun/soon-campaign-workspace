@@ -1,4 +1,5 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import {verifiedRequestUser,RequestAuthError} from '@/lib/verified-request-user';
 import {repairMagazineCopy} from '@/lib/repair-magazine-copy';
 import {magazineCopyInstruction,magazineCopyIssues} from '@/lib/magazine-copy-policy';
 import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
@@ -41,11 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
     const supabase = createServerSupabase(await cookies());
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user?.id)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user=await verifiedRequestUser(supabase);
     const access = await getWorkspaceAccess({
       email: user.email,
       userId: user.id,
@@ -368,8 +365,8 @@ export async function POST(req: Request) {
     console.error("[content-projects/generate-drafts]", error);
     if(generationId && generationAdmin) await generationAdmin.from("content_project_generation_runs").update({status:"failed",error:"生成未完成，請重試。",updated_at:new Date().toISOString()}).eq("id",generationId);
     return NextResponse.json(
-      { error: error instanceof DraftStepError ? error.message : "未能完成此步驟；已保存進度會保留，請稍後重試。", generationId: generationId || undefined },
-      { status: error instanceof DraftStepError ? error.status : 500 },
+      { error: error instanceof DraftStepError || error instanceof RequestAuthError ? error.message : "未能完成此步驟；已保存進度會保留，請稍後重試。", generationId: generationId || undefined },
+      { status: error instanceof DraftStepError || error instanceof RequestAuthError ? error.status : 500 },
     );
   }
 }
