@@ -15,4 +15,6 @@ assert.equal(canvas.objects.find(o=>o.data?.role==='comparison_label_1_1')?.text
 assert.ok(!canvas.objects.find(o=>o.data?.role==='comparison_label_0_2')?.text);
 const empty=master.createCoreMasterCanvas({...options,copy:{headline:'新題材',body:[]}});
 assert.ok(!empty.objects.some(o=>o.text==='進食'));
+const sourced=master.createCoreMasterCanvas({...options,copy:{...copy,body:[...copy.body.slice(0,5),'來源：已提供資料']}});
+assert.equal(sourced.objects.find(o=>o.data?.role==='source').text,'來源：已提供資料');
 console.log('PASS: per-role budgets, written copy, semantic labels, empty rows and example-credit suppression');

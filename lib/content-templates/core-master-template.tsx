@@ -56,6 +56,8 @@ type CoreMasterContract = {
 };
 
 type MasterCopy = {
+  role?: string;
+  layout?: string;
   compositionMode?: 'original' | 'ai';
   contentRole?: string;
   headline?: string;
@@ -190,7 +192,7 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
     comparison_highlight: copy.fields?.highlight || body[4] || '',
     comparison_source: copy.fields?.source || body[5] || '',
     highlight: body.length >= 5 ? body[4] : body[2] || "",
-    source: copy.fields?.source || "",
+    source: copy.fields?.source || body[({comparison:5,feature:6,longform:3,split:3} as Record<string,number>)[copy.role||copy.layout||'longform']] || "",
     question: body[1] || "",
     cta: body[2] || body.at(-1) || "了解更多",
     feature_title_1: body[0] || "",
