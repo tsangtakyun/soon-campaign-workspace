@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const {load}=require('./ts-loader.cjs');
-const {copyFieldTargets,copyCandidateRequest,applyCopyCandidates,readCopyCandidates,copyCandidatesSchema}=load('lib/copy-field-candidates.ts');
+const {copyFieldTargets,copyCandidateRequest,applyCopyCandidates,readCopyCandidates,copyCandidatesSchema,rejectedCopyCandidates}=load('lib/copy-field-candidates.ts');
 const long='據報哈佛有研究發現，雪糕與較低的二型糖尿病風險存在關聯，但有關鍵條件';
 const page={headline:'研究摘要',subheadline:'',role:'cover',body:[long],assetId:'keep',designDirection:'private layout instructions'};
 const targets=copyFieldTargets(page,{});
@@ -15,4 +15,19 @@ const uncertain={...page,body:['原帖指某研究可能有相關發現，但目
 const more=copyFieldTargets(uncertain,{});
 assert.equal(applyCopyCandidates(uncertain,more,{fields:[{field:'body.0',candidates:['研究已證實有效']}]}).body[0],uncertain.body[0]);
 assert.throws(()=>readCopyCandidates({content:[{type:'text',text:'{"fields":[{"field":"body.0","candidates":[1]}]}'}]}));
+const comparison={headline:'比較',role:'comparison',body:['Ice Cream','Frozen Dessert','乳脂肪≥10%，以鮮奶油為基礎','以植物油取代鮮奶油','根據原帖引述美國FDA標準，乳脂肪須達10%或以上才可標示為Ice Cream；MFGM相關研究說法暫列為待核實','原帖引述美國FDA標準；MFGM說法暫未能獨立核實']};
+const summaryTargets=copyFieldTargets(comparison,{});
+assert.equal(summaryTargets.length,1);
+assert.ok(!summaryTargets[0].requirements.some(s=>s.includes('因果')));
+assert.ok(summaryTargets[0].alreadyVisible.includes(comparison.body[2]));
+assert.ok(targets[0].requirements.some(s=>s.includes('因果')));
+const bad='原帖指FDA規定Ice Cream乳脂肪須達10%以上；MFGM關聯說法待核實';
+const feedback=rejectedCopyCandidates(summaryTargets,{fields:[{field:'body.4',candidates:[bad]}]});
+assert.equal(feedback[0].rejected[0].length,39);
+assert.ok(feedback[0].rejected[0].reasons[0].includes('超出7字'));
+summaryTargets[0].previousRejections=feedback[0].rejected;
+assert.ok(copyCandidateRequest('existing-model',summaryTargets).messages[0].content.includes('超出7字'));
+const revised='原帖引述分類標準；MFGM說法仍待核實';
+assert.equal(applyCopyCandidates(comparison,summaryTargets,{fields:[{field:'body.4',candidates:[revised]}]}).body[4],revised);
+assert.equal(applyCopyCandidates(comparison,summaryTargets,{fields:[{field:'body.4',candidates:['分類標準與MFGM研究']}]}).body[4],comparison.body[4]);
 console.log('PASS field alternatives: 34-to-28 regression, exact codepoint counts, source/uncertainty guards, no full-page prompt, safe selection');

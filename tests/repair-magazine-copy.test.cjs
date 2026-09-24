@@ -13,12 +13,12 @@ function harness(make){
      const targets=JSON.parse(request.messages[0].content.split('\n').at(-1));
      const page={...good,body:[...good.body]};
      for(const t of targets){if(t.field.startsWith('body.'))page.body[Number(t.field.slice(5))]=t.original;else page[t.field]=t.original;}
-     const modified=make(page,calls);
+     const modified=make(page,calls,targets);
      return {content:[{type:'text',text:JSON.stringify({fields:targets.map(t=>({field:t.field,candidates:[t.field.startsWith('body.')?modified.body[Number(t.field.slice(5))]:modified[t.field]]}))})}]};
    },
    runDraftStep:async(_scope,_key,_model,execute,validate)=>{const output=await execute();validate(output);return {output};},
  }});
- return {run:pages=>module.repairMagazineCopy({},'key','existing-model',pages,{}),calls:()=>calls};
+ return {run:(pages,feedback={})=>module.repairMagazineCopy({},'key','existing-model',pages,{},'',0,feedback),calls:()=>calls};
 }
 (async()=>{
  let h=harness(p=>({...p,headline:'研究仍待核實',body:['不應覆蓋合格正文'],assetId:'wrong'}));
@@ -37,6 +37,11 @@ function harness(make){
  assert.equal(result.processedPage,'P.1');assert.equal(result.issues.length,1);assert.equal(result.pages[1].headline,original.headline);
  result=await h.run(result.pages);assert.equal(result.processedPage,'P.2');assert.equal(result.issues.length,0);assert.equal(h.calls(),2);
  h=harness(p=>p);result=await h.run([good]);assert.equal(h.calls(),0);
+ h=harness((p,n,targets)=>{if(n===2){assert.ok(targets[0].previousRejections[0].reasons[0].includes('超出'));return {...p,headline:'研究摘要'};}return p;});
+ result=await h.run([original]);assert.ok(result.feedback['P.1'].length);
+ result=await h.run(result.pages,result.feedback);assert.equal(result.issues.length,0);assert.equal(result.feedback['P.1'],undefined);
+ h=harness((p,n,targets)=>{assert.equal(targets[0].previousRejections,undefined);return p;});
+ await h.run([original],{'P.1':[{field:'headline',original:'已修改舊稿',hardLimit:18,rejected:[]}]});
  assert.ok(productionCopyIssues({...good,headline:'六個中文字標題'},{copy_limits:{headline_chars_zh_max:4}}).length);
  console.log('PASS single-page copy fit: one request/one page, 75s budget, resume skips completed pages, valid copy/assets preserved');
 })().catch(e=>{console.error(e);process.exit(1)});

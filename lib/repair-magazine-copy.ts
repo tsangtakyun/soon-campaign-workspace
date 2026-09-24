@@ -1,10 +1,11 @@
 import {magazineCopyInstruction,productionCopyIssues} from './magazine-copy-policy';
 import {draftOutputSchema,readDraftOutput} from './draft-output';
 import {draftAnthropic,runDraftStep,DraftStepError,type DraftScope} from './draft-generation-step';
-import {copyFieldTargets,copyCandidateRequest,readCopyCandidates,applyCopyCandidates} from './copy-field-candidates';
+import {copyFieldTargets,copyCandidateRequest,readCopyCandidates,applyCopyCandidates,rejectedCopyCandidates,type CopyFitFeedback} from './copy-field-candidates';
 
-export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:string,original:Record<string,any>[],contract:any,attempt='',round=0){
+export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:string,original:Record<string,any>[],contract:any,attempt='',round=0,previousFeedback:Record<string,CopyFitFeedback[]>={}){
   let pages=original.map(p=>({...p}));
+  const feedback={...previousFeedback};
   let processedPage:string|undefined;
   // One paid call per HTTP request; the caller checkpoints before continuing.
   for(let step=0;step<1;step++){
@@ -12,6 +13,10 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
     if(!invalid.length)break;
     processedPage=String(invalid[0].page.page);
     const targets=copyFieldTargets(invalid[0].page,contract);
+    for(const target of targets){
+      const prior=previousFeedback[processedPage]?.find(f=>f.field===target.field&&f.original===target.original&&f.hardLimit===target.hardLimit);
+      if(prior)target.previousRejections=prior.rejected;
+    }
     const request=targets.length?copyCandidateRequest(model,targets):{model,max_tokens:1800,temperature:0.1,
       output_config:{format:{type:'json_schema',schema:draftOutputSchema}},
       system:magazineCopyInstruction,
@@ -22,7 +27,7 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
         JSON.stringify(invalid),
       ].join('\n')}],
     };
-    const result=await runDraftStep(scope,{kind:'magazine-auto-fit-fields-v3',attempt,round,targets,pages:invalid,limits:contract?.copy_limits},model,async()=>{
+    const result=await runDraftStep(scope,{kind:'magazine-auto-fit-fields-v4',attempt,round,targets,pages:invalid,limits:contract?.copy_limits},model,async()=>{
       try{
         const response=await draftAnthropic(apiKey,request,75_000);return {response,usage:response.usage};
       }catch(error){
@@ -31,6 +36,7 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
       }
     },r=>{if(targets.length){readCopyCandidates(r.response);return;}const output=readDraftOutput(r.response,invalid.length);if(output.pages.some((p:any,i:number)=>p.page!==invalid[i].page.page))throw new Error('AI 文案頁碼不符；原稿保留。');});
     const output=targets.length?{pages:[applyCopyCandidates(invalid[0].page,targets,readCopyCandidates(result.output.response))]}:readDraftOutput(result.output.response,invalid.length);
+    if(targets.length)feedback[processedPage]=rejectedCopyCandidates(targets,readCopyCandidates(result.output.response));
     for(const [i,item]of invalid.entries()){
       const p=output.pages[i];
       const colloquial=(s:unknown)=>/[唔嘅咁睇揀]|幾時|食緊|識得/.test(String(s||''));
@@ -63,5 +69,6 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
     }
   }
   const issues=pages.flatMap((p,index)=>{const issues=productionCopyIssues(p,contract);return issues.length?[{page:p.page||`P.${index+1}`,issues}]:[];});
-  return {pages,issues,processedPage};
+  for(const p of pages)if(!productionCopyIssues(p,contract).length)delete feedback[String(p.page)];
+  return {pages,issues,processedPage,feedback};
 }
