@@ -44,7 +44,7 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
         headline:item.issues.some(s=>s.includes('標題'))||colloquial(item.page.headline)?p.headline:item.page.headline,
         subheadline:item.issues.some(s=>s.includes('分類短標'))||colloquial(item.page.subheadline)?p.subheadline||'':item.page.subheadline,
         body:item.issues.includes('正文欄位數目不符')?p.body:item.page.body.map((text:unknown,index:number)=>
-          item.issues.some(s=>s.includes(`正文${index+1}超過`)||s.includes(`正文${index+1}最多`))||colloquial(text)?p.body[index]??text:text),
+          item.issues.some(s=>s.includes(`正文${index+1}超過`)||s.includes(`正文${index+1}最多`)||s.includes(`正文${index+1}第`))||colloquial(text)?p.body[index]??text:text),
         comparisonLabels:item.issues.some(s=>s.includes('維度標籤'))?p.comparisonLabels||[]:item.page.comparisonLabels,
       };
       // Never accept deleting meaningful copy as a way to pass a length gate.
@@ -59,6 +59,9 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
           if(s===item.page.body[index])return;
           delete candidate.fields.body;delete candidate.fields[`body_${index+1}`];
           for(const key of aliases[index]||[])delete candidate.fields[key];
+          if(candidate.role==='comparison'||candidate.layout==='comparison'){
+            if(index===2||index===3)for(let row=1;row<=3;row++)delete candidate.fields[`${index===2?'left':'right'}_row_${row}`];
+          }
           const role=String(candidate.role||candidate.layout);
           if(index===({longform:3,split:3,comparison:5,feature:6} as Record<string,number>)[role])delete candidate.fields.source;
           if(index===2&&['longform','split'].includes(role))delete candidate.fields.highlight;

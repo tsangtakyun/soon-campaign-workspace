@@ -15,7 +15,9 @@ export function copyFieldTargets(page:Record<string,any>,contract:any):CopyField
   const role=String(page.role||page.layout),budget=magazineBodyLimits[role]||[];
   const fields=[{field:'headline',text:page.headline,limit:Math.min(18,Number(contract?.copy_limits?.headline_chars_zh_max||24))},
     {field:'subheadline',text:page.subheadline,limit:10},
-    ...(Array.isArray(page.body)?page.body:[]).map((text:unknown,i:number)=>({field:`body.${i}`,text,limit:Math.min(budget[i]??0,Number(contract?.copy_limits?.body_chars_zh_max_per_block||72))}))];
+    ...(Array.isArray(page.body)?page.body:[]).flatMap((text:unknown,i:number)=>role==='comparison'&&[2,3].includes(i)
+      ?String(text||'').split(/\n|[；;]/u).map((row,n)=>({field:`body.${i}.row.${n}`,text:row,limit:18}))
+      :[{field:`body.${i}`,text,limit:Math.min(budget[i]??0,Number(contract?.copy_limits?.body_chars_zh_max_per_block||72))}])];
   return fields.filter(f=>f.limit>0&&(count(String(f.text||''))>f.limit||colloquial(String(f.text||'')))).map(f=>{
     const original=String(f.text||'');return {field:f.field,original,currentLength:count(original),hardLimit:f.limit,targetLength:Math.max(1,Math.floor(f.limit*.75)),requirements:qualifiers.filter(q=>q.test.test(original)).map(q=>q.name),...(role==='comparison'&&f.field==='body.4'?{alreadyVisible:page.body.filter((_:unknown,i:number)=>i!==4).map(String)}:{})};
   });
@@ -37,7 +39,9 @@ export function applyCopyCandidates(page:Record<string,any>,targets:CopyFieldTar
     const options=output.fields.filter(f=>f.field===target.field).flatMap(f=>f.candidates).slice(0,12);
     const choice=options.map(s=>s.trim()).find(s=>!candidateRejectionReasons(target,s).length);
     if(!choice)continue;
-    if(target.field.startsWith('body.'))result.body[Number(target.field.slice(5))]=choice;
+    const row=target.field.match(/^body\.(\d+)\.row\.(\d+)$/);
+    if(row){const index=Number(row[1]),lines=String(result.body[index]||'').split(/\n|[；;]/u);lines[Number(row[2])]=choice;result.body[index]=lines.join('\n');}
+    else if(target.field.startsWith('body.'))result.body[Number(target.field.slice(5))]=choice;
     else result[target.field]=choice;
   }
   return result;

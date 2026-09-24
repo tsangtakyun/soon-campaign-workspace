@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 async function main(){
- let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true,boundaryThrows=false,evidence=null;const files=new Map(),queries=[];
+ let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true,boundaryThrows=false,evidence=null,seamBad=false;const files=new Map(),queries=[];
  const analysisId='33333333-3333-4333-a333-333333333333';
  const workspaceId='11111111-1111-4111-a111-111111111111',projectId='22222222-2222-4222-a222-222222222222';
  const admin={from:table=>{let op='read',value,filters=[];const result=()=>{
@@ -24,6 +24,7 @@ async function main(){
   '@/lib/oauth-connections':{isUuid:v=>typeof v==='string'&&/^[0-9a-f-]{36}$/.test(v)},
   '@/lib/background-extension':{EXTENSION_VERSION:'test',loadExtensionSource:async()=>Buffer.from('original'),prepareExtension:async()=>({canvas:Buffer.from('canvas'),mask:Buffer.from('mask'),width:640,height:800,originalHeight:360}),finishExtension:async()=>{finished++;return Buffer.from('final-original-preserved')}},
  };
+ deps['@/lib/extension-quality'].inspectExtensionSeams=async()=>[{discontinuous:seamBad}];
  const box={exports:{},Buffer,URL,Request,Response,File,FormData,AbortSignal,console,process:{env:{OPENAI_API_KEY:'test-key',OPENAI_IMAGE_MODEL:'test-model'}},require:n=>deps[n]||require(n),fetch:async(url,options)=>{
   paid++;assert.equal(record.status,'pending');assert.ok(options.body.get('mask'));assert.equal(options.body.get('size'),'1024x1536');
   return Response.json({data:[{b64_json:Buffer.from('raw-model-output').toString('base64')}],usage:{total_tokens:100}});
@@ -38,6 +39,7 @@ async function main(){
  assert.ok(queries.find(q=>q.table==='content_projects').filters.some(([k,v])=>k==='workspace_id'&&v===workspaceId));
  assert.ok(!queries.some(q=>q.table==='content_projects'&&q.op!=='read'),'generation must not modify project');
  assert.equal((await (await post()).json()).cached,true);assert.equal(paid,1);
+ seamBad=true;assert.equal((await post()).status,422);assert.equal(paid,1);assert.equal(record.status,'ready','cached seam rejection does not overwrite an existing result');seamBad=false;
  record.status='failed';const recovered=await post();assert.equal(recovered.status,200);assert.equal(paid,1,'recover uploaded output without paying again');
  record=null;files.clear();boundarySafe=false;
  assert.equal((await post()).status,422);assert.equal(paid,1,'unsafe edge must not call image generator');assert.equal(record.output.rejected,true);

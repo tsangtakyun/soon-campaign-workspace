@@ -157,7 +157,9 @@ function fittedSize(text:string,width:number,height:number,initial:number,lineHe
     return count+lines;
   },0);
   let size=initial;
-  while(size>Math.min(initial,22) && linesAt(size)*size*lineHeight>height)size--;
+  // A fixed 22px floor can still overflow a short master textbox. Continue
+  // fitting to its actual bounds; upstream per-cell copy budgets keep it legible.
+  while(size>1 && linesAt(size)*size*lineHeight>height)size=Math.max(1,size-.25);
   return size;
 }
 

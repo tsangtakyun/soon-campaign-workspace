@@ -6,7 +6,7 @@ import { requireWorkspaceUser, consumeApiQuota } from '@/lib/platform-access';
 import { isUuid } from '@/lib/oauth-connections';
 import { generationError } from '@/lib/generation-error';
 import { loadExtensionSource, prepareExtension, finishExtension, EXTENSION_VERSION } from '@/lib/background-extension';
-import { boundarySchema, boundariesSafe, qualityApproved, inspectExtensionBoundaries, reviewExtension, extensionPrompt } from '@/lib/extension-quality';
+import { boundarySchema, boundariesSafe, qualityApproved, inspectExtensionBoundaries, inspectExtensionSeams, reviewExtension, extensionPrompt } from '@/lib/extension-quality';
 import {SUBJECT_PROMPT_VERSION} from '@/lib/ai-subject-focus';
 
 export const runtime = 'nodejs';
@@ -48,7 +48,15 @@ export async function POST(request: Request) {
     const { data: old, error: lookupError } = await admin.from(table).select('status,output,updated_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (lookupError) return reply({ error: '生成紀錄暫時不可用。' }, 503);
     if (old?.output?.rejected) return reply({ code:'EXTENSION_REJECTED', stage:old.output.rejectionStage||'review',error:'延伸未通過環境／主體檢查，已保留原圖；不會重複生成。' },422);
-    if (old?.status === 'ready' && qualityApproved(old.output?.review)) return reply({ ...old.output, cached: true });
+    if (old?.status === 'ready' && qualityApproved(old.output?.review)) {
+      // Recheck persisted pixels even for older model-approved results. No paid
+      // generation and no overwriting the user's current image on this path.
+      const cached=await admin.storage.from('brand-assets').download(`${workspaceId}/content-projects/${projectId}/extensions/${id}.png`);
+      if(!cached.data)return reply({error:'未能讀取已保存背景，現有圖片保留，請稍後重試。'},503);
+      const seams=await inspectExtensionSeams(new Uint8Array(await cached.data.arrayBuffer()),plan);
+      if(seams.some(s=>s.discontinuous))return reply({code:'EXTENSION_REJECTED',stage:'quality_review',error:'已保存背景有明顯接縫，不能再次套用；現有圖片未改動，請保留原圖或換圖。'},422);
+      return reply({ ...old.output, cached: true });
+    }
     if (old?.status === 'pending' && Date.now() - Date.parse(old.updated_at) < 240_000) return reply({ error: '正在延伸，請稍後再按；完成後會讀取已保存版本。' }, 409);
     if (!process.env.OPENAI_API_KEY) return reply({ error: '圖片服務尚未設定。' }, 503);
     const updatedAt = new Date().toISOString();

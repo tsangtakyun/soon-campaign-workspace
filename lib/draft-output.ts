@@ -10,6 +10,7 @@ export const draftOutputSchema = object({
     assetId:string, assetIds:strings, role:string, layout:string, templateArtboardId:string,
     // Anthropic rejects maxItems; enforce this constraint after generation.
     contentRole:{type:'string',enum:['narrative','comparison']}, comparisonLabels:{...strings,description:'At most three comparison dimension labels.'}, imageTreatment:string,
+    comparisonRows:{type:'array',items:object({label:string,left:string,right:string},['label','left','right']),description:'At most three aligned comparison rows: one shared dimension and both values in each row.'},
     assetStatus:{type:'string',enum:['matched','missing']},
     assetRequest:object({reason:string,suggestions:strings},['reason','suggestions']),
     designDirection:string,
@@ -33,6 +34,19 @@ export function readDraftOutput(response: any, expectedPages?: number) {
       !Array.isArray(page.body) || !page.body.length || page.body.some((line:any)=>typeof line!=='string') ||
       (page.comparisonLabels !== undefined && (!Array.isArray(page.comparisonLabels) || page.comparisonLabels.length>3 || page.comparisonLabels.some((label:any)=>typeof label!=='string')))))
     throw new DraftOutputError();
+  for(const page of value.pages){
+    if(page.comparisonRows!==undefined){
+      const rows=page.comparisonRows;
+      if(!Array.isArray(rows)||rows.length>3||rows.some((r:any)=>!r||['label','left','right'].some(k=>typeof r[k]!=='string')||[r.label,r.left,r.right].some(s=>/[\n；;]/u.test(s))))throw new DraftOutputError();
+      if((page.role||page.layout)==='comparison'&&rows.length){
+        page.comparisonLabels=rows.map((r:any)=>r.label);
+        page.body[2]=rows.map((r:any)=>r.left).join('\n');
+        page.body[3]=rows.map((r:any)=>r.right).join('\n');
+      }
+      // Persist only the canonical editable fields, never a stale second copy.
+      delete page.comparisonRows;
+    }
+  }
   return value;
 }
 
