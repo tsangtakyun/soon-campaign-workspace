@@ -1860,14 +1860,22 @@ export default function ContentStudioPage() {
         setMessage('AI 正在自動精簡文案並檢查母版字數，完成後會繼續製作；圖片及已完成進度保留…');
         let fitted:typeof selected|null=null;
         try{
-          const response=await fetch('/api/content-projects/generate-drafts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,projectId:selected.id,phase:'repair-copy',attempt:crypto.randomUUID()})});
+          const attempt=crypto.randomUUID(),rounds:Record<string,number>={};
+          let nextPage=String(selected.production.pageDrafts.find((p:any)=>productionCopyIssues(p,selected.format_decision?.templateContractSnapshot).length)?.page||'');
+          for(let step=0;step<selected.production.pageDrafts.length*3;step++){
+          setMessage(`AI 正在精簡 ${nextPage} 文案（第 ${(rounds[nextPage]||0)+1}/3 輪）；完成頁面已保存，毋須重新上載…`);
+          const response=await fetch('/api/content-projects/generate-drafts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,projectId:selected.id,phase:'repair-copy',attempt,round:rounds[nextPage]||0})});
           const data=await response.json();
           if(!response.ok)throw new Error(data.error||'文案自動精簡暫未完成，進度已保留。');
           if(data.project){
             setProjects(items=>items.map(item=>item.id===selected.id?{...item,...data.project}:item));
             if(data.success)fitted={...selected,...data.project};
           }
-          if(!data.success)setMessage(data.message||'文案精簡暫未完成，圖片及進度保留。');
+          if(data.success)break;
+          if(!data.continue){setMessage(data.message||'文案精簡暫未完成，圖片及進度保留。');break;}
+          if(data.processedPage)rounds[data.processedPage]=(rounds[data.processedPage]||0)+1;
+          nextPage=data.nextPage||nextPage;
+          }
         }catch(error){setMessage(error instanceof Error?error.message:'文案自動精簡暫未完成，進度已保留。');}
         finally{preparingImages.current=false;setSaving(false);}
         if(fitted)await confirmPageDrafts(optimizeBackground,retryPage,fitted);

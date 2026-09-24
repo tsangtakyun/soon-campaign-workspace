@@ -107,14 +107,17 @@ export async function POST(req: Request) {
       const contract=project.format_decision?.templateContractSnapshot;
       if(isVideo||!isFixedCoreTemplate(contract)||!Array.isArray(project.production.pageDrafts))
         return NextResponse.json({error:'目前沒有可精簡的母版草稿。'},{status:400});
-      const result=await repairMagazineCopy({admin:access.admin,workspaceId,projectId,actorId:user.id},apiKey,anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),project.production.pageDrafts,contract,typeof body.attempt==='string'?body.attempt.slice(0,80):'');
+      const round=Number.isInteger(body.round)?Math.max(0,Math.min(2,body.round)):0;
+      const result=await repairMagazineCopy({admin:access.admin,workspaceId,projectId,actorId:user.id},apiKey,anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),project.production.pageDrafts,contract,typeof body.attempt==='string'?body.attempt.slice(0,80):'',round);
       const production={...project.production,pageDrafts:result.pages,copyReview:result.issues};
       const {data:saved,error:saveError}=await access.admin.from('content_projects').update({production,updated_at:new Date().toISOString(),updated_by:user.id})
         .eq('id',projectId).eq('workspace_id',workspaceId).eq('updated_at',project.updated_at).select('id,production,updated_at').maybeSingle();
       if(saveError)throw saveError;
       if(!saved)throw new DraftStepError('內容在精簡期間有修改；未覆蓋你的修改，請再按製作。',409);
-      return NextResponse.json({success:!result.issues.length,project:saved,needsReview:result.issues.length>0,
-        message:result.issues.length?'AI 暫未能將部分文案整理至母版限制；原有圖片及進度保留，尚未製圖。可稍後重試或選擇檢視文案。':undefined});
+      const blocked=round>=2&&result.issues.some(p=>p.page===result.processedPage);
+      return NextResponse.json({success:!result.issues.length,project:saved,continue:result.issues.length>0&&!blocked,
+        processedPage:result.processedPage,nextPage:result.issues[0]?.page,needsReview:blocked,
+        message:blocked?'AI 暫未能將本頁文案整理至母版限制；其他完成頁面已保存，尚未製圖。可稍後重試或選擇檢視文案。':undefined});
     }
 
     const baseStructure = isVideo && Array.isArray(project.production.script) && project.production.script.length
