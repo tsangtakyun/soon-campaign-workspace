@@ -62,6 +62,7 @@ type MasterCopy = {
   subheadline?: string;
   body?: string[];
   fields?: Record<string, string>;
+  comparisonLabels?: string[];
 };
 
 type MasterAsset = FocusAsset & {
@@ -202,6 +203,13 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
   };
   const key = binding?.startsWith('content.') ? binding.slice('content.'.length) : role;
   if (copy.fields?.[key] != null) return readerFacingCopy(copy.fields[key]);
+  // Missing topic-specific fields must never reveal literal example copy.
+  const label=key.match(/^comparison_label_([1-3])$/);
+  if(label){
+    const n=Number(label[1])-1;
+    const hasContent=['left','right'].some(side=>comparisonCopy(body,side as 'left'|'right').split(/\n|[；;]/u)[n]?.trim());
+    return hasContent?readerFacingCopy(copy.comparisonLabels?.[n]||''):'';
+  }
   const row = key.match(/^(left|right)_row_([1-3])$/);
   if (row) {
     const lines = comparisonCopy(body, row[1] as 'left' | 'right').split(/\n|[；;]/u);
@@ -209,6 +217,7 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
   }
   const direct = values[key];
   if (direct != null) return direct;
+  if(binding?.startsWith('content.'))return '';
   return fallback.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_match, key: string) => values[key.toLowerCase()] ?? "");
 }
 

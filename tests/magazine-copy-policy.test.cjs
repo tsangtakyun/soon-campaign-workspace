@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),{load}=require('./ts-loader.cjs');
+const {magazineCopyIssues}=load('lib/magazine-copy-policy.ts');
+const master=load('lib/content-templates/core-master-template.tsx');
+const contract=JSON.parse(fs.readFileSync('tests/fixtures/clear-magazine-v3.contract.json'));
+const copy={role:'comparison',contentRole:'comparison',headline:'兩款產品如何比較',subheadline:'產品資料',comparisonLabels:['原料','製法'],body:['甲產品','乙產品','原料甲\n製法甲','原料乙\n製法乙','請查看產品標籤','']};
+assert.equal(magazineCopyIssues(copy).length,0);
+assert.ok(magazineCopyIssues({...copy,comparisonLabels:[]}).some(s=>s.includes('維度')));
+assert.ok(magazineCopyIssues({role:'cover',headline:'揀邊款',body:['長'.repeat(29)]}).length>=2);
+const options={design:master.getCoreMasterPageDesign(contract,'comparison'),copy,page:'04',branding:{name:'BRAND'},fonts:{family:'Test',editorialFamily:'Test'}};
+const canvas=master.createCoreMasterCanvas(options);
+const text=canvas.objects.filter(o=>/text/i.test(o.type)).map(o=>o.text).join('\n');
+for(const stale of ['進食','活動','能量來源','AI 示意圖','夏秋進食期'])assert.ok(!text.includes(stale),stale+' must never leak');
+assert.equal(canvas.objects.find(o=>o.data?.role==='comparison_label_0_0')?.text,'原料');
+assert.equal(canvas.objects.find(o=>o.data?.role==='comparison_label_1_1')?.text,'製法');
+assert.ok(!canvas.objects.find(o=>o.data?.role==='comparison_label_0_2')?.text);
+const empty=master.createCoreMasterCanvas({...options,copy:{headline:'新題材',body:[]}});
+assert.ok(!empty.objects.some(o=>o.text==='進食'));
+console.log('PASS: per-role budgets, written copy, semantic labels, empty rows and example-credit suppression');

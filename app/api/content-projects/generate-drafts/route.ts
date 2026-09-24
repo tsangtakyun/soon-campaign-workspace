@@ -1,4 +1,5 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import {magazineCopyInstruction,magazineCopyIssues} from '@/lib/magazine-copy-policy';
 import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
 import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
 import { runDraftStep, draftAnthropic, DraftStepError } from '@/lib/draft-generation-step';
@@ -28,6 +29,7 @@ type VisualAsset = Record<string, unknown> & {
 
 
 export async function POST(req: Request) {
+  const startedAt=Date.now();
   let generationId = "";
   let generationAdmin: SupabaseClient | null = null;
   try {
@@ -158,14 +160,14 @@ export async function POST(req: Request) {
             ] : []),
             ...(!fixedTemplate ? ["頁型必須按每頁內容決定，不可按頁碼套用固定次序。封面用 cover；長文用 longform；兩項互補內容用 split；比較、差異或 A vs B 內容必須用 comparison；單一重點用 feature；結尾資料或 CTA 用 end。"] : []),
             "每頁必須保存固定 templateArtboardId：cover=01_COVER、longform=02_FULL_BLEED_TEXT、split=03_IMAGE_TOP_TEXT_BOTTOM、comparison=04_COMPARISON、feature=05_LEFT_TEXT_RIGHT_IMAGE、end=06_END_CTA。",
-            "每頁 headline 建議不超過 18 個中文字。cover 及 end 的 body 最多 2 段；其餘內容頁，尤其 P.2 至 P.5，body 應忠實保留已確認 copyDirection 的具體資料，通常拆成 3 至 5 個短段，每段只寫一個重點。不得為了變短而刪走有來源支持的重要細節，亦不得以縮小字體容納過長內容。",
+            "所有頁面嚴格遵守 system 中逐欄字數及 body 固定次序，不按一般文章段落數生成。優先保留有來源支持的重點與必要歸因，不以縮小字體容納長文。",
             "逐頁文案只可整理及改寫已確認故事結構、Brief 與來源資料。不得新增任何數字、背景、因果、影響、例子或評價；資料不足時寧可較短，不可以常識或套話填充。報道及當事人說法必須保留歸因字眼。",
             "cover 的 subheadline 是短 Eyebrow，最多 10 個中文字；headline 不可含任何標點並須能平衡分成最多兩行；body 只可有一個短句，建議不超過 28 個中文字。",
             "end 頁 subheadline 使用短分類如『店舖資料』或『出發前留意』；headline 不可用直線或其他標點作分隔，最多兩行；場景或帶白底的產品相預設保留原圖，不可自動退地。",
             "longform 的 headline 不可含標點並應寫成兩個可獨立斷行的短語；body 每個短句獨立成一行，最多七行，不可用逗號將多個重點塞進同一行。longform 全頁必須使用自然、簡潔的繁體中文書面語，不可使用『唔係、係、嘅、拎、睇、薯仔』等廣東話口語。",
             "版面文案使用雜誌式換行建立節奏。body 每個陣列項目應是一個完整短段，段尾不要加入逗號、句號、分號或冒號；問號及感嘆號只在語意確實需要時使用。",
             "comparison 頁的 body[0]、body[1] 是左右標籤；body[2]、body[3] 分別解釋左、右兩項；如有必要，body[4] 才是簡短總結。左右內容不可合併成一段放在卡片外。",
-            "comparison 頁 headline 不可包含標點；左右說明各自最多四個短句，每句獨立成行，避免段內逗號及句號。",
+            "comparison 頁 headline 不可包含標點；左右說明各自最多三個短句，每句獨立成行，逐行對應 comparisonLabels 中相同的比較維度。",
             "最優先：每頁另回傳 contentRole，值為 narrative 或 comparison。母版的 comparison 只代表可用版型，不代表故事真的有比較。若只是介紹同一主體，contentRole=narrative、body 放一般段落、只選一張有關圖片，禁止捏造左右兩方；只有真實兩項比較才用 contentRole=comparison、左右固定欄位及兩張對應素材。",
             "split 頁只在兩張圖片分別支持兩項互補內容時使用一至兩張素材；其他頁只需一張主要素材。不可為了填滿版面而增加第二張圖片。assetId 必須等於 assetIds 第一項。",
             "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 分成兩個主要段落，每段可包含一至兩個有來源支持的短句，避免加入無資料支持的補充或免責文字。",
@@ -202,6 +204,7 @@ export async function POST(req: Request) {
         output_config: { format: { type: 'json_schema', schema: draftOutputSchema } },
         system: [
           "You are SOON Content Studio. Return valid JSON only.",
+          !isVideo&&isClearMagazine?magazineCopyInstruction:'',
           isVideo ? `The approved structure contains exactly ${structure.length} segments. Return exactly ${structure.length} pages, one per segment in the same order (S.1 through S.${structure.length}). Each page must contain a non-empty string array body and a string designDirection. Keep each approved segment's timing and purpose. Style examples and production prompts are reference material: their preferred segment count and example facts must NEVER override this approved structure or its factual limits.` : "",
           "Only source-supported facts may appear as statements. Do not invent observable details (including colours, shapes, textures, packaging), benefits, personal experience, prices, links or commercial relationships. Unconfirmed filming ideas must be clearly conditional production notes, never asserted dialogue or captions.",
         ].filter(Boolean).join("\n"),
@@ -227,7 +230,7 @@ export async function POST(req: Request) {
     if (fixedTemplate && (!Array.isArray(drafts.pages) || drafts.pages.length !== expectedTemplateRoles.length)) {
       throw new Error(`標準母版需要完整生成 ${expectedTemplateRoles.length} 頁，請重試。`);
     }
-    const normalizedPages = isVideo ? structure.map((segment: Record<string, unknown>, index: number) => {
+    let normalizedPages = isVideo ? structure.map((segment: Record<string, unknown>, index: number) => {
       const body = [segment.dialogue, segment.caption]
         .filter((item): item is string => typeof item === "string" && item.trim().length > 0);
       const styled = styledVideo ? drafts.pages[index] as Record<string,unknown> : null;
@@ -300,10 +303,29 @@ export async function POST(req: Request) {
           };
       return { ...draft, role, layout: role, templateArtboardId: artboardByRole[role], assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
     });
+    // Repair only invalid copy. Never regenerate images, reset successful pages,
+    // or trust the repair model to change roles and asset assignments.
+    if(!isVideo&&isClearMagazine){
+      const invalid=normalizedPages.map((page:Record<string,any>,index:number)=>({index,page,issues:magazineCopyIssues(page)})).filter((p:{issues:string[]})=>p.issues.length);
+      if(invalid.length&&Date.now()-startedAt<120_000){
+        try{
+          const repairBody={...requestBody,max_tokens:4000,messages:[{role:'user',content:[magazineCopyInstruction,'只修訂下列頁面的文案及comparisonLabels。保持原意、歸因與事實，不新增資料；只回傳這些頁面，次序不變。captionDraft留空。原稿及問題：',JSON.stringify(invalid)].join('\n')}]};
+          const repaired=await runDraftStep(scope,{kind:'magazine-copy-repair-v1',draftGenerationId:generationId,pages:invalid},requestBody.model,async()=>{const response=await draftAnthropic(apiKey,repairBody,45_000);return {response,usage:response.usage};},r=>{readDraftOutput(r.response,invalid.length);});
+          const pages=readDraftOutput(repaired.output.response,invalid.length).pages;
+          for(const [n,item]of invalid.entries()){
+            const p=pages[n];
+            if(p.page!==item.page.page)continue;
+            normalizedPages[item.index]={...normalizedPages[item.index],headline:p.headline,subheadline:p.subheadline||'',body:p.body,comparisonLabels:p.comparisonLabels||[]};
+          }
+        }catch(error){console.warn('[magazine-copy] repair deferred; original drafts preserved',error instanceof Error?error.name:'error');}
+      }
+    }
+    const copyReview=!isVideo&&isClearMagazine?normalizedPages.flatMap((page:Record<string,any>,index:number)=>{const issues=magazineCopyIssues(page);return issues.length?[{page:`P.${index+1}`,issues}]:[];}):[];
     const production = {
       ...project.production,
       assets: analyzedAssets,
       pageDrafts: normalizedPages,
+      copyReview,
       captionDraft: drafts.captionDraft || "",
       ...(isVideo ? {
         captionDraft: styledVideo ? String(drafts.captionDraft || "") : structure.flatMap((segment: Record<string, unknown>) => [segment.dialogue, segment.caption]).filter((item): item is string => typeof item === "string" && item.trim().length > 0).join("\n"),

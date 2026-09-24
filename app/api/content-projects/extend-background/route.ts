@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const { data: old, error: lookupError } = await admin.from(table).select('status,output,updated_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (lookupError) return reply({ error: '生成紀錄暫時不可用。' }, 503);
-    if (old?.output?.rejected) return reply({ code:'EXTENSION_REJECTED', error:'延伸未通過環境／主體檢查，已保留原圖；不會重複生成。' },422);
+    if (old?.output?.rejected) return reply({ code:'EXTENSION_REJECTED', stage:old.output.rejectionStage||'review',error:'延伸未通過環境／主體檢查，已保留原圖；不會重複生成。' },422);
     if (old?.status === 'ready' && qualityApproved(old.output?.review)) return reply({ ...old.output, cached: true });
     if (old?.status === 'pending' && Date.now() - Date.parse(old.updated_at) < 240_000) return reply({ error: '正在延伸，請稍後再按；完成後會讀取已保存版本。' }, 409);
     if (!process.env.OPENAI_API_KEY) return reply({ error: '圖片服務尚未設定。' }, 503);
@@ -53,10 +53,11 @@ export async function POST(request: Request) {
     }
     async function rejectExtension() {
       metadata.rejected=true;
+      metadata.rejectionStage=stage;
       await persistMetadata();
       const saved=await admin!.from(table).update({status:'failed',error:'延伸未通過環境／主體檢查'}).eq('id',id);
       if(saved.error)throw new Error('Rejection storage failed');
-      return reply({code:'EXTENSION_REJECTED',error:'延伸未通過環境／主體檢查，已保留原圖；不會自動重試。'},422);
+      return reply({code:'EXTENSION_REJECTED',stage,error:stage==='boundary_analysis'?'生成前邊界檢查未通過，未生成新背景；原圖保留。':'生成結果未通過品質檢查；原圖保留。'},422);
     }
     const priorBoundary=boundarySchema.safeParse(metadata.boundaries);
     if(!priorBoundary.success) {
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
       metadata={...metadata,boundaries:inspection.output,boundaryUsage:inspection.usage,boundaryInspectedAt:new Date().toISOString()};
       await persistMetadata();
     }
+    stage='boundary_analysis';
     if(!boundariesSafe(metadata.boundaries,plan)) return rejectExtension();
     const boundaries=boundarySchema.parse(metadata.boundaries);
     const path = `${workspaceId}/content-projects/${projectId}/extensions/${id}.png`;

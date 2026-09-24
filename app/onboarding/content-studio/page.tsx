@@ -3,6 +3,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import {CoreCatalogExample} from '@/components/content/CoreCatalogExample';
 import {imageStudioSteps,imageStep,imageLatestStep} from '@/lib/studio-flow';
+import {magazineCopyIssues} from '@/lib/magazine-copy-policy';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
 import { CompositionModeChoice } from '@/components/content/CompositionModeChoice';
@@ -1857,12 +1858,20 @@ export default function ContentStudioPage() {
         return;
       }
       for (const [index, draft] of selected.production.pageDrafts.entries()) {
+        const copyIssues=selected.production.copyReview ? magazineCopyIssues(draft as Record<string,any>) : [];
+        if(copyIssues.length){
+          goToStep('drafts');setEditingDraft(index);
+          setMessage(`P.${index+1} 尚需修改：${copyIssues.join('；')}。已保留所有圖片及其他頁面，修改並儲存本頁即可繼續。`);
+          return;
+        }
         const headlineLength = Array.from(String(draft.headline || "").replace(/\s+/g, "")).length;
         const bodyLines = Array.isArray(draft.body) ? draft.body : [];
         const assetIds = Array.isArray(draft.assetIds) ? draft.assetIds.filter(Boolean) : draft.assetId ? [draft.assetId] : [];
         const requiredImages = actualRoles[index] === "comparison" && hasComparisonColumns(draft) ? 2 : 1;
         if (headlineLength > maxHeadline || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > maxBody)) {
-          setMessage(`P.${index + 1} 文案超出標準母版上限（標題 ${maxHeadline} 字、每段正文 ${maxBody} 字），請先縮短。`);
+          goToStep('drafts');
+          setEditingDraft(index);
+          setMessage(`已開啟 P.${index + 1} 修改：標題最多 ${maxHeadline} 字、每段正文 ${maxBody} 字。圖片及其餘頁面已保留，儲存本頁後繼續，毋須重新生成。`);
           return;
         }
         if (assetIds.length < requiredImages) {
@@ -3095,6 +3104,7 @@ export default function ContentStudioPage() {
                                                   }
                                                 />
                                               </label>}
+                                              {isComparisonDraft ? <label><b>比較維度（每行一項，依左右內文次序，最多三項）</b><textarea value={(draft.comparisonLabels||[]).join('\n')} onChange={event=>updatePageDraft(index,'comparisonLabels',event.target.value.split('\n').slice(0,3))}/></label>:null}
                                               <label>
                                                 <b>{supportsMultipleImages ? "左側圖片" : "配對圖片"}</b>
                                                 <select

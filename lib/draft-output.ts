@@ -8,7 +8,7 @@ export const draftOutputSchema = object({
   pages:{type:'array', minItems:1, items:object({
     page:string, headline:string, subheadline:string, body:{...strings,minItems:1},
     assetId:string, assetIds:strings, role:string, layout:string, templateArtboardId:string,
-    contentRole:{type:'string',enum:['narrative','comparison']}, imageTreatment:string,
+    contentRole:{type:'string',enum:['narrative','comparison']}, comparisonLabels:{...strings,maxItems:3}, imageTreatment:string,
     assetStatus:{type:'string',enum:['matched','missing']},
     assetRequest:object({reason:string,suggestions:strings},['reason','suggestions']),
     designDirection:string,

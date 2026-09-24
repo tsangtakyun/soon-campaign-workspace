@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { fetchSafeExternal } from './safe-external-url';
 import {extensionGeometry,type ExtensionPlacement} from './extension-geometry';
 
-export const EXTENSION_VERSION = 'extend-four-boundaries-v4';
+export const EXTENSION_VERSION = 'extend-edge-evidence-v5';
 export async function loadExtensionSource(url: string) {
   const response = await fetchSafeExternal(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) throw new Error('Source unavailable');

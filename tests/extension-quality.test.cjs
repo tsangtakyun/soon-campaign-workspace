@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 let captured;
 const box={exports:{},AbortSignal,require:n=>n==='ai'?{generateText:async args=>{captured=args;return {};},Output:{object:args=>args}}:n==='@ai-sdk/anthropic'?{anthropic:model=>model}:n==='./ai-subject-focus'?{SUBJECT_MODEL:'existing-model'}:require(n)};
-vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/extension-quality.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/extension-quality.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,box);
 const {boundariesSafe,qualityApproved,extensionPrompt}=box.exports;
 const edge={safe:true,subjectTouchesEdge:false,environment:'observed mixed shoreline',continuation:'Continue left bank on left and ripples on right'};
 const plan={confidence:'high',subjects:'main subject',top:{...edge},bottom:{...edge},left:{...edge},right:{...edge}};
@@ -23,10 +23,11 @@ for(const key of ['environmentMatches','seamNatural'])assert.equal(qualityApprov
 assert.equal(qualityApproved({...review,confidence:'low'}),false);assert.equal(qualityApproved({}),false);
 assert.ok(extensionPrompt(geometry,plan).includes(edge.continuation));
 console.log('PASS: boundary-specific continuation, subject-edge rejection, uncertainty and post-generation duplicate/seam gates');
-void box.exports.inspectExtensionBoundaries(Buffer.from('image'),{...geometry,canvas:Buffer.alloc(4_000_000),mask:Buffer.alloc(4_000_000),original:Buffer.alloc(4_000_000)}).then(()=>{
+void require('sharp')({create:{width:640,height:360,channels:3,background:'#fff'}}).png().toBuffer().then(image=>box.exports.inspectExtensionBoundaries(image,{...geometry,canvas:Buffer.alloc(4_000_000),mask:Buffer.alloc(4_000_000),original:Buffer.alloc(4_000_000)})).then(()=>{
  const prompt=captured.messages[0].content[0].text;
  assert.ok(prompt.length<2000,'PNG bytes must never expand into millions of text tokens');
  assert.ok(!prompt.includes('Buffer'));assert.ok(!prompt.includes('canvas'));
  assert.equal(captured.messages[0].content[1].type,'image');
+ assert.equal(captured.messages[0].content.filter(p=>p.type==='image').length,5,'full original plus four edge close-ups');
  console.log('PASS: large image buffers excluded from geometry prompt; image uses image channel');
 }).catch(error=>{console.error(error);process.exitCode=1});

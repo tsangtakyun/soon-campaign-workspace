@@ -1,0 +1,9 @@
+# Magazine copy and edge verification — 2026-09-24
+
+Evidence: exported P.4 retained literal Core example comparison labels; the binding fallback returned example text when content keys were missing. New content bindings fail empty rather than returning example text. comparisonLabels now supplies shared semantic dimensions, with empty rows receiving no stale labels. Published master coordinates remain unchanged.
+
+Generation now has one role-specific written-Chinese copy policy, per-slot budgets, explicit phrase breaks for cover/end, and consistent attribution requirements. Invalid pages receive one persisted copy-only repair attempt, preserving role, assets and other pages. Remaining problems open the existing per-page editor, not a complete restart. This is not a factual verification service; source-supported medical claims still need editorial verification.
+
+Read-only investigation of project d0df4936-7cd2-48eb-9d08-cbcd037fb421 found all three extension rejection records had boundary analysis but no generated-image review. Messages had conflated pre-generation rejection with post-generation failure. The boundary inspector now receives full original plus four edge-strip images and explicit near-edge versus actual-cut rules. Safety approval thresholds remain unchanged. Cache versioning allows old failures to be reconsidered on a requested attempt; successful variants and explicit original-image choices remain preserved.
+
+Known limitation: planning can still find no safe extension, especially when subjects intersect a necessary border. This patch does not assert that all six images will extend successfully. No production content was overwritten during implementation. Eleven regression suites and a browser-rendered comparison fixture passed; a real paid generation acceptance run remains outstanding.
