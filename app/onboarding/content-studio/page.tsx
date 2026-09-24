@@ -5,6 +5,8 @@ import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
 import { PageCompositionAdvisor } from '@/components/content/PageCompositionAdvisor';
 import type { SubjectFocus } from '@/lib/subject-crop';
+import type { OptimizationIssue } from '@/lib/optimize-carousel-assets';
+import { BackgroundPreparationNotice, type BackgroundPreparation } from '@/components/content/BackgroundPreparationNotice';
 import { resolveContentBranding } from '@/lib/content-branding';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -1460,8 +1462,10 @@ export default function ContentStudioPage() {
       body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId, placement }), signal: AbortSignal.timeout(175_000) });
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      const error = new Error(payload?.error || '延伸未完成，原圖未改動。') as Error & {code?:string};
+      const error = new Error(payload?.error || '延伸未完成，原圖未改動。') as Error & {code?:string;runId?:string;stage?:string};
       error.code=payload?.code;
+      error.runId=payload?.runId;
+      error.stage=payload?.stage;
       throw error;
     }
     return payload as import('@/lib/extension-asset').ExtensionPreview;
@@ -1716,7 +1720,7 @@ export default function ContentStudioPage() {
     setEditingDraft(null);
   }
 
-  async function confirmPageDrafts(optimizeBackground = false) {
+  async function confirmPageDrafts(optimizeBackground = false, retryPage?: string) {
     if (preparingImages.current || saving) return;
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
@@ -1759,13 +1763,27 @@ export default function ContentStudioPage() {
     setSaving(true);
     try {
     let preparedAssets = selected.production.assets;
+    const priorPreparation=selected.production.backgroundPreparation as {issues?:OptimizationIssue[]}|undefined;
+    let issues:OptimizationIssue[]=retryPage?(priorPreparation?.issues||[]).filter(i=>i.page!==retryPage):[];
+    if(!optimizeBackground && Array.isArray(preparedAssets)) {
+      const failedIds=new Set((priorPreparation?.issues||[]).map(i=>i.assetId));
+      preparedAssets=preparedAssets.map((a:ProjectAsset)=>failedIds.has(a.id)?{...a,compositionFit:'contain'}:a);
+    }
+    const attemptAt=new Date().toISOString();
+    const checkpoint=async(assets:unknown,status:string)=>{
+      const ok=await saveProject({production:{...selected.production,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
+      if(!ok)throw new Error('未能保存處理進度，已停止，請重新載入後再試。');
+      setSaving(true);
+    };
     if (optimizeBackground && !isVideo) {
+      await checkpoint(preparedAssets,'processing');
       const [{coreMasterLayoutGeometry,getCoreMasterPageDesign},{resolveClearMagazineRole},{optimizeCarouselAssets}] = await Promise.all([
         import('@/lib/content-templates/core-master-template'), import('@/lib/content-templates/clear-magazine-carousel-v1'), import('@/lib/optimize-carousel-assets'),
       ]);
       const assets = (selected.production.assets || []) as ProjectAsset[];
       const drafts = selected.production.pageDrafts as any[];
       const frames = drafts.flatMap((draft,index) => {
+        if(retryPage && draft.page!==retryPage)return [];
         const design = getCoreMasterPageDesign(selected.format_decision?.templateContractSnapshot, resolveClearMagazineRole(draft,index,drafts.length));
         if (!design) return [];
         const ids = [...new Set([...(draft.assetIds || []),draft.assetId].filter(Boolean))];
@@ -1778,6 +1796,8 @@ export default function ContentStudioPage() {
       if (!frames.length) throw new Error('此版面暫未支援 AI 構圖分析，請選「直接用現有素材生成」。');
       preparedAssets = await optimizeCarouselAssets(assets.map(a=>({...a,width:a.width||0,height:a.height||0})),frames,{
         analyze:analyzeAssetFocus,generate:generateBackgroundExtension,progress:setMessage,
+        failure:issue=>{issues.push(issue);},
+        checkpoint:assets=>checkpoint(assets,'processing'),
         dimensions:asset=>new Promise((resolve,reject)=>{
           const image = new Image();
           const timer = window.setTimeout(()=>reject(new Error('圖片尺寸載入逾時，請重試。')),15000);
@@ -1786,6 +1806,7 @@ export default function ContentStudioPage() {
           image.src=asset.url;
         }),
       });
+      if(issues.length){await checkpoint(preparedAssets,'needs_attention');return;}
     }
     autoGenerationProjectRef.current = null;
     await saveProject(
@@ -1793,6 +1814,7 @@ export default function ContentStudioPage() {
         production: {
           ...selected.production,
           assets: preparedAssets,
+          backgroundPreparation: {status:'ready',startedAt:attemptAt,issues:[]},
           autoBackgroundExtension: false,
           productionStatus: isVideo ? "package_ready" : "drafts_confirmed",
           draftsConfirmedAt: new Date().toISOString(),
@@ -1804,6 +1826,13 @@ export default function ContentStudioPage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '構圖優化未完成，未開始出圖；可重試或直接用現有素材生成。');
     } finally { preparingImages.current = false; setSaving(false); }
+  }
+
+  async function keepFailedPage(issue:OptimizationIssue) {
+    if(saving || preparingImages.current || !selected?.production)return;
+    const preparation=selected.production.backgroundPreparation as BackgroundPreparation;
+    const assets=(selected.production.assets as ProjectAsset[]).map(a=>a.id===issue.assetId?{...a,compositionFit:'contain'}:a);
+    await saveProject({production:{...selected.production,assets,backgroundPreparation:{...preparation,issues:(preparation.issues||[]).filter(i=>i.assetId!==issue.assetId)}}},`${issue.page} 已選保留原圖；按「繼續製作圖片」輸出新版。`);
   }
 
   async function submitVideoPackage() {
@@ -3073,6 +3102,7 @@ export default function ContentStudioPage() {
                                 {selected.production.productionStatus ===
                                 "drafts_ready" || activeStep === 'drafts' ? (
                                   <div className="draft-confirm-step" style={{flexDirection:'column',alignItems:'stretch'}}>
+                                    <BackgroundPreparationNotice state={selected.production.backgroundPreparation as BackgroundPreparation|undefined} busy={saving} retry={page=>void confirmPageDrafts(true,page)} keep={issue=>void keepFailedPage(issue)} continueWithOriginals={()=>void confirmPageDrafts(false)} />
                                     <div>
                                       <b>
                                         {selected.selected_format === "short_video"
@@ -3140,9 +3170,10 @@ export default function ContentStudioPage() {
                                 ) : selected.production.productionStatus ===
                                   "images_ready" ? (
                                   <div className="generated-carousel">
+                                    <BackgroundPreparationNotice state={selected.production.backgroundPreparation as BackgroundPreparation|undefined} busy={saving} retry={page=>void confirmPageDrafts(true,page)} keep={issue=>void keepFailedPage(issue)} continueWithOriginals={()=>void confirmPageDrafts(false)} />
                                     <div className="generated-carousel-head">
                                       <div>
-                                        <b>{selected.selected_format === "single_image" ? "單張貼文已生成" : "全套輪播圖片已生成"}</b>
+                                        <b>{selected.production.backgroundPreparation && (selected.production.backgroundPreparation as BackgroundPreparation).status!=='complete' ? '上次成功版本（並非本次新結果）' : selected.selected_format === "single_image" ? "單張貼文已生成" : "全套輪播圖片已生成"}</b>
                                         <p>每頁尺寸：1080 × 1350 px</p>
                                       </div>
                                       <button

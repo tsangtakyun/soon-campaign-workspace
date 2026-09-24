@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireWorkspaceUser, consumeApiQuota } from '@/lib/platform-access';
 import { isUuid } from '@/lib/oauth-connections';
+import { generationError } from '@/lib/generation-error';
 import { loadExtensionSource, prepareExtension, finishExtension, EXTENSION_VERSION } from '@/lib/background-extension';
 import { boundarySchema, boundariesSafe, qualityApproved, inspectExtensionBoundaries, reviewExtension, extensionPrompt } from '@/lib/extension-quality';
 
@@ -13,6 +14,7 @@ const reply = (data: unknown, status = 200) => NextResponse.json(data, { status,
 
 export async function POST(request: Request) {
   let admin: SupabaseClient | undefined, runId: string | undefined;
+  let stage='prepare', metadata: Record<string, any> = {};
   try {
     const { workspaceId, projectId, assetId, placement = { aspectRatio: .8, topFraction: 0 } } = await request.json().catch(() => ({}));
     if (!placement || !Number.isFinite(placement.aspectRatio) || placement.aspectRatio < .25 || placement.aspectRatio > 2 || !Number.isFinite(placement.topFraction) || placement.topFraction < 0 || placement.topFraction > 1) return reply({ error: 'Invalid placement' }, 400);
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
         input: { kind: EXTENSION_VERSION, assetId, originalUrl: asset.url, hash }, updated_at: updatedAt }).select('id').maybeSingle();
     if (claim.error || !claim.data) return reply({ error: '生成請求已在處理，請稍後再試。' }, 409);
     runId = id;
-    let metadata: Record<string, any> = { ...(old?.output || {}) };
+    metadata = { ...(old?.output || {}) };
     async function persistMetadata() {
       const saved = await admin!.from(table).update({output:metadata,updated_at:new Date().toISOString()}).eq('id',id);
       if(saved.error) throw new Error('Review metadata storage failed');
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
     }
     const priorBoundary=boundarySchema.safeParse(metadata.boundaries);
     if(!priorBoundary.success) {
+      stage='boundary_analysis';
       const inspection=await inspectExtensionBoundaries(plan.original,plan);
       metadata={...metadata,boundaries:inspection.output,boundaryUsage:inspection.usage,boundaryInspectedAt:new Date().toISOString()};
       await persistMetadata();
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
       let generated: Buffer;
       if (priorRaw.data) generated = Buffer.from(await priorRaw.data.arrayBuffer());
       else {
+      stage='image_generation';
       const form = new FormData();
       form.append('model', model);
       form.append('image', new File([new Uint8Array(plan.canvas)], 'canvas.png', { type: 'image/png' }));
@@ -82,7 +86,7 @@ export async function POST(request: Request) {
       form.append('prompt', extensionPrompt(plan,boundaries));
       const response = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, body: form, signal: AbortSignal.timeout(90_000) });
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload?.data?.[0]?.b64_json) throw new Error('Image generation failed');
+      if (!response.ok || !payload?.data?.[0]?.b64_json) throw Object.assign(new Error('Image generation failed'),{statusCode:response.status,responseBody:JSON.stringify({error:payload?.error}),responseHeaders:{'x-request-id':response.headers.get('x-request-id')||''}});
       usage = payload.usage || null;
       generated = Buffer.from(payload.data[0].b64_json, 'base64');
       let rawUpload = await bucket.upload(rawPath, generated, { contentType: 'image/png', upsert: true });
@@ -93,6 +97,7 @@ export async function POST(request: Request) {
       }
       const final = await finishExtension(generated, plan);
       if(!qualityApproved(metadata.review)) {
+        stage='quality_review';
         const inspection=await reviewExtension(plan.original,final,plan,boundaries);
         metadata={...metadata,review:inspection.output,reviewUsage:inspection.usage,reviewedAt:new Date().toISOString()};
         await persistMetadata();
@@ -103,6 +108,7 @@ export async function POST(request: Request) {
       if (upload.error) throw new Error('Image storage failed');
     }
     if(recovered.data && !qualityApproved(metadata.review)) {
+      stage='quality_review';
       const inspection=await reviewExtension(plan.original,new Uint8Array(await recovered.data.arrayBuffer()),plan,boundaries);
       metadata={...metadata,review:inspection.output,reviewUsage:inspection.usage,reviewedAt:new Date().toISOString()};
       await persistMetadata();
@@ -110,14 +116,16 @@ export async function POST(request: Request) {
     }
     const output = { ...metadata, id, url: bucket.getPublicUrl(path).data.publicUrl, originalUrl: asset.url, width: plan.width, height: plan.height,
       originalHeight: plan.originalHeight, originalTop: plan.originalTop, placement, model, usage, estimatedCostUsd: null, costBasis: 'Provider usage retained; monetary cost not estimated', kind: EXTENSION_VERSION, createdAt: updatedAt };
+    stage='persist_result';
     let saved = await admin.from(table).update({ status: 'ready', output, updated_at: new Date().toISOString() }).eq('id', id);
     if (saved.error) saved = await admin.from(table).update({ status: 'ready', output, updated_at: new Date().toISOString() }).eq('id', id);
     if (saved.error) throw new Error('Record storage failed');
     return reply({ ...output, cached: Boolean(recovered.data) });
   } catch (error) {
-    if (runId && admin) await admin.from(table).update({ status: 'failed', error: '延伸未完成', updated_at: new Date().toISOString() }).eq('id', runId);
+    const diagnostic=generationError(error,stage);
+    if (runId && admin) await admin.from(table).update({ status: 'failed', error: `${stage}: ${diagnostic.name} ${diagnostic.statusCode||''}`,output:{...metadata,failures:[...(metadata.failures||[]),diagnostic]}, updated_at: new Date().toISOString() }).eq('id', runId);
     if (error instanceof Error && error.message === 'NOT_LANDSCAPE') return reply({ error: '此圖與目標圖片框不適用垂直延伸，請保留原圖或改用圖文分區。' }, 422);
-    console.error('[extend-background]', error instanceof Error ? error.name : 'UnknownError');
-    return reply({ error: '背景延伸未完成，原圖未改動。請稍後重試。' }, 502);
+    console.error('[extend-background]',{runId,...diagnostic});
+    return reply({ code:'EXTENSION_FAILED',runId,stage,error: '背景延伸未完成，原圖未改動。可重試本頁，或保留原圖繼續。' }, 502);
   }
 }

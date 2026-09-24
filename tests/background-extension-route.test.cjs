@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 async function main(){
- let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true;const files=new Map(),queries=[];
+ let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true,boundaryThrows=false;const files=new Map(),queries=[];
  const workspaceId='11111111-1111-4111-a111-111111111111',projectId='22222222-2222-4222-a222-222222222222';
  const admin={from:table=>{let op='read',value,filters=[];const result=()=>{
    queries.push({table,op,filters});
@@ -14,7 +14,8 @@ async function main(){
    getPublicUrl:path=>({data:{publicUrl:`https://storage.example/${path}`}})
  })}};
  const deps={
-  '@/lib/extension-quality':{boundarySchema:{safeParse:v=>({success:!!v}),parse:v=>v},boundariesSafe:v=>v.safe,qualityApproved:v=>v?.approved===true,inspectExtensionBoundaries:async()=>({output:{safe:boundarySafe},usage:{totalTokens:10}}),reviewExtension:async()=>({output:{approved:reviewSafe},usage:{totalTokens:10}}),extensionPrompt:()=> 'background only'},
+  '@/lib/generation-error':{generationError:(e,stage)=>({stage,name:e.name,statusCode:e.statusCode||null,message:e.message})},
+  '@/lib/extension-quality':{boundarySchema:{safeParse:v=>({success:!!v}),parse:v=>v},boundariesSafe:v=>v.safe,qualityApproved:v=>v?.approved===true,inspectExtensionBoundaries:async()=>{if(boundaryThrows)throw Object.assign(Error('provider unavailable'),{name:'AI_APICallError',statusCode:503});return {output:{safe:boundarySafe},usage:{totalTokens:10}}},reviewExtension:async()=>({output:{approved:reviewSafe},usage:{totalTokens:10}}),extensionPrompt:()=> 'background only'},
   '@/lib/platform-access':{requireWorkspaceUser:async(id,permission)=>{assert.equal(id,workspaceId);assert.equal(permission,'canEdit');return authorized?{access:{admin,user:{id:'actor'}}}:{error:new Response('',{status:403})}},consumeApiQuota:async()=>quota},
   '@/lib/oauth-connections':{isUuid:v=>typeof v==='string'&&/^[0-9a-f-]{36}$/.test(v)},
   '@/lib/background-extension':{EXTENSION_VERSION:'test',loadExtensionSource:async()=>Buffer.from('original'),prepareExtension:async()=>({canvas:Buffer.from('canvas'),mask:Buffer.from('mask'),width:640,height:800,originalHeight:360}),finishExtension:async()=>{finished++;return Buffer.from('final-original-preserved')}},
@@ -41,6 +42,9 @@ async function main(){
  assert.equal((await post()).status,422);assert.equal(paid,2);assert.equal(record.output.rejected,true);
  assert.equal(files.size,1,'rejected raw retained but no final output published');
  assert.equal((await post()).status,422);assert.equal(paid,2,'duplicate subject rejection never regenerates automatically');
+ record=null;files.clear();boundaryThrows=true;
+ const failed=await post();assert.equal(failed.status,502);const failure=await failed.json();
+ assert.equal(failure.stage,'boundary_analysis');assert.equal(failure.runId,record.id);assert.equal(record.output.failures[0].statusCode,503);assert.equal(paid,2);
  console.log('PASS: authentication, quota, workspace scope, pre-call record, masks, persistence, cache/recovery and no project mutation');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

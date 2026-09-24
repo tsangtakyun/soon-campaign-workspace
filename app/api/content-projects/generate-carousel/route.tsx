@@ -994,6 +994,7 @@ export async function POST(req: Request) {
       assets,
       extensionUnverified: verified.unverified,
       generatedPages: outputs,
+      backgroundPreparation: requestedPage ? project.production?.backgroundPreparation : {...(project.production?.backgroundPreparation||{}),status:'complete',issues:[]},
       productionStatus: "images_ready",
       imagesGeneratedAt: new Date().toISOString(),
     };

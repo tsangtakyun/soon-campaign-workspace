@@ -34,6 +34,24 @@ export async function GET(req: Request) {
       .order('updated_at', { ascending: false })
     if (error) throw error
 
+    // Recover legacy/interrupted attempts without mutating content on a GET.
+    const legacyIds=(data||[]).filter((p:any)=>!p.production?.backgroundPreparation).map((p:any)=>p.id)
+    if(legacyIds.length){
+      const {data:runs}=await access.admin.from('content_project_generation_runs')
+        .select('id,project_id,input,status,updated_at').eq('workspace_id',workspaceId)
+        .in('project_id',legacyIds).eq('status','failed').eq('input->>kind','extend-boundary-verified-v3')
+        .order('updated_at',{ascending:false}).limit(100)
+      for(const project of data||[]){
+        const production=project.production
+        if(!production || production.backgroundPreparation)continue
+        const failed=(runs||[]).filter((r:any)=>r.project_id===project.id && Date.parse(r.updated_at)>Date.parse(production.imagesGeneratedAt||'1970-01-01'))
+        const issues=failed.flatMap((r:any)=>(production.pageDrafts||[]).filter((d:any)=>d.assetId===r.input?.assetId || d.assetIds?.includes(r.input?.assetId)).map((d:any)=>({page:d.page,assetId:r.input.assetId,runId:r.id,message:'上次背景延伸未完成，原圖及上次輸出已保留。'})))
+        const seen=new Set<string>()
+        const unique=issues.filter((i:any)=>{const key=i.page+':'+i.assetId;if(seen.has(key))return false;seen.add(key);return true})
+        if(unique.length)project.production={...production,backgroundPreparation:{status:'needs_attention',startedAt:failed[0].updated_at,issues:unique}}
+      }
+    }
+
     const creatorIds = Array.from(new Set((data || []).map((project: any) => project.created_by).filter(Boolean)))
     const creators = new Map<string, { avatarUrl: string | null; displayName: string }>()
     await Promise.all(creatorIds.map(async (creatorId) => {
