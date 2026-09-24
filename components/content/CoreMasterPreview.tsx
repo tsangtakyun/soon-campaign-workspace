@@ -74,6 +74,7 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
   fields['asset.secondary.credit'] = assigned[1]?.sourceType === 'ai_generated' ? 'AI 生成素材' : '';
   fields.page_number = String(sourceIndex + 1).padStart(2, '0');
   const resolved = design ? resolveMasterComposition({ design, copy, page: fields.page_number, primary, secondary: assigned[1] }) : null;
+  const pendingComposition=primary?.compositionMode==='ai' && resolved?.primary?.compositionFit==='contain' && primary.autoExtensionDeclinedUrl!==primary.url;
   const crops = resolved ? Object.values(coreMasterSubjectLayout(resolved)) : [];
   const geometry = resolved ? coreMasterLayoutGeometry(resolved) : null;
   const primaryFrame = geometry?.images.find(image => image.asset === primary)?.rect;
@@ -90,7 +91,8 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
       {onExpand ? <button type="button" onClick={onExpand}>放大</button> : null}
     </nav>
     <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>風格示範 · {sample.label}{!primary ? ' · 此頁未配圖' : ''} · 選定後再製作完整內容</p>
-    {crops.some(crop => crop.active) ? <p style={{fontSize:11,margin:'8px 12px',color:'#6b2c30'}}>{crops.some(crop => crop.constrained) ? '圖片比例限制：主體仍可能被裁切或與文字重疊，建議換圖或改用圖文分區版面。' : '已按主體焦點及文字安全區調整裁切。'}</p> : null}
+    {pendingComposition ? <p role="status" style={{fontSize:12,margin:'8px 12px',color:'#6b2c30'}}>構圖待處理：母版保持不變，目前原圖僅作參考，並非延伸完成。請返回素材步驟換圖或選擇原圖創作。</p> : null}
+    {crops.some(crop => crop.active) ? <p style={{fontSize:11,margin:'8px 12px',color:'#6b2c30'}}>{crops.some(crop => crop.constrained) ? '圖片比例限制：主體仍可能被裁切或與文字重疊，請換圖或確認原圖呈現；不會自動更改母版。' : '已按主體焦點及文字安全區調整裁切。'}</p> : null}
     {!primary?.compositionMode && extensionActions && onAnalyzeFocus && onSaveFocus && primary?.id && primaryFrame && geometry ? <CompositionAdvisor key={`${role}-${primary.id}-${primary.url}`} asset={{ ...primary, id: primary.id }} frame={primaryFrame} textZones={geometry.textZones} actions={extensionActions} analyze={onAnalyzeFocus} saveFocus={onSaveFocus} disabled={saving}/> : null}
     <details style={{ padding: '8px 12px', fontSize: 12 }}><summary>進階調整 · 手動主體焦點</summary>
     {onSaveFocus && primary?.id ? <SubjectFocusEditor key={`${primary.id}-${primary.url}-${JSON.stringify(primary.subjectFocus)}`} asset={{ ...primary, id: primary.id }} disabled={saving} onSave={onSaveFocus} onAnalyze={onAnalyzeFocus}/> : null}

@@ -2,7 +2,6 @@ import React from "react";
 import { readerFacingCopy } from '../content-branding';
 import { subjectCrop, type FocusAsset, type CropRect } from '../subject-crop';
 import { compositionKey, resolveComposition } from '../composition-mode';
-import { hasComparisonColumns } from '../content-page-semantics';
 
 export type CoreMasterRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
@@ -137,81 +136,14 @@ function clean(value: unknown) {
   return String(value || "").trim();
 }
 
-/** A comparison master is not proof that the supplied story contains a comparison.
- * Use a single-image narrative when no semantic columns were supplied. Shared by
- * preview, raster and Fabric so no renderer invents or drops copy independently. */
-function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: MasterAsset): FabricObjectJson[] {
-  const original = design.canvasJson?.objects || [];
-  // A portrait retained without outpainting is an editorial photo, not a
-  // letterboxed full-bleed background. Shared by preview, export and editor.
-  const portrait=original.find(o=>o.data?.role==='image_main');
-  if(primary?.compositionFit==='contain' && portrait && finite(primary.width)>0 && finite(primary.height)>finite(primary.width)) {
-    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
-    const photoW=Math.min(510,870*finite(primary.width)/finite(primary.height));
-    const photoH=photoW*finite(primary.height)/finite(primary.width);
-    const text=(role:string,left:number,top:number,w:number,h:number,size:number,value:string):FabricObjectJson=>({type:'Textbox',left:left*sx,top:top*sy,width:w*sx,height:h*sy,fontSize:size*sy,lineHeight:1.28,fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,fill:'#101313',text:value,data:{role,fitText:true}});
-    const body=(copy.body||[]).filter(Boolean);
-    return [
-      {type:'Rect',left:0,top:0,width,height,fill:'#f8f6ef'},
-      ...original.filter(o=>['brand_logo','page_number'].includes(o.data?.role||'')).map(o=>({...o,fill:'#101313'})),
-      {...portrait,left:(48+(510-photoW)/2)*sx,top:220*sy,width:photoW*sx,height:photoH*sy,scaleX:1,scaleY:1},
-      text('headline',604,220,428,340,66,copy.headline||''),
-      text('body',604,605,428,510,32,body.join('\n\n')),
-      ...(copy.fields?.cta?[text('cta',48,1190,984,96,34,copy.fields.cta)]:[]),
-    ];
-  }
-  if(primary?.compositionFit==='contain' && original.some(o=>o.data?.role==='bottom_gradient')) {
-    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
-    return original.map(o=>o.data?.role==='image_main'?{...o,left:0,top:0,width:1080*sx,height:700*sy,scaleX:1,scaleY:1}
-      :o.data?.role==='bottom_gradient'?{...o,top:700*sy,height:650*sy,fill:'#172323'}:o);
-  }
-  // The split master has fixed semantic slots. A two-paragraph narrative must
-  // not repeat its final paragraph as a source or leave a blank highlight box.
-  const main=original.find(o=>o.data?.role==='image_main');
-  if(primary?.compositionFit==='contain' && main && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
-    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
-    const body=(copy.body||[]).filter(Boolean).join('\n\n');
-    const text=(role:string,top:number,h:number,size:number,value:string):FabricObjectJson=>({type:'Textbox',left:48*sx,top:top*sy,width:984*sx,height:h*sy,fontSize:size*sy,lineHeight:1.2,fill:'#101313',fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,text:value,data:{role,fitText:true}});
-    return [
-      {...main,left:0,top:0,width:1080*sx,height:620*sy,scaleX:1,scaleY:1},
-      ...original.filter(o=>['brand_logo','page_number','swipe_prompt','image_credit'].includes(o.data?.role||'')),
-      text('headline',660,150,68,copy.headline||''),text('body',840,360,34,body),
-    ];
-  }
-  if(main && (copy.body?.length||0)<=2 && !copy.fields?.highlight && !copy.fields?.source && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
-    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
-    return original.filter(o=>!['source','highlight','highlight_box'].includes(o.data?.role||'')).map(o=>{
-      const role=o.data?.role;
-      if(role==='headline')return {...o,top:180*sy,height:300*sy,fontSize:76*sy,data:{...o.data,fitText:true}};
-      if(role==='accent')return {...o,top:515*sy};
-      if(role==='body_1')return {...o,top:560*sy,height:280*sy,fontSize:34*sy,data:{...o.data,fitText:true}};
-      if(role==='body_2')return {...o,top:870*sy,height:330*sy,fontSize:32*sy,data:{...o.data,fitText:true}};
-      return o;
-    });
-  }
-  if (!original.some(o => o.data?.role === 'left_row_1')) return original;
-  const body=Array.isArray(copy.body)?copy.body:[];
-  const structured=hasComparisonColumns(copy);
-  const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
-  const text=(role:string,left:number,top:number,w:number,h:number,size:number,binding:string):FabricObjectJson=>({type:'Textbox',left:left*sx,top:top*sy,width:w*sx,height:h*sy,fontSize:size*sy,lineHeight:1.2,fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,fill:'#101313',data:{role,binding,fitText:true}});
-  const kept=original.filter(o=>['brand_logo','page_number','image_left','image_right','image_main','image_secondary','secondary_image','swipe_prompt'].includes(o.data?.role || ''));
-  const images=kept.map(o=>['image_left','image_right','image_main','image_secondary','secondary_image'].includes(o.data?.role || '')?{...o,top:310*sy,height:330*sy,scaleY:1}:o);
-  const title=text('headline',48,140,984,145,60,'content.headline');
-  if(!structured) {
-    // A second asset is not a second argument: do not imply a comparison or
-    // present an unrelated illustration as evidence for this subject.
-    const furniture=kept.filter(o=>['brand_logo','page_number','swipe_prompt'].includes(o.data?.role || ''));
-    const primary=kept.find(o=>['image_left','image_main'].includes(o.data?.role || ''));
-    const bodyHeight=Math.min(500,Math.max(260,Math.ceil(body.join('\n').length/28)*46));
-    const photoHeight=920-bodyHeight;
-    const photo=primary ? [{...primary,left:48*sx,top:270*sy,width:984*sx,height:photoHeight*sy,scaleX:1,scaleY:1,data:{...primary.data,binding:'content.asset.contain'}}] : [];
-    return [...furniture,...photo,text('headline',48,140,984,110,58,'content.headline'),
-      text('body',48,310+photoHeight,984,bodyHeight,34,'content.body')];
-  }
-  return [...images,title,
-    text('label_left',48,666,464,55,30,'content.label_left'),text('label_right',568,666,464,55,30,'content.label_right'),
-    text('left_body',48,740,464,350,30,'content.left_body'),text('right_body',568,740,464,350,30,'content.right_body'),
-    text('highlight',48,1120,984,90,28,'content.comparison_highlight'),text('source',48,1240,740,64,20,'content.comparison_source')];
+/** The published Core master owns geometry. Asset fitting and copy binding may
+ * never replace, move or resize its layout. Optional empty decoration is omitted. */
+function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: MasterAsset): FabricObjectJson[] {
+  return (design.canvasJson?.objects || []).filter(o =>
+    !(o.data?.role === 'highlight_box' && !copy.fields?.highlight)
+  ).map(o => /text/i.test(o.type || '') && o.data?.binding?.startsWith('content.')
+    ? {...o,data:{...o.data,fitText:true}}
+    : o);
 }
 
 /** Conservative CJK/Latin wrapping estimate; both renderers use the same size. */
@@ -257,7 +189,7 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
     comparison_highlight: copy.fields?.highlight || body[4] || '',
     comparison_source: copy.fields?.source || body[5] || '',
     highlight: body.length >= 5 ? body[4] : body[2] || "",
-    source: body.at(-1) || "",
+    source: copy.fields?.source || "",
     question: body[1] || "",
     cta: body[2] || body.at(-1) || "了解更多",
     feature_title_1: body[0] || "",

@@ -25,8 +25,8 @@ export function compositionAdvice(input: { width: number; height: number; frame:
   }).filter(c => !c.crop.constrained).sort((a,b)=>Math.abs(a.y-.45)-Math.abs(b.y-.45)) : [];
   const best = candidates[0];
   if (best) return {action:'extend',placement:{aspectRatio,topFraction:best.topFraction},title:best.topFraction===0?'向下延伸背景':best.topFraction===1?'向上延伸背景':'上下延伸背景',reason:`按此頁圖片框及文字位置，保留完整主體，避免放大裁切。${width < frame.width ? '原圖解像度較低，延伸唔會令原圖變高清。' : ''}`};
-  return { action: 'split', title: '改用圖文分區', reason: input.documentary ? '你選擇保留原始紀實畫面；建議圖片完整顯示，文字另放，唔生成背景。'
-    : !supported ? '此圖片框不適用向下延伸，建議圖片與文字分開。'
-    : analysis.background?.downwardExtension !== 'safe' ? `背景延伸風險較高或未能確定。${analysis.background?.reason || ''}建議圖片與文字分開。`
-    : '向下延伸後主體仍會與文字重疊，建議圖片與文字分開。' };
+  return { action: 'review', title: '此母版構圖需要處理', reason: input.documentary ? '保留原圖，但此圖片未能配合母版安全區；請選擇其他圖片或確認原圖呈現。'
+    : !supported ? '現有延伸器未支援此圖片框所需方向；母版保持不變，請換圖或確認保留原圖。'
+    : analysis.background?.downwardExtension !== 'safe' ? `背景延伸風險較高或未能確定。${analysis.background?.reason || ''}母版保持不變，請換圖或確認原圖。`
+    : '延伸後主體仍與文字重疊；母版保持不變，請換圖或確認原圖。' };
 }

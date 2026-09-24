@@ -22,7 +22,11 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
     if (!asset || asset.extensionOriginal || asset.compositionMode==='original' || rejected.has(asset.id)) continue;
     const key=compositionKey(item.frame,item.textZones);
     const variant=asset.compositionVariants?.[key];
-    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url)continue;
+    const unresolved=(message:string)=>actions.failure?.({page:item.page,assetId:asset.id,message,code:'COMPOSITION_NEEDS_REVIEW',stage:'composition',compositionKey:key});
+    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url){
+      if(variant.action==='contain' && asset.autoExtensionDeclinedUrl!==asset.url)unresolved('此圖片尚未配合母版；請換圖或明確確認保留原圖。');
+      continue;
+    }
     const record=(value:Omit<CompositionVariant,'sourceUrl'>)=>prepared.set(asset.id,{...prepared.get(asset.id)!,compositionVariants:{...prepared.get(asset.id)?.compositionVariants,[key]:{...value,sourceUrl:asset.url}}});
     if(asset.autoExtensionDeclinedUrl===asset.url){
       if(asset.compositionMode==='ai')record({action:'contain',reason:'用家已選擇保留原圖。'});
@@ -39,6 +43,7 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
     if (advice.action !== 'extend' || !advice.placement) {
       if(asset.compositionMode==='ai')record({action:advice.action==='split'||advice.action==='review'?'contain':'keep',reason:advice.reason,subjectFocus:analysis.focus});
       else if(advice.action==='split' || advice.action==='review')prepared.set(asset.id,{...asset,compositionFit:'contain'});
+      if(advice.action==='split'||advice.action==='review')unresolved(advice.reason);
       return;
     }
     actions.progress(`正在為 ${item.page} ${advice.title}，完成後才會製作圖片…`);
@@ -51,6 +56,7 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
       // preventing a later composition analysis (the API deduplicates paid runs).
       if(asset.compositionMode==='ai')record({action:'contain',reason:'背景延伸未通過品質檢查，完整保留原圖。'});
       else {rejected.add(asset.id);prepared.set(asset.id,{...asset,extensionRejectedUrl:asset.url,compositionFit:'contain'});}
+      unresolved('背景延伸未通過品質檢查；母版保持不變，請換圖或確認保留原圖。');
       return;
     }
     if(asset.compositionMode==='ai') {

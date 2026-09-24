@@ -542,7 +542,7 @@ export default function ContentStudioPage() {
     return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
-  const compositionPreviewSignature=JSON.stringify(['preview-copy-layout-v2',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
+  const compositionPreviewSignature=JSON.stringify(['preview-master-authority-v3',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
     visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
   useEffect(()=>{
@@ -562,7 +562,7 @@ export default function ContentStudioPage() {
     let missing:Array<{page:string;reason:string}>=[];
     let previewCopy:Record<string,any>={};
     const save=async(status:string)=>{
-      const ok=await saveProject({production:{...selected.production,assets,previewCopy,styleCompositionPreparation:{signature,status,issues,missing}}},status==='ready'?'三頁風格示範已準備；未延伸的原圖會使用圖文分區。':status==='needs_attention'?'部分預覽未完成，請重試或指定合適圖片。':'正在準備風格示範，原圖及已有成果會保留。');
+      const ok=await saveProject({production:{...selected.production,assets,previewCopy,styleCompositionPreparation:{signature,status,issues,missing}}},status==='ready'?'三頁風格示範已按母版準備。':status==='needs_attention'?'部分構圖未能配合母版；請換圖、確認原圖創作或重試。母版及已有成果保留。':'正在按母版準備風格示範，原圖及已有成果會保留。');
       if(!ok)throw new Error('未能保存預覽進度，請重新載入後繼續。');
       setSaving(true);
     };

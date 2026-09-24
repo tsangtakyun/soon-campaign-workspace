@@ -11,7 +11,7 @@ const deps={
  '@/lib/workspace-access':{getWorkspaceAccess:async()=>({role:'owner',admin})},
  '@/lib/oauth-connections':{isUuid:()=>true},'@/lib/anthropic-models':{anthropicModel:()=> 'configured-model'},
  '@/lib/draft-asset-analysis':{prepareDraftAssets:async()=>({done,assets,completed:1,total:2})},
- '@/lib/draft-generation-step':{DraftStepError,runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {output}},draftAnthropic:async()=>{modelCalls++;return {content:[{type:'text',text:JSON.stringify({matches:pages.map(p=>({page:p.page,assetIds:[invalid?'invented':'two'],reason:'畫面相關',headline:'預覽標題',body:incomplete?[]:['完整讀者文案。'],cta:'留言分享'}))})}]}}},
+ '@/lib/draft-generation-step':{DraftStepError,runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {output}},draftAnthropic:async()=>{modelCalls++;return {content:[{type:'text',text:JSON.stringify({matches:pages.map(p=>({page:p.page,assetIds:[invalid?'invented':'two'],reason:'畫面相關',headline:'預覽標題',body:incomplete?[]:['完整讀者文案。'],cta:p.page==='P.3'?'留言分享':''}))})}]}}},
 };
 (async()=>{
  const {POST}=load('app/api/content-projects/preview-assets/route.ts',deps);

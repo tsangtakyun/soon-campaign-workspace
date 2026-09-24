@@ -33,8 +33,8 @@ async function main(){
  const editor=master.createCoreMasterCanvas({...options,primary:actual});
  assert.ok(html.includes('verified-extension'));assert.ok(editor.objects.some(o=>o.src==='verified-extension'));
  const safe=master.createCoreMasterCanvas({...options,primary:{...a,compositionMode:'original'}});
- const photo=safe.objects.find(o=>o.type==='Image');assert.equal(photo.height,700);assert.equal(photo.data.editorImageFrame.fit,'contain');
- assert.ok(safe.objects.find(o=>o.data.role==='headline').top>=700,'fallback copy has its own space');
+ const photo=safe.objects.find(o=>o.type==='Image');const masterPhoto=options.design.canvasJson.objects.find(o=>o.data.role==='image_main');assert.equal(photo.height,masterPhoto.height*(masterPhoto.scaleY||1));assert.equal(photo.data.editorImageFrame.fit,'contain');
+ assert.equal(safe.objects.find(o=>o.data.role==='headline').top,options.design.canvasJson.objects.find(o=>o.data.role==='headline').top,'master position preserved');
  const context=load('lib/project-style-context.ts',{'./production-style':{object:v=>v&&typeof v==='object'?v:{},fingerprint:JSON.stringify}});
  const p={selected_format:'carousel',production:{assetStatus:'confirmed',assets:[{...a,compositionMode:undefined}]}};
  assert.equal(context.projectStyleContext(p).inputHash,context.projectStyleContext({...p,production:{...p.production,assets:[cached]}}).inputHash,'AI composition must not invalidate style selection');
