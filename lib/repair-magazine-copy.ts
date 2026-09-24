@@ -1,6 +1,7 @@
 import {magazineCopyInstruction,productionCopyIssues} from './magazine-copy-policy';
 import {draftOutputSchema,readDraftOutput} from './draft-output';
 import {draftAnthropic,runDraftStep,DraftStepError,type DraftScope} from './draft-generation-step';
+import {copyFieldTargets,copyCandidateRequest,readCopyCandidates,applyCopyCandidates} from './copy-field-candidates';
 
 export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:string,original:Record<string,any>[],contract:any,attempt='',round=0){
   let pages=original.map(p=>({...p}));
@@ -10,7 +11,8 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
     const invalid=pages.map((page,index)=>({page,index,issues:productionCopyIssues(page,contract)})).filter(p=>p.issues.length).slice(0,1);
     if(!invalid.length)break;
     processedPage=String(invalid[0].page.page);
-    const request={model,max_tokens:1800,temperature:0.1,
+    const targets=copyFieldTargets(invalid[0].page,contract);
+    const request=targets.length?copyCandidateRequest(model,targets):{model,max_tokens:1800,temperature:0.1,
       output_config:{format:{type:'json_schema',schema:draftOutputSchema}},
       system:magazineCopyInstruction,
       messages:[{role:'user',content:[
@@ -20,15 +22,15 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
         JSON.stringify(invalid),
       ].join('\n')}],
     };
-    const result=await runDraftStep(scope,{kind:'magazine-auto-fit-page-v2',attempt,round,pages:invalid,limits:contract?.copy_limits},model,async()=>{
+    const result=await runDraftStep(scope,{kind:'magazine-auto-fit-fields-v3',attempt,round,targets,pages:invalid,limits:contract?.copy_limits},model,async()=>{
       try{
         const response=await draftAnthropic(apiKey,request,75_000);return {response,usage:response.usage};
       }catch(error){
         if(error instanceof DraftStepError&&error.status===504)throw new DraftStepError(`${processedPage} 文案精簡逾時；之前完成的頁面已保存。再按製作會只處理未完成文案，毋須重新上載。`,504);
         throw error;
       }
-    },r=>{const output=readDraftOutput(r.response,invalid.length);if(output.pages.some((p:any,i:number)=>p.page!==invalid[i].page.page))throw new Error('AI 文案頁碼不符；原稿保留。');});
-    const output=readDraftOutput(result.output.response,invalid.length);
+    },r=>{if(targets.length){readCopyCandidates(r.response);return;}const output=readDraftOutput(r.response,invalid.length);if(output.pages.some((p:any,i:number)=>p.page!==invalid[i].page.page))throw new Error('AI 文案頁碼不符；原稿保留。');});
+    const output=targets.length?{pages:[applyCopyCandidates(invalid[0].page,targets,readCopyCandidates(result.output.response))]}:readDraftOutput(result.output.response,invalid.length);
     for(const [i,item]of invalid.entries()){
       const p=output.pages[i];
       const colloquial=(s:unknown)=>/[唔嘅咁睇揀]|幾時|食緊|識得/.test(String(s||''));

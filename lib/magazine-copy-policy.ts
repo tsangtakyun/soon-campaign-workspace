@@ -9,12 +9,12 @@ export const magazineCopyInstruction = [
   '所有未核實說法在各頁均須保留歸因及不確定性，不能在封面或中段改寫成已證實因果／效果。來源只有原帖時，不可寫成已查證原始研究。不得新增事實。',
 ].join('\n');
 const length=(v:unknown)=>Array.from(String(v||'').replace(/\s/g,'')).length;
+export const magazineBodyLimits:Record<string,number[]>={cover:[28],longform:[65,65,24,40],split:[65,65,24,40],comparison:[18,18,90,90,32,40],feature:[10,48,10,48,10,48,40],end:[40,18,18]};
 export function magazineCopyIssues(page:Record<string,any>):string[] {
   const role=String(page.role||page.layout||''),body=Array.isArray(page.body)?page.body:[],issues:string[]=[];
   if(length(page.headline)>18)issues.push('標題超過18字');
   if(length(page.subheadline)>10)issues.push('分類短標超過10字');
-  const limits:Record<string,number[]>={cover:[28],longform:[65,65,24,40],split:[65,65,24,40],comparison:[18,18,90,90,32,40],feature:[10,48,10,48,10,48,40],end:[40,18,18]};
-  const budget=limits[role];
+  const budget=magazineBodyLimits[role];
   if(budget){if(body.length>budget.length)issues.push('正文欄位數目不符');body.forEach((s:any,i:number)=>{if(length(s)>(budget[i]??0))issues.push(`正文${i+1}超過${budget[i]??0}字`);});}
   if(/[唔嘅咁睇揀]|幾時|食緊|識得/.test([page.headline,page.subheadline,...body].join('\n')))issues.push('仍有廣東話口語，請用書面語');
   if(role==='comparison'&&page.contentRole!=='narrative'){

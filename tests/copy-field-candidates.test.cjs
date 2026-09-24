@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const {load}=require('./ts-loader.cjs');
+const {copyFieldTargets,copyCandidateRequest,applyCopyCandidates,readCopyCandidates,copyCandidatesSchema}=load('lib/copy-field-candidates.ts');
+const long='據報哈佛有研究發現，雪糕與較低的二型糖尿病風險存在關聯，但有關鍵條件';
+const page={headline:'研究摘要',subheadline:'',role:'cover',body:[long],assetId:'keep',designDirection:'private layout instructions'};
+const targets=copyFieldTargets(page,{});
+assert.equal(targets.length,1);assert.equal(targets[0].field,'body.0');assert.equal(targets[0].currentLength,34);assert.equal(targets[0].hardLimit,28);
+const request=copyCandidateRequest('existing-model',targets);
+assert.ok(!request.messages[0].content.includes('private layout'));assert.ok(!JSON.stringify(copyCandidatesSchema).includes('maxItems'));
+const short='據報哈佛研究指雪糕與較低二型糖尿病風險相關，惟有條件';
+const result=applyCopyCandidates(page,targets,{fields:[{field:'body.0',candidates:[long,'雪糕可降低糖尿病風險',short]},{field:'headline',candidates:['不應修改']} ]});
+assert.equal(result.body[0],short);assert.equal(result.headline,page.headline);assert.equal(result.assetId,'keep');assert.equal(page.body[0],long);
+assert.equal(applyCopyCandidates(page,targets,{fields:[{field:'body.0',candidates:['','據報…',long]}]}).body[0],long);
+const uncertain={...page,body:['原帖指某研究可能有相關發現，但目前仍未能獨立核實，此說法不代表因果關係']};
+const more=copyFieldTargets(uncertain,{});
+assert.equal(applyCopyCandidates(uncertain,more,{fields:[{field:'body.0',candidates:['研究已證實有效']}]}).body[0],uncertain.body[0]);
+assert.throws(()=>readCopyCandidates({content:[{type:'text',text:'{"fields":[{"field":"body.0","candidates":[1]}]}'}]}));
+console.log('PASS field alternatives: 34-to-28 regression, exact codepoint counts, source/uncertainty guards, no full-page prompt, safe selection');

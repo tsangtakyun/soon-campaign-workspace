@@ -9,10 +9,12 @@ function harness(make){
    draftAnthropic:async(_key,request,timeout)=>{
      calls++;
      assert.equal(timeout,75000);
-     assert.equal(request.max_tokens,1800);
-     const invalid=JSON.parse(request.messages[0].content.split('\n').at(-1));
-     assert.equal(invalid.length,1);
-     return {content:[{type:'text',text:JSON.stringify({captionDraft:'',pages:invalid.map(({page})=>make(page,calls))})}]};
+     assert.equal(request.max_tokens,2400);
+     const targets=JSON.parse(request.messages[0].content.split('\n').at(-1));
+     const page={...good,body:[...good.body]};
+     for(const t of targets){if(t.field.startsWith('body.'))page.body[Number(t.field.slice(5))]=t.original;else page[t.field]=t.original;}
+     const modified=make(page,calls);
+     return {content:[{type:'text',text:JSON.stringify({fields:targets.map(t=>({field:t.field,candidates:[t.field.startsWith('body.')?modified.body[Number(t.field.slice(5))]:modified[t.field]]}))})}]};
    },
    runDraftStep:async(_scope,_key,_model,execute,validate)=>{const output=await execute();validate(output);return {output};},
  }});
