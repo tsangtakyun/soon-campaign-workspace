@@ -5,6 +5,7 @@ import { subjectCrop, type FocusAsset, type CropRect } from '../subject-crop';
 export type CoreMasterRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
 type FabricData = {
+  fitText?: boolean;
   binding?: string;
   role?: string;
 };
@@ -131,6 +132,38 @@ function clean(value: unknown) {
   return String(value || "").trim();
 }
 
+/** A comparison master is not proof that the supplied story contains a comparison.
+ * Use a paired-image narrative when no semantic columns were supplied. Shared by
+ * preview, raster and Fabric so no renderer invents or drops copy independently. */
+function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy): FabricObjectJson[] {
+  const original = design.canvasJson?.objects || [];
+  if (!original.some(o => o.data?.role === 'left_row_1')) return original;
+  const body=Array.isArray(copy.body)?copy.body:[];
+  const structured=Boolean(copy.fields?.left_body?.trim() && copy.fields?.right_body?.trim()) || Boolean(body.length>=4 && body[2]?.trim() && body[3]?.trim());
+  const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
+  const text=(role:string,left:number,top:number,w:number,h:number,size:number,binding:string):FabricObjectJson=>({type:'Textbox',left:left*sx,top:top*sy,width:w*sx,height:h*sy,fontSize:size*sy,lineHeight:1.2,fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,fill:'#101313',data:{role,binding,fitText:true}});
+  const kept=original.filter(o=>['brand_logo','page_number','image_left','image_right','image_main','image_secondary','secondary_image','swipe_prompt'].includes(o.data?.role || ''));
+  const images=kept.map(o=>['image_left','image_right','image_main','image_secondary','secondary_image'].includes(o.data?.role || '')?{...o,top:310*sy,height:330*sy,scaleY:1}:o);
+  const title=text('headline',48,140,984,145,60,'content.headline');
+  if(!structured) return [...images,title,text('body',48,700,984,500,34,'content.body')];
+  return [...images,title,
+    text('label_left',48,666,464,55,30,'content.label_left'),text('label_right',568,666,464,55,30,'content.label_right'),
+    text('left_body',48,740,464,350,30,'content.left_body'),text('right_body',568,740,464,350,30,'content.right_body'),
+    text('highlight',48,1120,984,90,28,'content.comparison_highlight'),text('source',48,1240,740,64,20,'content.comparison_source')];
+}
+
+/** Conservative CJK/Latin wrapping estimate; both renderers use the same size. */
+function fittedSize(text:string,width:number,height:number,initial:number,lineHeight:number) {
+  const linesAt=(size:number)=>text.split('\n').reduce((count,line)=>{
+    let lines=1,used=0;
+    for(const char of Array.from(line)){const advance=(/[\u0000-\u007f]/.test(char)?0.62:1.02)*size;if(used+advance>width){lines++;used=0;}used+=advance;}
+    return count+lines;
+  },0);
+  let size=initial;
+  while(size>Math.min(initial,22) && linesAt(size)*size*lineHeight>height)size--;
+  return size;
+}
+
 function comparisonCopy(body: string[], side: "left" | "right") {
   const legacy = String(body[2] || "").split(/[；;]/, 2);
   if (side === "left") return body[3] ? body[2] : legacy[0] || "";
@@ -138,7 +171,8 @@ function comparisonCopy(body: string[], side: "left" | "right") {
 }
 
 function bindingValue(role: string, fallback: string, copy: MasterCopy, page: string, binding?: string) {
-  const body = Array.isArray(copy.body) ? copy.body.filter(Boolean) : [];
+  // Empty slots are meaningful in structured copy (e.g. an optional label).
+  const body = Array.isArray(copy.body) ? copy.body.map(value=>String(value || '')) : [];
   const pageNumber = page.split(/[\s/]+/u)[0] || page;
   const values: Record<string, string> = {
     eyebrow: clean(copy.subheadline),
@@ -158,6 +192,8 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
     option_b: body[1] || "",
     label_left: body[0] || "",
     label_right: body[1] || "",
+    comparison_highlight: copy.fields?.highlight || body[4] || '',
+    comparison_source: copy.fields?.source || body[5] || '',
     highlight: body.length >= 5 ? body[4] : body[2] || "",
     source: body.at(-1) || "",
     question: body[1] || "",
@@ -247,9 +283,10 @@ function renderObject(options: {
     const family = requestedFamily.includes("serif") || requestedFamily.includes("明體")
       ? fonts.editorialFamily
       : fonts.family;
-    const fontSize = Math.max(1, finite(object.fontSize, 20) * finite(object.scaleY, 1) * scaleY);
+    const initialSize = Math.max(1, finite(object.fontSize, 20) * finite(object.scaleY, 1) * scaleY);
     const magazine = requestedFamily.startsWith('soon magazine');
     const lineHeight = finite(object.lineHeight, 1.16) * (magazine ? 1.13 : 1);
+    const fontSize = object.data?.fitText ? fittedSize(value,width,height,initialSize,lineHeight) : initialSize;
     // Fabric positions glyphs inside a 1.13-em first line; CSS includes half
     // the leading above it. Compensate without clipping the final baseline.
     const leading = magazine ? fontSize * (lineHeight - 1) / 2 : 0;
@@ -333,7 +370,7 @@ export function renderCoreMasterPage(options: {
   const coordinate = inferCoordinateSize(design);
   const scaleX = OUTPUT_WIDTH / coordinate.width;
   const scaleY = OUTPUT_HEIGHT / coordinate.height;
-  const objects = Array.isArray(design.canvasJson?.objects) ? design.canvasJson.objects : [];
+  const objects = pageObjects(design,options.copy);
   const crops = coreMasterSubjectLayout(options);
   return React.createElement("div", {
     style: {
@@ -388,7 +425,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
       const text = role === 'brand_logo' ? options.branding.name : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
       objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',
         fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
-        fontSize:Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
+        fontSize:object.data?.fitText ? fittedSize(text,width,height,Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),finite(object.lineHeight,1.16)*(requestedFamily.startsWith('soon magazine')?1.13:1)) : Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
         lineHeight:finite(object.lineHeight,1.16),charSpacing:finite(object.charSpacing),textAlign:object.textAlign||'left',editable:true,
         data:{...object.data,id,kind:'text',item:'body',label:role || '文字'}});
     } else {
@@ -396,7 +433,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
         data:{...object.data,id,kind:'shape',item:'rectangle',label:role || '色塊'}});
     }
   });
-  visit(options.design.canvasJson?.objects || [],'master');
+  visit(pageObjects(options.design,options.copy),'master');
   if(options.primary?.extensionOriginal || options.secondary?.extensionOriginal) objects.push({type:'Textbox',left:24,top:1310,width:220,fontSize:18,text:'AI 延伸背景',fill:'#fff',backgroundColor:'#000b',fontFamily:options.fonts.family,originX:'left',originY:'top',data:{id:'extension-label',kind:'text',item:'caption'}});
   return {version:'7.4.0',coordinateWidth:OUTPUT_WIDTH,coordinateHeight:OUTPUT_HEIGHT,background:options.design.canvasJson?.background || '#F4F0E8',objects};
 }
@@ -419,6 +456,6 @@ export function coreMasterLayoutGeometry(options: {
       && readerFacingCopy(bindingValue(role, clean(o.text), options.copy, options.page, o.data?.binding))) textZones.push(rect);
     if (o.objects) visit(o.objects, key, rect.x, rect.y);
   });
-  visit(options.design.canvasJson?.objects || [], 'master');
+  visit(pageObjects(options.design,options.copy), 'master');
   return { images, textZones };
 }

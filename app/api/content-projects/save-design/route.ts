@@ -50,6 +50,7 @@ export async function POST(req: Request) {
       : {}
     const nextProduction = {
       ...production,
+      editorHistory: [...(Array.isArray(production.editorHistory)?production.editorHistory:[]),...(editorDesigns[page]?[{page,design:editorDesigns[page],archivedAt:new Date().toISOString()}]:[])],
       editorDesigns: {
         ...editorDesigns,
         [page]: {

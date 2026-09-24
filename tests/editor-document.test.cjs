@@ -14,6 +14,7 @@ const box={exports:{},URL,console,require:n=>deps[n]};vm.runInNewContext(ts.tran
 const get=()=>box.exports.GET({url:'https://test/api?workspaceId=workspace&projectId=project&page=P.1'});
 (async()=>{let r=await get();assert.equal(r.status,200);assert.equal(r.body.canvasJson.objects.length,2);assert.ok(workspaceScope);
  project.production.editorDesigns={'P.1':{canvasJson:{objects:[{type:'Textbox',text:'Saved edit'}]}}};r=await get();assert.equal(r.body.canvasJson.objects[0].text,'Saved edit');
+ project.production.editorDesigns['P.1'].imageUrl='/old';project.production.generatedPages=[{page:'P.1',url:'/new'}];r=await get();assert.ok(r.body.notice);assert.equal(r.body.canvasJson.objects[0].text,'Headline');assert.equal(project.production.editorDesigns['P.1'].canvasJson.objects[0].text,'Saved edit','old manual edits not deleted');
  project.production.editorDesigns['P.1'].canvasJson.objects=[{type:'Image',data:{id:'carousel-generated-design'}}];r=await get();assert.equal(r.body.migrated,true);assert.equal(r.body.canvasJson.objects.length,2);
  master=false;assert.equal((await get()).status,409);allowed=false;assert.equal((await get()).status,403);authenticated=false;assert.equal((await get()).status,401);
  console.log('PASS: scoped loading, saved layers preferred, legacy PNG migration, missing master fails closed, authorization');

@@ -1649,6 +1649,7 @@ export default function ContentStudioPage() {
           ? {
               ...draft,
               [field]: value,
+              ...(field === 'body' ? {fields:undefined} : {}),
               ...(field === "assetIds" && Array.isArray(value)
                 ? { assetId: value[0] || "" }
                 : field === "assetId"
@@ -1820,8 +1821,10 @@ export default function ContentStudioPage() {
     );
   }
 
-  async function generateCarouselImages() {
+  async function generateCarouselImages(page?:string) {
     if (!workspaceId || !selected) return;
+    if(generatingCarousel)return;
+    if(selected.production?.productionStatus==='images_ready' && !window.confirm(page?`重新排版 ${page}？其他頁面及已選底圖會保留。舊版本會保存。`:'重新排版全套？已選底圖會保留，手動編輯將由草稿重新排版；舊版本會保存。'))return;
     const activeWorkspaceId = workspaceId;
     const projectId = selected.id;
     const generationStartedAt = Date.now();
@@ -1832,7 +1835,7 @@ export default function ContentStudioPage() {
       const response = await fetch("/api/content-projects/generate-carousel", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId }),
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId, page }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok)
@@ -2898,8 +2901,8 @@ export default function ContentStudioPage() {
                                                   }
                                                 />
                                               </label>
-                                              <label>
-                                                <b>正文（段落之間留一行）</b>
+                                              {isComparisonDraft && Array.isArray(draft.body) && draft.body.length>=4 ? ['左欄標籤','右欄標籤','左欄內文','右欄內文','結論（可選）','資料來源（可選）'].map((label,slot)=><label key={label}><b>{label}</b><textarea value={draft.body[slot] || ''} onChange={event=>{const body=[...draft.body];body[slot]=event.target.value;updatePageDraft(index,'body',body);}} /></label>) : <label>
+                                                <b>{isComparisonDraft ? '內文（未提供左右比較內容，會使用雙圖＋內文版面）' : '正文（段落之間留一行）'}</b>
                                                 <textarea
                                                   value={
                                                     Array.isArray(draft.body)
@@ -2916,7 +2919,7 @@ export default function ContentStudioPage() {
                                                     )
                                                   }
                                                 />
-                                              </label>
+                                              </label>}
                                               <label>
                                                 <b>{supportsMultipleImages ? "左側圖片" : "配對圖片"}</b>
                                                 <select
@@ -3180,6 +3183,7 @@ export default function ContentStudioPage() {
                                               <div>
                                                 <b>{page.page}</b>
                                                 <div className="generated-actions">
+                                                  <button type="button" disabled={saving} onClick={()=>void generateCarouselImages(page.page)}>重新排版本頁</button>
                                                   <a
                                                     className="generated-edit-button"
                                                     href={`/onboarding/scheduled-posts?editImage=${encodeURIComponent(page.url)}&editPage=${encodeURIComponent(page.page)}&editTitle=${encodeURIComponent(selected.title || "Carousel 圖片")}&projectId=${encodeURIComponent(selected.id)}&layered=${isClearMagazineCarousel(String(selected.format_decision?.renderTemplateCode || selected.format_decision?.templateCode || "")) ? "1" : "0"}`}

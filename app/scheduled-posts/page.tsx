@@ -1448,13 +1448,17 @@ function ScheduledPostsPageContent() {
   useEffect(() => {
     if (!layeredProject || !activeWorkspaceId || !externalProjectId) return;
     let cancelled = false;
+    const controller = new AbortController();
+    const timer = window.setTimeout(()=>controller.abort(),30000);
     setProjectEditorError("");
-    void fetch(`/api/content-projects/editor-document?${new URLSearchParams({ workspaceId: activeWorkspaceId, projectId: externalProjectId, page: externalEditPage })}`, { cache: "no-store" })
+    setProjectCanvasJson(null);
+    void fetch(`/api/content-projects/editor-document?${new URLSearchParams({ workspaceId: activeWorkspaceId, projectId: externalProjectId, page: externalEditPage })}`, { cache: "no-store", signal:controller.signal })
       .then(async response => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "未能載入圖層");
         if (cancelled) return;
         setProjectCanvasJson(result.canvasJson);
+        setSaveDesignMessage(result.notice || '');
         setCanvasSize({ label: "Instagram 4:5", w: result.canvasWidth || 1080, h: result.canvasHeight || 1350 });
         const id = `carousel-${externalProjectId}-${externalEditPage}`;
         setSelectedPost({ id, type: "靜態圖片", time: "", title: `${externalEditPage} · ${externalEditTitle}`, body: "", image: externalEditImage!, status: "草稿" });
@@ -1462,8 +1466,8 @@ function ScheduledPostsPageContent() {
         setDesignElementsPostId(id);
         setSelectedElementId(null);
         setDesignMode(true);
-      }).catch(error => { if (!cancelled) setProjectEditorError(error instanceof Error ? error.message : "未能載入圖層"); });
-    return () => { cancelled = true; };
+      }).catch(error => { if (!cancelled) setProjectEditorError(controller.signal.aborted ? '載入圖層逾時，請重新載入；現有圖片未有改動。' : error instanceof Error ? error.message : "未能載入圖層"); }).finally(()=>window.clearTimeout(timer));
+    return () => { cancelled = true; window.clearTimeout(timer); controller.abort(); };
   }, [layeredProject, activeWorkspaceId, externalProjectId, externalEditPage, externalEditTitle, externalEditImage]);
 
   useEffect(() => {
@@ -2754,7 +2758,9 @@ function ScheduledPostsPageContent() {
         return;
       } else if (isContentProjectDesign) {
         window.sessionStorage.removeItem("soon-carousel-editor-payload-v1");
+        setSaveDesignMessage("設計已儲存，正在返回內容製作…");
         router.push(externalEditorReturnUrl);
+        return;
       } else {
         setPersistedScheduledPosts((current) =>
           current.map((post) => post.id === selectedPost.id ? { ...post, image: imageUrl } : post),

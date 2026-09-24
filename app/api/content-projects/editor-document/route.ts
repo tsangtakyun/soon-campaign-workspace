@@ -21,9 +21,11 @@ export async function GET(req:Request) {
     if(!project)return NextResponse.json({error:'找不到專案'},{status:404});
     const saved=project.production?.editorDesigns?.[page];
     const savedObjects=saved?.canvasJson?.objects;
+    const currentImage=project.production?.generatedPages?.find((item:{page:string})=>item.page===page)?.url;
+    const staleSaved=Boolean(saved?.imageUrl && currentImage && saved.imageUrl!==currentImage);
     // Old one-PNG editor saves are migrated from the retained master and copy, not reused as layers.
     const flattened=Array.isArray(savedObjects)&&savedObjects.length===1&&savedObjects[0]?.data?.id==='carousel-generated-design';
-    if(saved?.canvasJson && !flattened)return NextResponse.json({...saved,projectUpdatedAt:project.updated_at},{headers:{'Cache-Control':'private, no-store'}});
+    if(saved?.canvasJson && !flattened && !staleSaved)return NextResponse.json({...saved,projectUpdatedAt:project.updated_at},{headers:{'Cache-Control':'private, no-store'}});
     const drafts=project.production?.pageDrafts || [],index=Number(page.slice(2))-1,draft=drafts[index];
     if(!draft)return NextResponse.json({error:'找不到本頁草稿'},{status:404});
     const role=resolveClearMagazineRole(draft,index,drafts.length);
@@ -44,6 +46,6 @@ export async function GET(req:Request) {
     const canvasJson=createCoreMasterCanvas({design,copy:draft,page:`${String(index+1).padStart(2,'0')} / ${String(drafts.length).padStart(2,'0')}`,
       primary:primary?{...primary,position:draft.imagePosition || 'center'}:undefined,secondary:secondary?{...secondary,position:draft.secondaryImagePosition || 'center'}:undefined,
       branding:{name,logoUrl:brand.logoUrl},fonts:{family,editorialFamily:typeface?family:contract?.typography?.locked?'SOON Magazine Serif':'Noto Serif TC'}});
-    return NextResponse.json({canvasJson,canvasWidth:1080,canvasHeight:1350,projectUpdatedAt:project.updated_at,migrated:flattened},{headers:{'Cache-Control':'private, no-store'}});
+    return NextResponse.json({canvasJson,canvasWidth:1080,canvasHeight:1350,projectUpdatedAt:project.updated_at,migrated:flattened,notice:staleSaved?'已載入最新草稿圖層；之前儲存的編輯版本仍然保留，未刪除。':undefined},{headers:{'Cache-Control':'private, no-store'}});
   }catch(error){console.error('[editor-document]',error);return NextResponse.json({error:'未能載入可編輯圖層，請重試。'},{status:500});}
 }

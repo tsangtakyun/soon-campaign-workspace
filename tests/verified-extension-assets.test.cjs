@@ -5,9 +5,10 @@ const {verifiedExtensionAssets:verify}=load('lib/verified-extension-assets.ts',n
 const asset={id:'asset',url:'extended',extensionId:'run',extensionOriginal:{url:'original',width:640,height:400}};
 const run={id:'run',status:'ready',input:{kind:'current',assetId:'asset'},output:{url:'extended',review:{confidence:'high',addedSubject:false,duplicatedSubject:false,unnaturalReflection:false,environmentMatches:true,seamNatural:true,reason:'checked'}}};
 assert.equal(verify([asset],[run]).assets[0].url,'extended');
+assert.equal(verify([{...asset,extensionUserApprovedId:'run'}],[{...run,input:{...run.input,kind:'old'}}]).unverified.length,0,'explicit user approval remains valid across review versions');
 for(const bad of [null,{...run,input:{...run.input,kind:'old'}},{...run,status:'failed'},{...run,output:{...run.output,url:'different'}},{...run,output:{...run.output,review:{...run.output.review,duplicatedSubject:true}}}]){
- const result=verify([asset],bad?[bad]:[]);assert.equal(result.assets[0].url,'original');assert.equal(result.assets[0].extensionId,undefined);assert.equal(result.restored.length,1);
+ const result=verify([asset],bad?[bad]:[]);assert.equal(result.assets[0].url,'extended');assert.equal(result.assets[0].extensionId,'run');assert.equal(result.restored.length,0);assert.equal(result.unverified.length,1);
 }
 assert.equal(asset.url,'extended','does not mutate input');
 assert.equal(verify([{id:'plain',url:'plain'}],[]).restored.length,0);
-console.log('PASS: stale, missing, rejected, failed and mismatched extension records restore original; verified images retained');
+console.log('PASS: existing choices preserved, missing review flagged separately, no silent restoration');

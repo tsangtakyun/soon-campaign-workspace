@@ -28,6 +28,7 @@ type Draft = {
   headline?: string;
   subheadline?: string;
   body?: string[];
+  fields?: Record<string,string>;
   assetId?: string;
   assetIds?: string[];
   layout?: string;
@@ -809,6 +810,8 @@ export async function POST(req: Request) {
     const workspaceId =
       typeof body.workspaceId === "string" ? body.workspaceId : "";
     const projectId = typeof body.projectId === "string" ? body.projectId : "";
+    const requestedPage = typeof body.page === 'string' ? body.page : '';
+    if(requestedPage && !/^P\.\d+$/.test(requestedPage))return NextResponse.json({error:'Invalid page'},{status:400});
     if (!isUuid(workspaceId) || !isUuid(projectId))
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     const supabase = createServerSupabase(await cookies());
@@ -826,7 +829,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const { data: project, error } = await access.admin
       .from("content_projects")
-      .select("id,production,format_decision")
+      .select("id,production,format_decision,updated_at")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -885,11 +888,20 @@ export async function POST(req: Request) {
     const extensionIds = sourceAssets.filter((a:any)=>a.extensionOriginal && a.extensionId).map((a:any)=>a.extensionId);
     const extensionRuns = extensionIds.length ? await access.admin.from('content_project_generation_runs')
       .select('id,status,input,output').eq('workspace_id',workspaceId).eq('project_id',projectId).in('id',extensionIds) : {data:[],error:null};
-    if(extensionRuns.error) throw new Error('未能核對背景延伸驗收紀錄，未開始生成，請重試。');
+    if(extensionRuns.error) throw new Error('未能核對背景延伸紀錄，已保留現有圖片，請重試。');
     const verified = verifiedExtensionAssets(sourceAssets,extensionRuns.data || []);
     const assets = verified.assets as Asset[];
     if (!drafts.length)
       return NextResponse.json({ error: "沒有逐頁草稿" }, { status: 400 });
+    for(const [index,draft] of drafts.entries()){
+      if(requestedPage && requestedPage!==`P.${index+1}`)continue;
+      if(draft.role!=='comparison' && draft.layout!=='comparison')continue;
+      const body=draft.fields?.left_body && draft.fields?.right_body ? [draft.fields.label_left||'',draft.fields.label_right||'',draft.fields.left_body,draft.fields.right_body,draft.fields.highlight||'',draft.fields.source||''] : draft.body || [];
+      if(!draft.headline?.trim() || !body.some(line=>line.trim()))return NextResponse.json({error:`P.${index+1} 缺少標題或內文，請先補充草稿；未生成空白圖片。`},{status:422});
+      if(draft.headline.length>64 || (body.length>=4 ? body.some((line,i)=>line.length>(i===5?70:i===4?120:i<2?45:240)) : body.join('\n').length>650))return NextResponse.json({error:`P.${index+1} 文案超出版面容量，請縮短標題、欄位標籤或內文；未裁走文字。`},{status:422});
+    }
+    if(requestedPage && !drafts.some((_,i)=>`P.${i+1}`===requestedPage))return NextResponse.json({error:'找不到本頁草稿'},{status:404});
+    if(requestedPage && drafts.some((_,i)=>`P.${i+1}`!==requestedPage && !project.production.generatedPages?.some((p:any)=>p.page===`P.${i+1}`)))return NextResponse.json({error:'請先完成首次全套生成'},{status:409});
     const configuredTypeface = brandSettings.fontStyle;
     const lockedMagazine = (templateContract as { typography?: { headline?: { family?: string }; locked?: boolean } } | undefined)?.typography;
     const fonts = !configuredTypeface && lockedMagazine?.locked && lockedMagazine.headline?.family === 'SOON Magazine Serif'
@@ -908,8 +920,7 @@ export async function POST(req: Request) {
       .filter((draft, index) => {
         if (!isClearMagazineCarousel(templateCode)) return false;
         const role = resolveClearMagazineRole(draft, index, drafts.length);
-        return draft.imageTreatment === "cutout"
-          || (draft.imageTreatment !== "full-bleed" && role === "comparison");
+        return draft.imageTreatment === "cutout";
       })
       .flatMap((draft) => [...(draft.assetIds || []), draft.assetId])
       .map((id) => assets.find((asset) => asset.id === id)?.url)
@@ -922,6 +933,7 @@ export async function POST(req: Request) {
     );
     const outputs = await Promise.all(drafts.map(async (draft, index) => {
       try {
+      if(requestedPage && requestedPage!==`P.${index+1}`)return project.production.generatedPages.find((p:any)=>p.page===`P.${index+1}`);
       const requestedAssetIds = [...(Array.isArray(draft.assetIds) ? draft.assetIds : []), draft.assetId]
         .filter((id): id is string => typeof id === "string" && Boolean(id));
       const assetIds = [...new Set(requestedAssetIds)];
@@ -933,13 +945,13 @@ export async function POST(req: Request) {
         ? getCoreMasterPageDesign(templateContract, role)
         : null;
       const preparedAsset = asset?.url
-        ? { ...asset, isCutout: Boolean((draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(asset.url)
+        ? { ...asset, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
           : preparedImageUrls.get(asset.url) || asset.url }
         : asset;
       const secondarySource = assets.find((item) => item.id === assetIds[1] && item.url);
       const secondaryAsset = secondarySource?.url
-        ? { ...secondarySource, isCutout: Boolean((draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.get(secondarySource.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(secondarySource.url) !== preparedImageUrls.get(secondarySource.url)), url: (draft.imageTreatment === "cutout" || role === "comparison") && preparedCutoutUrls.has(secondarySource.url)
+        ? { ...secondarySource, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(secondarySource.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(secondarySource.url) !== preparedImageUrls.get(secondarySource.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(secondarySource.url)
           ? preparedCutoutUrls.get(secondarySource.url) || preparedImageUrls.get(secondarySource.url) || secondarySource.url
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
@@ -971,10 +983,16 @@ export async function POST(req: Request) {
         throw new Error(`第 ${index + 1} 頁生成失敗：${message}`);
       }
     }));
+    const replacedPages=drafts.map((_,i)=>`P.${i+1}`).filter(p=>!requestedPage || p===requestedPage);
+    const editorDesigns={...project.production.editorDesigns};
+    const priorDesigns:Record<string,unknown>={};
+    for(const page of replacedPages){if(editorDesigns[page])priorDesigns[page]=editorDesigns[page];delete editorDesigns[page];}
     const production = {
       ...project.production,
+      editorDesigns,
+      renderHistory:[...(project.production.renderHistory || []),{at:new Date().toISOString(),pages:project.production.generatedPages || [],editorDesigns:priorDesigns,replacedPages}],
       assets,
-      extensionSafetyRestored: verified.restored,
+      extensionUnverified: verified.unverified,
       generatedPages: outputs,
       productionStatus: "images_ready",
       imagesGeneratedAt: new Date().toISOString(),
@@ -988,10 +1006,12 @@ export async function POST(req: Request) {
       })
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
+      .eq("updated_at", project.updated_at)
       .select("id,production,updated_at")
-      .single();
+      .maybeSingle();
     if (saveError) throw saveError;
-    return NextResponse.json({ success: true, project: saved, warning: verified.restored.length ? `已將 ${verified.restored.length} 張未通過新版驗收的延伸圖還原，並用原圖完成排版。沒有重新付費延伸背景。` : undefined });
+    if (!saved) return NextResponse.json({error:'專案在生成期間有更新，未覆蓋修改，請重新載入。'},{status:409});
+    return NextResponse.json({ success: true, project: saved, warning: verified.unverified.length ? `圖片已生成，已保留所有選定底圖。${verified.unverified.length} 張舊延伸圖未經新版驗收；未驗收不代表失敗，請逐頁檢查。` : undefined });
   } catch (error) {
     console.error("[content-projects/generate-carousel]", error);
     return NextResponse.json(
