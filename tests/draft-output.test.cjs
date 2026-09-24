@@ -16,6 +16,10 @@ const response=(value)=>({stop_reason:'end_turn',content:[{type:'text',text:type
  calls=0; await assert.rejects(withDraftFormatRetry(async()=>{calls++;throw new DraftOutputError()}),DraftOutputError);assert.equal(calls,2);
  calls=0; await assert.rejects(withDraftFormatRetry(async()=>{calls++;throw new Error('storage failed')}),/storage failed/);assert.equal(calls,1);
  assert.equal(draftOutputSchema.additionalProperties,false);
+ assert.equal(JSON.stringify(draftOutputSchema).includes('maxItems'),false);
+ for(const labels of [['a','b','c','d'],[12],'invalid'])
+   assert.throws(()=>readDraftOutput(response({...valid,pages:[{...valid.pages[0],comparisonLabels:labels}]})),DraftOutputError);
+ assert.equal(readDraftOutput(response({...valid,pages:[{...valid.pages[0],comparisonLabels:['原料','製法']}]})).pages[0].comparisonLabels.length,2);
  assert.equal(draftOutputSchema.properties.pages.items.additionalProperties,false);
  console.log('PASS draft output: structured schema, malformed/truncated/null/wrong-page rejection, bounded format-only retry');
 })().catch(error=>{console.error(error);process.exit(1)});

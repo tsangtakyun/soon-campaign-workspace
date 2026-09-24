@@ -46,8 +46,19 @@ export async function runDraftStep(scope: DraftScope, key: unknown, model: strin
 export async function draftAnthropic(apiKey: string, body: Record<string,unknown>, timeoutMs: number) {
   try {
     const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
+    if(!response.ok) {
+      // Never log provider response bodies: they may echo private input.
+      console.error('[draft-provider] rejected',{status:response.status,requestId:response.headers.get('request-id')});
+      const message=response.status===400 || response.status===413 || response.status===422
+        ? 'AI 請求格式或大小不符合服務要求，請聯絡支援；已保存進度保留，毋須重複按生成。'
+        : response.status===401 || response.status===403 || response.status===404
+          ? 'AI 服務設定或存取權限有問題，請聯絡支援；已保存進度保留。'
+          : response.status===429
+            ? 'AI 服務額度或請求頻率受限，請稍後重試；已完成步驟已保留。'
+            : 'AI 服務暫時未能完成，已完成步驟已保留，請稍後重試。';
+      throw new DraftStepError(message,response.status===429 ? 429 : 502);
+    }
     const data=await response.json();
-    if(!response.ok) throw new DraftStepError('AI 服務暫時未能完成，已完成步驟已保留，請稍後重試。',response.status===429 ? 429 : 502);
     return data;
   } catch(error) {
     if(error instanceof Error && ['TimeoutError','AbortError'].includes(error.name))

@@ -8,7 +8,8 @@ export const draftOutputSchema = object({
   pages:{type:'array', minItems:1, items:object({
     page:string, headline:string, subheadline:string, body:{...strings,minItems:1},
     assetId:string, assetIds:strings, role:string, layout:string, templateArtboardId:string,
-    contentRole:{type:'string',enum:['narrative','comparison']}, comparisonLabels:{...strings,maxItems:3}, imageTreatment:string,
+    // Anthropic rejects maxItems; enforce this constraint after generation.
+    contentRole:{type:'string',enum:['narrative','comparison']}, comparisonLabels:{...strings,description:'At most three comparison dimension labels.'}, imageTreatment:string,
     assetStatus:{type:'string',enum:['matched','missing']},
     assetRequest:object({reason:string,suggestions:strings},['reason','suggestions']),
     designDirection:string,
@@ -29,7 +30,8 @@ export function readDraftOutput(response: any, expectedPages?: number) {
   if(!value || typeof value.captionDraft!=='string' || !Array.isArray(value.pages) || !value.pages.length ||
     (expectedPages!==undefined && value.pages.length!==expectedPages) ||
     value.pages.some((page:any)=>!page || typeof page.headline!=='string' || typeof page.designDirection!=='string' ||
-      !Array.isArray(page.body) || !page.body.length || page.body.some((line:any)=>typeof line!=='string')))
+      !Array.isArray(page.body) || !page.body.length || page.body.some((line:any)=>typeof line!=='string') ||
+      (page.comparisonLabels !== undefined && (!Array.isArray(page.comparisonLabels) || page.comparisonLabels.length>3 || page.comparisonLabels.some((label:any)=>typeof label!=='string')))))
     throw new DraftOutputError();
   return value;
 }
