@@ -8,7 +8,7 @@ class StepError extends Error{constructor(message,status){super(message);this.st
 const deps={
 '@/lib/approved-video-duration':{approvedVideoDuration:()=>20},
 '@/lib/draft-asset-analysis':{prepareDraftAssets:async()=>({done:assetDone,assets:[],completed:1,total:2})},
-'@/lib/draft-generation-step':{DraftStepError:StepError,draftAnthropic:async()=>{calls++;if(fail)throw new StepError('saved progress',504);if(stale)project.updated_at='t2';return {content:[{type:'text',text:JSON.stringify({pages:[{headline:'Bear',body:['Facts'],designDirection:'Large photo'}]})}]}},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'run',output}}},
+'@/lib/draft-generation-step':{DraftStepError:StepError,draftAnthropic:async()=>{calls++;if(fail)throw new StepError('saved progress',504);if(stale)project.updated_at='t2';return {content:[{type:'text',text:JSON.stringify({captionDraft:'Facts',pages:[{headline:'Bear',body:['Facts'],designDirection:'Large photo'}]})}]}},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'run',output}}},
 '@/lib/project-style-context':{projectStyleContext:()=>({inputHash:'valid'}),confirmedStyleHash:()=> 'valid',projectBrand:async()=>({})},
 'next/headers':{cookies:async()=>({})},'next/server':{NextResponse:Response},
 '@/lib/anthropic-models':{anthropicModel:()=> 'model'},'@/lib/oauth-connections':{isUuid:()=>true},
@@ -18,6 +18,7 @@ const deps={
 '@/lib/content-templates/clear-magazine-carousel-v1':{isClearMagazineCarousel:()=>false},
 '@/lib/core-template-contract':{isFixedCoreTemplate:()=>false,coreTemplatePageRoles:()=>[],applyCoreTemplateStructure:p=>p}
 };
+deps['@/lib/draft-output']=compile(fs.readFileSync('lib/draft-output.ts','utf8'),{'./draft-generation-step':{DraftStepError:StepError}});
 const route=compile(fs.readFileSync('app/api/content-projects/generate-drafts/route.ts','utf8'),deps);
 const post=phase=>route.POST(new Request('https://test/api',{method:'POST',body:JSON.stringify({workspaceId:'w',projectId:'p',phase})}));
 authorized=false;assert.equal((await post('assets')).status,401);authorized=true;
