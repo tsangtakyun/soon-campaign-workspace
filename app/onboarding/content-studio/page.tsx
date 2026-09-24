@@ -1,6 +1,8 @@
 "use client";
 
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import {CoreCatalogExample} from '@/components/content/CoreCatalogExample';
+import {imageStudioSteps,imageStep,imageLatestStep} from '@/lib/studio-flow';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
 import { CompositionModeChoice } from '@/components/content/CompositionModeChoice';
@@ -497,7 +499,7 @@ export default function ContentStudioPage() {
   const visibleStudioSteps = useMemo(
     () => selected?.selected_format === "short_video"
       ? studioSteps.filter((step) => step.id !== "assets")
-      : studioSteps,
+      : imageStudioSteps,
     [selected?.selected_format],
   );
   const angleOptions = useMemo(
@@ -505,7 +507,7 @@ export default function ContentStudioPage() {
     [workspace],
   );
   const displayStyles = useMemo<DisplayStyle[]>(() => {
-    const format = selected?.selected_format || selectedFormat;
+    const format = activeStep==='format' ? selectedFormat : selected?.selected_format || selectedFormat;
     const coreFormat = format === "short_video"
       ? (videoMethod === "ai_video_generation" ? "ai_video" : "human_video")
       : format;
@@ -540,18 +542,20 @@ export default function ContentStudioPage() {
       core: style,
     }));
     return canonical;
-  }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
+  }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod,activeStep]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
+  const autoDraftAttempt=useRef<string>('');
+  useEffect(()=>{
+    if(isShortVideo||activeStep!=='drafts'||saving||!selected?.production?.generationRequested||selected.production.productionStatus!=='drafts_ready')return;
+    const key=`${selected.id}:${selected.production.generationRequested}`;
+    if(autoDraftAttempt.current===key)return;
+    autoDraftAttempt.current=key;
+    void confirmPageDrafts(selected.production.compositionMode==='ai');
+  },[selected?.id,selected?.production?.generationRequested,selected?.production?.productionStatus,saving,isShortVideo,activeStep]);
   const compositionPreviewSignature=JSON.stringify(['preview-master-authority-four-edges-v4',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
     visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
-  useEffect(()=>{
-    if(activeStep!=='style'||isShortVideo||saving||loadingStyles||!selected?.production||!visibleDisplayStyles.length)return;
-    const previous=selected.production.styleCompositionPreparation as {signature?:string}|undefined;
-    if(previous?.signature===compositionPreviewSignature||previewAttemptRef.current===compositionPreviewSignature)return;
-    previewAttemptRef.current=compositionPreviewSignature;
-    void prepareStyleCompositions(compositionPreviewSignature);
-  },[activeStep,isShortVideo,saving,loadingStyles,compositionPreviewSignature]);
+  // No image preview generation effect: selection displays the literal Core document.
 
   async function prepareStyleCompositions(signature:string) {
     if(!selected?.production||preparingImages.current)return;
@@ -706,6 +710,7 @@ export default function ContentStudioPage() {
   };
 
   function stepLabel(step: StudioStep) {
+    if(!isShortVideo)return imageStudioSteps.find(s=>s.id===imageStep(step))?.label||step;
     if (step === "structure" && selected?.selected_format === "short_video") return "短片結構";
     if (step === "assets" && selected?.selected_format === "single_image") return "圖片素材";
     if (step === "drafts" && selected?.selected_format === "short_video") return "製作草稿";
@@ -718,6 +723,7 @@ export default function ContentStudioPage() {
   }
 
   function latestAvailableStep(project: Project): StudioStep {
+    if(project.selected_format!=='short_video')return imageLatestStep(project);
     if (!project.selected_format) return project.stage === "format" ? "format" : "brief";
     if (project.stage === "brief") return "brief";
     if (project.stage === "format") return "format";
@@ -732,6 +738,7 @@ export default function ContentStudioPage() {
   }
 
   function goToStep(step: StudioStep) {
+    if(!isShortVideo && step!=='drafts')step=imageStep(step);
     setActiveStep(step);
     const url = new URL(window.location.href);
     url.searchParams.set("step", step);
@@ -993,12 +1000,24 @@ export default function ContentStudioPage() {
         ? selected.format_decision.templateCode
         : "",
     );
-    const requested = new URLSearchParams(window.location.search).get("step") as StudioStep | null;
+    const rawRequested = new URLSearchParams(window.location.search).get("step") as StudioStep | null;
+    const requested = rawRequested && selected.selected_format!=='short_video'?imageStep(rawRequested):rawRequested;
     const latest = latestAvailableStep(selected);
     const latestIndex = studioSteps.findIndex((step) => step.id === latest);
     const requestedIndex = studioSteps.findIndex((step) => step.id === requested);
     goToStep(requestedIndex >= 0 && requestedIndex <= latestIndex ? requested! : latest);
   }, [selected?.id]);
+
+  useEffect(() => {
+    if(activeStep!=='format'||!workspaceId||!['carousel','single_image'].includes(selectedFormat))return;
+    let cancelled=false;setLoadingStyles(true);setStyleMessage('');setCoreStyles([]);
+    fetch(`/api/content-styles/catalog?workspaceId=${encodeURIComponent(workspaceId)}&format=${selectedFormat}`,{cache:'no-store'})
+      .then(async r=>{const p=await r.json();if(!r.ok)throw Error(p.error);return p;})
+      .then(p=>{if(cancelled)return;setCoreStyles(p.styles||[]);if(!p.styles?.length)setStyleMessage('此格式暫未有已發布嘅可編輯母版。');})
+      .catch(e=>{if(!cancelled)setStyleMessage(e.message||'未能載入 Core 示範');})
+      .finally(()=>{if(!cancelled)setLoadingStyles(false);});
+    return()=>{cancelled=true;};
+  },[activeStep,workspaceId,selectedFormat,styleRetry]);
 
   useEffect(() => {
     const activeFormat = selected?.selected_format || selectedFormat;
@@ -1010,7 +1029,7 @@ export default function ContentStudioPage() {
       setStyleCandidateCount(0);
       return;
     }
-    if (activeStep !== "style") return;
+    if (activeStep !== "style" || activeFormat!=='short_video') return;
     let cancelled = false;
     setLoadingStyles(true);
     setCoreStyles([]);
@@ -1378,7 +1397,7 @@ export default function ContentStudioPage() {
     );
   }
 
-  async function uploadProjectAssets(event: ChangeEvent<HTMLInputElement>) {
+  async function uploadProjectAssets(event: ChangeEvent<HTMLInputElement>, targetPage='auto') {
     const files = Array.from(event.target.files || []);
     if (!files.length || !workspaceId || !selected?.production) return;
     setUploadingAssets(true);
@@ -1415,8 +1434,8 @@ export default function ContentStudioPage() {
           url: data.publicUrl,
           filename: uploadFile.name,
           ...dimensions,
-          assignedPage: "auto",
-          isCover: existing.length === 0 && uploaded.length === 0,
+          assignedPage: targetPage,
+          isCover: !existing.some(a=>a.isCover) && uploaded.length === 0 && (targetPage==='auto'||targetPage==='P.1'),
           sourceType: "upload",
           sourceLabel: "自行上載",
         });
@@ -1668,19 +1687,22 @@ export default function ContentStudioPage() {
       setMessage("請先加入至少一張圖片素材");
       return;
     }
+    if(selected.production.productionStatus==='images_ready'&&!window.confirm('將按目前內容及配圖重新製作。已有成品可能包含手動修改，請先下載備份；確定繼續？'))return;
     const confirmed = await saveProject(
       {
         production: {
           ...selected.production,
+          status: 'structure_confirmed',
+          generationRequested: new Date().toISOString(),
           assetStatus: "confirmed",
           ...(mode?{compositionMode:mode,assets:setCompositionMode(selected.production.assets as ProjectAsset[],mode),autoBackgroundExtension:false,styleCompositionPreparation:null}:{}),
           assetsConfirmedAt: new Date().toISOString(),
         },
       },
-      "圖片素材已確認，下一步可用真實素材比較內容風格",
-      "style",
+      "內容及配圖已確認，正在套用已選母版",
+      isShortVideo ? "style" : undefined,
     );
-    if (confirmed) setMessage("圖片素材已確認，下一步可用真實素材比較內容風格");
+    if (confirmed && !isShortVideo) await generatePageDrafts();
   }
 
   async function generatePageDrafts(attempt = "") {
@@ -1864,7 +1886,7 @@ export default function ContentStudioPage() {
     }
     const attemptAt=new Date().toISOString();
     const checkpoint=async(assets:unknown,status:string)=>{
-      const ok=await saveProject({production:{...selected.production,compositionMode:mode,autoBackgroundExtension:false,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
+      const ok=await saveProject({production:{...selected.production,generationRequested:status==='needs_attention'?null:selected.production.generationRequested,compositionMode:mode,autoBackgroundExtension:false,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
       if(!ok)throw new Error('未能保存處理進度，已停止，請重新載入後再試。');
       setSaving(true);
     };
@@ -1912,6 +1934,7 @@ export default function ContentStudioPage() {
           backgroundPreparation: {status:'ready',startedAt:attemptAt,issues:[]},
           autoBackgroundExtension: false,
           productionStatus: isVideo ? "package_ready" : "drafts_confirmed",
+          generationRequested: null,
           draftsConfirmedAt: new Date().toISOString(),
         },
       },
@@ -2174,7 +2197,7 @@ export default function ContentStudioPage() {
                       );
                       const disabled = index > latestIndex;
                       const done = index < latestIndex;
-                      const current = activeStep === step.id;
+                      const current = (isShortVideo?activeStep:imageStep(activeStep)) === step.id;
                       return (
                         <button
                           key={step.id}
@@ -2350,7 +2373,7 @@ export default function ContentStudioPage() {
                         </button>
                       ))}
                     </div>
-                    {selectedFormat === "carousel" && recommendedSlideCount ? (
+                    {selectedFormat === "carousel" && recommendedSlideCount && !isFixedCoreTemplate(displayStyles.find(s=>s.code===selectedStyleCode)?.core?.templates?.[0]?.version.contract) ? (
                       <section className="slide-count-recommendation" aria-label="輪播張數">
                         <div>
                           <strong>{`SOON 建議製作 ${recommendedSlideCount} 張`}</strong>
@@ -2365,6 +2388,15 @@ export default function ContentStudioPage() {
                         </div>
                       </section>
                     ) : null}
+                    {['carousel','single_image'].includes(selectedFormat)?<section className="catalog-choice">
+                      <h3>選擇內容風格</h3><p>先睇 Core 母版示範；下一步加入你嘅內容同圖片。</p>
+                      {loadingStyles?<p role="status">正在載入 Core 示範…</p>:styleMessage?<p role="alert">{styleMessage}<button type="button" onClick={()=>setStyleRetry(n=>n+1)}>重新載入</button></p>:null}
+                      <div className="catalog-grid">{displayStyles.map(s=><article key={s.code} className={selectedStyleCode===s.code?'selected':''}>
+                        <CoreCatalogExample contract={s.core?.templates?.[0]?.version.contract}/>
+                        <h4>{s.name}</h4><p>{s.note}</p>
+                        <button type="button" aria-pressed={selectedStyleCode===s.code} onClick={()=>setSelectedStyleCode(s.code)}>{selectedStyleCode===s.code?'✓ 已選擇':'選用這款'}</button>
+                      </article>)}</div>
+                    </section>:null}
                     <div className="actions">
                       <button
                         className="secondary"
@@ -2374,9 +2406,11 @@ export default function ContentStudioPage() {
                       </button>
                       <button
                         disabled={
-                          saving || !selectedFormat || !permissions?.canEdit
+                          saving || !selectedFormat || !permissions?.canEdit || (selectedFormat!=='short_video'&&(loadingStyles||!displayStyles.some(s=>s.code===selectedStyleCode)))
                         }
                         onClick={async () => {
+                          const styleChanged=selected.selected_format!==selectedFormat||selected.format_decision?.templateCode!==selectedStyleCode;
+                          if(styleChanged && selected.production?.pages && !window.confirm('更改格式／風格後，會按母版重新整理故事。已上載素材及現有成品會保留。確定繼續？'))return;
                           const saved = await saveProject(
                             {
                               formatDecision: {
@@ -2387,6 +2421,13 @@ export default function ContentStudioPage() {
                                 templateSource: null,
                                 templateName: null,
                                 templateSelectedAt: null,
+                                selectionMode: null,
+                                flowVersion: null,
+                                ...(selectedFormat!=='short_video'?{
+                                  selectionMode:'core_catalog',flowVersion:'core-master-v2',recommendationId:null,
+                                  templateCode:selectedStyleCode,
+                                  templateContentHash:displayStyles.find(s=>s.code===selectedStyleCode)?.core?.templates?.[0]?.version.contentHash,
+                                }:{}),
                                 ...(selectedFormat === "carousel" ? {
                                   slideCount: carouselSlideCount,
                                   slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
@@ -2396,7 +2437,7 @@ export default function ContentStudioPage() {
                               selectedFormat,
                               stage: "production",
                             },
-                            "格式已確認，SOON 正在整理故事結構",
+                            "格式及母版已確認，SOON 正在整理內容",
                             "structure",
                             [
                               {
@@ -2415,10 +2456,10 @@ export default function ContentStudioPage() {
                               }] : []),
                             ],
                           );
-                          if (saved) await generateStructure();
+                          if (saved && (styleChanged || !selected.production?.pages)) await generateStructure();
                         }}
                       >
-                        確認格式 →
+                        {selectedFormat==='short_video'?'確認格式 →':'確認格式及風格 →'}
                       </button>
                     </div>
                   </div>
@@ -2565,14 +2606,20 @@ export default function ContentStudioPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="editor-card production-card" data-step={activeStep}>
+                  <div className={`editor-card production-card${!isShortVideo?' compact-image-flow':''}`} data-step={activeStep}>
                     <div className="section-title">
                       <div>
-                        <span>STEP {studioSteps.findIndex((step) => step.id === activeStep) + 1}</span>
+                        <span>STEP {visibleStudioSteps.findIndex((step) => step.id === (isShortVideo?activeStep:imageStep(activeStep))) + 1}</span>
                         <h3>{stepLabel(activeStep)}</h3>
                       </div>
                       <em>按照已確認的內容設定製作</em>
                     </div>
+                    {!isShortVideo && activeStep==='structure' && Array.isArray(selected.production?.pageDrafts) && selected.production.pageDrafts.length>0 && (
+                      <button type="button" disabled={saving} onClick={()=>goToStep('drafts')}>查看製作文案／繼續製作 →</button>
+                    )}
+                    {!isShortVideo && activeStep==='drafts' && (
+                      <button type="button" disabled={saving} onClick={()=>goToStep('structure')}>← 返回內容及配圖</button>
+                    )}
                     {generatingStructure ? (
                       <div className="production-ready is-generating" role="status" aria-live="polite">
                         <b className="working" />
@@ -2720,11 +2767,17 @@ export default function ContentStudioPage() {
                                       {page.caption ? <p><strong>字幕：</strong>{page.caption}</p> : null}
                                       {page.productionNote ? <details className="page-visual-detail"><summary>查看拍攝／生成提示</summary><p>{page.productionNote}</p></details> : null}
                                     </> : <>
-                                      <p>{page.copyDirection || page.purpose || ""}</p>
+                                      <p>{page.purpose || page.headline || ""}</p>
+                                      <details><summary>查看完整內容方向</summary><p>{page.copyDirection||''}</p></details>
                                       {page.visualDirection ? <details className="page-visual-detail"><summary>查看畫面建議</summary><p>{page.visualDirection}</p></details> : null}
                                     </>}
                                   </>
                                 )}
+                                {!isShortVideo?<div className="story-page-assets">
+                                  <div className="story-page-thumbnails">{((selected.production?.assets||[]) as ProjectAsset[]).filter(a=>a.assignedPage===(page.page||`P.${index+1}`)||(index===0&&a.isCover)).map(a=><img key={a.id} src={a.url} alt={a.filename}/>)}</div>
+                                  <label className="asset-upload-button">＋ 上載本頁圖片<input type="file" accept="image/*" multiple disabled={saving||uploadingAssets} onChange={e=>void uploadProjectAssets(e,page.page||`P.${index+1}`)}/></label>
+                                  <button type="button" disabled={saving||!!generatingAssetPage} onClick={()=>void generateProjectAsset(page.page||`P.${index+1}`)}>{generatingAssetPage===(page.page||`P.${index+1}`)?'生成中…':'AI 生成本頁配圖'}</button>
+                                </div>:null}
                               </div>
                             </article>
                           ))}
@@ -2748,8 +2801,7 @@ export default function ContentStudioPage() {
                             )}
                           </div>
                         ) : null}
-                        {selected.production.status ===
-                        "structure_confirmed" ? (
+                        {(!isShortVideo || selected.production.status === "structure_confirmed") ? (
                           <>
                             <div className="next-production">
                               <div className="asset-upload-head">
@@ -2924,15 +2976,15 @@ export default function ContentStudioPage() {
                                       <b aria-hidden="true" />
                                       <span>
                                         <strong>SOON 正在確認圖片素材</strong>
-                                        完成後會進入內容風格，讓你用同一組素材直接比較版面。
+                                        完成後會套用已選母版，準備成品。
                                       </span>
                                     </span>
                                   ) : selected.production.assetStatus ===
                                     "confirmed" ? (
-                                    <span>✓ 圖片素材已確認，可以比較內容風格</span>
+                                    <span>✓ 配圖已確認，保留已選 Core 母版</span>
                                   ) : (
                                     <span>
-                                      確認後，下一步會用同一組素材比較內容風格
+                                      確認內容及配圖後，套用已選母版
                                     </span>
                                   )}
                                   <CompositionModeChoice mode={selected.production.compositionMode as CompositionMode|undefined} busy={saving} onChoose={mode=>void confirmAssets(mode)}/>
@@ -3449,7 +3501,7 @@ export default function ContentStudioPage() {
                       <div className="production-ready">
                         <b>!</b>
                         <h4>尚未建立內容順序</h4>
-                        <p>SOON 會先根據已確認的 Brief 及格式整理故事結構，內容風格會在圖片素材準備好後才選擇。</p>
+                        <p>SOON 會按 Brief 及已選母版整理內容，你可以逐頁加入圖片。</p>
                       </div>
                     )}
                     {generatingStructure ? null : <div className="actions">
@@ -3471,9 +3523,9 @@ export default function ContentStudioPage() {
                           >
                             重新生成
                           </button>
-                          <button disabled={saving} onClick={confirmStructure}>
+                          {isShortVideo?<button disabled={saving} onClick={confirmStructure}>
                             確認故事結構 →
-                          </button>
+                          </button>:null}
                         </>
                       ) : selected.production?.status ===
                         "structure_confirmed" ? null : (
@@ -3489,7 +3541,7 @@ export default function ContentStudioPage() {
                     </div>}
                   </div>
                 )}
-                {activeStep !== "style" ? <div className="studio-step-footer">
+                {activeStep !== "style" && isShortVideo ? <div className="studio-step-footer">
                   <button
                     type="button"
                     className="secondary"
@@ -3708,6 +3760,7 @@ const editingStyles = `
   .brief-source-field textarea{min-height:150px;font-size:15px;line-height:1.65}.brief-source-field>small{color:var(--soon-muted);font-size:11px}.structure-evidence{border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:13px 15px}.structure-evidence>summary,.page-visual-detail>summary{cursor:pointer;font-size:11px;font-weight:800;color:var(--soon-oxblood)}.structure-evidence>p{color:var(--soon-muted);font-size:11px;line-height:1.55}.structure-evidence .fact-grid{margin-top:12px}.story-pages article:not(:has(.page-editor))>div>p{max-width:1100px;white-space:pre-line;line-height:1.65}.page-visual-detail{margin-top:8px}.page-visual-detail p{display:block!important;margin-top:8px!important}.studio-message{position:fixed;z-index:90;top:22px;right:24px;width:min(430px,calc(100vw - 48px));box-sizing:border-box;margin:0!important;border:1px solid #d7dfbf;border-radius:12px!important;background:#f5f8eb!important;color:#334418!important;box-shadow:0 12px 34px rgba(31,25,20,.14);padding:15px 16px 15px 46px!important;font-size:13px!important;font-weight:750;line-height:1.45}.studio-message:before{content:"✓";position:absolute;left:16px;top:13px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#58731e;color:#fff;font-size:12px;font-weight:900}.studio-message.loading{border-color:#dbc8c1;background:#f7eee9!important;color:var(--soon-oxblood)!important}.studio-message.loading:before{content:"";box-sizing:border-box;top:15px;width:16px;height:16px;border:2px solid #c9aaa5;border-top-color:var(--soon-oxblood);background:transparent;animation:studio-loading-spin .8s linear infinite}.studio-message.error{border-color:#d9aaa7;background:#fff1ef!important;color:#742b30!important}.studio-message.error:before{content:"!";background:#742b30}@media(max-width:700px){.studio-message{top:12px;right:12px;width:calc(100vw - 24px)}}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .production-ready b.working{box-sizing:border-box;background:transparent;border:3px solid #dce8b6;border-top-color:var(--soon-oxblood);animation:studio-loading-spin .8s linear infinite}
+  .catalog-choice{margin-top:28px}.catalog-choice>p{color:#70665f;font-size:14px}.catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,320px));gap:20px;margin:20px 0}.catalog-grid>article{border:1px solid #ddd3c9;border-radius:16px;padding:12px;background:#fff;overflow:hidden}.catalog-grid>article.selected{border:2px solid #6b2c30;padding:11px;box-shadow:0 3px 0 #e7d7d0}.catalog-grid h4{margin:16px 0 8px}.catalog-grid p{font-size:12px;line-height:1.5;color:#70665f}.catalog-grid button{border:1px solid #d9cec3;border-radius:8px;padding:9px 13px;background:#faf7f2;color:#6b2c30;cursor:pointer}.catalog-grid button[aria-pressed=true]{background:#6b2c30;color:#fff}.catalog-grid>article>button{width:100%}.core-catalog-example nav{display:flex;gap:6px;margin:10px 0}.core-catalog-example small{font-size:10px;color:#7b7169}.story-page-thumbnails{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.story-page-thumbnails img{width:90px;height:90px;object-fit:cover;border-radius:8px}.story-page-assets{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.story-page-assets .story-page-thumbnails{width:100%}.story-page-assets input[type=file]{display:none}.story-page-assets button{border:1px solid #d8ccc2;border-radius:8px;padding:9px 12px;background:#fff;color:#6b2c30;cursor:pointer}.compact-image-flow[data-step="structure"] .next-production{display:block}.compact-image-flow[data-step="drafts"] .next-production{display:none}.compact-image-flow .structure-status{display:none}.compact-image-flow .story-pages>h4{margin-top:0}.compact-image-flow .story-pages details{font-size:12px;color:#70665f}.compact-image-flow .structure-sources{font-size:11px}.compact-image-flow .page-drafts-heading h4{font-size:18px}
   .studio-load-error{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dbc8c1;border-radius:12px;background:#f7eee9;padding:13px 15px;color:var(--soon-oxblood);font-size:13px;font-weight:750}.studio-load-error button{flex:none;border:1px solid var(--soon-oxblood);border-radius:9px;background:#fff;color:var(--soon-oxblood);padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}@media(max-width:560px){.studio-load-error{align-items:flex-start;flex-direction:column}.studio-load-error button{width:100%}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
   .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}

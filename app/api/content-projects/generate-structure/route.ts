@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import {applyCoreTemplateStructure,coreTemplatePageRoles,isFixedCoreTemplate} from '@/lib/core-template-contract'
 import { NextResponse } from 'next/server'
 
 import { anthropicModel } from '@/lib/anthropic-models'
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from('content_projects')
-      .select('id,title,source_url,source_name,source_note,brief,format_decision,selected_format,prompt_version_id')
+      .select('id,title,source_url,source_name,source_note,brief,production,format_decision,selected_format,prompt_version_id')
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
       .single()
@@ -108,7 +109,9 @@ export async function POST(req: Request) {
     const formatDecision = project.format_decision && typeof project.format_decision === 'object'
       ? project.format_decision as Record<string, unknown>
       : {}
-    const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
+    const fixedContract=isFixedCoreTemplate(formatDecision.templateContractSnapshot);
+    const templateRoles=coreTemplatePageRoles(formatDecision.templateContractSnapshot);
+    const slideCount = fixedContract?templateRoles.length:Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
     const roleDefinitions = [
       'cover：用一句吸引人的開場及一個清晰承諾帶出主題。',
       'longform：解釋主題的核心價值或背景，不得重複封面開場。',
@@ -121,7 +124,7 @@ export async function POST(req: Request) {
       ? [
           `用家已選擇 ${slideCount} 頁，不得擅自增加或減少頁面。`,
           `各角色功能如下：\n${roleDefinitions}`,
-          '這一步只決定故事次序，不決定視覺風格。除 cover 必須在首頁、end 必須在末頁外，中段須按內容語意選擇 longform、split、comparison 或 feature。',
+          fixedContract?`已選 Core 母版頁型依次為 ${templateRoles.map(p=>p.role).join('、')}。按這些角色整理故事，不改母版設計。`:'除 cover 必須在首頁、end 必須在末頁外，中段須按內容語意選擇 longform、split、comparison 或 feature。',
         ].join('\n')
       : ''
     const isShortVideo = project.selected_format === 'short_video'
@@ -167,7 +170,7 @@ export async function POST(req: Request) {
       `來源內容：${project.source_note || '未提供'}`,
       `Brief：${JSON.stringify(project.brief || {})}`,
       `已確認格式：${project.selected_format || '未提供'}`,
-      `格式備註：${JSON.stringify(project.format_decision || {})}`,
+      `格式備註：${JSON.stringify({videoMethod:formatDecision.videoMethod,templateName:formatDecision.templateName,slideCount,roles:templateRoles})}`,
       `格式製作要求：${formatInstruction}`,
       '',
       '只輸出一個 JSON object，不要 Markdown code fence。JSON 必須符合：',
@@ -182,7 +185,7 @@ export async function POST(req: Request) {
       isShortVideo
         ? 'script 必須由首三秒 Hook 開始，時間碼連續而不重疊，最後包含明確收結或 CTA。不得輸出 pages 或 P.1、P.2 等頁碼。不要把未核實內容寫成事實。'
         : 'pages 必須由 P.1 開始連續編號，並嚴格遵從上述格式製作要求。不要把未核實內容寫成事實。',
-      '這一步不得輸出或假設任何 templateArtboardId；版型會在用家準備圖片素材並選擇內容風格後才決定。',
+      '不要自行設計版面或生成 templateArtboardId；製作階段由已選 Core 母版提供。',
       isShortVideo
         ? '每個劇本段落只推進一個訊息；dialogue 必須是可直接讀出的旁白／對白，不可只寫「介紹背景」之類製作指示。visual 與 productionNote 必須可直接交付拍攝或生成。每段 sourceEvidence 必須逐字抄錄一段來源內容或 Brief 原文，並足以支持該段的具體效果、痛點及場景；資料不足時只可寫中性描述或「資料待確認」。'
         : '輪播每頁只可傳達一個主旨，不得在不同頁重複解釋相同內容。headline 應遵從上述文字語氣設定，建議不超過 18 個中文字。',
@@ -254,7 +257,13 @@ export async function POST(req: Request) {
           })
       : undefined
     const production = {
+      ...(project.production||{}),
+      previousStructure: project.production?.pages || project.production?.previousStructure || null,
       ...generated,
+      productionStatus: null,
+      assetStatus: 'pending',
+      generationRequested: null,
+      ...(!isShortVideo&&fixedContract?{pages:applyCoreTemplateStructure(generated.pages,formatDecision.templateContractSnapshot)}:{}),
       ...(isShortVideo ? { script: normalizedScript, pages: [] } : {}),
       confirmedFacts: hasExternalSource && Array.isArray(generated.confirmedFacts)
         ? generated.confirmedFacts

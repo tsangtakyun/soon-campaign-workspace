@@ -1,4 +1,5 @@
 import { coreCode, object, styleSnapshot, validateSelection, type StyleResult } from '@/lib/production-style'
+import {selectCatalogStyle,sameCatalogSelection} from '@/lib/core-catalog-selection'
 import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context'
 import { applyCoreTemplateStructure, isFixedCoreTemplate } from '@/lib/core-template-contract'
 import { cookies } from 'next/headers'
@@ -170,7 +171,17 @@ export async function PATCH(req: Request) {
     if(body.expectedUpdatedAt && body.expectedUpdatedAt!==existing.updated_at)return NextResponse.json({error:'專案已在另一個操作中更新。請重新載入；已保存成果不會被覆蓋。'},{status:409})
     if (body.formatDecision && typeof body.formatDecision === 'object') {
       const requested = object(body.formatDecision), old = object(existing.format_decision)
-      if (requested.recommendationId) {
+      if (requested.selectionMode === 'core_catalog') {
+        const format=String(body.selectedFormat||existing.selected_format||'');
+        if(sameCatalogSelection(old,requested,format,existing.selected_format)) {
+          body.formatDecision={...requested,...old,slideCount:requested.slideCount??old.slideCount};
+        } else {
+          try {
+            const trusted=await selectCatalogStyle(format,String(requested.templateCode||''),String(requested.templateContentHash||''));
+            body.formatDecision={...requested,...trusted};
+          } catch(error) {return NextResponse.json({error:error instanceof Error?error.message:'未能確認母版。'},{status:409});}
+        }
+      } else if (requested.recommendationId) {
         if (requested.recommendationId === old.recommendationId && requested.templateCode === old.templateCode) {
           // Clients may edit production settings but cannot rewrite an already locked snapshot.
           body.formatDecision = { ...requested, ...old, confirmedMaterials: requested.confirmedMaterials ?? old.confirmedMaterials, videoMethod: requested.videoMethod ?? old.videoMethod }

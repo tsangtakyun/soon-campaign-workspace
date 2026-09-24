@@ -30,14 +30,14 @@ function isSafetyError(payload: any, status: number) {
   return status === 400 && /(safety|moderation|content policy|policy violation|blocked|guardrail|unsafe)/i.test(text);
 }
 
-async function generateImage(apiKey: string, prompt: string) {
+async function generateImage(apiKey: string, prompt: string, size: '1024x1536'|'1536x1024'='1024x1536') {
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
       prompt,
-      size: "1024x1536",
+      size,
       quality: "medium",
       output_format: "png",
     }),
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from("content_projects")
-      .select("id,title,brief,production")
+      .select("id,title,brief,production,format_decision")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -133,8 +133,10 @@ export async function POST(request: Request) {
       || [briefAngle, briefSummary].filter(Boolean).join("。")
       || project.title;
     const cleanedDirection = imageOnlyDirection(originalVisualDirection);
+    const {masterAssetBrief}=await import('@/lib/master-asset-brief');
+    const masterPlan=masterAssetBrief(project.format_decision||{},pageData,pageIndex,pages.length);
     const prompt = [
-      "Create a premium editorial social media photograph in portrait 4:5 composition.",
+      masterPlan.instruction,
       `The editorial subject is ${briefAngle || project.title}. The words are context only and must never appear in the image.`,
       `Image-only visual direction: ${cleanedDirection}.`,
       "Leave generous clean negative space for typography that will be added later by the layout system.",
@@ -146,7 +148,7 @@ export async function POST(request: Request) {
     let promptAdjustmentReason: string | null = null;
     let base64: string;
     try {
-      base64 = await generateImage(apiKey, finalPrompt);
+      base64 = await generateImage(apiKey, finalPrompt, masterPlan.size);
     } catch (error) {
       if (!(error instanceof ImageGenerationError) || !error.safetyRelated) throw error;
       promptAdjustmentReason = "原畫面涉及較敏感表達，系統已自動改為合規、非直接描繪嘅視覺方向";
@@ -158,14 +160,14 @@ export async function POST(request: Request) {
       ].join(" ");
       finalPrompt = await rewriteSafePrompt(prompt) || neutralPrompt;
       try {
-        base64 = await generateImage(apiKey, finalPrompt);
+        base64 = await generateImage(apiKey, finalPrompt, masterPlan.size);
       } catch (retryError) {
         if (!(retryError instanceof ImageGenerationError) || !retryError.safetyRelated || finalPrompt === neutralPrompt) {
           throw retryError;
         }
         promptAdjustmentReason = "敏感畫面改寫後仍受限制，系統已改用中性象徵式 editorial 畫面";
         finalPrompt = neutralPrompt;
-        base64 = await generateImage(apiKey, finalPrompt);
+        base64 = await generateImage(apiKey, finalPrompt, masterPlan.size);
       }
     }
 

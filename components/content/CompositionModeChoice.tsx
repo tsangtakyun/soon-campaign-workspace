@@ -6,12 +6,12 @@ export function CompositionModeChoice({mode,busy,onChoose}:{mode?:CompositionMod
     <p>原圖及已確認版本會保留。你可以之後切換，不會刪除已有成果。</p>
     <div style={{display:'flex',flexWrap:'wrap',gap:12}}>
       <button type="button" aria-pressed={mode==='original'} disabled={busy} onClick={()=>onChoose('original')}>
-        原圖創作 →<small style={{display:'block',marginTop:8}}>完整保留圖片，以留白及圖文分區排版；不生成背景。</small>
+        用原圖製作 →<small style={{display:'block',marginTop:8}}>保留原圖，套用已選母版；不生成背景、不改版面。</small>
       </button>
       <button type="button" aria-pressed={mode==='ai'} disabled={busy} onClick={()=>onChoose('ai')}>
-        AI 智能構圖 · 推薦 →<small style={{display:'block',marginTop:8}}>按主體、文字及圖片框，只在需要時延伸環境；不新增主體。</small>
+        AI 智能構圖並製作 →<small style={{display:'block',marginTop:8}}>按母版圖片框及文字位置，需要時延伸環境；不新增主體。</small>
       </button>
     </div>
-    <small style={{display:'block',marginTop:12}}>AI 模式會使用分析及圖片生成額度。風格預覽最多處理每款的封面、內文、收尾，正式製作會重用合適結果；未通過檢查會保留原圖。</small>
+    <small style={{display:'block',marginTop:12}}>AI 模式會使用分析及圖片生成額度；已選母版不變，未通過檢查的頁面會提示處理，原圖保留。</small>
   </section>;
 }
