@@ -2902,7 +2902,7 @@ export default function ContentStudioPage() {
                                                 />
                                               </label>
                                               {isComparisonDraft && Array.isArray(draft.body) && draft.body.length>=4 ? ['左欄標籤','右欄標籤','左欄內文','右欄內文','結論（可選）','資料來源（可選）'].map((label,slot)=><label key={label}><b>{label}</b><textarea value={draft.body[slot] || ''} onChange={event=>{const body=[...draft.body];body[slot]=event.target.value;updatePageDraft(index,'body',body);}} /></label>) : <label>
-                                                <b>{isComparisonDraft ? '內文（未提供左右比較內容，會使用雙圖＋內文版面）' : '正文（段落之間留一行）'}</b>
+                                                <b>{isComparisonDraft ? '內文（未提供左右比較內容，會使用主圖＋內文版面）' : '正文（段落之間留一行）'}</b>
                                                 <textarea
                                                   value={
                                                     Array.isArray(draft.body)

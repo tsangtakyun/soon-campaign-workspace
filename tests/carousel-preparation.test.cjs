@@ -13,7 +13,7 @@ async function main(){
  await assert.rejects(()=>optimizeCarouselAssets(assets,frames,{...actions,generate:async()=>{throw Error('provider')}}),/provider/);
  assert.equal(assets[0].url,'original','failure leaves original input untouched');
  const rejected=await optimizeCarouselAssets(assets,frames,{...actions,generate:async()=>{throw Object.assign(Error('rejected'),{code:'EXTENSION_REJECTED'})}});
- assert.equal(rejected[0].url,'original');assert.equal(rejected[0].autoExtensionDeclinedUrl,'original');
+ assert.equal(rejected[0].url,'original');assert.equal(rejected[0].extensionRejectedUrl,'original');assert.equal(rejected[0].autoExtensionDeclinedUrl,undefined);
  const source=fs.readFileSync('app/onboarding/content-studio/page.tsx','utf8');
  assert.ok(source.indexOf('preparedAssets = await optimizeCarouselAssets') < source.indexOf('assets: preparedAssets'));
  assert.ok(source.includes('AI 優化構圖並生成圖片 →'));

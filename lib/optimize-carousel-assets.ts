@@ -12,22 +12,29 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
 }) {
   const prepared = new Map(assets.map(asset => [asset.id, {...asset}]));
   const analyses = new Map<string, CompositionAnalysis>();
+  const rejected = new Set<string>();
   for (const item of frames) {
     const asset = prepared.get(item.assetId);
-    if (!asset || asset.extensionOriginal || asset.autoExtensionDeclinedUrl === asset.url) continue;
+    if (!asset || asset.extensionOriginal || asset.autoExtensionDeclinedUrl === asset.url || rejected.has(asset.id)) continue;
     actions.progress(`正在分析 ${item.page} 圖片構圖…`);
     const size = await actions.dimensions(asset);
     let analysis = analyses.get(asset.id);
     if (!analysis) { analysis = await actions.analyze(asset.id); analyses.set(asset.id, analysis); }
     const advice = compositionAdvice({...size, frame:item.frame, textZones:item.textZones, analysis, documentary:false});
-    if (advice.action !== 'extend' || !advice.placement) continue;
+    if (advice.action !== 'extend' || !advice.placement) {
+      if(advice.action==='split' || advice.action==='review')prepared.set(asset.id,{...asset,compositionFit:'contain'});
+      continue;
+    }
     actions.progress(`正在為 ${item.page} ${advice.title}，完成後才會製作圖片…`);
     let preview: ExtensionPreview;
     try { preview = await actions.generate(asset.id, advice.placement); }
     catch(error) {
       if((error as {code?:string})?.code!=='EXTENSION_REJECTED')throw error;
       actions.progress(`${item.page} 延伸未通過檢查，保留原圖。`);
-      prepared.set(asset.id,{...asset,autoExtensionDeclinedUrl:asset.url});
+      // A model rejection is not a user opt-out. Keep it auditable without
+      // preventing a later composition analysis (the API deduplicates paid runs).
+      rejected.add(asset.id);
+      prepared.set(asset.id,{...asset,extensionRejectedUrl:asset.url,compositionFit:'contain'});
       continue;
     }
     prepared.set(asset.id, applyExtension({...asset,...size}, preview));

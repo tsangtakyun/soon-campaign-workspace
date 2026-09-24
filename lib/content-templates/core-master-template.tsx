@@ -63,6 +63,7 @@ type MasterCopy = {
 
 type MasterAsset = FocusAsset & {
   url?: string;
+  sourceType?: string;
 };
 
 type MasterBranding = {
@@ -133,10 +134,29 @@ function clean(value: unknown) {
 }
 
 /** A comparison master is not proof that the supplied story contains a comparison.
- * Use a paired-image narrative when no semantic columns were supplied. Shared by
+ * Use a single-image narrative when no semantic columns were supplied. Shared by
  * preview, raster and Fabric so no renderer invents or drops copy independently. */
-function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy): FabricObjectJson[] {
+function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: MasterAsset): FabricObjectJson[] {
   const original = design.canvasJson?.objects || [];
+  if(primary?.compositionFit==='contain' && original.some(o=>o.data?.role==='question_rule')) {
+    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
+    return original.map(o=>o.data?.role==='image_main'?{...o,left:0,top:0,width:1080*sx,height:700*sy,scaleX:1,scaleY:1}
+      :o.data?.role==='bottom_gradient'?{...o,top:700*sy,height:650*sy,fill:'#172323'}:o);
+  }
+  // The split master has fixed semantic slots. A two-paragraph narrative must
+  // not repeat its final paragraph as a source or leave a blank highlight box.
+  const main=original.find(o=>o.data?.role==='image_main');
+  if(main && (copy.body?.length||0)<=2 && !copy.fields && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
+    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
+    return original.filter(o=>!['source','highlight','highlight_box'].includes(o.data?.role||'')).map(o=>{
+      const role=o.data?.role;
+      if(role==='headline')return {...o,top:180*sy,height:300*sy,fontSize:76*sy,data:{...o.data,fitText:true}};
+      if(role==='accent')return {...o,top:515*sy};
+      if(role==='body_1')return {...o,top:560*sy,height:280*sy,fontSize:34*sy,data:{...o.data,fitText:true}};
+      if(role==='body_2')return {...o,top:870*sy,height:330*sy,fontSize:32*sy,data:{...o.data,fitText:true}};
+      return o;
+    });
+  }
   if (!original.some(o => o.data?.role === 'left_row_1')) return original;
   const body=Array.isArray(copy.body)?copy.body:[];
   const structured=Boolean(copy.fields?.left_body?.trim() && copy.fields?.right_body?.trim()) || Boolean(body.length>=4 && body[2]?.trim() && body[3]?.trim());
@@ -145,7 +165,17 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy): FabricObje
   const kept=original.filter(o=>['brand_logo','page_number','image_left','image_right','image_main','image_secondary','secondary_image','swipe_prompt'].includes(o.data?.role || ''));
   const images=kept.map(o=>['image_left','image_right','image_main','image_secondary','secondary_image'].includes(o.data?.role || '')?{...o,top:310*sy,height:330*sy,scaleY:1}:o);
   const title=text('headline',48,140,984,145,60,'content.headline');
-  if(!structured) return [...images,title,text('body',48,700,984,500,34,'content.body')];
+  if(!structured) {
+    // A second asset is not a second argument: do not imply a comparison or
+    // present an unrelated illustration as evidence for this subject.
+    const furniture=kept.filter(o=>['brand_logo','page_number','swipe_prompt'].includes(o.data?.role || ''));
+    const primary=kept.find(o=>['image_left','image_main'].includes(o.data?.role || ''));
+    const bodyHeight=Math.min(500,Math.max(260,Math.ceil(body.join('\n').length/28)*46));
+    const photoHeight=920-bodyHeight;
+    const photo=primary ? [{...primary,left:48*sx,top:270*sy,width:984*sx,height:photoHeight*sy,scaleX:1,scaleY:1,data:{...primary.data,binding:'content.asset.contain'}}] : [];
+    return [...furniture,...photo,text('headline',48,140,984,110,58,'content.headline'),
+      text('body',48,310+photoHeight,984,bodyHeight,34,'content.body')];
+  }
   return [...images,title,
     text('label_left',48,666,464,55,30,'content.label_left'),text('label_right',568,666,464,55,30,'content.label_right'),
     text('left_body',48,740,464,350,30,'content.left_body'),text('right_body',568,740,464,350,30,'content.right_body'),
@@ -271,14 +301,14 @@ function renderObject(options: {
       src: dynamicAsset.url,
       width,
       height,
-      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" ? "contain" : "cover", objectPosition: options.crops[key]?.position || dynamicAsset.position || "center" },
+      style: { ...common, objectFit: object.data?.binding === "content.asset.contain" || dynamicAsset.compositionFit==='contain' ? "contain" : "cover", objectPosition: options.crops[key]?.position || dynamicAsset.position || "center" },
     });
   }
 
   const type = clean(object.type).toLowerCase();
   if (type === "textbox" || type === "text" || type === "itext") {
     const fallback = clean(object.text);
-    const value = role === 'brand_logo' ? branding.name : readerFacingCopy(bindingValue(role, fallback, copy, page, object.data?.binding));
+    const value = role === 'brand_logo' ? branding.name : role==='image_credit' ? (primary?.sourceType==='ai_generated'?'AI 示意圖':'') : readerFacingCopy(bindingValue(role, fallback, copy, page, object.data?.binding));
     const requestedFamily = clean(object.fontFamily).toLowerCase();
     const family = requestedFamily.includes("serif") || requestedFamily.includes("明體")
       ? fonts.editorialFamily
@@ -370,7 +400,7 @@ export function renderCoreMasterPage(options: {
   const coordinate = inferCoordinateSize(design);
   const scaleX = OUTPUT_WIDTH / coordinate.width;
   const scaleY = OUTPUT_HEIGHT / coordinate.height;
-  const objects = pageObjects(design,options.copy);
+  const objects = pageObjects(design,options.copy,options.primary);
   const crops = coreMasterSubjectLayout(options);
   return React.createElement("div", {
     style: {
@@ -419,10 +449,10 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
     if (src) {
       if (logo) { width = Math.min(width,180); height = Math.min(Math.max(height,80),96); }
       objects.push({...common,type:'Image',src,crossOrigin:'anonymous',width,height,
-        data:{...object.data,id,kind:'image',item:'photo',label:role || '圖片',editorImageFrame:{width,height,fit:logo || !asset || object.data?.binding==='content.asset.contain'?'contain':'cover',position:logo?'0% 50%':crops[id]?.position || asset?.position || 'center'}}});
+        data:{...object.data,id,kind:'image',item:'photo',label:role || '圖片',editorImageFrame:{width,height,fit:logo || !asset || object.data?.binding==='content.asset.contain' || asset.compositionFit==='contain'?'contain':'cover',position:logo?'0% 50%':crops[id]?.position || asset?.position || 'center'}}});
     } else if (['textbox','text','itext'].includes(type)) {
       const requestedFamily = clean(object.fontFamily).toLowerCase();
-      const text = role === 'brand_logo' ? options.branding.name : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
+      const text = role === 'brand_logo' ? options.branding.name : role==='image_credit' ? (options.primary?.sourceType==='ai_generated'?'AI 示意圖':'') : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
       objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',
         fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
         fontSize:object.data?.fitText ? fittedSize(text,width,height,Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),finite(object.lineHeight,1.16)*(requestedFamily.startsWith('soon magazine')?1.13:1)) : Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
@@ -433,7 +463,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
         data:{...object.data,id,kind:'shape',item:'rectangle',label:role || '色塊'}});
     }
   });
-  visit(pageObjects(options.design,options.copy),'master');
+  visit(pageObjects(options.design,options.copy,options.primary),'master');
   if(options.primary?.extensionOriginal || options.secondary?.extensionOriginal) objects.push({type:'Textbox',left:24,top:1310,width:220,fontSize:18,text:'AI 延伸背景',fill:'#fff',backgroundColor:'#000b',fontFamily:options.fonts.family,originX:'left',originY:'top',data:{id:'extension-label',kind:'text',item:'caption'}});
   return {version:'7.4.0',coordinateWidth:OUTPUT_WIDTH,coordinateHeight:OUTPUT_HEIGHT,background:options.design.canvasJson?.background || '#F4F0E8',objects};
 }
@@ -451,11 +481,11 @@ export function coreMasterLayoutGeometry(options: {
     const rect = { x: ox + finite(o.left) * sx, y: oy + finite(o.top) * sy,
       width: finite(o.width) * finite(o.scaleX, 1) * sx, height: finite(o.height) * finite(o.scaleY, 1) * sy };
     const asset = roleAsset(role, options.primary, options.secondary);
-    if (asset && o.data?.binding !== 'content.asset.contain') images.push({ key, rect, asset });
+    if (asset && o.data?.binding !== 'content.asset.contain' && asset.compositionFit!=='contain') images.push({ key, rect, asset });
     else if (['textbox', 'text', 'itext'].includes(clean(o.type).toLowerCase())
       && readerFacingCopy(bindingValue(role, clean(o.text), options.copy, options.page, o.data?.binding))) textZones.push(rect);
     if (o.objects) visit(o.objects, key, rect.x, rect.y);
   });
-  visit(pageObjects(options.design,options.copy), 'master');
+  visit(pageObjects(options.design,options.copy,options.primary), 'master');
   return { images, textZones };
 }

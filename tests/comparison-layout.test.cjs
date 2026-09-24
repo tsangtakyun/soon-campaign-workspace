@@ -14,6 +14,14 @@ assert.equal(text.filter(o=>o.data.role==='body').length,1);
 assert.ok(!text.some(o=>['進食','活動','能量來源'].includes(o.text)),'no sample labels');
 assert.ok(text.find(o=>o.data.role==='headline').top+text.find(o=>o.data.role==='headline').height<310,'headline does not overlap images');
 assert.equal(JSON.stringify(base.design),original,'master remains immutable');
+const narrative=master.createCoreMasterCanvas({...base,copy,primary:{url:'official'},secondary:{url:'illustration'}}).objects;
+assert.equal(narrative.filter(o=>o.type==='Image').length,1,'narrative does not imply a second image is comparison evidence');
+assert.equal(narrative.find(o=>o.type==='Image').data.editorImageFrame.fit,'contain','preserve embedded photo labels');
+const splitCopy={headline:'435號 Holly 2019年冠軍',body:['官方冠軍記錄','核查資料：'+ '完整文字'.repeat(25)]};
+const split=master.createCoreMasterCanvas({...base,design:master.getCoreMasterPageDesign(contract,'split'),copy:splitCopy}).objects;
+assert.ok(!split.some(o=>['highlight_box','source'].includes(o.data.role)),'no blank highlight or duplicated paragraph as source');
+assert.equal(split.find(o=>o.data.role==='headline').text,splitCopy.headline);
+assert.equal(split.find(o=>o.data.role==='body_2').text,splitCopy.body[1]);
 const columns=master.createCoreMasterCanvas({...base,copy:{headline:'比較',body:['','右標籤','左內容','右內容','結論','來源']}}).objects;
 assert.equal(columns.find(o=>o.data.role==='label_left').text,'','empty slots preserved');
 assert.equal(columns.find(o=>o.data.role==='left_body').text,'左內容');
@@ -38,4 +46,20 @@ if(process.argv.includes('--render'))(async()=>{
  const options={...base,copy,primary:{url:photo},secondary:{url:photo}};
  const image=new (require('next/og').ImageResponse)(master.renderCoreMasterPage(options),{width:1080,height:1350,fonts:[{name:base.fonts.family,data:regular,weight:400},{name:base.fonts.family,data:bold,weight:700}]});
  fs.writeFileSync('/private/tmp/soon-comparison-verification.png',Buffer.from(await image.arrayBuffer()));
+ if(process.argv.includes('--live')) {
+   const headers={apikey:process.env.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+process.env.SUPABASE_SERVICE_ROLE_KEY};
+   const response=await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL+'/rest/v1/content_projects?select=production&id=eq.6a9f176d-5560-4512-8c13-f8bcdd7b1b5d&workspace_id=eq.6743d1ab-5373-4f44-815e-d73e4ba122b6',{headers});
+   if(!response.ok)throw Error('Project fixture unavailable');
+   const [project]=await response.json();
+   for(const page of ['P.3','P.4','P.6']) {
+     const draft=project.production.pageDrafts.find(d=>d.page===page);
+     const asset=project.production.assets.find(a=>a.id===draft.assetId);
+     const photoResponse=await fetch(asset.url);if(!photoResponse.ok)throw Error('Photo unavailable');
+     const bytes=await require('sharp')(Buffer.from(await photoResponse.arrayBuffer())).png().toBuffer();
+     const primary={...asset,url:'data:image/png;base64,'+bytes.toString('base64')};
+     const live={...base,design:master.getCoreMasterPageDesign(contract,draft.role),copy:draft,page,primary};
+     const result=new (require('next/og').ImageResponse)(master.renderCoreMasterPage(live),{width:1080,height:1350,fonts:[{name:base.fonts.family,data:regular,weight:400},{name:base.fonts.family,data:bold,weight:700}]});
+     fs.writeFileSync('/private/tmp/soon-live-'+page+'.png',Buffer.from(await result.arrayBuffer()));
+   }
+ }
 })().catch(e=>{console.error(e);process.exitCode=1;});
