@@ -29,6 +29,15 @@ export function previewComposition(contract: unknown, page: Record<string,any>, 
     fields[`feature_body_${n+1}`]=split>0&&split<24?sentence.slice(split+1):sentence;
   }
   if(page.fields&&typeof page.fields==='object')for(const [k,v]of Object.entries(page.fields))if(typeof v==='string')fields[k]=readerFacingCopy(v);
+  if(role==='end'){
+    fields.subheadline=body.join('\n');
+    fields.question='';
+  }
+  // Optional copy must not leave empty decorative blocks. All preview text
+  // uses bounded fitting, including brand fonts wider than the master font.
+  if(design)design.canvasJson.objects=(design.canvasJson.objects||[]).filter((o:any)=>
+    !(['highlight_box','highlight'].includes(o.data?.role)&&!fields.highlight)
+  ).map((o:any)=>/text/i.test(o.type||'')?{...o,data:{...o.data,fitText:true}}:o);
   fields.page_number=String(index+1).padStart(2,'0');
   return {design,role,copy:{headline:fields.headline,body,fields,contentRole:page.contentRole || (role==='comparison'?'narrative':undefined)},page:fields.page_number};
 }

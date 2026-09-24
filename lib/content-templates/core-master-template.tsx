@@ -142,6 +142,24 @@ function clean(value: unknown) {
  * preview, raster and Fabric so no renderer invents or drops copy independently. */
 function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: MasterAsset): FabricObjectJson[] {
   const original = design.canvasJson?.objects || [];
+  // A portrait retained without outpainting is an editorial photo, not a
+  // letterboxed full-bleed background. Shared by preview, export and editor.
+  const portrait=original.find(o=>o.data?.role==='image_main');
+  if(primary?.compositionFit==='contain' && portrait && finite(primary.width)>0 && finite(primary.height)>finite(primary.width)) {
+    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
+    const photoW=Math.min(510,870*finite(primary.width)/finite(primary.height));
+    const photoH=photoW*finite(primary.height)/finite(primary.width);
+    const text=(role:string,left:number,top:number,w:number,h:number,size:number,value:string):FabricObjectJson=>({type:'Textbox',left:left*sx,top:top*sy,width:w*sx,height:h*sy,fontSize:size*sy,lineHeight:1.28,fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,fill:'#101313',text:value,data:{role,fitText:true}});
+    const body=(copy.body||[]).filter(Boolean);
+    return [
+      {type:'Rect',left:0,top:0,width,height,fill:'#f8f6ef'},
+      ...original.filter(o=>['brand_logo','page_number'].includes(o.data?.role||'')).map(o=>({...o,fill:'#101313'})),
+      {...portrait,left:(48+(510-photoW)/2)*sx,top:220*sy,width:photoW*sx,height:photoH*sy,scaleX:1,scaleY:1},
+      text('headline',604,220,428,340,66,copy.headline||''),
+      text('body',604,605,428,510,32,body.join('\n\n')),
+      ...(copy.fields?.cta?[text('cta',48,1190,984,96,34,copy.fields.cta)]:[]),
+    ];
+  }
   if(primary?.compositionFit==='contain' && original.some(o=>o.data?.role==='bottom_gradient')) {
     const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
     return original.map(o=>o.data?.role==='image_main'?{...o,left:0,top:0,width:1080*sx,height:700*sy,scaleX:1,scaleY:1}

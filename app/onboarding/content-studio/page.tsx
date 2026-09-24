@@ -542,7 +542,7 @@ export default function ContentStudioPage() {
     return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
-  const compositionPreviewSignature=JSON.stringify(['preview-pairing-v1',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
+  const compositionPreviewSignature=JSON.stringify(['preview-copy-layout-v2',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
     visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
   useEffect(()=>{
@@ -560,8 +560,9 @@ export default function ContentStudioPage() {
     const mode=selected.production.compositionMode==='ai'?'ai':'original';
     let assets=setCompositionMode((selected.production.assets||[]) as ProjectAsset[],mode);
     let missing:Array<{page:string;reason:string}>=[];
+    let previewCopy:Record<string,any>={};
     const save=async(status:string)=>{
-      const ok=await saveProject({production:{...selected.production,assets,styleCompositionPreparation:{signature,status,issues,missing}}},status==='ready'?'三頁風格示範已準備；正式製作會重用合適構圖。':status==='needs_attention'?'部分預覽未完成，請重試或指定合適圖片。':'正在準備風格示範，原圖及已有成果會保留。');
+      const ok=await saveProject({production:{...selected.production,assets,previewCopy,styleCompositionPreparation:{signature,status,issues,missing}}},status==='ready'?'三頁風格示範已準備；未延伸的原圖會使用圖文分區。':status==='needs_attention'?'部分預覽未完成，請重試或指定合適圖片。':'正在準備風格示範，原圖及已有成果會保留。');
       if(!ok)throw new Error('未能保存預覽進度，請重新載入後繼續。');
       setSaving(true);
     };
@@ -576,6 +577,7 @@ export default function ContentStudioPage() {
         if(payload.continue){setMessage(`正在分析圖片 ${payload.completed}/${payload.total}…`);continue;}
         if(payload.revision!==savedRevisionRef.current[selected.id])throw new Error('配圖期間專案已更新，請重新載入，已有成果會保留。');
         assets=assets.map(asset=>({...asset,previewPageIds:payload.assets.find((a:ProjectAsset)=>a.id===asset.id)?.previewPageIds||[]}));
+        previewCopy=payload.previewCopy||{};
         missing=payload.missing||[];paired=true;break;
       }
       if(!paired)throw new Error('圖片分析未完成，請按重試繼續已保存進度。');
@@ -585,7 +587,7 @@ export default function ContentStudioPage() {
         import('@/lib/style-preview-composition'),import('@/lib/style-preview-pages'),import('@/lib/content-templates/core-master-template'),import('@/lib/optimize-carousel-assets'),
       ]);
       const {previewAssets}=await import('@/lib/preview-asset-selection');
-      const pages=(selected.production.pages||[]) as Record<string,any>[];
+      const pages=((selected.production.pages||[]) as Record<string,any>[]).map(p=>({...p,...previewCopy[String(p.page)]}));
       const frames=visibleDisplayStyles.flatMap(style=>stylePreviewPages(pages).flatMap(sample=>{
         const input=previewComposition(style.core?.templates?.[0]?.version.contract,sample.page,sample.sourceIndex,pages.length);
         if(!input.design)return [];
@@ -656,11 +658,14 @@ export default function ContentStudioPage() {
     return preferred.map((asset) => asset.url).filter((url): url is string => typeof url === "string" && Boolean(url));
   }, [selected?.production]);
   const renderStylePreview = (code: string, expanded = false) => {
+    if(isClearMagazineCarousel(code) && !Object.keys((selected?.production?.previewCopy as object)||{}).length){
+      return <div role="status" style={{padding:24,minHeight:280,background:'#f8f6ef'}}>正在準備封面、內文及收尾嘅完整預覽；未完成內容唔會當成成品顯示。</div>;
+    }
     const props: StylePreviewProps = {
       angle: brief.angle,
       summary: brief.summary,
       storyPages: Array.isArray(selected?.production?.pages)
-        ? selected.production.pages as Array<Record<string, unknown>>
+        ? (selected.production.pages as Array<Record<string, unknown>>).map(p=>({...p,...((selected.production?.previewCopy as Record<string,object>|undefined)?.[String(p.page)]||{})}))
         : [],
       brandName: workspace?.brandName || workspace?.name || "BRAND",
       imageUrls: previewImageUrls,
