@@ -1,5 +1,6 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
-import { randomUUID } from 'node:crypto';
+import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
+import { runDraftStep, draftAnthropic, DraftStepError } from '@/lib/draft-generation-step';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context';
 import { cookies } from "next/headers";
@@ -14,7 +15,7 @@ import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-
 import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 type VisualAsset = Record<string, unknown> & {
   id?: string;
@@ -40,73 +41,6 @@ function parseJson(text: unknown) {
   }
 }
 
-async function analyzeVisualAssets(apiKey: string, assets: VisualAsset[]) {
-  const pending = assets.filter((asset) => asset.id && asset.url && !asset.visualAnalysis).slice(0, 10);
-  if (!pending.length) return assets;
-
-  try {
-    const content: Array<Record<string, unknown>> = [{
-      type: "text",
-      text: "逐張分析以下圖片。分析必須只根據畫面，不可從檔名猜測。",
-    }];
-    const supportedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-    const downloaded = await Promise.all(pending.map(async (asset) => {
-      try {
-        const response = await fetch(String(asset.url), { signal: AbortSignal.timeout(8_000) });
-        if (!response.ok) return null;
-        const mediaType = (response.headers.get("content-type") || "").split(";")[0];
-        if (!supportedTypes.has(mediaType)) return null;
-        const buffer = Buffer.from(await response.arrayBuffer());
-        return buffer.byteLength <= 8_000_000 ? { asset, mediaType, buffer } : null;
-      } catch {
-        return null;
-      }
-    }));
-    let totalBytes = 0;
-    for (const item of downloaded) {
-      if (!item || totalBytes + item.buffer.byteLength > 18_000_000) continue;
-      const { asset, mediaType, buffer } = item;
-      totalBytes += buffer.byteLength;
-      content.push({ type: "text", text: `ASSET_ID: ${asset.id}\nFILENAME: ${asset.filename || "unknown"}` });
-      content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: buffer.toString("base64") } });
-    }
-    if (content.length === 1) return assets;
-    content.push({
-      type: "text",
-      text: [
-        "只輸出 JSON，不要加解釋。每張圖片都要用 ASSET_ID 對應。",
-        "subject 是主要畫面主體；objects 是可見的重要物件；scene 是場景；action 是正在發生的動作；visibleText 是清楚可辨認的文字。",
-        "relationship 只可為 brand_product、competitor_or_comparison、process、people_or_lifestyle、place、information、unknown。",
-        "contentUses 說明適合支持哪些內容意圖，例如產品特色、製作過程、口味、比較、人物體驗、店舖資料。distinctiveCues 寫出可區分相似圖片的視覺線索。",
-        "background 只描述主體外圍背景；cutoutSuitability 只可為 high、medium、low，純色或乾淨淺色背景且主體輪廓完整為 high，複雜場景或主體被遮擋為 low。",
-        '{"assets":[{"id":"","subject":"","objects":[],"scene":"","action":"","visibleText":[],"relationship":"unknown","contentUses":[],"distinctiveCues":[],"background":"","cutoutSuitability":"high|medium|low"}]}',
-      ].join("\n"),
-    });
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: anthropicModel(process.env.ANTHROPIC_PRODUCT_MODEL || process.env.ANTHROPIC_CONTENT_MODEL),
-        max_tokens: 2400,
-        temperature: 0,
-        system: "You are a visual asset librarian. Return valid JSON only.",
-        messages: [{ role: "user", content }],
-      }),
-      signal: AbortSignal.timeout(28_000),
-    });
-    const data = await response.json();
-    if (!response.ok) return assets;
-    const text = Array.isArray(data.content)
-      ? data.content.filter((item: { type?: string }) => item.type === "text").map((item: { text?: string }) => item.text || "").join("\n")
-      : "";
-    const parsed = parseJson(text);
-    const analyses = new Map((Array.isArray(parsed.assets) ? parsed.assets : []).map((item: Record<string, unknown>) => [String(item.id || ""), item]));
-    return assets.map((asset) => analyses.has(String(asset.id)) ? { ...asset, visualAnalysis: analyses.get(String(asset.id)) } : asset);
-  } catch (error) {
-    console.warn("[content-projects/generate-drafts] visual analysis skipped", error);
-    return assets;
-  }
-}
 
 export async function POST(req: Request) {
   let generationId = "";
@@ -138,7 +72,7 @@ export async function POST(req: Request) {
 
     const { data: project, error } = await access.admin
       .from("content_projects")
-      .select("id,title,source_note,brief,production,prompt_version_id,selected_format,format_decision")
+      .select("id,title,source_note,brief,production,prompt_version_id,selected_format,format_decision,updated_at")
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -190,7 +124,10 @@ export async function POST(req: Request) {
       ? applyCoreTemplateStructure(baseStructure, templateContract)
       : baseStructure;
     const assets: VisualAsset[] = project.production.assets || [];
-    const analyzedAssets = isVideo ? assets : await analyzeVisualAssets(apiKey, assets);
+    const scope={admin:access.admin,workspaceId,projectId,actorId:user.id};
+    const preparation=isVideo ? {done:true,assets,completed:0,total:0} : await prepareDraftAssets(scope,apiKey,assets);
+    if(!preparation.done || body.phase==='assets') return NextResponse.json({continue:true,phase:preparation.done?'drafts':'assets',completed:preparation.completed,total:preparation.total},{status:202});
+    const analyzedAssets = preparation.assets;
     const { data: contentPreferences } = await access.admin
       .from("content_preferences").select("content_mood")
       .eq("workspace_id", workspaceId).maybeSingle();
@@ -258,7 +195,9 @@ export async function POST(req: Request) {
       "\n【SOON Style 製作規格】\n" + contentStylePromptFromDecision(project.format_decision, project.selected_format),
       "\n【Project】\n" + project.title,
       "Brief：" + JSON.stringify(project.brief || {}),
-      "已選內容風格：" + JSON.stringify(project.format_decision || {}),
+      // The complete contract contains renderer geometry and examples, not draft instructions.
+      // Production rules are already included above; do not send the full snapshot twice.
+      "已選內容風格：" + JSON.stringify({name:project.format_decision?.templateName,code:project.format_decision?.templateCode}),
       (isVideo ? "已確認短片劇本：" : "已確認故事結構：") + JSON.stringify(structure),
       isVideo ? "參考圖片素材：" + JSON.stringify(analyzedAssets) : "圖片素材及畫面分析（必須用 asset id 引用）：" + JSON.stringify(analyzedAssets),
       "圖片必須按每頁主題及畫面用途配對，不可按照上載次序機械分配。",
@@ -270,18 +209,8 @@ export async function POST(req: Request) {
       "鏡頭／頁數及次序必須與已確認結構一致。不要新增未經核實的事實；除非來源明確支持，不能把受推薦、最受歡迎或最多人選擇寫成事實。",
       isVideo ? "以已確認短片結構為事實依據，按選定風格調整開場、對白及視覺節奏；不得新增痛點、功效、親身經驗或使用場景。" : "",
     ].join("\n");
-    generationId = randomUUID();
     generationAdmin = access.admin;
-    const {error:recordError}=await access.admin.from('content_project_generation_runs').insert({id:generationId,project_id:projectId,workspace_id:workspaceId,actor_id:user.id,status:'pending',model:anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),input:{prompt:input,style:project.format_decision}});
-    if(recordError) throw recordError;
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
+    const requestBody={
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),
         max_tokens: 6500,
         temperature: 0.25,
@@ -291,14 +220,20 @@ export async function POST(req: Request) {
           "Only source-supported facts may appear as statements. Do not invent observable details (including colours, shapes, textures, packaging), benefits, personal experience, prices, links or commercial relationships. Unconfirmed filming ideas must be clearly conditional production notes, never asserted dialogue or captions.",
         ].filter(Boolean).join("\n"),
         messages: [{ role: "user", content: input }],
-      }),
-      signal: AbortSignal.timeout(72_000),
+      };
+    const result=await runDraftStep(scope,{kind:'page-drafts-v2',request:requestBody,attempt:typeof body.attempt==='string'?body.attempt.slice(0,80):''},requestBody.model,async()=>{
+      const response=await draftAnthropic(apiKey,requestBody,150_000);
+      return {response,usage:response.usage};
+    },result=>{
+      const response=result.response as {content?:Array<{type:string;text?:string}>;stop_reason?:string};
+      const parsed=parseJson((response.content||[]).filter(part=>part.type==='text').map(part=>part.text||'').join('\n'));
+      if(response.stop_reason==='max_tokens' || !Array.isArray(parsed.pages) || !parsed.pages.length ||
+        ((fixedTemplate || isVideo) && parsed.pages.length!==structure.length) ||
+        parsed.pages.some((page:Record<string,unknown>)=>!Array.isArray(page.body) || !page.body.length || typeof page.designDirection!=='string'))
+        throw new DraftStepError('AI 草稿未完整，原有內容未有改動；請重試草稿步驟。');
     });
-    const data = await response.json();
-    const {error:outputError}=await access.admin.from('content_project_generation_runs').update({output:data,updated_at:new Date().toISOString()}).eq('id',generationId);
-    if(outputError) throw outputError;
-    if (!response.ok)
-      throw new Error(data?.error?.message || "AI request failed");
+    generationId=result.id;
+    const data = result.output.response as any;
     const text = Array.isArray(data.content)
       ? data.content
           .filter((item: any) => item.type === "text")
@@ -408,6 +343,9 @@ export async function POST(req: Request) {
       draftsGeneratedAt: new Date().toISOString(),
       draftGenerationId: generationId,
     };
+    // Do not overwrite a story or asset edit made while the AI was running.
+    const {data:fresh}=await access.admin.from('content_projects').select('updated_at').eq('id',projectId).eq('workspace_id',workspaceId).single();
+    if(!fresh || fresh.updated_at!==project.updated_at) throw new DraftStepError('生成期間內容已變更，結果已保存但未覆蓋你嘅修改。請重新確認後再繼續。',409);
     const { data: saved, error: saveError } = await access.admin
       .from("content_projects")
       .update({
@@ -417,6 +355,7 @@ export async function POST(req: Request) {
       })
       .eq("id", projectId)
       .eq("workspace_id", workspaceId)
+      .eq("updated_at",project.updated_at)
       .select("id,production,updated_at")
       .single();
     if (saveError) throw saveError;
@@ -427,8 +366,8 @@ export async function POST(req: Request) {
     console.error("[content-projects/generate-drafts]", error);
     if(generationId && generationAdmin) await generationAdmin.from("content_project_generation_runs").update({status:"failed",error:"生成未完成，請重試。",updated_at:new Date().toISOString()}).eq("id",generationId);
     return NextResponse.json(
-      { error: "未能生成逐頁文案及版面草稿", detail: String(error) },
-      { status: 500 },
+      { error: error instanceof DraftStepError ? error.message : "未能完成此步驟；已保存進度會保留，請稍後重試。", generationId: generationId || undefined },
+      { status: error instanceof DraftStepError ? error.status : 500 },
     );
   }
 }

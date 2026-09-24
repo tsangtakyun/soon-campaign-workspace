@@ -406,6 +406,7 @@ export default function ContentStudioPage() {
   const [generatingCarousel, setGeneratingCarousel] = useState(false);
   const [generatingStructure, setGeneratingStructure] = useState(false);
   const autoGenerationProjectRef = useRef<string | null>(null);
+  const draftRequestBusy = useRef(false);
   const [message, setMessage] = useState("");
   const [studioLoadError, setStudioLoadError] = useState(false);
   const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
@@ -1573,21 +1574,32 @@ export default function ContentStudioPage() {
     if (confirmed) setMessage("圖片素材已確認，下一步可用真實素材比較內容風格");
   }
 
-  async function generatePageDrafts() {
+  async function generatePageDrafts(attempt = "") {
     if (!workspaceId || !selected) return;
+    if (draftRequestBusy.current) return;
+    draftRequestBusy.current = true;
     setSaving(true);
-    setMessage("AI 正在生成逐頁文案、圖片配對及版面草稿…");
+    setMessage("步驟 1/2：正在準備圖片分析，已完成結果會自動重用…");
     try {
-      const response = await fetch("/api/content-projects/generate-drafts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId, projectId: selected.id }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok)
-        throw new Error(
-          payload?.detail || payload?.error || "未能生成逐頁草稿",
-        );
+      let phase = "assets";
+      let payload: any;
+      // Each request completes at most one image analysis or the draft step.
+      for (let step = 0; step < 200; step++) {
+        const response = await fetch("/api/content-projects/generate-drafts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ workspaceId, projectId: selected.id, phase, attempt }),
+        });
+        payload = await response.json().catch(() => null);
+        if (!response.ok)
+          throw new Error(payload?.error || "未能生成逐頁草稿");
+        if (!payload?.continue) break;
+        phase = payload.phase;
+        setMessage(phase === "assets"
+          ? `步驟 1/2：圖片分析已保存 ${payload.completed}/${payload.total}，正在處理下一張…`
+          : "步驟 2/2：圖片分析已完成並保存，正在生成文案及配圖草稿（最多約 150 秒）…");
+      }
+      if (!payload?.project) throw new Error("已保存進度，請再按一次繼續剩餘步驟。");
       setProjects((current) =>
         current.map((item) =>
           item.id === selected.id ? { ...item, ...payload.project } : item,
@@ -1598,6 +1610,7 @@ export default function ContentStudioPage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能生成逐頁草稿");
     } finally {
+      draftRequestBusy.current = false;
       setSaving(false);
     }
   }
@@ -1611,7 +1624,7 @@ export default function ContentStudioPage() {
       "重新生成會取代目前全部逐頁草稿，包括你已作出的修改。確定繼續？",
     );
     if (!confirmed) return;
-    await generatePageDrafts();
+    await generatePageDrafts(crypto.randomUUID());
   }
 
   function updatePageDraft(index: number, field: string, value: unknown) {
