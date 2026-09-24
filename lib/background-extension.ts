@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { fetchSafeExternal } from './safe-external-url';
 
-export const EXTENSION_VERSION = 'extend-frame-vertical-v2';
+export const EXTENSION_VERSION = 'extend-boundary-verified-v3';
 export async function loadExtensionSource(url: string) {
   const response = await fetchSafeExternal(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) throw new Error('Source unavailable');

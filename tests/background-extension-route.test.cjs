@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 async function main(){
- let authorized=true,quota=true,paid=0,finished=0,record=null;const files=new Map(),queries=[];
+ let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true;const files=new Map(),queries=[];
  const workspaceId='11111111-1111-4111-a111-111111111111',projectId='22222222-2222-4222-a222-222222222222';
  const admin={from:table=>{let op='read',value,filters=[];const result=()=>{
    queries.push({table,op,filters});
@@ -14,6 +14,7 @@ async function main(){
    getPublicUrl:path=>({data:{publicUrl:`https://storage.example/${path}`}})
  })}};
  const deps={
+  '@/lib/extension-quality':{boundarySchema:{safeParse:v=>({success:!!v}),parse:v=>v},boundariesSafe:v=>v.safe,qualityApproved:v=>v?.approved===true,inspectExtensionBoundaries:async()=>({output:{safe:boundarySafe},usage:{totalTokens:10}}),reviewExtension:async()=>({output:{approved:reviewSafe},usage:{totalTokens:10}}),extensionPrompt:()=> 'background only'},
   '@/lib/platform-access':{requireWorkspaceUser:async(id,permission)=>{assert.equal(id,workspaceId);assert.equal(permission,'canEdit');return authorized?{access:{admin,user:{id:'actor'}}}:{error:new Response('',{status:403})}},consumeApiQuota:async()=>quota},
   '@/lib/oauth-connections':{isUuid:v=>typeof v==='string'&&/^[0-9a-f-]{36}$/.test(v)},
   '@/lib/background-extension':{EXTENSION_VERSION:'test',loadExtensionSource:async()=>Buffer.from('original'),prepareExtension:async()=>({canvas:Buffer.from('canvas'),mask:Buffer.from('mask'),width:640,height:800,originalHeight:360}),finishExtension:async()=>{finished++;return Buffer.from('final-original-preserved')}},
@@ -33,6 +34,13 @@ async function main(){
  assert.ok(!queries.some(q=>q.table==='content_projects'&&q.op!=='read'),'generation must not modify project');
  assert.equal((await (await post()).json()).cached,true);assert.equal(paid,1);
  record.status='failed';const recovered=await post();assert.equal(recovered.status,200);assert.equal(paid,1,'recover uploaded output without paying again');
+ record=null;files.clear();boundarySafe=false;
+ assert.equal((await post()).status,422);assert.equal(paid,1,'unsafe edge must not call image generator');assert.equal(record.output.rejected,true);
+ assert.equal((await post()).status,422);assert.equal(paid,1,'rejected cache must not retry');
+ record=null;files.clear();boundarySafe=true;reviewSafe=false;
+ assert.equal((await post()).status,422);assert.equal(paid,2);assert.equal(record.output.rejected,true);
+ assert.equal(files.size,1,'rejected raw retained but no final output published');
+ assert.equal((await post()).status,422);assert.equal(paid,2,'duplicate subject rejection never regenerates automatically');
  console.log('PASS: authentication, quota, workspace scope, pre-call record, masks, persistence, cache/recovery and no project mutation');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

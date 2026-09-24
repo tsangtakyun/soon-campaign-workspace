@@ -1459,7 +1459,11 @@ export default function ContentStudioPage() {
     const response = await fetch('/api/content-projects/extend-background', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId, placement }), signal: AbortSignal.timeout(175_000) });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error || '延伸未完成，原圖未改動。');
+    if (!response.ok) {
+      const error = new Error(payload?.error || '延伸未完成，原圖未改動。') as Error & {code?:string};
+      error.code=payload?.code;
+      throw error;
+    }
     return payload as import('@/lib/extension-asset').ExtensionPreview;
   }
 

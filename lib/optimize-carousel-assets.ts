@@ -22,7 +22,14 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
     const advice = compositionAdvice({...size, frame:item.frame, textZones:item.textZones, analysis, documentary:false});
     if (advice.action !== 'extend' || !advice.placement) continue;
     actions.progress(`正在為 ${item.page} ${advice.title}，完成後才會製作圖片…`);
-    const preview = await actions.generate(asset.id, advice.placement);
+    let preview: ExtensionPreview;
+    try { preview = await actions.generate(asset.id, advice.placement); }
+    catch(error) {
+      if((error as {code?:string})?.code!=='EXTENSION_REJECTED')throw error;
+      actions.progress(`${item.page} 延伸未通過檢查，保留原圖。`);
+      prepared.set(asset.id,{...asset,autoExtensionDeclinedUrl:asset.url});
+      continue;
+    }
     prepared.set(asset.id, applyExtension({...asset,...size}, preview));
   }
   return assets.map(asset => prepared.get(asset.id)!);
