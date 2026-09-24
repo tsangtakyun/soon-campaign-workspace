@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { validExtensionPlacement } from '@/lib/extension-geometry';
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireWorkspaceUser, consumeApiQuota } from '@/lib/platform-access';
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   let stage='prepare', metadata: Record<string, any> = {};
   try {
     const { workspaceId, projectId, assetId, placement = { aspectRatio: .8, topFraction: 0 } } = await request.json().catch(() => ({}));
-    if (!placement || !Number.isFinite(placement.aspectRatio) || placement.aspectRatio < .25 || placement.aspectRatio > 2 || !Number.isFinite(placement.topFraction) || placement.topFraction < 0 || placement.topFraction > 1) return reply({ error: 'Invalid placement' }, 400);
+    if (!validExtensionPlacement(placement)) return reply({ error: 'Invalid placement' }, 400);
     if (!isUuid(workspaceId) || !isUuid(projectId) || typeof assetId !== 'string' || !assetId || assetId.length > 200) return reply({ error: 'Invalid request' }, 400);
     const auth = await requireWorkspaceUser(workspaceId, 'canEdit');
     if (auth.error) return auth.error;
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
     const bytes = await loadExtensionSource(new URL(asset.url, request.url).toString());
     const plan = await prepareExtension(bytes, placement);
-    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${model}:${EXTENSION_VERSION}:${placement.aspectRatio}:${placement.topFraction}:`).update(bytes).digest('hex');
+    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${model}:${EXTENSION_VERSION}:${placement.aspectRatio}:${placement.topFraction}:${placement.leftFraction ?? .5}:${placement.expansion ?? 1}:`).update(bytes).digest('hex');
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const { data: old, error: lookupError } = await admin.from(table).select('status,output,updated_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (lookupError) return reply({ error: '生成紀錄暫時不可用。' }, 503);
@@ -115,7 +116,7 @@ export async function POST(request: Request) {
       if(!qualityApproved(metadata.review))return rejectExtension();
     }
     const output = { ...metadata, id, url: bucket.getPublicUrl(path).data.publicUrl, originalUrl: asset.url, width: plan.width, height: plan.height,
-      originalHeight: plan.originalHeight, originalTop: plan.originalTop, placement, model, usage, estimatedCostUsd: null, costBasis: 'Provider usage retained; monetary cost not estimated', kind: EXTENSION_VERSION, createdAt: updatedAt };
+      originalWidth: plan.originalWidth, originalLeft: plan.originalLeft, originalHeight: plan.originalHeight, originalTop: plan.originalTop, placement, model, usage, estimatedCostUsd: null, costBasis: 'Provider usage retained; monetary cost not estimated', kind: EXTENSION_VERSION, createdAt: updatedAt };
     stage='persist_result';
     let saved = await admin.from(table).update({ status: 'ready', output, updated_at: new Date().toISOString() }).eq('id', id);
     if (saved.error) saved = await admin.from(table).update({ status: 'ready', output, updated_at: new Date().toISOString() }).eq('id', id);
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const diagnostic=generationError(error,stage);
     if (runId && admin) await admin.from(table).update({ status: 'failed', error: `${stage}: ${diagnostic.name} ${diagnostic.statusCode||''}`,output:{...metadata,failures:[...(metadata.failures||[]),diagnostic]}, updated_at: new Date().toISOString() }).eq('id', runId);
-    if (error instanceof Error && error.message === 'NOT_LANDSCAPE') return reply({ error: '此圖與目標圖片框不適用垂直延伸，請保留原圖或改用圖文分區。' }, 422);
+    if (error instanceof Error && ['NO_EXTENSION_NEEDED', 'EXTENSION_TOO_LARGE', 'INVALID_PLACEMENT'].includes(error.message)) return reply({ error: '此構圖不需要延伸或超出安全延伸範圍；原圖及母版保留。' }, 422);
     console.error('[extend-background]',{runId,...diagnostic});
     return reply({ code:'EXTENSION_FAILED',runId,stage,error: '背景延伸未完成，原圖未改動。可重試本頁，或保留原圖繼續。' }, 502);
   }

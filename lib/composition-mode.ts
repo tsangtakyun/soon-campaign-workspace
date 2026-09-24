@@ -2,6 +2,7 @@ import type { CropRect, SubjectFocus } from './subject-crop';
 
 export type CompositionMode = 'original' | 'ai';
 export type CompositionVariant = {
+  policyVersion?: string;
   sourceUrl: string;
   action: 'extend' | 'contain' | 'keep';
   reason: string;

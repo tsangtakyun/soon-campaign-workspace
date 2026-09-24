@@ -542,7 +542,7 @@ export default function ContentStudioPage() {
     return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
-  const compositionPreviewSignature=JSON.stringify(['preview-master-authority-v3',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
+  const compositionPreviewSignature=JSON.stringify(['preview-master-authority-four-edges-v4',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
     visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
   useEffect(()=>{

@@ -14,6 +14,7 @@ async function main(){
    getPublicUrl:path=>({data:{publicUrl:`https://storage.example/${path}`}})
  })}};
  const deps={
+  '@/lib/extension-geometry':require('./ts-loader.cjs').load('lib/extension-geometry.ts'),
   '@/lib/generation-error':{generationError:(e,stage)=>({stage,name:e.name,statusCode:e.statusCode||null,message:e.message})},
   '@/lib/extension-quality':{boundarySchema:{safeParse:v=>({success:!!v}),parse:v=>v},boundariesSafe:v=>v.safe,qualityApproved:v=>v?.approved===true,inspectExtensionBoundaries:async()=>{if(boundaryThrows)throw Object.assign(Error('provider unavailable'),{name:'AI_APICallError',statusCode:503});return {output:{safe:boundarySafe},usage:{totalTokens:10}}},reviewExtension:async()=>({output:{approved:reviewSafe},usage:{totalTokens:10}}),extensionPrompt:()=> 'background only'},
   '@/lib/platform-access':{requireWorkspaceUser:async(id,permission)=>{assert.equal(id,workspaceId);assert.equal(permission,'canEdit');return authorized?{access:{admin,user:{id:'actor'}}}:{error:new Response('',{status:403})}},consumeApiQuota:async()=>quota},

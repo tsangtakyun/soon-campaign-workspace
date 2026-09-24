@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function compile(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
-const {compositionAdvice}=compile('lib/composition-advice.ts',{'./subject-crop':compile('lib/subject-crop.ts')});
+const {compositionAdvice}=compile('lib/composition-advice.ts',{'./subject-crop':compile('lib/subject-crop.ts'),'./extension-geometry':compile('lib/extension-geometry.ts')});
 const input={width:1600,height:900,frame:{x:0,y:0,width:1080,height:1350},textZones:[{x:0,y:920,width:1080,height:350}],documentary:false,
  analysis:{focus:{x:.5,y:.5,width:.2,height:.4},label:'熊',reason:'動物',cached:false,background:{downwardExtension:'safe',reason:'水面'}}};
 assert.equal(compositionAdvice(input).action,'extend');
@@ -20,4 +20,9 @@ const narrow=compositionAdvice({...input,analysis:both,frame:{x:0,y:0,width:500,
 assert.equal(narrow.action,'extend');assert.equal(narrow.placement.aspectRatio,500/1350);
 assert.ok(narrow.placement.topFraction>0 && narrow.placement.topFraction<1,'balance subject in narrow frame');
 assert.ok(compositionAdvice({...input,width:640,height:360}).reason.includes('唔會令原圖變高清'));
+const portrait={...input,width:600,height:1000,frame:{x:0,y:0,width:1080,height:620},textZones:[],analysis:{...input.analysis,background:{downwardExtension:'uncertain',leftwardExtension:'safe',rightwardExtension:'safe',reason:'background'}}};
+const horizontal=compositionAdvice(portrait);
+assert.equal(horizontal.action,'extend');assert.equal(horizontal.placement.expansion,1);
+assert.ok(horizontal.placement.leftFraction>0&&horizontal.placement.leftFraction<1);
+assert.equal(compositionAdvice({...portrait,analysis:{...portrait.analysis,background:{downwardExtension:'uncertain',leftwardExtension:'uncertain',rightwardExtension:'uncertain',reason:'unknown'}}}).action,'review');
 console.log('PASS: safe extension, documentary/complex/unknown fallbacks, crop, missing dimensions, actual text overlap and unsupported frame');

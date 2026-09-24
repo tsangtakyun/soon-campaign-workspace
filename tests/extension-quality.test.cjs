@@ -4,7 +4,7 @@ const box={exports:{},AbortSignal,require:n=>n==='ai'?{generateText:async args=>
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/extension-quality.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);
 const {boundariesSafe,qualityApproved,extensionPrompt}=box.exports;
 const edge={safe:true,subjectTouchesEdge:false,environment:'observed mixed shoreline',continuation:'Continue left bank on left and ripples on right'};
-const plan={confidence:'high',subjects:'main subject',top:{...edge},bottom:{...edge}};
+const plan={confidence:'high',subjects:'main subject',top:{...edge},bottom:{...edge},left:{...edge},right:{...edge}};
 const geometry={width:640,height:800,originalTop:0,originalHeight:360};
 assert.equal(boundariesSafe(plan,geometry),true);
 assert.equal(boundariesSafe({...plan,confidence:'medium'},geometry),false);
@@ -12,6 +12,10 @@ assert.equal(boundariesSafe({...plan,bottom:{...edge,subjectTouchesEdge:true}},g
 assert.equal(boundariesSafe({...plan,top:{...edge,safe:false}},geometry),true,'unused edge does not block downward extension');
 assert.equal(boundariesSafe({...plan,top:{...edge,safe:false}},{...geometry,originalTop:100}),false);
 assert.equal(boundariesSafe(null,geometry),false);
+const horizontal={width:900,height:800,originalWidth:400,originalHeight:800,originalLeft:250,originalTop:0};
+assert.equal(boundariesSafe(plan,horizontal),true);
+assert.equal(boundariesSafe({...plan,left:{...edge,subjectTouchesEdge:true}},horizontal),false);
+assert.equal(boundariesSafe({...plan,right:{...edge,safe:false}},horizontal),false);
 const review={confidence:'high',addedSubject:false,duplicatedSubject:false,unnaturalReflection:false,environmentMatches:true,seamNatural:true,reason:'checked'};
 assert.equal(qualityApproved(review),true);
 for(const key of ['addedSubject','duplicatedSubject','unnaturalReflection'])assert.equal(qualityApproved({...review,[key]:true}),false);

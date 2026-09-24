@@ -15,5 +15,11 @@ const {optimizeCarouselAssets}=load('lib/optimize-carousel-assets.ts',{'./compos
  assert.equal(issues.length,1);assert.equal(issues[0].code,'COMPOSITION_NEEDS_REVIEW');assert.equal(calls,0);
  issues=[];await optimizeCarouselAssets(result,frames,actions);assert.equal(issues.length,1,'cached contain is not success');
  issues=[];await optimizeCarouselAssets(result.map(a=>({...a,autoExtensionDeclinedUrl:a.url})),frames,actions);assert.equal(issues.length,0,'explicit original acceptance is respected');
+ let analyses=0;
+ const old=result.map(a=>({...a,compositionVariants:Object.fromEntries(Object.entries(a.compositionVariants).map(([k,v])=>[k,{...v,policyVersion:undefined}]))}));
+ const refreshed=await optimizeCarouselAssets(old,frames,{...actions,analyze:async()=>{analyses++;return {focus:null}}});
+ assert.equal(analyses,1,'old unresolved geometry is reanalyzed once');
+ await optimizeCarouselAssets(refreshed,frames,{...actions,analyze:async()=>{analyses++;return {focus:null}}});
+ assert.equal(analyses,1,'current unresolved result is cached without repeated analysis');
  console.log('PASS: role copy budgets, incomplete/unsupported and cached outcomes remain needs-review, explicit acceptance');
 })().catch(e=>{console.error(e);process.exitCode=1});

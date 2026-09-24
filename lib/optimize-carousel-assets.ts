@@ -23,11 +23,11 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
     const key=compositionKey(item.frame,item.textZones);
     const variant=asset.compositionVariants?.[key];
     const unresolved=(message:string)=>actions.failure?.({page:item.page,assetId:asset.id,message,code:'COMPOSITION_NEEDS_REVIEW',stage:'composition',compositionKey:key});
-    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url){
+    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url && (variant.action!=='contain' || variant.policyVersion==='four-edges-v4' || asset.autoExtensionDeclinedUrl===asset.url)){
       if(variant.action==='contain' && asset.autoExtensionDeclinedUrl!==asset.url)unresolved('此圖片尚未配合母版；請換圖或明確確認保留原圖。');
       continue;
     }
-    const record=(value:Omit<CompositionVariant,'sourceUrl'>)=>prepared.set(asset.id,{...prepared.get(asset.id)!,compositionVariants:{...prepared.get(asset.id)?.compositionVariants,[key]:{...value,sourceUrl:asset.url}}});
+    const record=(value:Omit<CompositionVariant,'sourceUrl'>)=>prepared.set(asset.id,{...prepared.get(asset.id)!,compositionVariants:{...prepared.get(asset.id)?.compositionVariants,[key]:{...value,sourceUrl:asset.url,policyVersion:'four-edges-v4'}}});
     if(asset.autoExtensionDeclinedUrl===asset.url){
       if(asset.compositionMode==='ai')record({action:'contain',reason:'用家已選擇保留原圖。'});
       continue;

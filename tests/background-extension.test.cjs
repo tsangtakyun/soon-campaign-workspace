@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),sharp=require('sharp');
 function compile(file,deps={}){const box={exports:{},Buffer,require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,box);return box.exports;}
 async function main(){
- const lib=compile('lib/background-extension.ts',{'./safe-external-url':{}});
+ const lib=compile('lib/background-extension.ts',{'./safe-external-url':{},'./extension-geometry':compile('lib/extension-geometry.ts')});
  const source=await sharp({create:{width:640,height:360,channels:3,background:'#237abc'}}).png().toBuffer();
  const plan=await lib.prepareExtension(source);
  assert.equal(plan.width,640);assert.equal(plan.height,800);assert.equal(plan.originalHeight,360);
@@ -13,7 +13,14 @@ async function main(){
  assert.deepEqual(preserved,await sharp(source).raw().toBuffer(),'original pixels must be restored, even if model rewrites them');
  const bottom=await sharp(result).extract({left:0,top:400,width:1,height:1}).removeAlpha().raw().toBuffer();assert.deepEqual([...bottom],[255,0,0]);
  await assert.rejects(()=>lib.finishExtension(source,plan),/dimensions/);
- await assert.rejects(()=>lib.prepareExtension(generated),/NOT_LANDSCAPE/);
+ const exact=await sharp({create:{width:640,height:800,channels:3,background:'blue'}}).png().toBuffer();
+ await assert.rejects(()=>lib.prepareExtension(exact),/NO_EXTENSION_NEEDED/);
+ for(const leftFraction of [0,.5,1]) {
+  const horizontal=await lib.prepareExtension(exact,{aspectRatio:1.7,topFraction:.5,leftFraction,expansion:1.1});
+  const output=await lib.finishExtension(generated,horizontal);
+  const pixels=await sharp(output).extract({left:horizontal.originalLeft,top:horizontal.originalTop,width:horizontal.originalWidth,height:horizontal.originalHeight}).raw().toBuffer();
+  assert.deepEqual(pixels,await sharp(horizontal.original).ensureAlpha().raw().toBuffer(),'four-way output preserves original rectangle');
+ }
  const assets=compile('lib/extension-asset.ts');
  for(const topFraction of [0,.5,1]) {
   const shifted=await lib.prepareExtension(source,{aspectRatio:.5,topFraction});
