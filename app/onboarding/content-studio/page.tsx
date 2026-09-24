@@ -126,7 +126,7 @@ type CorePublishedStyle = {
     rules: Record<string, unknown>;
   };
   evidence?: { confirmedReferenceCount?: number };
-  recommendation?: { score?: number; reason?: string; angle?: string; gaps?: string[] };
+  recommendation?: { score?: number; reason?: string; angle?: string; gaps?: string[]; source?: 'layout_eligibility' };
   templates?: Array<{
     templateId: string;
     code: string;
@@ -2446,10 +2446,10 @@ export default function ContentStudioPage() {
                             ))}
                           </div>}
                           <div className="template-copy">
-                            <span>{template.code === "product-focus" ? "STYLE 02" : template.code === "ranking-review" ? "STYLE 03" : index === 0 ? "SOON 建議" : "可選風格"}</span>
+                            <span>{template.core?.recommendation?.source==='layout_eligibility' ? "版面可用" : template.code === "product-focus" ? "STYLE 02" : template.code === "ranking-review" ? "STYLE 03" : index === 0 ? "SOON 建議" : "可選風格"}</span>
                             <strong>{template.name}</strong>
                             <small>{template.note}</small>
-                            {template.core?.recommendation?.reason ? <p className="style-recommendation-reason"><b>AI 推薦原因</b>{template.core.recommendation.reason}</p> : null}
+                            {template.core?.recommendation?.reason ? <p className="style-recommendation-reason"><b>{template.core.recommendation.source==='layout_eligibility'?'版面適用說明（非內容核實）':'AI 推薦原因'}</b>{template.core.recommendation.reason}</p> : null}
                             {template.core?.recommendation?.gaps?.length ? <details><summary>製作前需補充</summary><ul>{template.core.recommendation.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></details> : null}
                             <em>{template.source === "soon_core" ? `參考 ${template.core?.evidence?.confirmedReferenceCount || 0} 個已確認案例` : "SOON 基本品牌模板"}</em>
                             <button type="button" onClick={() => setSelectedStyleCode(template.code)}>

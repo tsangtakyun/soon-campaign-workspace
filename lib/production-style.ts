@@ -5,7 +5,7 @@ export type ProductionStyle = {
   styleId: string; code: string; name: string; format: string; description: string;
   version: { id: string; number: number; ref: string; contentHash: string; rules: RecordValue };
   templates: Array<{ templateId:string; code:string; version:{ id:string; number:number; ref:string; rendererCode:string; contentHash:string; contract:RecordValue; creatorCommit?:string|null } }>;
-  recommendation?: { reason:string; angle:string; gaps:string[]; score:number };
+  recommendation?: { reason:string; angle:string; gaps:string[]; score:number; source?:'layout_eligibility' };
 }
 export type StyleResult = { id:string; registryVersion:string; contextHash:string; candidateCount:number; styles:ProductionStyle[]; emptyReason:string; outputCapability:string }
 export const object = (v:unknown):RecordValue => v && typeof v === 'object' && !Array.isArray(v) ? v as RecordValue : {}
