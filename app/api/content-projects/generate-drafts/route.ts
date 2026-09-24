@@ -1,4 +1,5 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
 import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
 import { runDraftStep, draftAnthropic, DraftStepError } from '@/lib/draft-generation-step';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -24,22 +25,6 @@ type VisualAsset = Record<string, unknown> & {
   visualAnalysis?: Record<string, unknown>;
 };
 
-function parseJson(text: unknown) {
-  const clean = String(text ?? "")
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "");
-  if (!clean) throw new Error("AI 暫未回傳草稿內容，請重新生成");
-  try {
-    return JSON.parse(clean);
-  } catch {
-    const start = clean.indexOf("{");
-    const end = clean.lastIndexOf("}");
-    if (start >= 0 && end > start)
-      return JSON.parse(clean.slice(start, end + 1));
-    throw new Error("AI response is not valid JSON");
-  }
-}
 
 
 export async function POST(req: Request) {
@@ -214,6 +199,7 @@ export async function POST(req: Request) {
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),
         max_tokens: 6500,
         temperature: 0.25,
+        output_config: { format: { type: 'json_schema', schema: draftOutputSchema } },
         system: [
           "You are SOON Content Studio. Return valid JSON only.",
           isVideo ? `The approved structure contains exactly ${structure.length} segments. Return exactly ${structure.length} pages, one per segment in the same order (S.1 through S.${structure.length}). Each page must contain a non-empty string array body and a string designDirection. Keep each approved segment's timing and purpose. Style examples and production prompts are reference material: their preferred segment count and example facts must NEVER override this approved structure or its factual limits.` : "",
@@ -221,26 +207,15 @@ export async function POST(req: Request) {
         ].filter(Boolean).join("\n"),
         messages: [{ role: "user", content: input }],
       };
-    const result=await runDraftStep(scope,{kind:'page-drafts-v2',request:requestBody,attempt:typeof body.attempt==='string'?body.attempt.slice(0,80):''},requestBody.model,async()=>{
-      const response=await draftAnthropic(apiKey,requestBody,150_000);
+    const expectedPages=(fixedTemplate || isVideo) ? structure.length : project.selected_format==='single_image' ? 1 : undefined;
+    const result=await withDraftFormatRetry(async formatAttempt=>runDraftStep(scope,{kind:'page-drafts-v3',request:requestBody,formatAttempt,attempt:typeof body.attempt==='string'?body.attempt.slice(0,80):''},requestBody.model,async()=>{
+      const response=await draftAnthropic(apiKey,requestBody,70_000);
       return {response,usage:response.usage};
     },result=>{
-      const response=result.response as {content?:Array<{type:string;text?:string}>;stop_reason?:string};
-      const parsed=parseJson((response.content||[]).filter(part=>part.type==='text').map(part=>part.text||'').join('\n'));
-      if(response.stop_reason==='max_tokens' || !Array.isArray(parsed.pages) || !parsed.pages.length ||
-        ((fixedTemplate || isVideo) && parsed.pages.length!==structure.length) ||
-        parsed.pages.some((page:Record<string,unknown>)=>!Array.isArray(page.body) || !page.body.length || typeof page.designDirection!=='string'))
-        throw new DraftStepError('AI 草稿未完整，原有內容未有改動；請重試草稿步驟。');
-    });
+      readDraftOutput(result.response,expectedPages);
+    }));
     generationId=result.id;
-    const data = result.output.response as any;
-    const text = Array.isArray(data.content)
-      ? data.content
-          .filter((item: any) => item.type === "text")
-          .map((item: any) => item.text || "")
-          .join("\n")
-      : "";
-    const drafts = parseJson(text);
+    const drafts = readDraftOutput(result.output.response,expectedPages);
     const validAssetIds = new Set(analyzedAssets.map((asset) => asset.id).filter(Boolean));
     const comparisonLanguage = /(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i;
     const validRoles = new Set(["cover", "longform", "split", "comparison", "feature", "end"]);
