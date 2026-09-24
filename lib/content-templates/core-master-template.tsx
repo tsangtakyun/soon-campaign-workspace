@@ -358,6 +358,49 @@ export function coreMasterSubjectLayout(options: {
   return Object.fromEntries(images.map(({ key, rect, asset }) => [key, subjectCrop(asset, rect, textZones)]));
 }
 
+/** Bind the same published master used by PNG rendering to editable Fabric objects. */
+export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMasterPage>[0]) {
+  const coordinate = inferCoordinateSize(options.design);
+  const sx = OUTPUT_WIDTH / coordinate.width, sy = OUTPUT_HEIGHT / coordinate.height;
+  const crops = coreMasterSubjectLayout(options);
+  const objects: Record<string, unknown>[] = [];
+  const visit = (items: FabricObjectJson[], prefix: string, ox = 0, oy = 0) => items.forEach((object, index) => {
+    if (object.visible === false) return;
+    const id = `${prefix}-${index}`, role = clean(object.data?.role).toLowerCase();
+    const type = clean(object.type).toLowerCase();
+    const left = ox + finite(object.left) * sx, top = oy + finite(object.top) * sy;
+    let width = Math.max(1, finite(object.width, 1) * finite(object.scaleX, 1) * sx);
+    let height = Math.max(1, finite(object.height, 1) * finite(object.scaleY, 1) * sy);
+    if (type === 'group') { visit(object.objects || [], id, left, top); return; }
+    const asset = roleAsset(role, options.primary, options.secondary);
+    const logo = role === 'brand_logo' && options.branding.logoUrl;
+    const imageRole = ['image','image_main','image_left','image_right','image_secondary','secondary_image','content_image','primary_image'].includes(role);
+    // Never retain a reference/example image when a content binding has no asset.
+    if (imageRole && !asset?.url) return;
+    const src = logo || asset?.url || (type === 'image' ? object.src : null);
+    const common = {left,top,width,height,originX:'left',originY:'top',scaleX:1,scaleY:1,angle:finite(object.angle),opacity:object.opacity??1,selectable:true,evented:true};
+    if (src) {
+      if (logo) { width = Math.min(width,180); height = Math.min(Math.max(height,80),96); }
+      objects.push({...common,type:'Image',src,crossOrigin:'anonymous',width,height,
+        data:{...object.data,id,kind:'image',item:'photo',label:role || '圖片',editorImageFrame:{width,height,fit:logo || !asset || object.data?.binding==='content.asset.contain'?'contain':'cover',position:logo?'0% 50%':crops[id]?.position || asset?.position || 'center'}}});
+    } else if (['textbox','text','itext'].includes(type)) {
+      const requestedFamily = clean(object.fontFamily).toLowerCase();
+      const text = role === 'brand_logo' ? options.branding.name : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
+      objects.push({...common,type:'Textbox',text,fill:typeof object.fill==='string'?object.fill:'#171717',
+        fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
+        fontSize:Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
+        lineHeight:finite(object.lineHeight,1.16),charSpacing:finite(object.charSpacing),textAlign:object.textAlign||'left',editable:true,
+        data:{...object.data,id,kind:'text',item:'body',label:role || '文字'}});
+    } else {
+      objects.push({...common,type:'Rect',fill:object.fill || 'transparent',stroke:object.stroke,strokeWidth:finite(object.strokeWidth)*Math.min(sx,sy),rx:finite(object.rx)*sx,ry:finite(object.ry)*sy,
+        data:{...object.data,id,kind:'shape',item:'rectangle',label:role || '色塊'}});
+    }
+  });
+  visit(options.design.canvasJson?.objects || [],'master');
+  if(options.primary?.extensionOriginal || options.secondary?.extensionOriginal) objects.push({type:'Textbox',left:24,top:1310,width:220,fontSize:18,text:'AI 延伸背景',fill:'#fff',backgroundColor:'#000b',fontFamily:options.fonts.family,originX:'left',originY:'top',data:{id:'extension-label',kind:'text',item:'caption'}});
+  return {version:'7.4.0',coordinateWidth:OUTPUT_WIDTH,coordinateHeight:OUTPUT_HEIGHT,background:options.design.canvasJson?.background || '#F4F0E8',objects};
+}
+
 export function coreMasterLayoutGeometry(options: {
   design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset;
 }) {

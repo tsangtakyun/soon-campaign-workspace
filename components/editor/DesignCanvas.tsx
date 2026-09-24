@@ -25,6 +25,7 @@ type DesignCanvasProps = {
   onCloseDesignMode: () => void
   onFabricReady?: (controls: FabricControls) => void
   initialCanvasJson?: Record<string, unknown> | null
+  onElementsChange?: (elements: DesignElement[]) => void
   canvasRef: RefObject<HTMLElement | null>
 }
 
@@ -44,10 +45,12 @@ export function DesignCanvas({
   onDeselectElement,
   onFabricReady,
   initialCanvasJson,
+  onElementsChange,
   onSelectElement,
   canvasRef,
 }: DesignCanvasProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [loadError, setLoadError] = useState('')
   const loadedPostRef = useRef<string | null>(null)
   const displaySize = useMemo(() => getDisplaySize(canvasSize), [canvasSize])
   const controls = useFabricCanvas({
@@ -55,6 +58,7 @@ export function DesignCanvas({
     autosaveName: selectedPost.title,
     canvasId: 'fabric-design-canvas',
     height: displaySize.height,
+    onElementsChange,
     onSelectElement: (id) => {
       if (id) onSelectElement(id)
       else onDeselectElement()
@@ -69,8 +73,8 @@ export function DesignCanvas({
   useEffect(() => {
     if (loadedPostRef.current === selectedPost.id) return
     loadedPostRef.current = selectedPost.id
-    if (initialCanvasJson) void controls.loadCanvasJSON(initialCanvasJson)
-    else void controls.loadDesignElements(designElements)
+    const loading = initialCanvasJson ? controls.loadCanvasJSON(initialCanvasJson) : controls.loadDesignElements(designElements)
+    void loading.catch(() => setLoadError('圖層載入失敗，請返回後重新開啟；請勿儲存空白畫布。'))
   }, [controls, designElements, initialCanvasJson, selectedPost.id])
 
   useEffect(() => {
@@ -126,6 +130,7 @@ export function DesignCanvas({
 
   return (
     <section className="design-canvas-area">
+      {loadError ? <p role="alert">{loadError}</p> : null}
       <article
         className="design-canvas fabric-design-canvas-shell"
         ref={canvasRef}

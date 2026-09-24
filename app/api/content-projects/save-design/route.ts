@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     const { data: project, error: projectError } = await access.admin
       .from('content_projects')
-      .select('id,production')
+      .select('id,production,updated_at')
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
       .single()
@@ -35,6 +35,9 @@ export async function POST(req: Request) {
     const production = project.production && typeof project.production === 'object'
       ? project.production as Record<string, unknown>
       : {}
+    if (!Array.isArray(production.generatedPages) || !production.generatedPages.some((item) => item?.page === page)) {
+      return NextResponse.json({ error: '找不到要編輯的頁面，請返回內容製作重新開啟。' }, { status: 409 })
+    }
     const generatedPages = Array.isArray(production.generatedPages)
       ? production.generatedPages.map((item) => {
           if (!item || typeof item !== 'object') return item
@@ -59,12 +62,16 @@ export async function POST(req: Request) {
       },
       generatedPages,
     }
-    const { error: updateError } = await access.admin
+    const { data: updated, error: updateError } = await access.admin
       .from('content_projects')
       .update({ production: nextProduction, updated_at: new Date().toISOString(), updated_by: user.id })
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
+      .eq('updated_at', project.updated_at)
+      .select('id')
+      .maybeSingle()
     if (updateError) throw updateError
+    if (!updated) return NextResponse.json({ error: '專案剛被更新，請重試儲存。' }, { status: 409 })
     const { error: eventError } = await access.admin.from('content_preference_events').insert({
       workspace_id: workspaceId,
       content_project_id: projectId,

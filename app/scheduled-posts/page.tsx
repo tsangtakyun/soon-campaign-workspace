@@ -1177,8 +1177,10 @@ function ScheduledPostsPageContent() {
     : "cover";
   const isTemplateMaster = searchParams.get("mode") === "template-master" && Boolean(templateMasterId && templateMasterToken);
   const carouselEditorPayload = useMemo(() => readCarouselEditorPayload(), []);
-  const externalEditorReturnUrl = carouselEditorPayload?.projectId
-    ? `/onboarding/content-studio?project=${encodeURIComponent(carouselEditorPayload.projectId)}`
+  const externalProjectId = searchParams.get("projectId") || carouselEditorPayload?.projectId;
+  const layeredProject = Boolean(externalEditImage && externalProjectId && (searchParams.get("layered") === "1" || isClearMagazineCarousel(carouselEditorPayload?.templateCode)));
+  const externalEditorReturnUrl = externalProjectId
+    ? `/onboarding/content-studio?project=${encodeURIComponent(externalProjectId)}&step=carousel`
     : "/onboarding/content-studio";
   const [compact, setCompact] = useState(false);
   const fallbackScheduledPosts = useMemo(
@@ -1269,6 +1271,8 @@ function ScheduledPostsPageContent() {
   const [saveDesignMessage, setSaveDesignMessage] = useState("");
   const [masterTemplate, setMasterTemplate] = useState<MasterTemplatePayload | null>(null);
   const [masterCanvasJson, setMasterCanvasJson] = useState<Record<string, unknown> | null>(null);
+  const [projectCanvasJson, setProjectCanvasJson] = useState<Record<string, unknown> | null>(null);
+  const [projectEditorError, setProjectEditorError] = useState("");
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<
     string | null
@@ -1396,7 +1400,7 @@ function ScheduledPostsPageContent() {
   }, [autoOpenDesign, brandKitLoading, designMode, selectedPost]);
 
   useEffect(() => {
-    if (!externalEditImage || selectedPost) return;
+    if (!externalEditImage || selectedPost || layeredProject) return;
     const externalPost: ScheduledPost = {
       id: `carousel-${externalEditPage}`,
       type: "靜態圖片",
@@ -1438,7 +1442,29 @@ function ScheduledPostsPageContent() {
     externalEditPage,
     externalEditTitle,
     selectedPost,
+    layeredProject,
   ]);
+
+  useEffect(() => {
+    if (!layeredProject || !activeWorkspaceId || !externalProjectId) return;
+    let cancelled = false;
+    setProjectEditorError("");
+    void fetch(`/api/content-projects/editor-document?${new URLSearchParams({ workspaceId: activeWorkspaceId, projectId: externalProjectId, page: externalEditPage })}`, { cache: "no-store" })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "未能載入圖層");
+        if (cancelled) return;
+        setProjectCanvasJson(result.canvasJson);
+        setCanvasSize({ label: "Instagram 4:5", w: result.canvasWidth || 1080, h: result.canvasHeight || 1350 });
+        const id = `carousel-${externalProjectId}-${externalEditPage}`;
+        setSelectedPost({ id, type: "靜態圖片", time: "", title: `${externalEditPage} · ${externalEditTitle}`, body: "", image: externalEditImage!, status: "草稿" });
+        setDesignElements([]);
+        setDesignElementsPostId(id);
+        setSelectedElementId(null);
+        setDesignMode(true);
+      }).catch(error => { if (!cancelled) setProjectEditorError(error instanceof Error ? error.message : "未能載入圖層"); });
+    return () => { cancelled = true; };
+  }, [layeredProject, activeWorkspaceId, externalProjectId, externalEditPage, externalEditTitle, externalEditImage]);
 
   useEffect(() => {
     if (!isTemplateMaster || brandKitLoading) return;
@@ -2693,9 +2719,9 @@ function ScheduledPostsPageContent() {
       if (uploadError) throw uploadError;
       const { data: publicUrlData } = supabase.storage.from("brand-assets").getPublicUrl(storagePath);
       const imageUrl = publicUrlData.publicUrl;
-      const canvasJson = canvas.toObject(["data"]);
+      const canvasJson = { ...canvas.toObject(["data"]), coordinateWidth: canvas.width, coordinateHeight: canvas.height };
 
-      const isContentProjectDesign = Boolean(carouselEditorPayload?.projectId && externalEditImage);
+      const isContentProjectDesign = Boolean(externalProjectId && externalEditImage);
       const isMasterTemplateDesign = Boolean(isTemplateMaster && masterTemplate?.draft.id);
       const response = await fetch(
         isMasterTemplateDesign
@@ -2708,9 +2734,9 @@ function ScheduledPostsPageContent() {
           canvasWidth: canvasSize.w,
           imageUrl,
           name: selectedPost.title,
-          page: carouselEditorPayload?.page,
+          page: externalEditPage,
           postId: selectedPost.id,
-          projectId: carouselEditorPayload?.projectId,
+          projectId: externalProjectId,
           workspaceId: activeWorkspaceId,
           pageRole: isMasterTemplateDesign ? masterPage : undefined,
           previewImageUrl: isMasterTemplateDesign ? imageUrl : undefined,
@@ -2937,6 +2963,10 @@ function ScheduledPostsPageContent() {
     window.addEventListener("pointerup", onUp);
   };
 
+  if (layeredProject && !projectCanvasJson) {
+    return <main style={{ padding: 40 }}><p role={projectEditorError ? "alert" : "status"}>{projectEditorError || "正在載入可編輯圖層…"}</p><button onClick={() => window.location.reload()}>重新載入</button> <button onClick={() => router.push(externalEditorReturnUrl)}>返回內容製作</button></main>;
+  }
+
   if (selectedPost && designMode) {
     return (
       <main className="design-editor-page">
@@ -2994,7 +3024,8 @@ function ScheduledPostsPageContent() {
             canvasSize={canvasSize}
             canvasRef={canvasRef}
             designElements={designElements}
-            initialCanvasJson={isTemplateMaster ? masterCanvasJson : null}
+            initialCanvasJson={isTemplateMaster ? masterCanvasJson : layeredProject ? projectCanvasJson : null}
+            onElementsChange={layeredProject ? setDesignElements : undefined}
             onFabricReady={(controls) => {
               fabricControlsRef.current = controls;
             }}

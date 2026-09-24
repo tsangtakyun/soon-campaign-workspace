@@ -1,3 +1,18 @@
+export function resolveClearMagazineRole(draft: { headline?: string; subheadline?: string; body?: string[]; templateArtboardId?: string; assetIds?: string[]; assetId?: string; role?: string; layout?: string }, index: number, total: number): 'cover' | 'end' | 'comparison' | 'longform' | 'split' | 'feature' {
+  if (index === 0) return 'cover';
+  if (index === total - 1) return 'end';
+  const text = [draft.headline, draft.subheadline, ...(draft.body || [])].join(' ');
+  if (/(?:比較|對比|分別|不同|唔同|差異|有咩(?:唔同|不同)|\bvs\.?\b)/i.test(text)) return 'comparison';
+  const roles = { '01_COVER': 'cover', '02_FULL_BLEED_TEXT': 'longform', '03_IMAGE_TOP_TEXT_BOTTOM': 'split', '04_COMPARISON': 'comparison', '05_LEFT_TEXT_RIGHT_IMAGE': 'feature', '06_END_CTA': 'end' } as const;
+  const role = roles[draft.templateArtboardId as keyof typeof roles];
+  if (role) return role;
+  if (new Set([...(draft.assetIds || []), draft.assetId].filter(Boolean)).size > 1) return 'split';
+  if (/(?:以外|口味|選擇|值得試|功能|款式|產品|服務)/i.test(text)) return 'feature';
+  if (/(?:製作|過程|即場|步驟|如何|點樣|由.+到|開始)/i.test(text)) return 'longform';
+  const requested = String(draft.role || draft.layout || '').toLowerCase();
+  return requested === 'longform' || requested === 'split' || requested === 'feature' ? requested : 'feature';
+}
+
 export const clearMagazineCarouselV1 = {
   code: "clear-magazine-carousel-v1",
   sourceStyleCode: "clear_magazine_carousel",

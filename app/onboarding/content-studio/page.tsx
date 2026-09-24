@@ -3124,7 +3124,7 @@ export default function ContentStudioPage() {
                                                 <div className="generated-actions">
                                                   <a
                                                     className="generated-edit-button"
-                                                    href={`/onboarding/scheduled-posts?editImage=${encodeURIComponent(page.url)}&editPage=${encodeURIComponent(page.page)}&editTitle=${encodeURIComponent(selected.title || "Carousel 圖片")}`}
+                                                    href={`/onboarding/scheduled-posts?editImage=${encodeURIComponent(page.url)}&editPage=${encodeURIComponent(page.page)}&editTitle=${encodeURIComponent(selected.title || "Carousel 圖片")}&projectId=${encodeURIComponent(selected.id)}&layered=${isClearMagazineCarousel(String(selected.format_decision?.renderTemplateCode || selected.format_decision?.templateCode || "")) ? "1" : "0"}`}
                                                     onClick={() => {
                                                       const pageIndex =
                                                         Number(

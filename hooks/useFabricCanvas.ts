@@ -11,6 +11,8 @@ type FabricElementObject = FabricObject & {
     id?: string
     kind?: DesignElement['kind']
     item?: string
+    label?: string
+    editorImageFrame?: { width: number; height: number; fit: string; position: string }
   }
 }
 
@@ -21,9 +23,11 @@ type UseFabricCanvasOptions = {
   height: number
   width: number
   onSelectElement?: (id: string | null) => void
+  onElementsChange?: (elements: DesignElement[]) => void
 }
 
 const BASE_CANVAS = { width: 430, height: 538 }
+const loadedMagazineFonts = new Map<string, Promise<FontFace>>()
 
 function resolveCanvasFontFamily(value?: string) {
   if (!value || value === 'inherit') return 'SweiGothicCJKtc-Regular'
@@ -35,6 +39,14 @@ function resolveCanvasFontFamily(value?: string) {
 async function ensureCanvasFontLoaded(fontFamily: string, fontWeight: string | number = 'normal') {
   if (typeof document === 'undefined' || !document.fonts) return
   try {
+    const magazine = fontFamily === 'SOON Magazine Sans' ? 'Sans' : fontFamily === 'SOON Magazine Serif' ? 'Serif' : null
+    if (magazine) {
+      const bold = fontWeight === 'bold' || Number(fontWeight) >= 600
+      const file = `${magazine}-${bold ? magazine === 'Serif' ? 'Black' : 'Bold' : 'Regular'}.otf`
+      const key = `${fontFamily}:${fontWeight}`
+      if (!loadedMagazineFonts.has(key)) loadedMagazineFonts.set(key, new FontFace(fontFamily, `url(/fonts/magazine/${file})`, { weight: String(fontWeight) }).load())
+      document.fonts.add(await loadedMagazineFonts.get(key)!)
+    }
     await document.fonts.load(`${fontWeight} 32px "${fontFamily}"`, '繁體中文 ABC 123')
   } catch {
     // Fabric can still render with the browser fallback if a remote font is unavailable.
@@ -203,7 +215,9 @@ async function createFabricObject(element: DesignElement, size: Pick<CanvasSize,
   return attachElementData(shape, element)
 }
 
-export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, onSelectElement, width }: UseFabricCanvasOptions) {
+export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, onSelectElement, onElementsChange, width }: UseFabricCanvasOptions) {
+  const onElementsChangeRef = useRef(onElementsChange)
+  onElementsChangeRef.current = onElementsChange
   const autosaveKeyRef = useRef(autosaveKey)
   const autosaveNameRef = useRef(autosaveName)
   const autosaveTimerRef = useRef<number | null>(null)
@@ -273,6 +287,22 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
   const snapshotHistory = useCallback((canvas: Canvas) => {
     if (isRestoringRef.current) return
+    onElementsChangeRef.current?.(canvas.getObjects().map((entry, zIndex): DesignElement => {
+      const object = entry as FabricElementObject
+      const text = entry instanceof IText ? entry : null
+      const center = object.getCenterPoint()
+      const scale = elementScale({ w: canvas.width, h: canvas.height })
+      return { id: object.data?.id || `layer-${zIndex}`, kind: object.data?.kind || (text ? 'text' : entry instanceof FabricImage ? 'image' : 'shape'),
+        item: object.data?.item || (text ? 'body' : 'photo'), label: object.data?.label || text?.text || '圖層',
+        x: center.x / canvas.width * 100, y: center.y / canvas.height * 100, size: object.getScaledWidth() / scale,
+        width: object.getScaledWidth() / scale, height: object.getScaledHeight() / scale, rotation: object.angle, opacity: object.opacity * 100,
+        color: typeof object.fill === 'string' ? object.fill : '#000000', zIndex,
+        ...(text ? { textContent: text.text, fontFamily: text.fontFamily, fontSize: text.fontSize * text.scaleY / scale,
+          fontWeight: text.fontWeight === 'bold' || Number(text.fontWeight) >= 600 ? 'bold' as const : 'normal' as const,
+          fontStyle: text.fontStyle === 'italic' ? 'italic' as const : 'normal' as const, textAlign: text.textAlign as 'left' | 'center' | 'right', lineHeight: text.lineHeight } : {}),
+        ...(entry instanceof FabricImage ? { imageUrl: entry.getSrc() } : {}),
+      }
+    }))
     const json = JSON.stringify(canvas.toObject(['data']))
     const stack = historyRef.current.slice(0, historyIndexRef.current + 1)
     if (stack[stack.length - 1] === json) return
@@ -304,6 +334,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     canvas.on('object:added', onMutation)
     canvas.on('object:modified', onMutation)
     canvas.on('object:removed', onMutation)
+    canvas.on('text:changed', onMutation)
     canvas.on('selection:created', onSelection)
     canvas.on('selection:updated', onSelection)
     canvas.on('selection:cleared', () => onSelectElementRef.current?.(null))
@@ -366,11 +397,33 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const canvas = fabricRef.current
     if (!canvas) return
     isRestoringRef.current = true
-    await canvas.loadFromJSON(value)
-    canvas.getObjects().forEach((object) => applyControls(object as FabricElementObject))
-    canvas.discardActiveObject()
-    canvas.renderAll()
-    isRestoringRef.current = false
+    try {
+      const entries = (value.objects || []) as Array<{ fontFamily?: string; fontWeight?: string | number }>
+      await Promise.all(entries.filter(o => o.fontFamily).map(o => ensureCanvasFontLoaded(o.fontFamily!, o.fontWeight)))
+      await canvas.loadFromJSON(value)
+      const sx = canvas.width / (Number(value.coordinateWidth) || canvas.width)
+      const sy = canvas.height / (Number(value.coordinateHeight) || canvas.height)
+      canvas.getObjects().forEach((entry, index) => {
+        const object = entry as FabricElementObject
+        object.data = { ...object.data, id: object.data?.id || `layer-${index}` }
+        const frame = object.data.editorImageFrame
+        if (entry instanceof FabricImage && frame) {
+          const source = entry.getOriginalSize()
+          const parts = frame.position.split(/\s+/)
+          const fraction = (part?: string) => part?.endsWith('%') ? Math.max(0, Math.min(1, parseFloat(part) / 100)) : part === 'left' || part === 'top' ? 0 : part === 'right' || part === 'bottom' ? 1 : 0.5
+          const px = fraction(parts[0]), py = fraction(parts[1])
+          const ratio = frame.fit === 'contain' ? Math.min(frame.width / source.width, frame.height / source.height) : Math.max(frame.width / source.width, frame.height / source.height)
+          if (frame.fit === 'contain') entry.set({ width: source.width, height: source.height, scaleX: ratio, scaleY: ratio, left: entry.left + (frame.width - source.width * ratio) * px, top: entry.top + (frame.height - source.height * ratio) * py })
+          else entry.set({ width: frame.width / ratio, height: frame.height / ratio, scaleX: ratio, scaleY: ratio, cropX: (source.width - frame.width / ratio) * px, cropY: (source.height - frame.height / ratio) * py })
+          delete object.data.editorImageFrame
+        }
+        object.set({ left: object.left * sx, top: object.top * sy, scaleX: object.scaleX * sx, scaleY: object.scaleY * sy })
+        applyControls(object)
+        object.setCoords()
+      })
+      canvas.discardActiveObject()
+      canvas.renderAll()
+    } finally { isRestoringRef.current = false }
     snapshotHistory(canvas)
   }, [snapshotHistory])
 
@@ -398,20 +451,27 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
 
     if (changes.imageUrl && object.type === 'image') {
       const replacement = await FabricImage.fromURL(changes.imageUrl, { crossOrigin: 'anonymous' })
+      const center = object.getCenterPoint()
+      const index = canvas.getObjects().indexOf(object)
+      const ratio = Math.max(object.getScaledWidth() / replacement.width, object.getScaledHeight() / replacement.height)
+      const cropWidth = object.getScaledWidth() / ratio, cropHeight = object.getScaledHeight() / ratio
       replacement.set({
         angle: object.angle,
         data: object.data,
-        left: object.left,
+        left: center.x,
         opacity: object.opacity,
         originX: 'center',
         originY: 'center',
-        scaleX: object.scaleX,
-        scaleY: object.scaleY,
-        top: object.top,
+        cropX: (replacement.width - cropWidth) / 2,
+        cropY: (replacement.height - cropHeight) / 2,
+        width: cropWidth, height: cropHeight,
+        scaleX: ratio,
+        scaleY: ratio,
+        top: center.y,
       })
       applyControls(replacement as FabricElementObject)
       canvas.remove(object)
-      canvas.add(replacement)
+      canvas.insertAt(index, replacement)
       canvas.setActiveObject(replacement)
       canvas.renderAll()
       return
@@ -420,7 +480,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     const nextProps: Record<string, unknown> = {}
     if (changes.rotation !== undefined) nextProps.angle = changes.rotation
     if (changes.color !== undefined && object.type !== 'image') nextProps.fill = changes.color
-    if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize
+    if (changes.fontSize !== undefined) nextProps.fontSize = changes.fontSize * elementScale(sizeRef.current) / object.scaleY
     if (changes.fontFamily !== undefined || changes.fontWeight !== undefined) {
       const fontFamily = resolveCanvasFontFamily(changes.fontFamily || String(object.get('fontFamily') || ''))
       const fontWeight = changes.fontWeight || String(object.get('fontWeight') || 'normal')
@@ -433,7 +493,7 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     if (changes.lineHeight !== undefined) nextProps.lineHeight = changes.lineHeight
     if (changes.opacity !== undefined) nextProps.opacity = changes.opacity / 100
     if (changes.textAlign !== undefined) nextProps.textAlign = changes.textAlign
-    if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current)
+    if (changes.width !== undefined) nextProps.width = changes.width * elementScale(sizeRef.current) / object.scaleX
 
     if (changes.textContent !== undefined && 'text' in object) {
       object.set({ text: changes.textContent })
@@ -448,7 +508,8 @@ export function useFabricCanvas({ autosaveKey, autosaveName, canvasId, height, o
     }
     object.setCoords()
     canvas.requestRenderAll()
-  }, [])
+    snapshotHistory(canvas)
+  }, [snapshotHistory])
 
   const deleteSelected = useCallback(() => {
     const canvas = fabricRef.current
