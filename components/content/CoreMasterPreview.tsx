@@ -10,9 +10,10 @@ import type { FocusAsset, SubjectFocus } from '@/lib/subject-crop';
 import { findBrandTypeface, readerFacingCopy, localTypefaceFiles } from '@/lib/content-branding';
 import { stylePreviewPages } from '@/lib/style-preview-pages';
 import { previewComposition } from '@/lib/style-preview-composition';
+import { previewAssets } from '@/lib/preview-asset-selection';
 
 type Page = Record<string, unknown>;
-type Asset = FocusAsset & { id?: string; url: string; assignedPage?: string; isCover?: boolean; sourceType?: string };
+type Asset = FocusAsset & { id?: string; url: string; assignedPage?: string; isCover?: boolean; sourceType?: string; previewPageIds?:string[] };
 
 export function CoreMasterPreview({ contract, pages, assets, brandName, branding, onExpand, onSaveFocus, onAnalyzeFocus, extensionActions, saving }: {
   contract: unknown; pages: Page[]; assets: Asset[]; brandName: string;
@@ -66,8 +67,8 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
   const sourceIndex = sample.sourceIndex;
   const pageId = String(page.page || `P.${sourceIndex + 1}`);
   const {design,role,copy} = previewComposition(contract,page,sourceIndex,pages.length);
-  const assigned = assets.filter(asset => asset.assignedPage === pageId);
-  const primary = assigned[0] || (role === 'cover' ? assets.find(asset => asset.isCover && !asset.assignedPage) : undefined);
+  const assigned = previewAssets(assets,pageId,role==='cover');
+  const primary = assigned[0];
   const {fields,body}=copy;
   fields['asset.credit'] = primary?.sourceType === 'ai_generated' ? 'AI 生成素材' : '';
   fields['asset.secondary.credit'] = assigned[1]?.sourceType === 'ai_generated' ? 'AI 生成素材' : '';
@@ -78,7 +79,7 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
   const primaryFrame = geometry?.images.find(image => image.asset === primary)?.rect;
   return <section className="master-preview" data-preview-version="three-samples-v3">
     <div ref={frame} style={{ width: '100%', aspectRatio: '4 / 5', overflow: 'hidden', position: 'relative', background: '#f4f0e8' }}>
-      {design ? <div style={{ width: 1080, height: 1350, transform: `scale(${width / 1080})`, transformOrigin: 'top left' }}>
+      {!primary ? <div role="status" style={{padding:24,color:'#665b53',height:'100%',display:'grid',alignContent:'center',textAlign:'center'}}><strong>預覽圖片尚未配對完成</strong><p>正在準備或等待合適圖片；這不是生成完成的圖片。</p></div> : design ? <div style={{ width: 1080, height: 1350, transform: `scale(${width / 1080})`, transformOrigin: 'top left' }}>
         {renderCoreMasterPage({ design, copy, page: fields.page_number,
           primary, secondary: assigned[1], branding: { name: brandName, logoUrl: branding?.logoUrl },
           fonts: { family: activeFont || 'SOON Preview Sans', editorialFamily: activeFont || 'SOON Preview Serif' } })}

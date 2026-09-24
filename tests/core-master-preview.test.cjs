@@ -39,7 +39,7 @@ assert.equal(branding.resolveContentBranding({logo_url:'/custom.png'},null,'Egg.
 pages[0].copyDirection='副題點明：這不是網絡迷因，而是美國國家公園每年舉辦的正式網上投票比賽。棕熊參賽，公眾投票，選出年度最胖冠軍。';
 const actualProjectPreview=render(0,true,eggBrand);
 assert.ok(actualProjectPreview.includes('/brand-assets/eggsoon/soon-egg.png'));
-assert.ok(actualProjectPreview.includes('棕熊參賽，公眾投票，選出年度最胖冠軍。'));
+assert.ok(!actualProjectPreview.includes('棕熊參賽，公眾投票，選出年度最胖冠軍。'),'copyDirection is not finished copy');
 assert.ok(!actualProjectPreview.includes('副題點明'));
 assert.ok(actualProjectPreview.includes('three-samples-v3'));
 console.log('PASS: workspace/kit priority, logo rendering, font aliases, optional subtitle and editorial instruction filtering');

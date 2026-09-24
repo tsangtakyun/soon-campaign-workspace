@@ -15,10 +15,9 @@ export function previewComposition(contract: unknown, page: Record<string,any>, 
     if(Array.isArray(o.objects))clean(o.objects);
   });
   if(design)clean(design.canvasJson?.objects||[]);
-  const text=readerFacingCopy(page.copyDirection);
-  const paragraphs=text.split(/\n+/).filter(Boolean),sentences=text.match(/[^。！？]+[。！？]?/gu)||[];
-  const short=sentences.find(line=>[...line].length<=24);
-  const body=Array.isArray(page.body)?page.body.map(readerFacingCopy):role==='cover'?(short?[short]:[]):paragraphs.length>1?paragraphs:sentences;
+  // copyDirection is an editor's brief, not finished copy. Before drafts exist,
+  // show the approved headline only rather than guessing which sentence is copy.
+  const body=Array.isArray(page.body)?page.body.map(readerFacingCopy):[];
   fields.headline=readerFacingCopy(page.headline);
   fields.body=body.join('\n');
   body.forEach((line:string,n:number)=>{fields[`body_${n+1}`]=line;});

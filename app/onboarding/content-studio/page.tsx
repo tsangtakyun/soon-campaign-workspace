@@ -32,6 +32,7 @@ import {
 import { createClient } from "@/lib/supabase";
 
 type ProjectAsset = {
+  previewPageIds?: string[];
   compositionMode?: CompositionMode;
   compositionVariants?: Record<string,CompositionVariant>;
   compositionFit?: 'contain';
@@ -541,11 +542,11 @@ export default function ContentStudioPage() {
     return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
-  const compositionPreviewSignature=JSON.stringify([selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
+  const compositionPreviewSignature=JSON.stringify(['preview-pairing-v1',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
     visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
   useEffect(()=>{
-    if(activeStep!=='style'||isShortVideo||saving||loadingStyles||selected?.production?.compositionMode!=='ai'||!visibleDisplayStyles.length)return;
+    if(activeStep!=='style'||isShortVideo||saving||loadingStyles||!selected?.production||!visibleDisplayStyles.length)return;
     const previous=selected.production.styleCompositionPreparation as {signature?:string}|undefined;
     if(previous?.signature===compositionPreviewSignature||previewAttemptRef.current===compositionPreviewSignature)return;
     previewAttemptRef.current=compositionPreviewSignature;
@@ -556,24 +557,41 @@ export default function ContentStudioPage() {
     if(!selected?.production||preparingImages.current)return;
     preparingImages.current=true;setSaving(true);
     const issues:OptimizationIssue[]=[];
-    let assets=setCompositionMode((selected.production.assets||[]) as ProjectAsset[],'ai');
+    const mode=selected.production.compositionMode==='ai'?'ai':'original';
+    let assets=setCompositionMode((selected.production.assets||[]) as ProjectAsset[],mode);
+    let missing:Array<{page:string;reason:string}>=[];
     const save=async(status:string)=>{
-      const ok=await saveProject({production:{...selected.production,assets,styleCompositionPreparation:{signature,status,issues}}},status==='ready'?'三頁風格示範已準備；正式製作會重用合適構圖。':'正在準備風格示範，原圖及已有成果會保留。');
+      const ok=await saveProject({production:{...selected.production,assets,styleCompositionPreparation:{signature,status,issues,missing}}},status==='ready'?'三頁風格示範已準備；正式製作會重用合適構圖。':status==='needs_attention'?'部分預覽未完成，請重試或指定合適圖片。':'正在準備風格示範，原圖及已有成果會保留。');
       if(!ok)throw new Error('未能保存預覽進度，請重新載入後繼續。');
       setSaving(true);
     };
     try {
       await save('processing');
+      let paired=false;
+      for(let attempt=0;attempt<assets.length+2;attempt++){
+        setMessage('正在分析圖片並配對封面、內文及收尾…');
+        const response=await fetch('/api/content-projects/preview-assets',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,projectId:selected.id})});
+        const payload=await response.json();
+        if(!response.ok)throw new Error(payload.error||'預覽配圖未完成');
+        if(payload.continue){setMessage(`正在分析圖片 ${payload.completed}/${payload.total}…`);continue;}
+        if(payload.revision!==savedRevisionRef.current[selected.id])throw new Error('配圖期間專案已更新，請重新載入，已有成果會保留。');
+        assets=assets.map(asset=>({...asset,previewPageIds:payload.assets.find((a:ProjectAsset)=>a.id===asset.id)?.previewPageIds||[]}));
+        missing=payload.missing||[];paired=true;break;
+      }
+      if(!paired)throw new Error('圖片分析未完成，請按重試繼續已保存進度。');
+      await save('processing');
+      if(mode!=='ai'){await save(missing.length?'needs_attention':'ready');return;}
       const [{previewComposition},{stylePreviewPages},{coreMasterLayoutGeometry},{optimizeCarouselAssets}]=await Promise.all([
         import('@/lib/style-preview-composition'),import('@/lib/style-preview-pages'),import('@/lib/content-templates/core-master-template'),import('@/lib/optimize-carousel-assets'),
       ]);
+      const {previewAssets}=await import('@/lib/preview-asset-selection');
       const pages=(selected.production.pages||[]) as Record<string,any>[];
       const frames=visibleDisplayStyles.flatMap(style=>stylePreviewPages(pages).flatMap(sample=>{
         const input=previewComposition(style.core?.templates?.[0]?.version.contract,sample.page,sample.sourceIndex,pages.length);
         if(!input.design)return [];
         const pageId=String(sample.page.page||`P.${sample.sourceIndex+1}`);
-        const assigned=assets.filter(a=>a.assignedPage===pageId);
-        const primary=assigned[0]||(input.role==='cover'?assets.find(a=>a.isCover&&!a.assignedPage):undefined);
+        const assigned=previewAssets(assets,pageId,input.role==='cover');
+        const primary=assigned[0];
         const geometry=coreMasterLayoutGeometry({...input,primary,secondary:assigned[1],planning:true});
         return geometry.images.flatMap(image=>{
           const asset=assets.find(a=>a.url===image.asset.url);
@@ -582,8 +600,8 @@ export default function ContentStudioPage() {
       }));
       assets=await optimizeCarouselAssets(assets,frames,{analyze:analyzeAssetFocus,generate:generateBackgroundExtension,dimensions:compositionDimensions,progress:setMessage,
         failure:issue=>issues.push(issue),checkpoint:async next=>{assets=next;await save('processing');}});
-      await save(issues.length?'needs_attention':'ready');
-    } catch(error){setMessage(error instanceof Error?error.message:'風格構圖未完成，可繼續保留原圖或重試。');}
+      await save(issues.length||missing.length||!frames.length?'needs_attention':'ready');
+    } catch(error){await save('needs_attention').catch(()=>{});setMessage(error instanceof Error?error.message:'風格構圖未完成，可繼續保留原圖或重試。');}
     finally{preparingImages.current=false;setSaving(false);}
   }
 
@@ -2420,7 +2438,7 @@ export default function ContentStudioPage() {
                       <b>{selected.production?.compositionMode==='ai'?'AI 智能構圖':selected.production?.compositionMode==='original'?'原圖創作':'尚未選擇圖片製作方式'}</b>
                       <p>{saving?'正在準備構圖，完成的結果會逐張保存。':'只示範封面、內文、收尾；正式製作會再按各頁圖片框及文字位置檢查。'}</p>
                       <button type="button" disabled={saving} onClick={()=>goToStep('assets')}>更改製作方式</button>
-                      {selected.production?.compositionMode==='ai' && (selected.production.styleCompositionPreparation as {status?:string}|undefined)?.status!=='ready'?<button type="button" disabled={saving} onClick={()=>void prepareStyleCompositions(compositionPreviewSignature)}>繼續／重試預覽構圖</button>:null}
+                      {(selected.production?.styleCompositionPreparation as {status?:string}|undefined)?.status!=='ready'?<button type="button" disabled={saving} onClick={()=>void prepareStyleCompositions(compositionPreviewSignature)}>繼續／重試預覽配圖及構圖</button>:null}
                     </section>:null}
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {

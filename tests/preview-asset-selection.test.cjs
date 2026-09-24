@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const {load}=require('./ts-loader.cjs');
+const {previewAssets}=load('lib/preview-asset-selection.ts');
+const assets=[{id:'cover',url:'cover',assignedPage:'auto',isCover:true},{id:'detail',url:'detail',assignedPage:'auto',previewPageIds:['P.2','P.7']}];
+assert.equal(previewAssets(assets,'P.1',true)[0].id,'cover');
+assert.equal(previewAssets(assets,'P.2',false)[0].id,'detail');
+assert.equal(previewAssets(assets,'P.7',false)[0].id,'detail');
+assert.equal(previewAssets(assets,'P.3',false).length,0,'never fill with upload-order image');
+assert.equal(previewAssets([...assets,{id:'manual',url:'manual',assignedPage:'P.1'}],'P.1',true)[0].id,'manual');
+assert.equal(previewAssets([{...assets[0],assignedPage:'P.5'}],'P.1',true).length,0);
+const {previewComposition}=load('lib/style-preview-composition.ts',{'./content-templates/core-master-template':{getCoreMasterPageDesign:()=>null}});
+const preview=previewComposition({}, {headline:'Approved headline',copyDirection:'語氣保持克制，不作肯定結論。'},0,3);
+assert.equal(preview.copy.body.length,0,'editorial instructions are not preview copy');
+assert.equal(preview.copy.headline,'Approved headline');
+console.log('PASS: auto cover, semantic bindings, manual priority, missing-image state, no editorial copy leakage');
