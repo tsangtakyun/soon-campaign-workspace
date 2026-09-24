@@ -3,7 +3,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import {CoreCatalogExample} from '@/components/content/CoreCatalogExample';
 import {imageStudioSteps,imageStep,imageLatestStep} from '@/lib/studio-flow';
-import {magazineCopyIssues} from '@/lib/magazine-copy-policy';
+import {productionCopyIssues} from '@/lib/magazine-copy-policy';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
 import { CompositionModeChoice } from '@/components/content/CompositionModeChoice';
@@ -1835,7 +1835,8 @@ export default function ContentStudioPage() {
     setEditingDraft(null);
   }
 
-  async function confirmPageDrafts(optimizeBackground = false, retryPage?: string) {
+  async function confirmPageDrafts(optimizeBackground = false, retryPage?: string, currentProject = selected):Promise<void> {
+    const selected=currentProject;
     if (preparingImages.current || saving) return;
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
@@ -1849,31 +1850,32 @@ export default function ContentStudioPage() {
     }
     const requiredRoles = coreTemplatePageRoles(selected.format_decision?.templateContractSnapshot);
     if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
-      const copyLimits = (selected.format_decision?.templateContractSnapshot as { copy_limits?: { headline_chars_zh_max?: number; body_chars_zh_max_per_block?: number } })?.copy_limits;
-      const maxHeadline = Number(copyLimits?.headline_chars_zh_max || 24);
-      const maxBody = Number(copyLimits?.body_chars_zh_max_per_block || 72);
       const actualRoles = selected.production.pageDrafts.map((draft: any) => String(draft.role || draft.layout || ""));
       if (actualRoles.length !== requiredRoles.length || requiredRoles.some((item, index) => item.role !== actualRoles[index])) {
         setMessage("逐頁草稿與已選標準母版的六頁角色不一致，請重新生成。");
         return;
       }
+      if(selected.production.pageDrafts.some((draft:any)=>productionCopyIssues(draft,selected.format_decision?.templateContractSnapshot).length)){
+        preparingImages.current=true;setSaving(true);
+        setMessage('AI 正在自動精簡文案並檢查母版字數，完成後會繼續製作；圖片及已完成進度保留…');
+        let fitted:typeof selected|null=null;
+        try{
+          const response=await fetch('/api/content-projects/generate-drafts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,projectId:selected.id,phase:'repair-copy',attempt:crypto.randomUUID()})});
+          const data=await response.json();
+          if(!response.ok)throw new Error(data.error||'文案自動精簡暫未完成，進度已保留。');
+          if(data.project){
+            setProjects(items=>items.map(item=>item.id===selected.id?{...item,...data.project}:item));
+            if(data.success)fitted={...selected,...data.project};
+          }
+          if(!data.success)setMessage(data.message||'文案精簡暫未完成，圖片及進度保留。');
+        }catch(error){setMessage(error instanceof Error?error.message:'文案自動精簡暫未完成，進度已保留。');}
+        finally{preparingImages.current=false;setSaving(false);}
+        if(fitted)await confirmPageDrafts(optimizeBackground,retryPage,fitted);
+        return;
+      }
       for (const [index, draft] of selected.production.pageDrafts.entries()) {
-        const copyIssues=selected.production.copyReview ? magazineCopyIssues(draft as Record<string,any>) : [];
-        if(copyIssues.length){
-          goToStep('drafts');setEditingDraft(index);
-          setMessage(`P.${index+1} 尚需修改：${copyIssues.join('；')}。已保留所有圖片及其他頁面，修改並儲存本頁即可繼續。`);
-          return;
-        }
-        const headlineLength = Array.from(String(draft.headline || "").replace(/\s+/g, "")).length;
-        const bodyLines = Array.isArray(draft.body) ? draft.body : [];
         const assetIds = Array.isArray(draft.assetIds) ? draft.assetIds.filter(Boolean) : draft.assetId ? [draft.assetId] : [];
         const requiredImages = actualRoles[index] === "comparison" && hasComparisonColumns(draft) ? 2 : 1;
-        if (headlineLength > maxHeadline || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > maxBody)) {
-          goToStep('drafts');
-          setEditingDraft(index);
-          setMessage(`已開啟 P.${index + 1} 修改：標題最多 ${maxHeadline} 字、每段正文 ${maxBody} 字。圖片及其餘頁面已保留，儲存本頁後繼續，毋須重新生成。`);
-          return;
-        }
         if (assetIds.length < requiredImages) {
           setMessage(`P.${index + 1} 尚欠${requiredImages === 2 ? "兩張比較" : "一張"}圖片，補齊後才可製作。`);
           return;

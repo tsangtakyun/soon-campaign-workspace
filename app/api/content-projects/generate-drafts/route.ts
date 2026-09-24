@@ -1,4 +1,5 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
+import {repairMagazineCopy} from '@/lib/repair-magazine-copy';
 import {magazineCopyInstruction,magazineCopyIssues} from '@/lib/magazine-copy-policy';
 import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
 import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
@@ -29,7 +30,6 @@ type VisualAsset = Record<string, unknown> & {
 
 
 export async function POST(req: Request) {
-  const startedAt=Date.now();
   let generationId = "";
   let generationAdmin: SupabaseClient | null = null;
   try {
@@ -100,6 +100,22 @@ export async function POST(req: Request) {
         { error: "AI service is not configured" },
         { status: 500 },
       );
+
+    // Separate request budget: existing drafts can be fitted without redoing
+    // image analysis, matching, or successful production work.
+    if(body.phase==='repair-copy'){
+      const contract=project.format_decision?.templateContractSnapshot;
+      if(isVideo||!isFixedCoreTemplate(contract)||!Array.isArray(project.production.pageDrafts))
+        return NextResponse.json({error:'目前沒有可精簡的母版草稿。'},{status:400});
+      const result=await repairMagazineCopy({admin:access.admin,workspaceId,projectId,actorId:user.id},apiKey,anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),project.production.pageDrafts,contract,typeof body.attempt==='string'?body.attempt.slice(0,80):'');
+      const production={...project.production,pageDrafts:result.pages,copyReview:result.issues};
+      const {data:saved,error:saveError}=await access.admin.from('content_projects').update({production,updated_at:new Date().toISOString(),updated_by:user.id})
+        .eq('id',projectId).eq('workspace_id',workspaceId).eq('updated_at',project.updated_at).select('id,production,updated_at').maybeSingle();
+      if(saveError)throw saveError;
+      if(!saved)throw new DraftStepError('內容在精簡期間有修改；未覆蓋你的修改，請再按製作。',409);
+      return NextResponse.json({success:!result.issues.length,project:saved,needsReview:result.issues.length>0,
+        message:result.issues.length?'AI 暫未能將部分文案整理至母版限制；原有圖片及進度保留，尚未製圖。可稍後重試或選擇檢視文案。':undefined});
+    }
 
     const baseStructure = isVideo && Array.isArray(project.production.script) && project.production.script.length
       ? project.production.script
@@ -303,23 +319,8 @@ export async function POST(req: Request) {
           };
       return { ...draft, role, layout: role, templateArtboardId: artboardByRole[role], assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
     });
-    // Repair only invalid copy. Never regenerate images, reset successful pages,
-    // or trust the repair model to change roles and asset assignments.
-    if(!isVideo&&isClearMagazine){
-      const invalid=normalizedPages.map((page:Record<string,any>,index:number)=>({index,page,issues:magazineCopyIssues(page)})).filter((p:{issues:string[]})=>p.issues.length);
-      if(invalid.length&&Date.now()-startedAt<120_000){
-        try{
-          const repairBody={...requestBody,max_tokens:4000,messages:[{role:'user',content:[magazineCopyInstruction,'只修訂下列頁面的文案及comparisonLabels。保持原意、歸因與事實，不新增資料；只回傳這些頁面，次序不變。captionDraft留空。原稿及問題：',JSON.stringify(invalid)].join('\n')}]};
-          const repaired=await runDraftStep(scope,{kind:'magazine-copy-repair-v1',draftGenerationId:generationId,pages:invalid},requestBody.model,async()=>{const response=await draftAnthropic(apiKey,repairBody,45_000);return {response,usage:response.usage};},r=>{readDraftOutput(r.response,invalid.length);});
-          const pages=readDraftOutput(repaired.output.response,invalid.length).pages;
-          for(const [n,item]of invalid.entries()){
-            const p=pages[n];
-            if(p.page!==item.page.page)continue;
-            normalizedPages[item.index]={...normalizedPages[item.index],headline:p.headline,subheadline:p.subheadline||'',body:p.body,comparisonLabels:p.comparisonLabels||[]};
-          }
-        }catch(error){console.warn('[magazine-copy] repair deferred; original drafts preserved',error instanceof Error?error.name:'error');}
-      }
-    }
+    // Save drafts first. The production action fits invalid copy in a separate
+    // request so generation time cannot consume the repair timeout budget.
     const copyReview=!isVideo&&isClearMagazine?normalizedPages.flatMap((page:Record<string,any>,index:number)=>{const issues=magazineCopyIssues(page);return issues.length?[{page:`P.${index+1}`,issues}]:[];}):[];
     const production = {
       ...project.production,

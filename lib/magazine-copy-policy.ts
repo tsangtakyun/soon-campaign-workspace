@@ -23,3 +23,15 @@ export function magazineCopyIssues(page:Record<string,any>):string[] {
   }
   return issues;
 }
+
+/** The same gate is used before rendering and when validating AI repairs. */
+export function productionCopyIssues(page:Record<string,any>, contract:any):string[] {
+  const issues=magazineCopyIssues(page);
+  const headline=Number(contract?.copy_limits?.headline_chars_zh_max||24);
+  const body=Number(contract?.copy_limits?.body_chars_zh_max_per_block||72);
+  if(length(page.headline)>headline)issues.push(`母版標題最多${headline}字`);
+  (Array.isArray(page.body)?page.body:[]).forEach((s:unknown,i:number)=>{
+    if(Array.from(String(s||'')).length>body)issues.push(`母版正文${i+1}最多${body}字（包括空格及換行）`);
+  });
+  return issues;
+}
