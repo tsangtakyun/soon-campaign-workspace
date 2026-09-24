@@ -1,7 +1,7 @@
 /** Normalized source-image coordinates; x/y are the centre of the protected area. */
 export type SubjectFocus = { x: number; y: number; width: number; height: number; sourceWidth?: number; sourceHeight?: number };
 export type CropRect = { x: number; y: number; width: number; height: number };
-export type FocusAsset = { width?: number; height?: number; subjectFocus?: SubjectFocus | null; position?: string; extensionOriginal?: { url: string }; extensionId?: string; autoExtensionDeclinedUrl?: string; compositionFit?: 'contain' };
+export type FocusAsset = import('./composition-mode').CompositionAsset & { position?: string; autoExtensionDeclinedUrl?: string };
 const clamp = (v: number, low = 0, high = 1) => Math.max(low, Math.min(high, v));
 export function validSubjectFocus(value: unknown): value is SubjectFocus {
   const f = value as SubjectFocus | null;

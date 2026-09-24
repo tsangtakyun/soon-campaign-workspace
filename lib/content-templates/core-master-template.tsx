@@ -1,6 +1,8 @@
 import React from "react";
 import { readerFacingCopy } from '../content-branding';
 import { subjectCrop, type FocusAsset, type CropRect } from '../subject-crop';
+import { compositionKey, resolveComposition } from '../composition-mode';
+import { hasComparisonColumns } from '../content-page-semantics';
 
 export type CoreMasterRole = "cover" | "longform" | "split" | "comparison" | "feature" | "end";
 
@@ -55,6 +57,8 @@ type CoreMasterContract = {
 };
 
 type MasterCopy = {
+  compositionMode?: 'original' | 'ai';
+  contentRole?: string;
   headline?: string;
   subheadline?: string;
   body?: string[];
@@ -138,7 +142,7 @@ function clean(value: unknown) {
  * preview, raster and Fabric so no renderer invents or drops copy independently. */
 function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: MasterAsset): FabricObjectJson[] {
   const original = design.canvasJson?.objects || [];
-  if(primary?.compositionFit==='contain' && original.some(o=>o.data?.role==='question_rule')) {
+  if(primary?.compositionFit==='contain' && original.some(o=>o.data?.role==='bottom_gradient')) {
     const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
     return original.map(o=>o.data?.role==='image_main'?{...o,left:0,top:0,width:1080*sx,height:700*sy,scaleX:1,scaleY:1}
       :o.data?.role==='bottom_gradient'?{...o,top:700*sy,height:650*sy,fill:'#172323'}:o);
@@ -146,7 +150,17 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: M
   // The split master has fixed semantic slots. A two-paragraph narrative must
   // not repeat its final paragraph as a source or leave a blank highlight box.
   const main=original.find(o=>o.data?.role==='image_main');
-  if(main && (copy.body?.length||0)<=2 && !copy.fields && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
+  if(primary?.compositionFit==='contain' && main && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
+    const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
+    const body=(copy.body||[]).filter(Boolean).join('\n\n');
+    const text=(role:string,top:number,h:number,size:number,value:string):FabricObjectJson=>({type:'Textbox',left:48*sx,top:top*sy,width:984*sx,height:h*sy,fontSize:size*sy,lineHeight:1.2,fill:'#101313',fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,text:value,data:{role,fitText:true}});
+    return [
+      {...main,left:0,top:0,width:1080*sx,height:620*sy,scaleX:1,scaleY:1},
+      ...original.filter(o=>['brand_logo','page_number','swipe_prompt','image_credit'].includes(o.data?.role||'')),
+      text('headline',660,150,68,copy.headline||''),text('body',840,360,34,body),
+    ];
+  }
+  if(main && (copy.body?.length||0)<=2 && !copy.fields?.highlight && !copy.fields?.source && finite(main.width)<inferCoordinateSize(design).width*.6 && original.some(o=>o.data?.role==='body_2')) {
     const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
     return original.filter(o=>!['source','highlight','highlight_box'].includes(o.data?.role||'')).map(o=>{
       const role=o.data?.role;
@@ -159,7 +173,7 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, primary?: M
   }
   if (!original.some(o => o.data?.role === 'left_row_1')) return original;
   const body=Array.isArray(copy.body)?copy.body:[];
-  const structured=Boolean(copy.fields?.left_body?.trim() && copy.fields?.right_body?.trim()) || Boolean(body.length>=4 && body[2]?.trim() && body[3]?.trim());
+  const structured=hasComparisonColumns(copy);
   const {width,height}=inferCoordinateSize(design),sx=width/1080,sy=height/1350;
   const text=(role:string,left:number,top:number,w:number,h:number,size:number,binding:string):FabricObjectJson=>({type:'Textbox',left:left*sx,top:top*sy,width:w*sx,height:h*sy,fontSize:size*sy,lineHeight:1.2,fontFamily:'SOON Magazine Sans',fontWeight:role==='headline'?700:400,fill:'#101313',data:{role,binding,fitText:true}});
   const kept=original.filter(o=>['brand_logo','page_number','image_left','image_right','image_main','image_secondary','secondary_image','swipe_prompt'].includes(o.data?.role || ''));
@@ -396,6 +410,7 @@ export function renderCoreMasterPage(options: {
   branding: MasterBranding;
   fonts: MasterFonts;
 }) {
+  options = resolveMasterComposition(options);
   const { design } = options;
   const coordinate = inferCoordinateSize(design);
   const scaleX = OUTPUT_WIDTH / coordinate.width;
@@ -427,6 +442,7 @@ export function coreMasterSubjectLayout(options: {
 
 /** Bind the same published master used by PNG rendering to editable Fabric objects. */
 export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMasterPage>[0]) {
+  options = resolveMasterComposition(options);
   const coordinate = inferCoordinateSize(options.design);
   const sx = OUTPUT_WIDTH / coordinate.width, sy = OUTPUT_HEIGHT / coordinate.height;
   const crops = coreMasterSubjectLayout(options);
@@ -469,8 +485,9 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
 }
 
 export function coreMasterLayoutGeometry(options: {
-  design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset;
+  design: CoreMasterPageDesign; copy: MasterCopy; page: string; primary?: MasterAsset; secondary?: MasterAsset; planning?: boolean;
 }) {
+  if(options.planning) options={...options,primary:options.primary?{...options.primary,compositionFit:undefined}:undefined,secondary:options.secondary?{...options.secondary,compositionFit:undefined}:undefined};
   const coordinate = inferCoordinateSize(options.design);
   const sx = OUTPUT_WIDTH / coordinate.width, sy = OUTPUT_HEIGHT / coordinate.height;
   const textZones: CropRect[] = [];
@@ -488,4 +505,15 @@ export function coreMasterLayoutGeometry(options: {
   });
   visit(pageObjects(options.design,options.copy,options.primary), 'master');
   return { images, textZones };
+}
+
+/** All three renderers bind the same persisted, frame-specific composition. */
+export function resolveMasterComposition<T extends {design:CoreMasterPageDesign;copy:MasterCopy;page:string;primary?:MasterAsset;secondary?:MasterAsset}>(options:T):T {
+  const geometry=coreMasterLayoutGeometry({...options,planning:true});
+  const resolve=(asset:MasterAsset|undefined)=>{
+    if(!asset)return asset;
+    const image=geometry.images.find(image=>image.asset.url===asset.url);
+    return resolveComposition(options.copy.compositionMode?{...asset,compositionMode:options.copy.compositionMode}:asset,image?compositionKey(image.rect,geometry.textZones):'contained-layout');
+  };
+  return {...options,primary:resolve(options.primary),secondary:resolve(options.secondary)};
 }

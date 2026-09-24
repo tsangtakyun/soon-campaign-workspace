@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-function load(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
+function load(file,deps={}){const box={exports:{},require:n=>deps[n]||require("./ts-loader.cjs").resolveImport(n,file,deps)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
 const {generationError}=load('lib/generation-error.ts');
 const diagnostic=generationError({name:'AI_APICallError',statusCode:429,responseBody:JSON.stringify({error:{code:'rate_limit',message:'retry sk-secret123 Bearer secret https://private.test/a user@test.com'}})},'boundary_analysis');
 assert.equal(diagnostic.statusCode,429);assert.equal(diagnostic.stage,'boundary_analysis');

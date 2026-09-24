@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-function load(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
+function load(file,deps={}){const box={exports:{},require:n=>deps[n]||require("./ts-loader.cjs").resolveImport(n,file,deps)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
 const brand=load('lib/content-branding.ts',{'./typefaces':load('lib/typefaces.ts')});
 const master=load('lib/content-templates/core-master-template.tsx',{'../content-branding':brand,'../subject-crop':load('lib/subject-crop.ts')});
 const contract=JSON.parse(fs.readFileSync('tests/fixtures/clear-magazine-v3.contract.json'));

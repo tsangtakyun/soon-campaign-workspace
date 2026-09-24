@@ -7,7 +7,7 @@ const { ImageResponse } = require('next/og');
 const { decompress } = require('wawoff2');
 const sharp = require('sharp');
 function compile(file, deps = {}) {
-  const box = { exports: {}, require: name => deps[name] || require(name) };
+  const box = { exports: {}, require: name => deps[name] || require("./ts-loader.cjs").resolveImport(name,file,deps) };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText, box);
   return box.exports;
 }

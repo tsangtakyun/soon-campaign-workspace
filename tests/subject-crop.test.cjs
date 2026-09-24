@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), ts = require('typescript');
-function compile(file, deps={}) { const box={exports:{},require:n=>deps[n]||require(n)}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,box); return box.exports; }
+function compile(file, deps={}) { const box={exports:{},require:n=>deps[n]||require("./ts-loader.cjs").resolveImport(n,file,deps)}; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,box); return box.exports; }
 const crop=compile('lib/subject-crop.ts');
 const frame={x:0,y:0,width:100,height:100};
 assert.equal(crop.subjectCrop({},frame).position,'center');

@@ -165,8 +165,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: '內容製作只限 Workspace Owner 或 Admin' }, { status: 403 })
     }
 
-    const { data: existing } = await access.admin.from('content_projects').select('id,title,source_note,brief,production,format_decision,selected_format').eq('id',projectId).eq('workspace_id',workspaceId).maybeSingle()
+    const { data: existing } = await access.admin.from('content_projects').select('id,title,source_note,brief,production,format_decision,selected_format,updated_at').eq('id',projectId).eq('workspace_id',workspaceId).maybeSingle()
     if (!existing) return NextResponse.json({ error:'找不到專案' },{ status:404 })
+    if(body.expectedUpdatedAt && body.expectedUpdatedAt!==existing.updated_at)return NextResponse.json({error:'專案已在另一個操作中更新。請重新載入；已保存成果不會被覆蓋。'},{status:409})
     if (body.formatDecision && typeof body.formatDecision === 'object') {
       const requested = object(body.formatDecision), old = object(existing.format_decision)
       if (requested.recommendationId) {
@@ -219,9 +220,11 @@ export async function PATCH(req: Request) {
       .update(updates)
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
+      .eq('updated_at',existing.updated_at)
       .select('id,title,stage,selected_format,brief,format_decision,production,updated_at')
-      .single()
+      .maybeSingle()
     if (error) throw error
+    if(!data)return NextResponse.json({error:'專案已更新，請重新載入後繼續。'},{status:409})
     if (updates.stage === 'archived') {
       const { error: withdrawError } = await access.admin
         .from('campaign_posts')

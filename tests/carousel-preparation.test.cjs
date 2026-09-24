@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-function compile(file,deps={}){const box={exports:{},require:n=>deps[n]||require(n)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
+function compile(file,deps={}){const box={exports:{},require:n=>deps[n]||require("./ts-loader.cjs").resolveImport(n,file,deps)};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
 const extension=compile('lib/extension-asset.ts');
 const {optimizeCarouselAssets}=compile('lib/optimize-carousel-assets.ts',{'./extension-asset':extension,'./composition-advice':{compositionAdvice:({analysis})=>({action:analysis.action,placement:{aspectRatio:.8,topFraction:.5}})}});
 async function main(){

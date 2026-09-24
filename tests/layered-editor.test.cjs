@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm'), ts = require('typescript');
 const transpile = file => ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
-function compile(file, deps = {}) { const box = { exports: {}, require: n => deps[n] || require(n) }; vm.runInNewContext(transpile(file), box); return box.exports; }
+function compile(file, deps = {}) { const box = { exports: {}, require: n => deps[n] || require("./ts-loader.cjs").resolveImport(n,file,deps) }; vm.runInNewContext(transpile(file), box); return box.exports; }
 const branding = compile('lib/content-branding.ts', { './typefaces': compile('lib/typefaces.ts') });
 const master = compile('lib/content-templates/core-master-template.tsx', { '../content-branding': branding, '../subject-crop': compile('lib/subject-crop.ts') });
 const contract = JSON.parse(fs.readFileSync('tests/fixtures/clear-magazine-v3.contract.json', 'utf8'));

@@ -181,7 +181,7 @@ export async function POST(req: Request) {
             "版面文案使用雜誌式換行建立節奏。body 每個陣列項目應是一個完整短段，段尾不要加入逗號、句號、分號或冒號；問號及感嘆號只在語意確實需要時使用。",
             "comparison 頁的 body[0]、body[1] 是左右標籤；body[2]、body[3] 分別解釋左、右兩項；如有必要，body[4] 才是簡短總結。左右內容不可合併成一段放在卡片外。",
             "comparison 頁 headline 不可包含標點；左右說明各自最多四個短句，每句獨立成行，避免段內逗號及句號。",
-            "comparison 頁必須按語意選擇兩張不同素材，assetIds 依次為左圖、右圖；右圖在內容相關的前提下，優先選擇 cutoutSuitability 為 high 的獨立產品或包裝圖片，其次才使用 medium；不可為了退地而選擇不相關圖片。不足兩張合適素材時只填合適的一張，不可隨機補圖。",
+            "最優先：每頁另回傳 contentRole，值為 narrative 或 comparison。母版的 comparison 只代表可用版型，不代表故事真的有比較。若只是介紹同一主體，contentRole=narrative、body 放一般段落、只選一張有關圖片，禁止捏造左右兩方；只有真實兩項比較才用 contentRole=comparison、左右固定欄位及兩張對應素材。",
             "split 頁只在兩張圖片分別支持兩項互補內容時使用一至兩張素材；其他頁只需一張主要素材。不可為了填滿版面而增加第二張圖片。assetId 必須等於 assetIds 第一項。",
             "split 頁 headline 不可包含標點；subheadline 必須是短 Eyebrow；body 分成兩個主要段落，每段可包含一至兩個有來源支持的短句，避免加入無資料支持的補充或免責文字。",
             "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
@@ -277,7 +277,7 @@ export async function POST(req: Request) {
         .filter((id): id is string => typeof id === "string" && validAssetIds.has(id));
       const role = templatePage.role;
       const assetIds = [...new Set(requestedIds)].slice(0, role === "comparison" || role === "split" ? 2 : 1);
-      const needsAnotherImage = role === "comparison" && assetIds.length < 2;
+      const needsAnotherImage = role === "comparison" && draft.contentRole !== 'narrative' && assetIds.length < 2;
       const assetStatus = draft.assetStatus === "missing" || assetIds.length === 0 || needsAnotherImage ? "missing" : "matched";
       const assetRequest = draft.assetRequest && typeof draft.assetRequest === "object"
         ? draft.assetRequest

@@ -19,11 +19,13 @@ import { resolveContentBranding, readerFacingCopy, findBrandTypeface, localTypef
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 import type { FocusAsset } from '@/lib/subject-crop';
 import { verifiedExtensionAssets } from '@/lib/verified-extension-assets';
+import { resolveComposition } from '@/lib/composition-mode';
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type Draft = {
+  contentRole?: string;
   page?: string;
   headline?: string;
   subheadline?: string;
@@ -234,8 +236,8 @@ async function renderPage(
               position: "absolute",
               inset: 0,
               width: "100%",
-              height: "100%",
-              objectFit: "cover",
+              height: asset.compositionFit==='contain' ? 650 : "100%",
+              objectFit: asset.compositionFit==='contain' ? "contain" : "cover",
             }
           : {
               width: "100%",
@@ -482,7 +484,7 @@ async function renderRankingReviewPage(
         src: asset.url,
         width: Math.max(1, Number(asset.width) || 1080),
         height: Math.max(1, Number(asset.height) || 780),
-        style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" },
+        style: { position: "absolute", inset: 0, width: "100%", height: asset.compositionFit==='contain'?650:"100%", objectFit: asset.compositionFit==='contain'?"contain":"cover" },
       })
     : box({ position: "absolute", inset: 0, background: "linear-gradient(145deg,#2a211b,#a35c2f 52%,#e2b663)" }, null);
   const chrome = [
@@ -630,7 +632,7 @@ async function renderClearMagazinePage(
     .map(cleanBodyLine);
   const source = asset?.url;
   const picture = (style: React.CSSProperties, url = source) => url
-    ? React.createElement("img", { src: url, width: 1080, height: 1350, style: { objectFit: "cover", ...style } })
+    ? React.createElement("img", { src: url, width: 1080, height: 1350, style: { objectFit: "cover", ...style,...(asset?.compositionFit==='contain'?{objectFit:'contain',transform:'none'}:{}) } })
     : box({ ...style, background: "#d9d4cc" }, null);
   const logo = branding.logoUrl
     ? React.createElement("img", { src: branding.logoUrl, width: 73, height: 70, style: { width: 73, height: 70, objectFit: "contain", objectPosition: "left center" } })
@@ -885,7 +887,7 @@ export async function POST(req: Request) {
       body: draft.body?.map(readerFacingCopy),
     }));
     const sourceAssets = project.production.assets || [];
-    const extensionIds = sourceAssets.filter((a:any)=>a.extensionOriginal && a.extensionId).map((a:any)=>a.extensionId);
+    const extensionIds = [...new Set(sourceAssets.flatMap((a:any)=>[a.extensionId,...Object.values(a.compositionVariants||{}).map((v:any)=>v.extensionId)].filter(Boolean)))];
     const extensionRuns = extensionIds.length ? await access.admin.from('content_project_generation_runs')
       .select('id,status,input,output').eq('workspace_id',workspaceId).eq('project_id',projectId).in('id',extensionIds) : {data:[],error:null};
     if(extensionRuns.error) throw new Error('未能核對背景延伸紀錄，已保留現有圖片，請重試。');
@@ -910,7 +912,7 @@ export async function POST(req: Request) {
     if (configuredTypeface && !fonts.hasBrandFont) {
       return NextResponse.json({ error: "品牌字型未能載入，請檢查品牌素材庫字型設定後重試；未使用其他字型代替。" }, { status: 422 });
     }
-    const uniqueAssetUrls = [...new Set(assets.map((asset) => asset.url).filter(Boolean))];
+    const uniqueAssetUrls = [...new Set(assets.flatMap(asset=>[asset.url,asset.extensionOriginal?.url,...Object.values(asset.compositionVariants||{}).filter(v=>v.sourceUrl===asset.url).map(v=>v.url)]).filter((url):url is string=>Boolean(url)))];
     const preparedImageUrls = new Map(
       await Promise.all(
         uniqueAssetUrls.map(async (url) => [url, await prepareImageSource(url)] as const),
@@ -945,23 +947,23 @@ export async function POST(req: Request) {
         ? getCoreMasterPageDesign(templateContract, role)
         : null;
       const preparedAsset = asset?.url
-        ? { ...asset, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(asset.url)
+        ? { ...asset, compositionSourceUrl:asset.url, compositionVariants:Object.fromEntries(Object.entries(asset.compositionVariants||{}).map(([k,v])=>[k,{...v,url:v.url?preparedImageUrls.get(v.url)||v.url:undefined}])), extensionOriginal:asset.extensionOriginal?{...asset.extensionOriginal,url:preparedImageUrls.get(asset.extensionOriginal.url)||asset.extensionOriginal.url}:undefined, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(asset.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(asset.url) !== preparedImageUrls.get(asset.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(asset.url)
           ? preparedCutoutUrls.get(asset.url) || preparedImageUrls.get(asset.url) || asset.url
           : preparedImageUrls.get(asset.url) || asset.url }
         : asset;
       const secondarySource = assets.find((item) => item.id === assetIds[1] && item.url);
       const secondaryAsset = secondarySource?.url
-        ? { ...secondarySource, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(secondarySource.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(secondarySource.url) !== preparedImageUrls.get(secondarySource.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(secondarySource.url)
+        ? { ...secondarySource, compositionSourceUrl:secondarySource.url, compositionVariants:Object.fromEntries(Object.entries(secondarySource.compositionVariants||{}).map(([k,v])=>[k,{...v,url:v.url?preparedImageUrls.get(v.url)||v.url:undefined}])), extensionOriginal:secondarySource.extensionOriginal?{...secondarySource.extensionOriginal,url:preparedImageUrls.get(secondarySource.extensionOriginal.url)||secondarySource.extensionOriginal.url}:undefined, isCutout: Boolean(draft.imageTreatment === "cutout" && preparedCutoutUrls.get(secondarySource.url)?.startsWith("data:image/png") && preparedCutoutUrls.get(secondarySource.url) !== preparedImageUrls.get(secondarySource.url)), url: draft.imageTreatment === "cutout" && preparedCutoutUrls.has(secondarySource.url)
           ? preparedCutoutUrls.get(secondarySource.url) || preparedImageUrls.get(secondarySource.url) || secondarySource.url
           : preparedImageUrls.get(secondarySource.url) || secondarySource.url }
         : undefined;
       const response = coreMasterDesign
         ? renderPublishedCoreMasterPage(coreMasterDesign, draft, preparedAsset, secondaryAsset, index, drafts.length, fonts, branding)
         : isClearMagazineCarousel(templateCode)
-        ? await renderClearMagazinePage(draft, preparedAsset, index, drafts.length, fonts, branding, secondaryAsset, fonts.hasBrandFont)
+        ? await renderClearMagazinePage(draft, preparedAsset?resolveComposition(preparedAsset,'contained-layout'):undefined, index, drafts.length, fonts, branding, secondaryAsset?resolveComposition(secondaryAsset,'contained-layout'):undefined, fonts.hasBrandFont)
         : templateCode === "ranking-review"
-          ? await renderRankingReviewPage(draft, preparedAsset, index, drafts.length, fonts, branding)
-        : await renderPage(draft, preparedAsset, index, fonts, branding, theme);
+          ? await renderRankingReviewPage(draft, preparedAsset?resolveComposition(preparedAsset,'contained-layout'):undefined, index, drafts.length, fonts, branding)
+        : await renderPage(draft, preparedAsset?resolveComposition(preparedAsset,'contained-layout'):undefined, index, fonts, branding, theme);
       const png = new Uint8Array(await response.arrayBuffer());
       const storagePath = `${workspaceId}/content-projects/${projectId}/carousel/p-${index + 1}-${Date.now()}.png`;
       const { error: uploadError } = await access.admin.storage

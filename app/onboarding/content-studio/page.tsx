@@ -3,6 +3,9 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
+import { CompositionModeChoice } from '@/components/content/CompositionModeChoice';
+import { setCompositionMode, type CompositionMode, type CompositionVariant } from '@/lib/composition-mode';
+import { hasComparisonColumns } from '@/lib/content-page-semantics';
 import { PageCompositionAdvisor } from '@/components/content/PageCompositionAdvisor';
 import type { SubjectFocus } from '@/lib/subject-crop';
 import type { OptimizationIssue } from '@/lib/optimize-carousel-assets';
@@ -29,6 +32,9 @@ import {
 import { createClient } from "@/lib/supabase";
 
 type ProjectAsset = {
+  compositionMode?: CompositionMode;
+  compositionVariants?: Record<string,CompositionVariant>;
+  compositionFit?: 'contain';
   extensionOriginal?: import('@/lib/extension-asset').ExtensionOriginal;
   extensionId?: string;
   autoExtensionDeclinedUrl?: string;
@@ -461,12 +467,17 @@ export default function ContentStudioPage() {
   const [promptVersion, setPromptVersion] = useState<number | null>(null);
   const [activeStep, setActiveStep] = useState<StudioStep>("brief");
   const studioLoadedRef = useRef(false);
+  const savedRevisionRef=useRef<Record<string,string>>({});
+  const previewAttemptRef=useRef('');
 
   const selected = useMemo(
     () => projects.find((project) => project.id === selectedId) || null,
     [projects, selectedId],
   );
   const isShortVideo = selected?.selected_format === "short_video";
+  useEffect(()=>{
+    if(selected && (!savedRevisionRef.current[selected.id] || Date.parse(selected.updated_at)>Date.parse(savedRevisionRef.current[selected.id])))savedRevisionRef.current[selected.id]=selected.updated_at;
+  },[selected?.id,selected?.updated_at]);
   const videoScript = useMemo(() => {
     if (!isShortVideo) return [];
     const production = selected?.production || {};
@@ -530,6 +541,60 @@ export default function ContentStudioPage() {
     return canonical;
   }, [coreStyles, selected?.selected_format, selectedFormat, videoMethod]);
   const visibleDisplayStyles = useMemo(() => displayStyles.slice(0, 3), [displayStyles]);
+  const compositionPreviewSignature=JSON.stringify([selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
+    (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
+    visibleDisplayStyles.map(s=>[s.code,s.core?.templates?.[0]?.version.contentHash])]);
+  useEffect(()=>{
+    if(activeStep!=='style'||isShortVideo||saving||loadingStyles||selected?.production?.compositionMode!=='ai'||!visibleDisplayStyles.length)return;
+    const previous=selected.production.styleCompositionPreparation as {signature?:string}|undefined;
+    if(previous?.signature===compositionPreviewSignature||previewAttemptRef.current===compositionPreviewSignature)return;
+    previewAttemptRef.current=compositionPreviewSignature;
+    void prepareStyleCompositions(compositionPreviewSignature);
+  },[activeStep,isShortVideo,saving,loadingStyles,compositionPreviewSignature]);
+
+  async function prepareStyleCompositions(signature:string) {
+    if(!selected?.production||preparingImages.current)return;
+    preparingImages.current=true;setSaving(true);
+    const issues:OptimizationIssue[]=[];
+    let assets=setCompositionMode((selected.production.assets||[]) as ProjectAsset[],'ai');
+    const save=async(status:string)=>{
+      const ok=await saveProject({production:{...selected.production,assets,styleCompositionPreparation:{signature,status,issues}}},status==='ready'?'三頁風格示範已準備；正式製作會重用合適構圖。':'正在準備風格示範，原圖及已有成果會保留。');
+      if(!ok)throw new Error('未能保存預覽進度，請重新載入後繼續。');
+      setSaving(true);
+    };
+    try {
+      await save('processing');
+      const [{previewComposition},{stylePreviewPages},{coreMasterLayoutGeometry},{optimizeCarouselAssets}]=await Promise.all([
+        import('@/lib/style-preview-composition'),import('@/lib/style-preview-pages'),import('@/lib/content-templates/core-master-template'),import('@/lib/optimize-carousel-assets'),
+      ]);
+      const pages=(selected.production.pages||[]) as Record<string,any>[];
+      const frames=visibleDisplayStyles.flatMap(style=>stylePreviewPages(pages).flatMap(sample=>{
+        const input=previewComposition(style.core?.templates?.[0]?.version.contract,sample.page,sample.sourceIndex,pages.length);
+        if(!input.design)return [];
+        const pageId=String(sample.page.page||`P.${sample.sourceIndex+1}`);
+        const assigned=assets.filter(a=>a.assignedPage===pageId);
+        const primary=assigned[0]||(input.role==='cover'?assets.find(a=>a.isCover&&!a.assignedPage):undefined);
+        const geometry=coreMasterLayoutGeometry({...input,primary,secondary:assigned[1],planning:true});
+        return geometry.images.flatMap(image=>{
+          const asset=assets.find(a=>a.url===image.asset.url);
+          return asset?[{assetId:asset.id,frame:image.rect,textZones:geometry.textZones,page:pageId}]:[];
+        });
+      }));
+      assets=await optimizeCarouselAssets(assets,frames,{analyze:analyzeAssetFocus,generate:generateBackgroundExtension,dimensions:compositionDimensions,progress:setMessage,
+        failure:issue=>issues.push(issue),checkpoint:async next=>{assets=next;await save('processing');}});
+      await save(issues.length?'needs_attention':'ready');
+    } catch(error){setMessage(error instanceof Error?error.message:'風格構圖未完成，可繼續保留原圖或重試。');}
+    finally{preparingImages.current=false;setSaving(false);}
+  }
+
+  function compositionDimensions(asset:ProjectAsset):Promise<{width:number;height:number}> {
+    if(asset.width>0&&asset.height>0)return Promise.resolve({width:asset.width,height:asset.height});
+    return new Promise((resolve,reject)=>{
+      const image=new Image(),timer=window.setTimeout(()=>reject(new Error('圖片載入逾時')),15000);
+      image.onload=()=>{clearTimeout(timer);resolve({width:image.naturalWidth,height:image.naturalHeight});};
+      image.onerror=()=>{clearTimeout(timer);reject(new Error('圖片未能載入'));};image.src=asset.url;
+    });
+  }
   useEffect(() => {
     if (!workspaceId || !selected?.id || !isShortVideo || activeStep !== "style" || !visibleDisplayStyles.length) return;
     const existing = selected.production?.stylePreviews && typeof selected.production.stylePreviews === "object"
@@ -996,12 +1061,14 @@ export default function ContentStudioPage() {
         body: JSON.stringify({
           projectId: selected.id,
           workspaceId,
+          expectedUpdatedAt: savedRevisionRef.current[selected.id] || selected.updated_at,
           ...updates,
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(payload?.detail || payload?.error || "未能儲存");
+      savedRevisionRef.current[selected.id]=payload.project.updated_at;
       setProjects((current) =>
         current.map((item) =>
           item.id === selected.id ? { ...item, ...payload.project } : item,
@@ -1570,7 +1637,8 @@ export default function ContentStudioPage() {
     }
   }
 
-  async function confirmAssets() {
+  async function confirmAssets(mode?:CompositionMode) {
+    if(saving || preparingImages.current)return;
     if (!selected?.production || !Array.isArray(selected.production.assets))
       return;
     if (!selected.production.assets.length) {
@@ -1582,6 +1650,7 @@ export default function ContentStudioPage() {
         production: {
           ...selected.production,
           assetStatus: "confirmed",
+          ...(mode?{compositionMode:mode,assets:setCompositionMode(selected.production.assets as ProjectAsset[],mode),autoBackgroundExtension:false,styleCompositionPreparation:null}:{}),
           assetsConfirmedAt: new Date().toISOString(),
         },
       },
@@ -1746,7 +1815,7 @@ export default function ContentStudioPage() {
         const headlineLength = Array.from(String(draft.headline || "").replace(/\s+/g, "")).length;
         const bodyLines = Array.isArray(draft.body) ? draft.body : [];
         const assetIds = Array.isArray(draft.assetIds) ? draft.assetIds.filter(Boolean) : draft.assetId ? [draft.assetId] : [];
-        const requiredImages = actualRoles[index] === "comparison" ? 2 : 1;
+        const requiredImages = actualRoles[index] === "comparison" && hasComparisonColumns(draft) ? 2 : 1;
         if (headlineLength > maxHeadline || bodyLines.some((line: unknown) => Array.from(String(line || "")).length > maxBody)) {
           setMessage(`P.${index + 1} 文案超出標準母版上限（標題 ${maxHeadline} 字、每段正文 ${maxBody} 字），請先縮短。`);
           return;
@@ -1762,16 +1831,17 @@ export default function ContentStudioPage() {
     preparingImages.current = true;
     setSaving(true);
     try {
-    let preparedAssets = selected.production.assets;
+    const mode:CompositionMode=optimizeBackground?'ai':selected.production.compositionMode==='ai'?'ai':'original';
+    let preparedAssets = setCompositionMode((selected.production.assets||[]) as ProjectAsset[],mode);
     const priorPreparation=selected.production.backgroundPreparation as {issues?:OptimizationIssue[]}|undefined;
     let issues:OptimizationIssue[]=retryPage?(priorPreparation?.issues||[]).filter(i=>i.page!==retryPage):[];
     if(!optimizeBackground && Array.isArray(preparedAssets)) {
       const failedIds=new Set((priorPreparation?.issues||[]).map(i=>i.assetId));
-      preparedAssets=preparedAssets.map((a:ProjectAsset)=>failedIds.has(a.id)?{...a,compositionFit:'contain'}:a);
+      preparedAssets=preparedAssets.map((a:ProjectAsset)=>failedIds.has(a.id)?{...a,compositionFit:'contain',compositionVariants:{...a.compositionVariants,...Object.fromEntries((priorPreparation?.issues||[]).filter(i=>i.assetId===a.id&&i.compositionKey).map(i=>[i.compositionKey!,{sourceUrl:a.url,action:'contain' as const,reason:'用家選擇保留原圖。'}]))}}:a);
     }
     const attemptAt=new Date().toISOString();
     const checkpoint=async(assets:unknown,status:string)=>{
-      const ok=await saveProject({production:{...selected.production,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
+      const ok=await saveProject({production:{...selected.production,compositionMode:mode,autoBackgroundExtension:false,assets,backgroundPreparation:{status,startedAt:attemptAt,issues}}},status==='needs_attention'?'部分頁面未完成，請選擇重試或保留原圖。':'正在處理構圖；現有下載仍是上次成功版本。');
       if(!ok)throw new Error('未能保存處理進度，已停止，請重新載入後再試。');
       setSaving(true);
     };
@@ -1780,20 +1850,21 @@ export default function ContentStudioPage() {
       const [{coreMasterLayoutGeometry,getCoreMasterPageDesign},{resolveClearMagazineRole},{optimizeCarouselAssets}] = await Promise.all([
         import('@/lib/content-templates/core-master-template'), import('@/lib/content-templates/clear-magazine-carousel-v1'), import('@/lib/optimize-carousel-assets'),
       ]);
-      const assets = (selected.production.assets || []) as ProjectAsset[];
+      const assets = preparedAssets as ProjectAsset[];
       const drafts = selected.production.pageDrafts as any[];
       const frames = drafts.flatMap((draft,index) => {
-        if(retryPage && draft.page!==retryPage)return [];
+        if(draft.compositionMode==='original')return [];
+        if(retryPage && issues.some(i=>i.page===draft.page))return [];
         const design = getCoreMasterPageDesign(selected.format_decision?.templateContractSnapshot, resolveClearMagazineRole(draft,index,drafts.length));
         if (!design) return [];
         const ids = [...new Set([...(draft.assetIds || []),draft.assetId].filter(Boolean))];
-        const geometry = coreMasterLayoutGeometry({design,copy:draft,page:`P.${index+1}`,primary:assets.find(a=>a.id===ids[0]),secondary:assets.find(a=>a.id===ids[1])});
+        const geometry = coreMasterLayoutGeometry({design,copy:draft,page:`P.${index+1}`,primary:assets.find(a=>a.id===ids[0]),secondary:assets.find(a=>a.id===ids[1]),planning:true});
         return geometry.images.flatMap(image => {
           const asset = assets.find(a=>a.url===image.asset.url);
           return asset ? [{assetId:asset.id,frame:image.rect,textZones:geometry.textZones,page:`P.${index+1}`}] : [];
         });
       });
-      if (!frames.length) throw new Error('此版面暫未支援 AI 構圖分析，請選「直接用現有素材生成」。');
+      // Contained narrative layouts need no outpainting; an empty worklist is success.
       preparedAssets = await optimizeCarouselAssets(assets.map(a=>({...a,width:a.width||0,height:a.height||0})),frames,{
         analyze:analyzeAssetFocus,generate:generateBackgroundExtension,progress:setMessage,
         failure:issue=>{issues.push(issue);},
@@ -1814,6 +1885,7 @@ export default function ContentStudioPage() {
         production: {
           ...selected.production,
           assets: preparedAssets,
+          compositionMode:mode,
           backgroundPreparation: {status:'ready',startedAt:attemptAt,issues:[]},
           autoBackgroundExtension: false,
           productionStatus: isVideo ? "package_ready" : "drafts_confirmed",
@@ -1831,8 +1903,15 @@ export default function ContentStudioPage() {
   async function keepFailedPage(issue:OptimizationIssue) {
     if(saving || preparingImages.current || !selected?.production)return;
     const preparation=selected.production.backgroundPreparation as BackgroundPreparation;
-    const assets=(selected.production.assets as ProjectAsset[]).map(a=>a.id===issue.assetId?{...a,compositionFit:'contain'}:a);
+    const assets=(selected.production.assets as ProjectAsset[]).map(a=>a.id===issue.assetId?{...a,compositionFit:'contain',compositionVariants:{...a.compositionVariants,...(issue.compositionKey?{[issue.compositionKey]:{sourceUrl:a.url,action:'contain' as const,reason:'用家選擇保留原圖。'}}:{})}}:a);
     await saveProject({production:{...selected.production,assets,backgroundPreparation:{...preparation,issues:(preparation.issues||[]).filter(i=>i.assetId!==issue.assetId)}}},`${issue.page} 已選保留原圖；按「繼續製作圖片」輸出新版。`);
+  }
+
+  async function changePageComposition(page:string,mode:CompositionMode) {
+    if(saving||preparingImages.current||!selected?.production)return;
+    const drafts=(selected.production.pageDrafts||[]) as any[];
+    const ok=await saveProject({production:{...selected.production,pageDrafts:drafts.map(d=>d.page===page?{...d,compositionMode:mode}:d)}},`${page} 已切換構圖方式，正在更新本頁；其他頁不變。`);
+    if(ok)await generateCarouselImages(page);
   }
 
   async function submitVideoPackage() {
@@ -2337,6 +2416,12 @@ export default function ContentStudioPage() {
                       <b>目前只屬風格預覽</b>
                       <span>{isShortVideo ? "這張無字圖片只模擬短片首鏡；選擇後，SOON 會按完整劇本建立逐鏡製作包。" : "選擇後，SOON 會按完整故事及圖片生成正式版面；到「編輯圖片」仍可逐頁調整文字、圖片、字體、大小及位置。"}</span>
                     </details>
+                    {!isShortVideo ? <section className="style-preview-notice" aria-live="polite">
+                      <b>{selected.production?.compositionMode==='ai'?'AI 智能構圖':selected.production?.compositionMode==='original'?'原圖創作':'尚未選擇圖片製作方式'}</b>
+                      <p>{saving?'正在準備構圖，完成的結果會逐張保存。':'只示範封面、內文、收尾；正式製作會再按各頁圖片框及文字位置檢查。'}</p>
+                      <button type="button" disabled={saving} onClick={()=>goToStep('assets')}>更改製作方式</button>
+                      {selected.production?.compositionMode==='ai' && (selected.production.styleCompositionPreparation as {status?:string}|undefined)?.status!=='ready'?<button type="button" disabled={saving} onClick={()=>void prepareStyleCompositions(compositionPreviewSignature)}>繼續／重試預覽構圖</button>:null}
+                    </section>:null}
                     <div className="style-template-grid">
                       {visibleDisplayStyles.map((template, index) => {
                         const slides = contextualPreviewSlides(template, brief.angle);
@@ -2827,21 +2912,7 @@ export default function ContentStudioPage() {
                                       確認後，下一步會用同一組素材比較內容風格
                                     </span>
                                   )}
-                                  <button
-                                    disabled={saving}
-                                    onClick={
-                                      selected.production.assetStatus === "confirmed"
-                                        ? () => goToStep("style")
-                                        : confirmAssets
-                                    }
-                                  >
-                                    {saving
-                                      ? "確認中，毋須再按"
-                                      : selected.production.assetStatus ===
-                                    "confirmed"
-                                        ? "選擇內容風格 →"
-                                        : "確認圖片素材 →"}
-                                  </button>
+                                  <CompositionModeChoice mode={selected.production.compositionMode as CompositionMode|undefined} busy={saving} onChoose={mode=>void confirmAssets(mode)}/>
                                 </div>
                               ) : null}
                             </div>
@@ -3117,7 +3188,7 @@ export default function ContentStudioPage() {
                                           : "請檢查文案、圖片配對及版面指示；確認後會鎖定這個製作版本。"}
                                       </p>
                                     </div>
-                                    {selected.selected_format !== 'short_video' ? <div>
+                                    {selected.selected_format !== 'short_video' && selected.production.compositionMode!=='original' ? <div>
                                       <p>AI 會先分析各頁，只在有需要時延伸背景，再製作圖片；會使用圖片生成額度。原圖保留，可還原。請勿關閉頁面。</p>
                                       <button type="button" disabled={saving || editingDraft !== null} onClick={()=>void confirmPageDrafts(true)}>{saving ? '正在處理…' : 'AI 優化構圖並生成圖片 →'}</button>
                                     </div> : null}
@@ -3127,7 +3198,7 @@ export default function ContentStudioPage() {
                                       disabled={saving || editingDraft !== null}
                                       onClick={() => void confirmPageDrafts()}
                                     >
-                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "直接用現有素材生成 →"}
+                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : selected.production.compositionMode==='original'?"使用原圖製作圖片 →":"保留目前構圖，直接生成 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus === "package_ready" ? (
@@ -3295,7 +3366,10 @@ export default function ContentStudioPage() {
                                                     下載圖片
                                                   </a>
                                                 </div>
-                                                {permissions?.canEdit ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={extensionActions()} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
+                                                {permissions?.canEdit && !selected.production.compositionMode ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={extensionActions()} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
+                                                {permissions?.canEdit && selected.production.compositionMode==='ai'?<button type="button" disabled={saving} onClick={()=>void changePageComposition(page.page,(selected.production?.pageDrafts as any[])?.find(d=>d.page===page.page)?.compositionMode==='original'?'ai':'original')}>
+                                                  {(selected.production.pageDrafts as any[])?.find(d=>d.page===page.page)?.compositionMode==='original'?'重用本頁 AI 構圖':'本頁還原原圖構圖'}
+                                                </button>:null}
                                               </div>
                                             </article>
                                           ))

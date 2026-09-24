@@ -1,7 +1,7 @@
 import type { SubjectFocus } from './subject-crop';
 export type ExtensionPreview = { id: string; url: string; originalUrl: string; width: number; height: number; originalHeight: number };
 export type ExtensionOriginal = { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null };
-export type ExtendableAsset = { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null; extensionOriginal?: ExtensionOriginal; extensionId?: string; autoExtensionDeclinedUrl?: string; extensionRejectedUrl?: string; compositionFit?: 'contain' };
+export type ExtendableAsset = import('./composition-mode').CompositionAsset & { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null; extensionOriginal?: ExtensionOriginal; extensionId?: string; autoExtensionDeclinedUrl?: string; extensionRejectedUrl?: string; compositionFit?: 'contain' };
 export function applyExtension<T extends ExtendableAsset>(asset: T, preview: ExtensionPreview): T {
   if (asset.extensionOriginal || preview.originalUrl !== asset.url) throw new Error('圖片已更改，請重新預覽。');
   return { ...asset, extensionOriginal: { url: asset.url, width: asset.width, height: asset.height, subjectFocus: asset.subjectFocus },
