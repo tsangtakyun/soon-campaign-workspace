@@ -28,7 +28,7 @@ async function main(){
  const preview={id:'run',url:'extended',originalUrl:'original',width:640,height:800,originalHeight:360};
  const applied=assets.applyExtension(asset,preview);
  assert.equal(applied.subjectFocus,null);assert.equal(applied.license,asset.license);assert.equal(asset.url,'original');
- assert.deepEqual(JSON.parse(JSON.stringify(assets.restoreExtension(applied))),asset);
+ assert.deepEqual(JSON.parse(JSON.stringify(assets.restoreExtension(applied))),{...asset,autoExtensionDeclinedUrl:asset.url});
  assert.throws(()=>assets.applyExtension({...asset,url:'new'},preview),/圖片已更改/);
  const materials=compile('lib/confirmed-project-materials.ts');
  const context=compile('lib/project-style-context.ts',{'./confirmed-project-materials':materials,'./production-style':{object:v=>v&&typeof v==='object'?v:{},fingerprint:JSON.stringify}});

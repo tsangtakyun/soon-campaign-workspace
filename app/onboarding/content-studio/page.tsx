@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase";
 type ProjectAsset = {
   extensionOriginal?: import('@/lib/extension-asset').ExtensionOriginal;
   extensionId?: string;
+  autoExtensionDeclinedUrl?: string;
   subjectFocus?: SubjectFocus | null;
   id: string;
   url: string;
@@ -588,7 +589,7 @@ export default function ContentStudioPage() {
         brandName={props.brandName || 'BRAND'} branding={previewBrand} onExpand={props.onExpand}
         saving={saving} onSaveFocus={permissions?.canEdit ? saveAssetFocus : undefined}
         onAnalyzeFocus={permissions?.canEdit ? analyzeAssetFocus : undefined}
-        extensionActions={permissions?.canEdit ? { generate: generateBackgroundExtension, apply: applyBackgroundExtension } : undefined}/>;
+        extensionActions={permissions?.canEdit ? extensionActions() : undefined}/>;
     }
     if (code === "product-focus") return <ProductFocusPreview {...props}/>;
     if (code === "ranking-review") return <RankingReviewPreview {...props}/>;
@@ -1445,6 +1446,12 @@ export default function ContentStudioPage() {
       },
       `已加入 ${assetTargetPage} 授權圖片；發佈前請核對授權及署名要求`,
     );
+  }
+
+  function extensionActions() {
+    return { generate: generateBackgroundExtension, apply: applyBackgroundExtension,
+      scope: `${workspaceId}:${selected?.id}`, automatic: selected?.production?.autoBackgroundExtension === true,
+      setAutomatic: async (enabled: boolean) => selected?.production ? saveProject({ production: { ...selected.production, autoBackgroundExtension: enabled } }, enabled ? '已開啟自動延伸背景（會使用生成額度）' : '已關閉自動延伸背景') : false };
   }
 
   async function generateBackgroundExtension(assetId: string, placement?: import('@/lib/composition-advice').ExtensionPlacement) {
@@ -3203,7 +3210,7 @@ export default function ContentStudioPage() {
                                                     下載圖片
                                                   </a>
                                                 </div>
-                                                {permissions?.canEdit ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={{generate:generateBackgroundExtension,apply:applyBackgroundExtension}} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
+                                                {permissions?.canEdit ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={extensionActions()} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
                                               </div>
                                             </article>
                                           ))

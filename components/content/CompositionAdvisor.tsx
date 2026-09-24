@@ -5,7 +5,7 @@ import type { CropRect, SubjectFocus } from '@/lib/subject-crop';
 import { BackgroundExtensionEditor, type ExtensionActions } from './BackgroundExtensionEditor';
 
 export function CompositionAdvisor({ asset, frame, textZones, analyze, saveFocus, actions, disabled }: {
-  asset: { id: string; url: string; width?: number; height?: number; extensionOriginal?: { url: string } };
+  asset: { id: string; url: string; width?: number; height?: number; extensionOriginal?: { url: string }; autoExtensionDeclinedUrl?: string };
   frame: CropRect; textZones: CropRect[]; analyze: (id: string) => Promise<CompositionAnalysis>;
   saveFocus: (id: string, updates: { subjectFocus: SubjectFocus | null; width: number; height: number }) => Promise<boolean>;
   actions: ExtensionActions; disabled?: boolean;
@@ -47,7 +47,7 @@ export function CompositionAdvisor({ asset, frame, textZones, analyze, saveFocus
     <img src={asset.url} alt="" style={{ display: 'none' }} onLoad={event => setSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}/>
     <strong>SOON 構圖建議</strong>
     {asset.extensionOriginal ? <p>已套用延伸版，保留現有構圖；唔會再次生成。</p> : <>
-      <p style={{ fontSize: 11 }}>自動分析原圖、主體及版面，使用少量 token；生成圖片需另外確認。</p>
+      <p style={{ fontSize: 11 }}>自動分析原圖、主體及版面，使用少量 token；開啟自動延伸後，合適的背景會直接生成及套用，可還原原圖。</p>
       <label style={{ fontSize: 12 }}><input type="checkbox" checked={documentary} onChange={event => setDocumentary(event.target.checked)}/> 必須保留原始紀實畫面，不建議生成背景</label>
       <div role="status">{loading ? <p>正在分析構圖…</p> : error ? <p>{error}</p> : advice ? <><h4 style={{ margin: '10px 0 6px' }}>{advice.title}</h4><p style={{ fontSize: 12 }}>{advice.reason}</p></> : null}</div>
       {error ? <button type="button" disabled={loading || disabled} onClick={() => void retry()}>重新分析構圖</button> : null}

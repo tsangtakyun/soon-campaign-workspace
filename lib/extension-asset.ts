@@ -1,7 +1,7 @@
 import type { SubjectFocus } from './subject-crop';
 export type ExtensionPreview = { id: string; url: string; originalUrl: string; width: number; height: number; originalHeight: number };
 export type ExtensionOriginal = { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null };
-export type ExtendableAsset = { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null; extensionOriginal?: ExtensionOriginal; extensionId?: string };
+export type ExtendableAsset = { url: string; width: number; height: number; subjectFocus?: SubjectFocus | null; extensionOriginal?: ExtensionOriginal; extensionId?: string; autoExtensionDeclinedUrl?: string };
 export function applyExtension<T extends ExtendableAsset>(asset: T, preview: ExtensionPreview): T {
   if (asset.extensionOriginal || preview.originalUrl !== asset.url) throw new Error('圖片已更改，請重新預覽。');
   return { ...asset, extensionOriginal: { url: asset.url, width: asset.width, height: asset.height, subjectFocus: asset.subjectFocus },
@@ -10,5 +10,5 @@ export function applyExtension<T extends ExtendableAsset>(asset: T, preview: Ext
 export function restoreExtension<T extends ExtendableAsset>(asset: T): T {
   if (!asset.extensionOriginal) return asset;
   const { extensionOriginal, extensionId, ...rest } = asset;
-  return { ...rest, ...extensionOriginal } as T;
+  return { ...rest, ...extensionOriginal, autoExtensionDeclinedUrl: extensionOriginal.url } as T;
 }

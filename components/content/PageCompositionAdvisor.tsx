@@ -23,7 +23,7 @@ export function PageCompositionAdvisor({ contract, drafts, assets, page, actions
   const geometry=coreMasterLayoutGeometry({design,copy:draft,page,primary,secondary});
   return <details onToggle={event=>setOpen(event.currentTarget.open)}><summary>AI 構圖建議 · {page}</summary>
     <p>按本頁圖片框分析；套用只更新素材，現有輸出及已儲存編輯不會被覆寫。共用此素材的頁面下次製作亦會使用延伸版。</p>
-    {open?geometry.images.map(image=>{
+    {open || actions.automatic ? geometry.images.map(image=>{
       const asset=assets.find(a=>a.url===image.asset.url);
       return asset?<CompositionAdvisor key={`${page}-${image.key}-${asset.url}`} asset={asset} frame={image.rect} textZones={geometry.textZones} actions={actions} analyze={analyze} saveFocus={saveFocus} disabled={disabled}/>:null;
     }):null}
