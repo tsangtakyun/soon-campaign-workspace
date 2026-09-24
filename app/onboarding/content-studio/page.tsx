@@ -1842,7 +1842,7 @@ export default function ContentStudioPage() {
           item.id === projectId ? { ...item, ...payload.project } : item,
         ),
       );
-      setMessage("全套 Carousel 圖片已生成");
+      setMessage(payload.warning || "全套 Carousel 圖片已生成");
     } catch (error) {
       if (error instanceof TypeError) {
         try {

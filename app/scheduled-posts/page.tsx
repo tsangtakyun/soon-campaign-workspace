@@ -2964,7 +2964,22 @@ function ScheduledPostsPageContent() {
   };
 
   if (layeredProject && !projectCanvasJson) {
-    return <main style={{ padding: 40 }}><p role={projectEditorError ? "alert" : "status"}>{projectEditorError || "正在載入可編輯圖層…"}</p><button onClick={() => window.location.reload()}>重新載入</button> <button onClick={() => router.push(externalEditorReturnUrl)}>返回內容製作</button></main>;
+    return <main className="layer-loading-shell">
+      <header><strong>SOON <span>圖片編輯器</span></strong><button type="button" onClick={()=>router.push(externalEditorReturnUrl)}>← 返回內容製作</button></header>
+      <div className="layer-loading-body">
+        {projectEditorError ? <section className="layer-loading-error" role="alert"><small>圖片編輯器</small><h1>暫時未能開啟圖層</h1><p>{projectEditorError}</p><p>可以重新載入，或返回內容製作查看圖片。</p></section> : <SoonLoading title="正在載入可編輯圖層…" description="正在準備圖片、文字及品牌字型。載入完成後，你就可以逐個圖層編輯。" />}
+        <div className="layer-loading-actions"><p>{projectEditorError ? '重新載入不會重新生成圖片。' : '等候較久？你可以重新載入，無需重新生成圖片。'}</p><button type="button" onClick={()=>window.location.reload()}>重新載入</button></div>
+      </div>
+      <style jsx>{`
+        .layer-loading-shell{min-height:100dvh;background:#f6f2eb;color:#202126}
+        header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 32px;border-bottom:1px solid #ded5cd;background:#fff}
+        strong{color:#6b2c30;letter-spacing:.06em}strong span{color:#6f737d;font-size:13px;font-weight:500;margin-left:16px;letter-spacing:0}
+        button{border:1px solid #ded5cd;border-radius:10px;padding:11px 16px;background:#fff;color:#6b2c30;font:inherit;cursor:pointer}button:hover{background:#efe8df}button:focus-visible{outline:3px solid #6b2c30;outline-offset:3px}
+        .layer-loading-body{max-width:824px;margin:0 auto;padding:clamp(40px,10vh,110px) 24px}.layer-loading-actions{text-align:center;margin-top:22px}.layer-loading-actions p{color:#6f737d;font-size:13px;line-height:1.6}
+        .layer-loading-error{padding:48px 32px;border:1px solid #ded5cd;border-radius:22px;background:#fff;text-align:center}.layer-loading-error small{color:#6b2c30}.layer-loading-error h1{font-size:24px}.layer-loading-error p{line-height:1.7;color:#6f737d;overflow-wrap:anywhere}
+        @media(max-width:520px){header{padding:16px}strong span{display:none}.layer-loading-body{padding:40px 16px}}
+      `}</style>
+    </main>;
   }
 
   if (selectedPost && designMode) {

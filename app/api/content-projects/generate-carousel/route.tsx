@@ -18,6 +18,7 @@ import { createServerSupabase } from "@/lib/server-supabase";
 import { resolveContentBranding, readerFacingCopy, findBrandTypeface, localTypefaceFiles } from '@/lib/content-branding';
 import { getWorkspaceAccess } from "@/lib/workspace-access";
 import type { FocusAsset } from '@/lib/subject-crop';
+import { verifiedExtensionAssets } from '@/lib/verified-extension-assets';
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -880,7 +881,13 @@ export async function POST(req: Request) {
       headline: readerFacingCopy(draft.headline), subheadline: readerFacingCopy(draft.subheadline),
       body: draft.body?.map(readerFacingCopy),
     }));
-    const assets = (project.production.assets || []) as Asset[];
+    const sourceAssets = project.production.assets || [];
+    const extensionIds = sourceAssets.filter((a:any)=>a.extensionOriginal && a.extensionId).map((a:any)=>a.extensionId);
+    const extensionRuns = extensionIds.length ? await access.admin.from('content_project_generation_runs')
+      .select('id,status,input,output').eq('workspace_id',workspaceId).eq('project_id',projectId).in('id',extensionIds) : {data:[],error:null};
+    if(extensionRuns.error) throw new Error('未能核對背景延伸驗收紀錄，未開始生成，請重試。');
+    const verified = verifiedExtensionAssets(sourceAssets,extensionRuns.data || []);
+    const assets = verified.assets as Asset[];
     if (!drafts.length)
       return NextResponse.json({ error: "沒有逐頁草稿" }, { status: 400 });
     const configuredTypeface = brandSettings.fontStyle;
@@ -966,6 +973,8 @@ export async function POST(req: Request) {
     }));
     const production = {
       ...project.production,
+      assets,
+      extensionSafetyRestored: verified.restored,
       generatedPages: outputs,
       productionStatus: "images_ready",
       imagesGeneratedAt: new Date().toISOString(),
@@ -982,7 +991,7 @@ export async function POST(req: Request) {
       .select("id,production,updated_at")
       .single();
     if (saveError) throw saveError;
-    return NextResponse.json({ success: true, project: saved });
+    return NextResponse.json({ success: true, project: saved, warning: verified.restored.length ? `已將 ${verified.restored.length} 張未通過新版驗收的延伸圖還原，並用原圖完成排版。沒有重新付費延伸背景。` : undefined });
   } catch (error) {
     console.error("[content-projects/generate-carousel]", error);
     return NextResponse.json(
