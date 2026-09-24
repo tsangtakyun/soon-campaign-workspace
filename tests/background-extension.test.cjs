@@ -15,6 +15,15 @@ async function main(){
  await assert.rejects(()=>lib.finishExtension(source,plan),/dimensions/);
  await assert.rejects(()=>lib.prepareExtension(generated),/NOT_LANDSCAPE/);
  const assets=compile('lib/extension-asset.ts');
+ for(const topFraction of [0,.5,1]) {
+  const shifted=await lib.prepareExtension(source,{aspectRatio:.5,topFraction});
+  const output=await lib.finishExtension(generated,shifted);
+  const pixels=await sharp(output).extract({left:0,top:shifted.originalTop,width:shifted.width,height:shifted.originalHeight}).removeAlpha().raw().toBuffer();
+  assert.deepEqual(pixels,await sharp(shifted.original).removeAlpha().raw().toBuffer());
+  assert.equal(shifted.height,shifted.width*2);
+  assert.equal(shifted.originalTop,Math.round((shifted.height-shifted.originalHeight)*topFraction));
+ }
+ await assert.rejects(()=>lib.prepareExtension(source,{aspectRatio:NaN,topFraction:0}),/INVALID_PLACEMENT/);
  const asset={id:'a',url:'original',width:640,height:360,subjectFocus:{x:.5,y:.4,width:.3,height:.3},license:'original license'};
  const preview={id:'run',url:'extended',originalUrl:'original',width:640,height:800,originalHeight:360};
  const applied=assets.applyExtension(asset,preview);

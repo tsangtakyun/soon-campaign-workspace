@@ -129,7 +129,7 @@ export function CoreMasterPreview({ contract, pages, assets, brandName, branding
     </nav>
     <p style={{fontSize:11,margin:'8px 12px',color:'#666'}}>風格示範 · {sample.label}{!primary ? ' · 此頁未配圖' : ''} · 選定後再製作完整內容</p>
     {crops.some(crop => crop.active) ? <p style={{fontSize:11,margin:'8px 12px',color:'#6b2c30'}}>{crops.some(crop => crop.constrained) ? '圖片比例限制：主體仍可能被裁切或與文字重疊，建議換圖或改用圖文分區版面。' : '已按主體焦點及文字安全區調整裁切。'}</p> : null}
-    {extensionActions && onAnalyzeFocus && onSaveFocus && role === 'cover' && primary?.id && primaryFrame && geometry ? <CompositionAdvisor key={`${primary.id}-${primary.url}`} asset={{ ...primary, id: primary.id }} frame={primaryFrame} textZones={geometry.textZones} actions={extensionActions} analyze={onAnalyzeFocus} saveFocus={onSaveFocus} disabled={saving}/> : null}
+    {extensionActions && onAnalyzeFocus && onSaveFocus && primary?.id && primaryFrame && geometry ? <CompositionAdvisor key={`${role}-${primary.id}-${primary.url}`} asset={{ ...primary, id: primary.id }} frame={primaryFrame} textZones={geometry.textZones} actions={extensionActions} analyze={onAnalyzeFocus} saveFocus={onSaveFocus} disabled={saving}/> : null}
     <details style={{ padding: '8px 12px', fontSize: 12 }}><summary>進階調整 · 手動主體焦點</summary>
     {onSaveFocus && primary?.id ? <SubjectFocusEditor key={`${primary.id}-${primary.url}-${JSON.stringify(primary.subjectFocus)}`} asset={{ ...primary, id: primary.id }} disabled={saving} onSave={onSaveFocus} onAnalyze={onAnalyzeFocus}/> : null}
     {onSaveFocus && assigned[1]?.id ? <SubjectFocusEditor key={`${assigned[1].id}-${assigned[1].url}-${JSON.stringify(assigned[1].subjectFocus)}`} asset={{ ...assigned[1], id: assigned[1].id! }} disabled={saving} onSave={onSaveFocus} onAnalyze={onAnalyzeFocus}/> : null}

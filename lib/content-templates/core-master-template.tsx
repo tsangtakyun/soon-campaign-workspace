@@ -386,7 +386,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
     } else if (['textbox','text','itext'].includes(type)) {
       const requestedFamily = clean(object.fontFamily).toLowerCase();
       const text = role === 'brand_logo' ? options.branding.name : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
-      objects.push({...common,type:'Textbox',text,fill:typeof object.fill==='string'?object.fill:'#171717',
+      objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',
         fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
         fontSize:Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
         lineHeight:finite(object.lineHeight,1.16),charSpacing:finite(object.charSpacing),textAlign:object.textAlign||'left',editable:true,

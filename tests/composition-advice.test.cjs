@@ -11,6 +11,13 @@ assert.equal(compositionAdvice({...input,analysis:{...input.analysis,focus:null}
 assert.equal(compositionAdvice({...input,width:0}).action,'review');
 assert.equal(compositionAdvice({...input,width:1080,height:1350,textZones:[]}).action,'crop');
 assert.equal(compositionAdvice({...input,textZones:[{x:0,y:100,width:1080,height:1200}]}).action,'split','extension must really clear the text zone');
-assert.equal(compositionAdvice({...input,frame:{x:0,y:0,width:1080,height:1920}}).action,'split','unsupported ratios cannot generate');
+assert.equal(compositionAdvice({...input,frame:{x:0,y:0,width:1080,height:1920}}).action,'extend','portrait frames are supported');
+assert.equal(compositionAdvice({...input,frame:{x:0,y:0,width:100,height:1920}}).action,'split','extreme ratios remain unsupported');
+const both={...input.analysis,background:{downwardExtension:'safe',upwardExtension:'safe',reason:'water and sky'}};
+const up=compositionAdvice({...input,analysis:both,textZones:[{x:0,y:0,width:1080,height:650}]});
+assert.equal(up.action,'extend');assert.ok(up.placement.topFraction>0,'reserve upper text area');
+const narrow=compositionAdvice({...input,analysis:both,frame:{x:0,y:0,width:500,height:1350},textZones:[]});
+assert.equal(narrow.action,'extend');assert.equal(narrow.placement.aspectRatio,500/1350);
+assert.ok(narrow.placement.topFraction>0 && narrow.placement.topFraction<1,'balance subject in narrow frame');
 assert.ok(compositionAdvice({...input,width:640,height:360}).reason.includes('唔會令原圖變高清'));
 console.log('PASS: safe extension, documentary/complex/unknown fallbacks, crop, missing dimensions, actual text overlap and unsupported frame');

@@ -3,6 +3,7 @@
 import { approvedVideoDuration } from '@/lib/approved-video-duration';
 import { confirmedPhotoCount } from '@/lib/confirmed-project-materials';
 import { CoreMasterPreview } from '@/components/content/CoreMasterPreview';
+import { PageCompositionAdvisor } from '@/components/content/PageCompositionAdvisor';
 import type { SubjectFocus } from '@/lib/subject-crop';
 import { resolveContentBranding } from '@/lib/content-branding';
 import { type ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
@@ -1446,9 +1447,9 @@ export default function ContentStudioPage() {
     );
   }
 
-  async function generateBackgroundExtension(assetId: string) {
+  async function generateBackgroundExtension(assetId: string, placement?: import('@/lib/composition-advice').ExtensionPlacement) {
     const response = await fetch('/api/content-projects/extend-background', { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId }), signal: AbortSignal.timeout(175_000) });
+      body: JSON.stringify({ workspaceId, projectId: selected?.id, assetId, placement }), signal: AbortSignal.timeout(175_000) });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || '延伸未完成，原圖未改動。');
     return payload as import('@/lib/extension-asset').ExtensionPreview;
@@ -3202,6 +3203,7 @@ export default function ContentStudioPage() {
                                                     下載圖片
                                                   </a>
                                                 </div>
+                                                {permissions?.canEdit ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={{generate:generateBackgroundExtension,apply:applyBackgroundExtension}} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
                                               </div>
                                             </article>
                                           ))

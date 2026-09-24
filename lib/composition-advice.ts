@@ -1,7 +1,8 @@
 import { subjectCrop, validSubjectFocus, type SubjectFocus, type CropRect } from './subject-crop';
 export type CompositionAnalysis = { focus: SubjectFocus | null; label: string; reason: string; cached: boolean;
-  background?: { downwardExtension: 'safe' | 'risky' | 'uncertain'; reason: string } };
-export type CompositionAdvice = { action: 'keep' | 'crop' | 'extend' | 'split' | 'review'; title: string; reason: string };
+  background?: { downwardExtension: 'safe' | 'risky' | 'uncertain'; upwardExtension?: 'safe' | 'risky' | 'uncertain'; reason: string } };
+export type ExtensionPlacement = { aspectRatio: number; topFraction: number };
+export type CompositionAdvice = { action: 'keep' | 'crop' | 'extend' | 'split' | 'review'; title: string; reason: string; placement?: ExtensionPlacement };
 export function compositionAdvice(input: { width: number; height: number; frame: CropRect; textZones: CropRect[]; analysis: CompositionAnalysis; documentary: boolean }): CompositionAdvice {
   const { width, height, frame, textZones, analysis } = input;
   if (!(width > 0 && height > 0 && frame.width > 0 && frame.height > 0) || !validSubjectFocus(analysis.focus))
@@ -13,14 +14,17 @@ export function compositionAdvice(input: { width: number; height: number; frame:
   const zoomOverWidth = scale / (frame.width / width);
   const needsChange = crop.constrained || retainedArea < .7 || zoomOverWidth > 1.5;
   if (!needsChange) return { action: 'crop', title: '保留原圖，輕微調整裁切', reason: '現有比例可保留主體，文字亦有空間；毋須生成背景。' };
-  // This release can only generate a full-bleed 4:5 cover, anchored at its top edge.
-  const supported = Math.abs(frame.width / frame.height - .8) < .025 && height / width < 1.2;
-  const extendedHeight = width * 1.25;
-  const extendedFocus = { ...focus, y: focus.y * height / extendedHeight, height: focus.height * height / extendedHeight, sourceWidth: width, sourceHeight: extendedHeight };
-  const extendedCrop = subjectCrop({ width, height: extendedHeight, subjectFocus: extendedFocus }, frame, textZones);
-  if (!input.documentary && supported && analysis.background?.downwardExtension === 'safe' && !extendedCrop.constrained) return {
-    action: 'extend', title: '向下延伸背景', reason: `${crop.constrained ? '現有裁切令主體與文字空間不足' : '橫圖填滿直幅會裁走太多畫面'}；延伸可保留整張原圖、為文字留位。${width < frame.width ? '原圖解像度較低，延伸唔會令原圖變高清。' : ''}`,
-  };
+  const aspectRatio = frame.width / frame.height, extendedHeight = width / aspectRatio;
+  const supported = aspectRatio >= .25 && aspectRatio <= 2 && extendedHeight > height + 32 && extendedHeight <= height * 6;
+  const candidates = !input.documentary && supported ? [0,.25,.5,.75,1].filter(top =>
+    (top === 0 || analysis.background?.upwardExtension === 'safe') && (top === 1 || analysis.background?.downwardExtension === 'safe')
+  ).map(topFraction => {
+    const y = (focus.y * height + (extendedHeight-height)*topFraction)/extendedHeight;
+    const extendedFocus = {...focus,y,height:focus.height*height/extendedHeight,sourceWidth:width,sourceHeight:extendedHeight};
+    return {topFraction,y,crop:subjectCrop({width,height:extendedHeight,subjectFocus:extendedFocus},frame,textZones)};
+  }).filter(c => !c.crop.constrained).sort((a,b)=>Math.abs(a.y-.45)-Math.abs(b.y-.45)) : [];
+  const best = candidates[0];
+  if (best) return {action:'extend',placement:{aspectRatio,topFraction:best.topFraction},title:best.topFraction===0?'向下延伸背景':best.topFraction===1?'向上延伸背景':'上下延伸背景',reason:`按此頁圖片框及文字位置，保留完整主體，避免放大裁切。${width < frame.width ? '原圖解像度較低，延伸唔會令原圖變高清。' : ''}`};
   return { action: 'split', title: '改用圖文分區', reason: input.documentary ? '你選擇保留原始紀實畫面；建議圖片完整顯示，文字另放，唔生成背景。'
     : !supported ? '此圖片框不適用向下延伸，建議圖片與文字分開。'
     : analysis.background?.downwardExtension !== 'safe' ? `背景延伸風險較高或未能確定。${analysis.background?.reason || ''}建議圖片與文字分開。`

@@ -55,7 +55,7 @@ export function CompositionAdvisor({ asset, frame, textZones, analyze, saveFocus
       {!loading && !error && advice?.action === 'split' ? <p style={{ fontSize: 12 }}>此版先提供分區建議，未自動更換母版；可改選圖文分區版面或圖片。</p> : null}
     </>}
     <p role="status">{message}</p>
-    <BackgroundExtensionEditor asset={asset} actions={actions} disabled={disabled || saving}
+    <BackgroundExtensionEditor key={JSON.stringify(advice?.placement)} asset={asset} actions={actions} disabled={disabled || saving || (!asset.extensionOriginal && advice?.action !== 'extend')} placement={advice?.placement}
       suggested={!loading && !error && advice?.action === 'extend' && !documentary}/>
   </section>;
 }
