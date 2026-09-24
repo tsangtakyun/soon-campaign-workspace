@@ -24,5 +24,10 @@ const portrait={...input,width:600,height:1000,frame:{x:0,y:0,width:1080,height:
 const horizontal=compositionAdvice(portrait);
 assert.equal(horizontal.action,'extend');assert.equal(horizontal.placement.expansion,1);
 assert.ok(horizontal.placement.leftFraction>0&&horizontal.placement.leftFraction<1);
+const wide=compositionAdvice({...portrait,width:1467,height:2200,frame:{x:0,y:0,width:984,height:450}});
+assert.equal(wide.action,'extend','P.5 2.187:1 frame must be accepted');
+assert.equal(wide.placement.aspectRatio,984/450);
+assert.equal(compositionAdvice({...portrait,analysis:{...portrait.analysis,imageKind:'collage'}}).action,'review');
+assert.ok(compositionAdvice({...portrait,analysis:{...portrait.analysis,imageKind:'collage'}}).reason.includes('拼貼'));
 assert.equal(compositionAdvice({...portrait,analysis:{...portrait.analysis,background:{downwardExtension:'uncertain',leftwardExtension:'uncertain',rightwardExtension:'uncertain',reason:'unknown'}}}).action,'review');
 console.log('PASS: safe extension, documentary/complex/unknown fallbacks, crop, missing dimensions, actual text overlap and unsupported frame');

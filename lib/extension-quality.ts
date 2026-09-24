@@ -3,9 +3,9 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { SUBJECT_MODEL } from './ai-subject-focus';
 import sharp from 'sharp';
+import {boundarySchema} from './extension-evidence';
+export {boundarySchema} from './extension-evidence';
 
-const edge = z.object({ safe: z.boolean(), subjectTouchesEdge: z.boolean(), environment: z.string().max(400), continuation: z.string().max(600) });
-export const boundarySchema = z.object({ confidence: z.enum(['high','medium','low']), subjects: z.string().max(400), top: edge, bottom: edge, left:edge, right:edge });
 export const reviewSchema = z.object({ confidence: z.enum(['high','medium','low']), addedSubject: z.boolean(), duplicatedSubject: z.boolean(), unnaturalReflection: z.boolean(), environmentMatches: z.boolean(), seamNatural: z.boolean(), reason: z.string().max(400) });
 export type ExtensionGeometry = { width:number; height:number; originalTop:number; originalHeight:number; originalLeft?:number; originalWidth?:number };
 /** Callers pass a plan containing PNG Buffers. Never stringify that plan:

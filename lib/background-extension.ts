@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { fetchSafeExternal } from './safe-external-url';
 import {extensionGeometry,type ExtensionPlacement} from './extension-geometry';
 
-export const EXTENSION_VERSION = 'extend-edge-evidence-v5';
+export const EXTENSION_VERSION = 'extend-shared-edges-v6';
 export async function loadExtensionSource(url: string) {
   const response = await fetchSafeExternal(url, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok || !response.headers.get('content-type')?.startsWith('image/')) throw new Error('Source unavailable');
@@ -30,10 +30,14 @@ export async function prepareExtension(bytes: Buffer, placement:ExtensionPlaceme
   const {data:original,info}=await sharp(normalized.data).resize({width:Math.max(1,Math.floor(geometry.originalWidth*scale)),height:Math.max(1,Math.floor(geometry.originalHeight*scale)),fit:'fill',withoutEnlargement:true}).png().toBuffer({resolveWithObject:true});
   const originalTop=Math.round((height-info.height)*placement.topFraction);
   const originalLeft=Math.round((width-info.width)*(placement.leftFraction??.5));
-  const canvas = await sharp({ create: { width: 1024, height: 1536, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: original, left: originalLeft, top: originalTop }]).png().toBuffer();
+  // The provider canvas may be larger than the actual image frame. Lock unused
+  // padding: otherwise it becomes another editable region encouraging reframing.
+  const clear=await sharp({create:{width,height,channels:4,background:'#fff'}}).png().toBuffer();
+  const locked=await sharp({create:{width:1024,height:1536,channels:4,background:'#fff'}})
+    .composite([{input:clear,left:0,top:0,blend:'dest-out'}]).png().toBuffer();
+  const canvas = await sharp(locked).composite([{ input: original, left: originalLeft, top: originalTop }]).png().toBuffer();
   const opaque = await sharp({ create: { width:info.width, height: info.height, channels: 4, background: '#fff' } }).png().toBuffer();
-  const mask = await sharp({ create: { width: 1024, height: 1536, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  const mask = await sharp(locked)
     .composite([{ input: opaque, left: originalLeft, top: originalTop }]).png().toBuffer();
   return { original, canvas, mask, width, height, originalWidth:info.width,originalLeft,originalHeight: info.height, originalTop };
 }

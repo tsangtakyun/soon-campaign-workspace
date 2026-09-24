@@ -1,10 +1,12 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 async function main(){
- let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true,boundaryThrows=false;const files=new Map(),queries=[];
+ let authorized=true,quota=true,paid=0,finished=0,record=null,boundarySafe=true,reviewSafe=true,boundaryThrows=false,evidence=null;const files=new Map(),queries=[];
+ const analysisId='33333333-3333-4333-a333-333333333333';
  const workspaceId='11111111-1111-4111-a111-111111111111',projectId='22222222-2222-4222-a222-222222222222';
  const admin={from:table=>{let op='read',value,filters=[];const result=()=>{
    queries.push({table,op,filters});
    if(table==='content_projects')return {data:{production:{assets:[{id:'a',url:'https://example.com/photo.png'}]}},error:null};
+   if(filters.some(([k,v])=>k==='id'&&v===analysisId))return {data:evidence,error:null};
    if(op==='insert'){record=value;return {data:{id:value.id},error:null};}
    if(op==='update'){record={...record,...value};return {data:{id:record.id},error:null};}
    return {data:record,error:null};
@@ -14,6 +16,7 @@ async function main(){
    getPublicUrl:path=>({data:{publicUrl:`https://storage.example/${path}`}})
  })}};
  const deps={
+  '@/lib/ai-subject-focus':{SUBJECT_PROMPT_VERSION:'subject-test'},
   '@/lib/extension-geometry':require('./ts-loader.cjs').load('lib/extension-geometry.ts'),
   '@/lib/generation-error':{generationError:(e,stage)=>({stage,name:e.name,statusCode:e.statusCode||null,message:e.message})},
   '@/lib/extension-quality':{boundarySchema:{safeParse:v=>({success:!!v}),parse:v=>v},boundariesSafe:v=>v.safe,qualityApproved:v=>v?.approved===true,inspectExtensionBoundaries:async()=>{if(boundaryThrows)throw Object.assign(Error('provider unavailable'),{name:'AI_APICallError',statusCode:503});return {output:{safe:boundarySafe},usage:{totalTokens:10}}},reviewExtension:async()=>({output:{approved:reviewSafe},usage:{totalTokens:10}}),extensionPrompt:()=> 'background only'},
@@ -46,6 +49,14 @@ async function main(){
  record=null;files.clear();boundaryThrows=true;
  const failed=await post();assert.equal(failed.status,502);const failure=await failed.json();
  assert.equal(failure.stage,'boundary_analysis');assert.equal(failure.runId,record.id);assert.equal(record.output.failures[0].statusCode,503);assert.equal(paid,2);
+ record=null;files.clear();reviewSafe=true;
+ evidence={status:'ready',input:{kind:'subject-test',assetId:'a',sourceHash:require('node:crypto').createHash('sha256').update('original').digest('hex')},output:{detection:{imageKind:'single_scene',boundaries:{safe:true}}}};
+ const shared=await post({analysisId});assert.equal(shared.status,200,'shared evidence bypasses separate boundary model, which is deliberately throwing');assert.equal(paid,3);
+ const lookup=queries.find(q=>q.filters.some(([k,v])=>k==='id'&&v===analysisId));
+ assert.ok(lookup.filters.some(([k,v])=>k==='workspace_id'&&v===workspaceId));assert.ok(lookup.filters.some(([k,v])=>k==='project_id'&&v===projectId));
+ evidence.input.sourceHash='stale';assert.equal((await post({analysisId})).status,409);assert.equal(paid,3);
+ evidence.input.sourceHash=require('node:crypto').createHash('sha256').update('original').digest('hex');evidence.output.detection.imageKind='collage';
+ assert.equal((await post({analysisId})).status,422);assert.equal(paid,3,'collage must never reach image generator');
  console.log('PASS: authentication, quota, workspace scope, pre-call record, masks, persistence, cache/recovery and no project mutation');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

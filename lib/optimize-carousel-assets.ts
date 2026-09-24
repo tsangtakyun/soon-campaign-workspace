@@ -2,13 +2,14 @@ import { compositionAdvice, type CompositionAnalysis, type ExtensionPlacement } 
 import { applyExtension, type ExtensionPreview, type ExtendableAsset } from './extension-asset';
 import type { CropRect } from './subject-crop';
 import { compositionKey, type CompositionVariant } from './composition-mode';
+import {COMPOSITION_POLICY} from './extension-evidence';
 
 export type OptimizationFrame = { assetId: string; frame: CropRect; textZones: CropRect[]; page: string };
 export type OptimizationIssue = {page:string;assetId:string;message:string;code?:string;runId?:string;stage?:string;compositionKey?:string};
 /** Complete asset preparation before committing drafts_confirmed or starting raster output. */
 export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:string}>(assets: T[], frames: OptimizationFrame[], actions: {
   analyze: (id:string) => Promise<CompositionAnalysis>;
-  generate: (id:string, placement?:ExtensionPlacement) => Promise<ExtensionPreview>;
+  generate: (id:string, placement?:ExtensionPlacement,analysisId?:string) => Promise<ExtensionPreview>;
   dimensions: (asset:T) => Promise<{width:number;height:number}>;
   progress: (message:string) => void;
   failure?: (issue:OptimizationIssue) => void;
@@ -23,11 +24,11 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
     const key=compositionKey(item.frame,item.textZones);
     const variant=asset.compositionVariants?.[key];
     const unresolved=(message:string)=>actions.failure?.({page:item.page,assetId:asset.id,message,code:'COMPOSITION_NEEDS_REVIEW',stage:'composition',compositionKey:key});
-    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url && (variant.action!=='contain' || variant.policyVersion==='edge-evidence-v5' || asset.autoExtensionDeclinedUrl===asset.url)){
-      if(variant.action==='contain' && asset.autoExtensionDeclinedUrl!==asset.url)unresolved('此圖片尚未配合母版；請換圖或明確確認保留原圖。');
+    if(asset.compositionMode==='ai' && variant?.sourceUrl===asset.url && (variant.action!=='contain' || variant.policyVersion===COMPOSITION_POLICY || asset.autoExtensionDeclinedUrl===asset.url)){
+      if(variant.action==='contain' && asset.autoExtensionDeclinedUrl!==asset.url)unresolved(`${variant.reason} 同一方案已檢查，不會重複付費生成；請保留原圖或換圖。`);
       continue;
     }
-    const record=(value:Omit<CompositionVariant,'sourceUrl'>)=>prepared.set(asset.id,{...prepared.get(asset.id)!,compositionVariants:{...prepared.get(asset.id)?.compositionVariants,[key]:{...value,sourceUrl:asset.url,policyVersion:'edge-evidence-v5'}}});
+    const record=(value:Omit<CompositionVariant,'sourceUrl'>)=>prepared.set(asset.id,{...prepared.get(asset.id)!,compositionVariants:{...prepared.get(asset.id)?.compositionVariants,[key]:{...value,sourceUrl:asset.url,policyVersion:COMPOSITION_POLICY}}});
     if(asset.autoExtensionDeclinedUrl===asset.url){
       if(asset.compositionMode==='ai')record({action:'contain',reason:'用家已選擇保留原圖。'});
       continue;
@@ -46,9 +47,9 @@ export async function optimizeCarouselAssets<T extends ExtendableAsset & {id:str
       if(advice.action==='split'||advice.action==='review')unresolved(advice.reason);
       return;
     }
-    actions.progress(`正在為 ${item.page} ${advice.title}，完成後才會製作圖片…`);
+    actions.progress(`正在提交 ${item.page} ${advice.title}方案，通過邊界檢查後才生成背景…`);
     let preview: ExtensionPreview;
-    try { preview = await actions.generate(asset.id, advice.placement); }
+    try { preview = await actions.generate(asset.id, advice.placement,analysis.analysisId); }
     catch(error) {
       if((error as {code?:string})?.code!=='EXTENSION_REJECTED')throw error;
       actions.progress(`${item.page} 延伸未通過檢查，保留原圖。`);

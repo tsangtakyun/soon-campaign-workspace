@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 let captured;
-const box={exports:{},AbortSignal,require:n=>n==='ai'?{generateText:async args=>{captured=args;return {};},Output:{object:args=>args}}:n==='@ai-sdk/anthropic'?{anthropic:model=>model}:n==='./ai-subject-focus'?{SUBJECT_MODEL:'existing-model'}:require(n)};
+const box={exports:{},AbortSignal,require:n=>n==='./extension-evidence'?require('./ts-loader.cjs').load('lib/extension-evidence.ts'):n==='ai'?{generateText:async args=>{captured=args;return {};},Output:{object:args=>args}}:n==='@ai-sdk/anthropic'?{anthropic:model=>model}:n==='./ai-subject-focus'?{SUBJECT_MODEL:'existing-model'}:require(n)};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/extension-quality.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,box);
 const {boundariesSafe,qualityApproved,extensionPrompt}=box.exports;
 const edge={safe:true,subjectTouchesEdge:false,environment:'observed mixed shoreline',continuation:'Continue left bank on left and ripples on right'};

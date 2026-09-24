@@ -6,6 +6,7 @@ import { isUuid } from '@/lib/oauth-connections';
 import { requireWorkspaceUser, consumeApiQuota } from '@/lib/platform-access';
 import { fetchSafeExternal } from '@/lib/safe-external-url';
 import { detectSubject, focusFromDetection, SUBJECT_MODEL, SUBJECT_PROMPT_VERSION } from '@/lib/ai-subject-focus';
+import {backgroundFromBoundaries} from '@/lib/extension-evidence';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -28,8 +29,9 @@ async function readImage(url: string) {
       chunks.push(value);
     }
   } finally { await reader.cancel().catch(() => {}); }
-  return sharp(Buffer.concat(chunks), { limitInputPixels: 40_000_000, animated: false }).rotate()
-    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+  const bytes=Buffer.concat(chunks);
+  return {sourceHash:createHash('sha256').update(bytes).digest('hex'),image:await sharp(bytes, { limitInputPixels: 40_000_000, animated: false }).rotate()
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()};
 }
 
 export async function POST(request: Request) {
@@ -48,8 +50,8 @@ export async function POST(request: Request) {
     const asset = Array.isArray(project?.production?.assets) ? project.production.assets.find((a: any) => a?.id === assetId) : null;
     if (!asset?.url) return reply({ error: '找不到專案圖片。' }, 404);
     // The client supplies an asset ID, never a URL. Do not send authenticated URLs or original metadata to the model.
-    const image = await readImage(new URL(asset.url, request.url).toString());
-    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${SUBJECT_MODEL}:${SUBJECT_PROMPT_VERSION}:`).update(image).digest('hex');
+    const {image,sourceHash} = await readImage(new URL(asset.url, request.url).toString());
+    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${SUBJECT_MODEL}:${SUBJECT_PROMPT_VERSION}:${sourceHash}:`).update(image).digest('hex');
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const { data: old, error: lookupError } = await admin.from(table).select('status,output,updated_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (lookupError) return reply({ error: '辨識紀錄暫時不可用。' }, 503);
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
     if (!process.env.ANTHROPIC_API_KEY) return reply({ error: 'AI 辨識服務尚未設定，請先使用手動焦點。' }, 503);
     if (old?.status === 'pending' && Date.now() - Date.parse(old.updated_at) < 120_000) return reply({ error: '此圖片正在辨識中；請稍後再按一次。', id, url: address }, 409);
     const record = { id, project_id: projectId, workspace_id: workspaceId, actor_id: auth.access.user.id, status: 'pending', model: SUBJECT_MODEL,
-      input: { kind: SUBJECT_PROMPT_VERSION, assetId, imageHash: hash }, updated_at: new Date().toISOString() };
+      input: { kind: SUBJECT_PROMPT_VERSION, assetId, imageHash: hash,sourceHash }, updated_at: new Date().toISOString() };
     const claim = old ? await admin.from(table).update({ status: 'pending', error: null, updated_at: record.updated_at }).eq('id', id).eq('status', old.status).eq('updated_at', old.updated_at).select('id').maybeSingle()
       : await admin.from(table).insert(record).select('id').maybeSingle();
     if (claim.error || !claim.data) return reply({ error: '辨識請求已在處理，請稍後再試。' }, 409);
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
     const result = await detectSubject(image);
     const focus = focusFromDetection(result.output);
     const inputTokens = result.totalUsage.inputTokens || 0, outputTokens = result.totalUsage.outputTokens || 0;
-    const output = { detection: result.output, focus, usage: { inputTokens, outputTokens }, model: SUBJECT_MODEL, provider: 'anthropic-direct',
+    const output = { detection: {...result.output,background:backgroundFromBoundaries(result.output.boundaries)}, focus, usage: { inputTokens, outputTokens }, model: SUBJECT_MODEL, provider: 'anthropic-direct',
       estimatedCostUsd: inputTokens * .000001 + outputTokens * .000005, costBasis: 'Gateway catalog 2026-09-23, estimate excluding cache discounts',
       createdAt: new Date().toISOString(), applied: false };
     const { error: savedError } = await admin.from(table).update({ status: 'ready', output, updated_at: new Date().toISOString() }).eq('id', id);

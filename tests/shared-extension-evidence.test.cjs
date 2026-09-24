@@ -1,0 +1,26 @@
+const assert=require('node:assert/strict');
+const {load}=require('./ts-loader.cjs');
+const {backgroundFromBoundaries}=load('lib/extension-evidence.ts');
+const {boundariesSafe}=load('lib/extension-quality.ts',{'ai':{},'@ai-sdk/anthropic':{},'./ai-subject-focus':{SUBJECT_MODEL:'test'}});
+const edge={safe:true,subjectTouchesEdge:false,environment:'pink wall',continuation:'continue pink wall'};
+const evidence={confidence:'high',subjects:'person',top:edge,left:edge,right:edge,bottom:{...edge,safe:false,subjectTouchesEdge:true}};
+const background=backgroundFromBoundaries(evidence);
+assert.equal(background.leftwardExtension,'safe');assert.equal(background.downwardExtension,'risky');
+assert.equal(boundariesSafe(evidence,{width:800,height:1000,originalWidth:600,originalHeight:800,originalLeft:100,originalTop:200}),true,'top and sides use safe evidence');
+assert.equal(boundariesSafe(evidence,{width:800,height:1000,originalWidth:600,originalHeight:800,originalLeft:100,originalTop:0}),false,'bottom remains forbidden');
+assert.equal(backgroundFromBoundaries({...evidence,confidence:'low'}).leftwardExtension,'uncertain');
+assert.equal(backgroundFromBoundaries(null).leftwardExtension,'uncertain');
+console.log('PASS same edge evidence drives planning and server validation; cropped body remains protected');
+const {compositionKey}=load('lib/composition-mode.ts');
+const {optimizeCarouselAssets}=load('lib/optimize-carousel-assets.ts',{'./composition-advice':{compositionAdvice:()=>({action:'extend',reason:'safe',title:'延伸',placement:{aspectRatio:.8,topFraction:0}})}});
+(async()=>{
+ const frame={assetId:'a',page:'P.1',frame:{x:0,y:0,width:800,height:1000},textZones:[]};
+ const key=compositionKey(frame.frame,[]);let analyzes=0,generates=0;
+ const asset={id:'a',url:'original',compositionMode:'ai',compositionVariants:{[key]:{sourceUrl:'original',action:'contain',reason:'old rejection',policyVersion:'edge-evidence-v5'}}};
+ const actions={analyze:async()=>{analyzes++;return {analysisId:'saved-evidence'};},generate:async(id,p,evidence)=>{assert.equal(evidence,'saved-evidence');generates++;throw Object.assign(Error('rejected'),{code:'EXTENSION_REJECTED',stage:'boundary_analysis'});},dimensions:async()=>({width:800,height:600}),progress:()=>{},failure:()=>{}};
+ const next=await optimizeCarouselAssets([asset],[frame],actions);assert.equal(analyzes,1);assert.equal(generates,1,'old policy rejection is re-evaluated');
+ await optimizeCarouselAssets(next,[frame],actions);assert.equal(generates,1,'identical current-policy rejection must not charge again');
+ const approved={...asset,compositionVariants:{[key]:{sourceUrl:'original',action:'extend',url:'approved',policyVersion:'edge-evidence-v5'}}};
+ const kept=await optimizeCarouselAssets([approved],[frame],actions);assert.equal(kept[0].compositionVariants[key].url,'approved');assert.equal(analyzes,1,'approved results survive policy upgrade');
+ console.log('PASS old failures re-evaluated, unchanged failures deduplicated, approved results preserved, evidence ID forwarded');
+})().catch(e=>{console.error(e);process.exitCode=1;});

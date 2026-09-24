@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function load(file,require){const box={exports:{},require};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
-const quality=load('lib/extension-quality.ts',n=>n==='ai'||n==='@ai-sdk/anthropic'?{}:n==='./ai-subject-focus'?{SUBJECT_MODEL:'test'}:require(n));
+const quality=load('lib/extension-quality.ts',n=>n==='./extension-evidence'?require('./ts-loader.cjs').load('lib/extension-evidence.ts'):n==='ai'||n==='@ai-sdk/anthropic'?{}:n==='./ai-subject-focus'?{SUBJECT_MODEL:'test'}:require(n));
 const {verifiedExtensionAssets:verify}=load('lib/verified-extension-assets.ts',n=>n==='./extension-quality'?quality:{EXTENSION_VERSION:'current'});
 const asset={id:'asset',url:'extended',extensionId:'run',extensionOriginal:{url:'original',width:640,height:400}};
 const run={id:'run',status:'ready',input:{kind:'current',assetId:'asset'},output:{url:'extended',review:{confidence:'high',addedSubject:false,duplicatedSubject:false,unnaturalReflection:false,environmentMatches:true,seamNatural:true,reason:'checked'}}};

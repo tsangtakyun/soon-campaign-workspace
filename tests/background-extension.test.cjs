@@ -7,6 +7,7 @@ async function main(){
  assert.equal(plan.width,640);assert.equal(plan.height,800);assert.equal(plan.originalHeight,360);
  const mask=await sharp(plan.mask).raw().toBuffer();
  assert.equal(mask[(100*1024+100)*4+3],255);assert.equal(mask[(400*1024+100)*4+3],0);
+ assert.equal(mask[(1000*1024+900)*4+3],255,'unused provider canvas must be protected, not generated');
  const generated=await sharp({create:{width:1024,height:1536,channels:3,background:'#ff0000'}}).png().toBuffer();
  const result=await lib.finishExtension(generated,plan);
  const preserved=await sharp(result).extract({left:0,top:0,width:640,height:360}).removeAlpha().raw().toBuffer();
@@ -21,6 +22,8 @@ async function main(){
   const pixels=await sharp(output).extract({left:horizontal.originalLeft,top:horizontal.originalTop,width:horizontal.originalWidth,height:horizontal.originalHeight}).raw().toBuffer();
   assert.deepEqual(pixels,await sharp(horizontal.original).ensureAlpha().raw().toBuffer(),'four-way output preserves original rectangle');
  }
+ const wide=await lib.prepareExtension(exact,{aspectRatio:2.187,topFraction:0,leftFraction:.5});
+ assert.ok(Math.abs(wide.width/wide.height-2.187)<.01);
  const assets=compile('lib/extension-asset.ts');
  for(const topFraction of [0,.5,1]) {
   const shifted=await lib.prepareExtension(source,{aspectRatio:.5,topFraction});

@@ -2,12 +2,13 @@ import { subjectCrop, validSubjectFocus, type SubjectFocus, type CropRect } from
 import {extensionGeometry,type ExtensionPlacement} from './extension-geometry';
 export type {ExtensionPlacement} from './extension-geometry';
 type Risk='safe'|'risky'|'uncertain';
-export type CompositionAnalysis = { focus: SubjectFocus | null; label:string; reason:string; cached:boolean;
+export type CompositionAnalysis = { focus: SubjectFocus | null; label:string; reason:string; cached:boolean;analysisId?:string;imageKind?:string;
  background?:{downwardExtension:Risk;upwardExtension?:Risk;leftwardExtension?:Risk;rightwardExtension?:Risk;reason:string} };
 export type CompositionAdvice = { action:'keep'|'crop'|'extend'|'split'|'review';title:string;reason:string;placement?:ExtensionPlacement };
 export function compositionAdvice(input:{width:number;height:number;frame:CropRect;textZones:CropRect[];analysis:CompositionAnalysis;documentary:boolean}):CompositionAdvice {
  const {width,height,frame,textZones,analysis}=input;
  const review=(reason:string):CompositionAdvice=>({action:'review',title:'此母版構圖需要處理',reason});
+ if(analysis.imageKind==='collage'||analysis.imageKind==='graphic')return review('此圖是拼貼／圖表，並非連續環境；不會重畫或延伸內部圖格。請保留完整原圖，或改用單一場景圖片。');
  if(!(width>0&&height>0&&frame.width>0&&frame.height>0)||!validSubjectFocus(analysis.focus))return review('未能可靠判斷主體或尺寸；母版及原圖保留。');
  const focus=analysis.focus;
  const crop=subjectCrop({width,height,subjectFocus:{...focus,sourceWidth:width,sourceHeight:height}},frame,textZones);
@@ -31,6 +32,6 @@ export function compositionAdvice(input:{width:number;height:number;frame:CropRe
   candidates.push({placement,score:g.width*g.height/(width*height)+centre*.2,directions:['上','下','左','右'].filter((_,i)=>margins[i]>.01)});
  }
  const best=candidates.sort((a,b)=>a.score-b.score)[0];
- if(!best)return review('未找到能保留主體並避開文字的安全延伸方案；母版不變，請確認原圖或換圖。');
+ if(!best)return review(textZones.length?'安全邊界、主體保護範圍及文字區未能同時配合；不會延伸人物肢體。請保留原圖或換圖。':'在此圖片框比例下，沒有可用的安全延伸邊界或延伸範圍超限；並非文字遮擋。請保留原圖或換圖。');
  return {action:'extend',placement:best.placement,title:`向${best.directions.join('、')}延伸背景`,reason:`按母版圖片框及文字安全區，只補環境，不改主體。${width<frame.width?'原圖較低解像度，延伸唔會令原圖變高清。':''}`};
 }

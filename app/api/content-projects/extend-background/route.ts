@@ -7,6 +7,7 @@ import { isUuid } from '@/lib/oauth-connections';
 import { generationError } from '@/lib/generation-error';
 import { loadExtensionSource, prepareExtension, finishExtension, EXTENSION_VERSION } from '@/lib/background-extension';
 import { boundarySchema, boundariesSafe, qualityApproved, inspectExtensionBoundaries, reviewExtension, extensionPrompt } from '@/lib/extension-quality';
+import {SUBJECT_PROMPT_VERSION} from '@/lib/ai-subject-focus';
 
 export const runtime = 'nodejs';
 export const maxDuration = 180;
@@ -17,7 +18,8 @@ export async function POST(request: Request) {
   let admin: SupabaseClient | undefined, runId: string | undefined;
   let stage='prepare', metadata: Record<string, any> = {};
   try {
-    const { workspaceId, projectId, assetId, placement = { aspectRatio: .8, topFraction: 0 } } = await request.json().catch(() => ({}));
+    const { workspaceId, projectId, assetId,analysisId, placement = { aspectRatio: .8, topFraction: 0 } } = await request.json().catch(() => ({}));
+    if(analysisId!==undefined&&!isUuid(analysisId))return reply({error:'Invalid analysis reference'},400);
     if (!validExtensionPlacement(placement)) return reply({ error: 'Invalid placement' }, 400);
     if (!isUuid(workspaceId) || !isUuid(projectId) || typeof assetId !== 'string' || !assetId || assetId.length > 200) return reply({ error: 'Invalid request' }, 400);
     const auth = await requireWorkspaceUser(workspaceId, 'canEdit');
@@ -31,8 +33,17 @@ export async function POST(request: Request) {
     if (asset.extensionOriginal) return reply({ error: '此圖已延伸；請先還原原圖。' }, 422);
     const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-2';
     const bytes = await loadExtensionSource(new URL(asset.url, request.url).toString());
+    let sharedEvidence:any=null;
+    if(analysisId){
+      const {data:evidence,error:evidenceError}=await admin.from(table).select('input,output,status').eq('id',analysisId).eq('workspace_id',workspaceId).eq('project_id',projectId).maybeSingle();
+      if(evidenceError)return reply({error:'未能讀取邊界證據，原圖保留。'},503);
+      if(evidence?.status!=='ready'||evidence.input?.kind!==SUBJECT_PROMPT_VERSION||evidence.input?.assetId!==assetId||evidence.input?.sourceHash!==createHash('sha256').update(bytes).digest('hex'))return reply({error:'圖片或邊界證據已改變，請重新分析；未生成背景。'},409);
+      sharedEvidence=evidence.output?.detection;
+      if(['collage','graphic'].includes(sharedEvidence?.imageKind))return reply({code:'EXTENSION_REJECTED',stage:'boundary_analysis',error:'拼貼／圖表不是連續環境，不會延伸或重畫內部圖格；請保留原圖或改用單一場景。'},422);
+      if(!boundarySchema.safeParse(sharedEvidence?.boundaries).success)return reply({error:'邊界證據不完整，請重新分析。'},409);
+    }
     const plan = await prepareExtension(bytes, placement);
-    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${model}:${EXTENSION_VERSION}:${placement.aspectRatio}:${placement.topFraction}:${placement.leftFraction ?? .5}:${placement.expansion ?? 1}:`).update(bytes).digest('hex');
+    const hash = createHash('sha256').update(`${workspaceId}:${projectId}:${assetId}:${model}:${EXTENSION_VERSION}:${analysisId||'manual'}:${placement.aspectRatio}:${placement.topFraction}:${placement.leftFraction ?? .5}:${placement.expansion ?? 1}:`).update(bytes).digest('hex');
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const { data: old, error: lookupError } = await admin.from(table).select('status,output,updated_at').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (lookupError) return reply({ error: '生成紀錄暫時不可用。' }, 503);
@@ -43,10 +54,11 @@ export async function POST(request: Request) {
     const updatedAt = new Date().toISOString();
     const claim = old ? await admin.from(table).update({ status: 'pending', error: null, updated_at: updatedAt }).eq('id', id).eq('status', old.status).eq('updated_at', old.updated_at).select('id').maybeSingle()
       : await admin.from(table).insert({ id, project_id: projectId, workspace_id: workspaceId, actor_id: auth.access.user.id, status: 'pending', model,
-        input: { kind: EXTENSION_VERSION, assetId, originalUrl: asset.url, hash }, updated_at: updatedAt }).select('id').maybeSingle();
+        input: { kind: EXTENSION_VERSION, assetId, originalUrl: asset.url, hash,placement,analysisId:analysisId||null }, updated_at: updatedAt }).select('id').maybeSingle();
     if (claim.error || !claim.data) return reply({ error: '生成請求已在處理，請稍後再試。' }, 409);
     runId = id;
     metadata = { ...(old?.output || {}) };
+    if(sharedEvidence)metadata={...metadata,boundaries:sharedEvidence.boundaries,analysisId,imageKind:sharedEvidence.imageKind};
     async function persistMetadata() {
       const saved = await admin!.from(table).update({output:metadata,updated_at:new Date().toISOString()}).eq('id',id);
       if(saved.error) throw new Error('Review metadata storage failed');
@@ -60,6 +72,7 @@ export async function POST(request: Request) {
       return reply({code:'EXTENSION_REJECTED',stage,error:stage==='boundary_analysis'?'生成前邊界檢查未通過，未生成新背景；原圖保留。':'生成結果未通過品質檢查；原圖保留。'},422);
     }
     const priorBoundary=boundarySchema.safeParse(metadata.boundaries);
+    if(sharedEvidence)await persistMetadata();
     if(!priorBoundary.success) {
       stage='boundary_analysis';
       const inspection=await inspectExtensionBoundaries(plan.original,plan);
