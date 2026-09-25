@@ -13,4 +13,8 @@ Save failure reproduced as HTTP 413 at `/api/content-projects/save-design`. Embe
 
 White page numbers/credits use a small dark contrast backing shared by PNG and editor (not pixel-based background analysis). Text packing applies to the verified 1080×1350 coordinate system; other master coordinate systems keep their geometry.
 
-Pending visual work: full-bleed only when subject protection permits; user comparisons for P.5/P.6. Do not claim these are fixed by text packing.
+P.5/P.6 comparisons received: feature pages reclaim unused headline space for the image without moving the list. Closing pages use summary headline → question → action, with an optional body instead of repeated explanation. Short closing copy packs inside the master's protected dark region; the user's top-text/pink-background composition is a reference, not a universal override.
+
+Input provenance is not publication attribution: do not automatically print “原帖指出”, “原帖自述”, or “來源：原帖整理”. Preserve actual research references and necessary uncertainty; never manufacture certainty or sources. Existing saved copy is not regex-stripped or overwritten.
+
+Pending visual work: image-aware top/bottom text placement, automatic contrast measurement and extension seam detection/full-bleed require image verification. Do not claim these are fixed by text packing or prompting.

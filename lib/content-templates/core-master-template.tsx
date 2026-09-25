@@ -185,7 +185,7 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: 
  * the original slots; short copy must not inherit empty paragraphs' gaps. */
 function packEditorialText(source:FabricObjectJson[],copy:MasterCopy){
   const role=copy.role||copy.layout;
-  if(!['cover','longform','split'].includes(role||''))return source;
+  if(!['cover','longform','split','feature','end'].includes(role||''))return source;
   if(copy.fields?.highlight)return source; // preserve an explicitly boxed callout
   const get=(name:string)=>source.find(o=>o.data?.role===name);
   const value=(o:FabricObjectJson)=>bindingValue(o.data?.role||'','',copy,'',o.data?.binding);
@@ -199,7 +199,35 @@ function packEditorialText(source:FabricObjectJson[],copy:MasterCopy){
     return Math.ceil(lines*size*finite(o.lineHeight,1.16)*1.13);
   };
   const changes=new Map<FabricObjectJson,FabricObjectJson>();
-  if(role==='cover'){
+  if(role==='feature'){
+    const headline=get('headline'),accent=get('accent'),image=get('image_main');
+    if(headline&&accent&&image&&value(headline)){
+      const height=measure(headline,finite(headline.fontSize,108));
+      const top=finite(headline.top)+height+12;
+      const imageTop=top+finite(accent.height,7)+14;
+      const oldTop=finite(image.top),bottom=oldTop+finite(image.height)*finite(image.scaleY,1);
+      // Grow only into unused heading space; keep image bottom and list fixed.
+      if(imageTop<oldTop&&height<=finite(headline.height)){
+        changes.set(headline,{...headline,height});
+        changes.set(accent,{...accent,top});
+        changes.set(image,{...image,top:imageTop,height:(bottom-imageTop)/finite(image.scaleY,1)});
+      }
+    }
+  }else if(role==='end'){
+    const objects=['eyebrow','headline','body_1','question_rule','question','cta'].map(get)
+      .filter((o):o is FabricObjectJson=>!!o&&(o.data?.role==='question_rule'?!!copy.body?.[1]:!!value(o)));
+    const metrics=objects.map(o=>{
+      const size=finite(o.fontSize,33);
+      return {o,size,height:o.data?.role==='question_rule'?finite(o.height,3):measure(o,size)};
+    });
+    const total=metrics.reduce((sum,m)=>sum+m.height,0)+Math.max(0,metrics.length-1)*20;
+    // Remain inside the master's protected dark text area. Never move text
+    // over a face merely to imitate a particular user's top-text example.
+    if(total<=1350-804-50){
+      let top=804;
+      for(const {o,size,height} of metrics){changes.set(o,{...o,top,height,scaleY:1,fontSize:size});top+=height+20;}
+    }
+  }else if(role==='cover'){
     const headline=get('headline'),subtitle=get('subheadline');
     if(headline&&subtitle&&value(headline)&&value(subtitle)){
       const size=fittedSize(value(headline),finite(headline.width),finite(headline.height),finite(headline.fontSize),finite(headline.lineHeight,1.16)*1.13);

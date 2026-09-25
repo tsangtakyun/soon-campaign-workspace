@@ -34,6 +34,15 @@ async function main() {
   const metadata = await sharp(output).metadata();
   assert.equal(metadata.width, 1080); assert.equal(metadata.height, 1350);
   if (process.env.BRAND_TEST_OUTPUT) fs.writeFileSync(process.env.BRAND_TEST_OUTPUT, output);
+  for (const role of ['feature', 'end']) {
+    const copy = role === 'feature'
+      ? {role, headline:'選購重點', body:['成分','查看成分表','標示','查看產品標示','份量','控制每次份量','']}
+      : {role, headline:'懂得選擇\n適量享用', body:['','你會查看成分嗎？','收藏備用']};
+    const page = renderer.renderCoreMasterPage({design:renderer.getCoreMasterPageDesign(contract,role),copy,page:'05',primary:{url:photo,width:1080,height:1800},branding:{name:'TEST',logoUrl:logo},fonts:{family:'Brand Test',editorialFamily:'Brand Test'}});
+    const result = Buffer.from(await new ImageResponse(page,{width:1080,height:1350,fonts:[400,700,900].map(weight=>({name:'Brand Test',data,weight}))}).arrayBuffer());
+    assert.equal((await sharp(result).metadata()).height,1350);
+    if(process.env.BRAND_TEST_OUTPUT)fs.writeFileSync(process.env.BRAND_TEST_OUTPUT.replace(/\.png$/,`-${role}.png`),result);
+  }
   console.log('PASS: real ImageResponse PNG with brand logo, Nani font including 900 weight, optional subtitle, no editorial direction');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

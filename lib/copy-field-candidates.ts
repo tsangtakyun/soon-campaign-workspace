@@ -2,7 +2,7 @@ import {magazineBodyLimits} from './magazine-copy-policy';
 const count=(s:string)=>Array.from(s).length;
 const colloquial=(s:string)=>/[唔嘅咁睇揀]|幾時|食緊|識得/.test(s);
 const qualifiers=[
-  {test:/(據報|據稱|據原帖|原帖|引述|報道|報稱|聲稱)/,accept:/(據|原帖|引述|報道|報稱|聲稱)/,name:'保留來源歸因，例如據報／原帖指出'},
+  {test:/(據報|據稱|據原帖|原帖|引述|報道|報稱|聲稱)/,accept:/(據|原帖|引述|報道|報稱|聲稱)/,name:'保留必要歸因，可用「據報／據稱」，不必重複「原帖指出」'},
   {test:/(未.{0,5}核實|待.{0,3}核實|未.{0,3}證實)/,accept:/(未.{0,5}核實|待.{0,3}核實|未.{0,3}證實)/,name:'保留尚未核實／證實的限制'},
   {test:/(可能|或許|或有)/,accept:/(可能|或許|或有)/,name:'保留可能性，不能改成肯定結果'},
   {test:/(關聯|相關)(?!研究|資料|文獻|報道|說法|內容|資訊)/,accept:/(關聯|相關)/,name:'只表示相關／關聯，不能改成因果'},
