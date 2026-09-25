@@ -1997,21 +1997,21 @@ export default function ContentStudioPage() {
     );
   }
 
-  async function generateCarouselImages(page?:string) {
+  async function generateCarouselImages(page?:string,repairComparison=false) {
     if (!workspaceId || !selected) return;
     if(generatingCarousel)return;
-    if(selected.production?.productionStatus==='images_ready' && !window.confirm(page?`重新排版 ${page}？其他頁面及已選底圖會保留。舊版本會保存。`:'重新排版全套？已選底圖會保留，手動編輯將由草稿重新排版；舊版本會保存。'))return;
+    if(selected.production?.productionStatus==='images_ready' && !window.confirm(repairComparison?`AI 會整理 ${page} 的比較維度及文案，再排版本頁；會使用文字 AI 額度。其他頁面及底圖不變，舊稿會保存。`:page?`重新排版 ${page}？其他頁面及已選底圖會保留。舊版本會保存。`:'重新排版全套？已選底圖會保留，手動編輯將由草稿重新排版；舊版本會保存。'))return;
     const activeWorkspaceId = workspaceId;
     const projectId = selected.id;
     const generationStartedAt = Date.now();
     setGeneratingCarousel(true);
     setSaving(true);
-    setMessage("正在生成全套 Carousel 圖片，請勿關閉頁面…");
+    setMessage(repairComparison?`正在整理 ${page} 比較內容，再排版本頁；其他頁面及圖片保留…`:page?`正在重新排版 ${page}，其他頁面保留…`:"正在生成全套 Carousel 圖片，請勿關閉頁面…");
     try {
       const response = await fetch("/api/content-projects/generate-carousel", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId, page }),
+        body: JSON.stringify({ workspaceId: activeWorkspaceId, projectId, page,repairComparison }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok)
@@ -3384,6 +3384,7 @@ export default function ContentStudioPage() {
                                                 <b>{page.page}</b>
                                                 <div className="generated-actions">
                                                   <button type="button" disabled={saving} onClick={()=>void generateCarouselImages(page.page)}>重新排版本頁</button>
+                                                  {Array.isArray(selected.production?.pageDrafts)&&selected.production.pageDrafts.some((d:any)=>d.page===page.page&&(d.role==='comparison'||d.layout==='comparison'))?<button type="button" disabled={saving} onClick={()=>void generateCarouselImages(page.page,true)}>修正比較內容並排版本頁</button>:null}
                                                   <a
                                                     className="generated-edit-button"
                                                     href={`/onboarding/scheduled-posts?editImage=${encodeURIComponent(page.url)}&editPage=${encodeURIComponent(page.page)}&editTitle=${encodeURIComponent(selected.title || "Carousel 圖片")}&projectId=${encodeURIComponent(selected.id)}&layered=${isClearMagazineCarousel(String(selected.format_decision?.renderTemplateCode || selected.format_decision?.templateCode || "")) ? "1" : "0"}`}

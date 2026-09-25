@@ -20,9 +20,11 @@ import { getWorkspaceAccess } from "@/lib/workspace-access";
 import type { FocusAsset } from '@/lib/subject-crop';
 import { verifiedExtensionAssets } from '@/lib/verified-extension-assets';
 import { resolveComposition } from '@/lib/composition-mode';
+import {repairComparisonPage} from '@/lib/repair-comparison-page';
+import {anthropicModel} from '@/lib/anthropic-models';
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 type Draft = {
   contentRole?: string;
@@ -886,6 +888,11 @@ export async function POST(req: Request) {
       headline: readerFacingCopy(draft.headline), subheadline: readerFacingCopy(draft.subheadline),
       body: draft.body?.map(readerFacingCopy),
     }));
+    if(body.repairComparison===true){
+      const index=drafts.findIndex((_,i)=>requestedPage===`P.${i+1}`);
+      if(index<0||!usesPublishedCoreMaster||!(drafts[index].role==='comparison'||drafts[index].layout==='comparison'))return NextResponse.json({error:'請選擇一頁比較頁修正，其他頁面不變。'},{status:400});
+      drafts[index]=await repairComparisonPage({admin:access.admin,workspaceId,projectId,actorId:user.id},process.env.ANTHROPIC_API_KEY||'',anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),drafts[index]);
+    }
     const sourceAssets = project.production.assets || [];
     const extensionIds = [...new Set(sourceAssets.flatMap((a:any)=>[a.extensionId,...Object.values(a.compositionVariants||{}).map((v:any)=>v.extensionId)].filter(Boolean)))];
     const extensionRuns = extensionIds.length ? await access.admin.from('content_project_generation_runs')
@@ -992,7 +999,8 @@ export async function POST(req: Request) {
     const production = {
       ...project.production,
       editorDesigns,
-      renderHistory:[...(project.production.renderHistory || []),{at:new Date().toISOString(),pages:project.production.generatedPages || [],editorDesigns:priorDesigns,replacedPages}],
+      renderHistory:[...(project.production.renderHistory || []),{at:new Date().toISOString(),pages:project.production.generatedPages || [],editorDesigns:priorDesigns,replacedPages,...(body.repairComparison===true?{pageDrafts:project.production.pageDrafts}:{})}],
+      ...(body.repairComparison===true?{pageDrafts:project.production.pageDrafts.map((draft:Draft,i:number)=>requestedPage===`P.${i+1}`?drafts[i]:draft)}:{}),
       assets,
       extensionUnverified: verified.unverified,
       generatedPages: outputs,

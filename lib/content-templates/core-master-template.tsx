@@ -150,7 +150,14 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: 
 }
 
 /** Conservative CJK/Latin wrapping estimate; both renderers use the same size. */
-function fittedSize(text:string,width:number,height:number,initial:number,lineHeight:number) {
+function fittedSize(text:string,width:number,height:number,initial:number,lineHeight:number,singleLine=false) {
+  if(singleLine){
+    // Comparison cells in the published master are one-line slots. Treat each
+    // glyph as a full em (including wide Latin capitals and CJK parentheses),
+    // with breathing room; ASCII averages underestimated Swei's MFGM acronym.
+    const units=Array.from(text).reduce((n,c)=>n+(/\s/u.test(c)?.5:1.08),0);
+    return Math.max(1,Math.floor(Math.min(initial,width/Math.max(1,units),height/lineHeight)*4)/4);
+  }
   const linesAt=(size:number)=>text.split('\n').reduce((count,line)=>{
     let lines=1,used=0;
     for(const char of Array.from(line)){const advance=(/[\u0000-\u007f]/.test(char)?0.62:1.02)*size;if(used+advance>width){lines++;used=0;}used+=advance;}
@@ -293,7 +300,8 @@ function renderObject(options: {
     const initialSize = Math.max(1, finite(object.fontSize, 20) * finite(object.scaleY, 1) * scaleY);
     const magazine = requestedFamily.startsWith('soon magazine');
     const lineHeight = finite(object.lineHeight, 1.16) * (magazine ? 1.13 : 1);
-    const fontSize = object.data?.fitText ? fittedSize(value,width,height,initialSize,lineHeight) : initialSize;
+    const singleLine=/^content\.(left|right)_row_[1-3]$/.test(object.data?.binding||'');
+    const fontSize = object.data?.fitText ? fittedSize(value,width,height,initialSize,lineHeight,singleLine) : initialSize;
     // Fabric positions glyphs inside a 1.13-em first line; CSS includes half
     // the leading above it. Compensate without clipping the final baseline.
     const leading = magazine ? fontSize * (lineHeight - 1) / 2 : 0;
@@ -311,7 +319,7 @@ function renderObject(options: {
         letterSpacing: finite(object.charSpacing) * finite(object.fontSize, 20) / 1000 * finite(object.scaleX, 1) * scaleX,
         lineHeight,
         textAlign: object.textAlign || "left",
-        whiteSpace: "pre-wrap",
+        whiteSpace: singleLine ? "nowrap" : "pre-wrap",
         alignItems: "flex-start",
         justifyContent: object.textAlign === "center" ? "center" : object.textAlign === "right" ? "flex-end" : "flex-start",
       },
@@ -434,7 +442,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
       const text = role === 'brand_logo' ? options.branding.name : role==='image_credit' ? (options.primary?.sourceType==='ai_generated'?'AI 示意圖':'') : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
       objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',
         fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
-        fontSize:object.data?.fitText ? fittedSize(text,width,height,Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),finite(object.lineHeight,1.16)*(requestedFamily.startsWith('soon magazine')?1.13:1)) : Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
+        fontSize:object.data?.fitText ? fittedSize(text,width,height,Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),finite(object.lineHeight,1.16)*(requestedFamily.startsWith('soon magazine')?1.13:1),/^content\.(left|right)_row_[1-3]$/.test(object.data?.binding||'')) : Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
         lineHeight:finite(object.lineHeight,1.16),charSpacing:finite(object.charSpacing),textAlign:object.textAlign||'left',editable:true,
         data:{...object.data,id,kind:'text',item:'body',label:role || '文字'}});
     } else {
