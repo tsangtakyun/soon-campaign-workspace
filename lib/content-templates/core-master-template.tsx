@@ -142,7 +142,19 @@ function clean(value: unknown) {
 /** The published Core master owns geometry. Asset fitting and copy binding may
  * never replace, move or resize its layout. Optional empty decoration is omitted. */
 function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: MasterAsset): FabricObjectJson[] {
-  return (design.canvasJson?.objects || []).filter(o =>
+  let source=design.canvasJson?.objects || [];
+  // Explicit comparison header correction: derive a matched pair from the
+  // published slots, leaving the stored master and all other objects intact.
+  const leftBox=source.find(o=>o.data?.role==='left_label_box'),rightBox=source.find(o=>o.data?.role==='right_label_box');
+  const leftLabel=source.find(o=>o.data?.role==='label_left'),rightLabel=source.find(o=>o.data?.role==='label_right');
+  if(leftBox&&rightBox&&leftLabel&&rightLabel){
+    const width=Math.max(finite(leftBox.width),finite(rightBox.width)),height=Math.min(finite(leftBox.height),finite(rightBox.height));
+    const inset=24,textWidth=width-inset*2,textHeight=height-12;
+    const lineHeight=finite(leftLabel.lineHeight,1.2)*1.13;
+    const size=Math.min(...[copy.fields?.label_left??copy.body?.[0]??'',copy.fields?.label_right??copy.body?.[1]??''].map(text=>fittedSize(String(text),textWidth,textHeight,finite(leftLabel.fontSize,49),lineHeight,true)));
+    source=source.map(o=>o===leftBox||o===rightBox?{...o,width,height,top:leftBox.top}:o===leftLabel||o===rightLabel?{...o,left:finite(o===leftLabel?leftBox.left:rightBox.left)+inset,top:finite(leftBox.top)+6,width:textWidth,height:textHeight,fontSize:size,fontFamily:leftLabel.fontFamily,fontWeight:leftLabel.fontWeight,lineHeight:leftLabel.lineHeight,textAlign:'left' as const}:o);
+  }
+  return source.filter(o =>
     !(o.data?.role === 'highlight_box' && !copy.fields?.highlight)
   ).map(o => /text/i.test(o.type || '') && o.data?.binding?.startsWith('content.')
     ? {...o,data:{...o.data,fitText:true}}
@@ -219,12 +231,18 @@ function bindingValue(role: string, fallback: string, copy: MasterCopy, page: st
   if(label){
     const n=Number(label[1])-1;
     const hasContent=['left','right'].some(side=>comparisonCopy(body,side as 'left'|'right').split(/\n|[；;]/u)[n]?.trim());
-    return hasContent?readerFacingCopy(copy.comparisonLabels?.[n]||''):'';
+    let title=copy.comparisonLabels?.[n]||'';
+    const cells=['left','right'].map(side=>comparisonCopy(body,side as 'left'|'right').split(/\n|[；;]/u)[n]||'');
+    if(/添加成[分份]/u.test(title)&&cells.some(text=>/天然|本身含|自然含/u.test(text)))title='成分特點';
+    return hasContent?readerFacingCopy(title):'';
   }
   const row = key.match(/^(left|right)_row_([1-3])$/);
   if (row) {
     const lines = comparisonCopy(body, row[1] as 'left' | 'right').split(/\n|[；;]/u);
-    return (lines[Number(row[2])-1] || '').replace(/^(進食|活動|能量來源|能量)[\s：:]+/u, '');
+    const n=Number(row[2])-1;
+    const value=(lines[n] || '').replace(/^(進食|活動|能量來源|能量)[\s：:]+/u, '');
+    const other=comparisonCopy(body,row[1]==='left'?'right':'left').split(/\n|[；;]/u)[n];
+    return value || (other?.trim()?'原文未提供':'');
   }
   const direct = values[key];
   if (direct != null) return direct;
