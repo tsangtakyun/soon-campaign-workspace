@@ -117,7 +117,7 @@ function fitReasons(item:{field:string;text:string;limit:number},text:string,ali
     // A retained qualifier or ID alone is not a retained claim. Require a
     // concrete phrase from each note, in addition to the qualifier checks.
     const concrete=note.text.replace(/原帖|待核實|未核實|據稱|或有助|可能|說法|資料來源/g,'');
-    const phrases=concrete.match(/[\p{Script=Han}]{4,}/gu)||[];
+    const phrases:string[]=concrete.match(/[\p{Script=Han}]{4,}/gu)||[];
     if(phrases.length&&!phrases.some(phrase=>Array.from({length:phrase.length-3},(_,i)=>phrase.slice(i,i+4)).some(part=>text.includes(part))))reasons.push(`須保留${note.id}的具體內容，不可只保留待核實`);
   }
   return reasons;
