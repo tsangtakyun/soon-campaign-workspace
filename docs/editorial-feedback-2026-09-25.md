@@ -11,4 +11,6 @@ Apply refinements only when generating/reflowing a page; never silently regenera
 
 Save failure reproduced as HTTP 413 at `/api/content-projects/save-design`. Embedded media must be uploaded independently and replaced by stable URLs in a cloned canvas document, including nested groups and custom metadata. No PNG quality reduction or flattening of editable text.
 
-Pending visual work: background-aware page-number/credit contrast; full-bleed only when subject protection permits; user comparisons for P.5/P.6. Do not claim these are fixed by text packing.
+White page numbers/credits use a small dark contrast backing shared by PNG and editor (not pixel-based background analysis). Text packing applies to the verified 1080×1350 coordinate system; other master coordinate systems keep their geometry.
+
+Pending visual work: full-bleed only when subject protection permits; user comparisons for P.5/P.6. Do not claim these are fixed by text packing.

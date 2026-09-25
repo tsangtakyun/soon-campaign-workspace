@@ -35,6 +35,7 @@ type FabricObjectJson = {
   lineHeight?: number;
   charSpacing?: number;
   textAlign?: "left" | "center" | "right";
+  backgroundColor?: string;
   src?: string;
   objects?: FabricObjectJson[];
   data?: FabricData;
@@ -168,7 +169,11 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: 
       source=source.filter(o=>!peers.includes(o)&&o.data?.binding!==`content.comparison_label_${n}`&&!new RegExp(`^row_rule_[01]_${n-1}$`).test(o.data?.role||''));
     }
   }
-  source=packEditorialText(source,copy);
+  const coordinate=inferCoordinateSize(design);
+  if(coordinate.width===OUTPUT_WIDTH&&coordinate.height===OUTPUT_HEIGHT)source=packEditorialText(source,copy);
+  // A small contrast backing is deterministic even when source photography
+  // changes. Keep credits readable without pretending to analyze its pixels.
+  source=source.map(o=>['page_number','image_credit','secondary_image_credit','source'].includes(o.data?.role||'')&&/^#(?:fff|ffffff)$/i.test(typeof o.fill==='string'?o.fill:'')?{...o,backgroundColor:'#000000B3'}:o);
   return source.filter(o =>
     !(o.data?.role === 'highlight_box' && !copy.fields?.highlight)
   ).map(o => /text/i.test(o.type || '') && o.data?.binding?.startsWith('content.')
@@ -393,6 +398,7 @@ function renderObject(options: {
         top: top - leading,
         height: height + leading * 2,
         color: typeof object.fill === "string" ? object.fill : "#171717",
+        ...(value && object.backgroundColor ? { backgroundColor: object.backgroundColor } : {}),
         fontFamily: family,
         fontSize,
         fontStyle: object.fontStyle || "normal",
@@ -521,7 +527,7 @@ export function createCoreMasterCanvas(options: Parameters<typeof renderCoreMast
     } else if (['textbox','text','itext'].includes(type)) {
       const requestedFamily = clean(object.fontFamily).toLowerCase();
       const text = role === 'brand_logo' ? options.branding.name : role==='image_credit' ? (options.primary?.sourceType==='ai_generated'?'AI 示意圖':'') : readerFacingCopy(bindingValue(role,clean(object.text),options.copy,options.page,object.data?.binding));
-      objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',
+      objects.push({...common,type:'Textbox',text,splitByGrapheme:true,fill:typeof object.fill==='string'?object.fill:'#171717',backgroundColor:text?object.backgroundColor:undefined,
         fontFamily:requestedFamily.includes('serif') || requestedFamily.includes('明體')?options.fonts.editorialFamily:options.fonts.family,
         fontSize:object.data?.fitText ? fittedSize(text,width,height,Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),finite(object.lineHeight,1.16)*(requestedFamily.startsWith('soon magazine')?1.13:1),/^content\.(left|right)_row_[1-3]$/.test(object.data?.binding||'')) : Math.max(1,finite(object.fontSize,20)*finite(object.scaleY,1)*sy),fontWeight:object.fontWeight||400,fontStyle:object.fontStyle||'normal',
         lineHeight:finite(object.lineHeight,1.16),charSpacing:finite(object.charSpacing),textAlign:object.textAlign||'left',editable:true,

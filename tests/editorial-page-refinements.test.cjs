@@ -6,6 +6,8 @@ const canvas=(role,copy)=>m.createCoreMasterCanvas({design:contract.master_desig
 const get=(c,role)=>c.objects.find(o=>o.data?.role===role);
 const p1=canvas('cover',{headline:'短標題',body:['保留來源的副文']});
 assert.ok(get(p1,'subheadline').top<1175,'short headline and subtitle grouped');
+assert.equal(get(p1,'page_number').backgroundColor,'#000000B3');
+assert.equal(get(p1,'image_credit').backgroundColor,undefined,'no empty credit plate');
 const p2=canvas('longform',{headline:'背景介紹',body:['原帖所述背景','','為甚麼會這樣？','資料尚待核實']});
 assert.ok(get(p2,'highlight').top<1193,'question follows actual body rather than an empty paragraph');
 assert.equal(get(p2,'highlight').fontSize,40);
