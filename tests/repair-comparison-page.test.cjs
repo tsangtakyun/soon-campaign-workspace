@@ -3,8 +3,8 @@ let calls=0;
 const page={page:'P.4',role:'comparison',headline:'原有標題',assetIds:['one','two'],body:['甲','乙','乳脂肪≥10%\n舊文字\n原帖稱或有助改善敏感度（待核實）','植物油\n乳化劑\n不符合FDA定義','','原帖引述FDA'],fields:{left_row_2:'含MFGM',source:'原帖引述FDA',headline:'原有標題'}};
 const repaired={rows:[{label:'原料',left:'乳脂肪≥10%',right:'植物油',leftRefs:['L1'],rightRefs:['R1']},{label:'成分',left:'含MFGM',right:'乳化劑',leftRefs:['L2'],rightRefs:['R2']},{label:'法規標示',left:'',right:'不符合FDA定義',leftRefs:[],rightRefs:['R3']}],source:'原帖引述FDA；MFGM或有助改善敏感度（待核實）',noteRefs:['L3']};
 const response=x=>({content:[{type:'text',text:JSON.stringify(x)}]});
-let saved=null,nextResponse=repaired;
-const lib=load('lib/repair-comparison-page.ts',{'./draft-generation-step':{DraftStepError:Error,readDraftStep:async()=>({record:saved}),draftAnthropic:async()=>{calls++;return response(nextResponse)},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'saved-result',output}}}});
+let saved=null,nextResponse=repaired,queue=[],requests=[];
+const lib=load('lib/repair-comparison-page.ts',{'./draft-generation-step':{DraftStepError:Error,readDraftStep:async()=>({record:saved}),draftAnthropic:async(key,request)=>{calls++;requests.push(request);return response(queue.length?queue.shift():nextResponse)},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate?.(output);return {id:'saved-result',output}}}});
 async function main(){
  assert.ok(lib.readComparisonRepair(response(repaired),page));
  assert.throws(()=>lib.readComparisonRepair(response({...repaired,noteRefs:[]}),page),'cannot omit an original fact');
@@ -24,9 +24,27 @@ async function main(){
  assert.equal(JSON.stringify(fitted.noteRefs),JSON.stringify(long.noteRefs));
  assert.throws(()=>lib.applyComparisonFit(response({updates:[...patch.updates,{field:'rows.0.left',text:'改動'}]}),long,page));
  assert.throws(()=>lib.applyComparisonFit(response({updates:patch.updates.map(u=>u.field==='source'?{...u,text:'原帖引述FDA；含MFGM'}:u)}),long,page));
- saved={output:{response:response(long),completed:false}};nextResponse=patch;
+ const candidates={fields:patch.updates.map(u=>({field:u.field,candidates:[u.text]}))};
+ // Exact failed model strings from the production incident.
+ const bad={fields:[{field:'rows.2.right',candidates:['嚴格而言不符FDA「Ice Cream」定義']},{field:'source',candidates:['原帖引述美國FDA標準；MFGM說法待核實；L3待核實']}]};
+ const rejected=lib.selectComparisonCandidates(response(bad),long,page);
+ assert.equal(Object.keys(rejected.accepted).length,0);
+ assert.match(JSON.stringify(rejected.feedback),/超出/);
+ assert.match(JSON.stringify(rejected.feedback),/內部fact ID/);
+ const alternatives={fields:bad.fields.map((f,i)=>({...f,candidates:[...f.candidates,candidates.fields[i].candidates[0]]}))};
+ assert.equal(Object.keys(lib.selectComparisonCandidates(response(alternatives),long,page).accepted).length,2);
+ saved={output:{response:response(long),completed:false}};nextResponse=candidates;
  const before=calls;await lib.repairComparisonPage({},'key','configured-model',page);
  assert.equal(calls-before,1,'resume persisted alignment; only compact overflow fields');
+ queue=[{fields:[candidates.fields[0],bad.fields[1]]},{fields:[candidates.fields[1]]}];
+ const retryBefore=calls;await lib.repairComparisonPage({},'key','configured-model',page);
+ assert.equal(calls-retryBefore,2);
+ const second=JSON.parse(requests.at(-1).messages[0].content);
+ assert.equal(second.targets.length,1);assert.equal(second.targets[0].field,'source');
+ assert.match(JSON.stringify(second.feedback),/內部fact ID/);
+ nextResponse=bad;const boundedBefore=calls;
+ await assert.rejects(()=>lib.repairComparisonPage({},'key','configured-model',page),/兩輪/);
+ assert.equal(calls-boundedBefore,2,'bounded automatic retries');
  console.log('PASS comparison alignment: complete fact references, no side swapping, numeric/uncertainty guards, stale overrides cleared, assets preserved');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
