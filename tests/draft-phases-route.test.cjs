@@ -6,6 +6,10 @@ const project={id:'p',updated_at:'t1',title:'Bear',selected_format:'single_image
 const admin={from(table){let write,filters=[];const q={select(){return q},eq(k,v){filters.push([k,v]);return q},update(v){write=v;return q},single(){return Promise.resolve(run())},maybeSingle(){return Promise.resolve(run())},then(resolve,reject){return Promise.resolve(run()).then(resolve,reject)}};function run(){if(table==='content_projects'){if(write){if(filters.some(([k,v])=>k==='updated_at'&&v!==project.updated_at))return {error:new Error('stale')};Object.assign(project,write)}return {data:{...project}}}if(table==='workspace_prompt_versions')return {data:{production_prompt:'Use verified facts'}};return {data:null}}return q}};
 class StepError extends Error{constructor(message,status){super(message);this.status=status}}
 const deps={
+'@/lib/verified-request-user':{RequestAuthError:StepError,verifiedRequestUser:async()=>{if(!authorized)throw new StepError('unauthorized',401);return{id:'user'};}},
+'@/lib/repair-magazine-copy':{repairMagazineCopy:async()=>{throw Error('not used')}},
+'@/lib/magazine-copy-policy':{magazineCopyInstruction:'',magazineCopyIssues:()=>[]},
+'@/lib/editorial-page-guidance':{EDITORIAL_PAGE_GUIDANCE:''},
 '@/lib/approved-video-duration':{approvedVideoDuration:()=>20},
 '@/lib/draft-asset-analysis':{prepareDraftAssets:async()=>({done:assetDone,assets:[],completed:1,total:2})},
 '@/lib/draft-generation-step':{DraftStepError:StepError,draftAnthropic:async()=>{calls++;if(fail)throw new StepError('saved progress',504);if(stale)project.updated_at='t2';return {content:[{type:'text',text:JSON.stringify({captionDraft:'Facts',pages:[{headline:'Bear',body:['Facts'],designDirection:'Large photo'}]})}]}},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'run',output}}},

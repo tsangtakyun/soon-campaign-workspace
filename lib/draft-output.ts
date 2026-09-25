@@ -2,7 +2,9 @@ import { DraftStepError } from './draft-generation-step';
 
 const string = { type: 'string' };
 const strings = { type: 'array', items: string };
-const object = (properties: Record<string, unknown>, required: string[]) => ({type:'object', properties, required, additionalProperties:false});
+// Optional nested properties multiply grammar compilation states. Keep a stable
+// full shape and use empty values for irrelevant fields; validate meaning below.
+const object = (properties: Record<string, unknown>, _required: string[]) => ({type:'object', properties, required:Object.keys(properties), additionalProperties:false});
 export const draftOutputSchema = object({
   captionDraft:string, hook:string, durationSeconds:{type:'number'}, shotList:strings,
   pages:{type:'array', minItems:1, items:object({

@@ -47,8 +47,13 @@ export async function draftAnthropic(apiKey: string, body: Record<string,unknown
   try {
     const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
     if(!response.ok) {
-      // Never log provider response bodies: they may echo private input.
-      console.error('[draft-provider] rejected',{status:response.status,requestId:response.headers.get('request-id')});
+      // Inspect in memory, log only allowlisted categories, never raw input/body.
+      let detail='';try{detail=String((await response.json())?.error?.message||'');}catch{}
+      const reason=/schema.*(complex|compil)|compil.*schema/i.test(detail)?'schema_compilation'
+        :/schema|output_config|json_schema/i.test(detail)?'schema_validation'
+        :/too.*(large|long)|maximum.*(size|length)|request.*size/i.test(detail)?'request_size'
+        :'unclassified';
+      console.error('[draft-provider] rejected',{status:response.status,reason,requestId:response.headers.get('request-id'),requestBytes:Buffer.byteLength(JSON.stringify(body))});
       const message=response.status===400 || response.status===413 || response.status===422
         ? 'AI 請求格式或大小不符合服務要求，請聯絡支援；已保存進度保留，毋須重複按生成。'
         : response.status===401 || response.status===403 || response.status===404

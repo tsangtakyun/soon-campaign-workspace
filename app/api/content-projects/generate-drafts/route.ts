@@ -124,10 +124,12 @@ export async function POST(req: Request) {
       : project.production.pages || [];
     const templateContract = project.format_decision?.templateContractSnapshot;
     const fixedTemplate = !isVideo && isFixedCoreTemplate(templateContract);
-    const expectedTemplateRoles = fixedTemplate ? coreTemplatePageRoles(templateContract) : [];
     const structure = fixedTemplate
       ? applyCoreTemplateStructure(baseStructure, templateContract)
       : baseStructure;
+    const expectedTemplateRoles = structure.map((p:Record<string,any>)=>({role:String(p.role||p.layout||'longform'),position:String(p.templatePosition||''),required:Boolean(p.templateRequired)}));
+    if(!isVideo&&project.selected_format==='carousel'&&structure.length!==Math.min(10,Math.max(3,Number(project.format_decision?.slideCount)||5)))
+      return NextResponse.json({error:'故事頁數與已確認設定不一致，請返回內容及配圖重新整理故事；已上載圖片保留。'},{status:409});
     const assets: VisualAsset[] = project.production.assets || [];
     const scope={admin:access.admin,workspaceId,projectId,actorId:user.id};
     const preparation=isVideo ? {done:true,assets,completed:0,total:0} : await prepareDraftAssets(scope,apiKey,assets);
@@ -172,7 +174,7 @@ export async function POST(req: Request) {
           '只輸出 JSON：{"captionDraft":"IG caption","pages":[{"page":"P.1","role":"cover|longform|split|comparison|feature|end","templateArtboardId":"01_COVER|02_FULL_BLEED_TEXT|03_IMAGE_TOP_TEXT_BOTTOM|04_COMPARISON|05_LEFT_TEXT_RIGHT_IMAGE|06_END_CTA","headline":"","subheadline":"","body":["段落一","段落二"],"assetId":"主要素材 id 或空字串","assetIds":["主要素材 id","第二素材 id"],"imageTreatment":"auto|cutout|full-bleed|card","assetStatus":"matched|missing","assetRequest":{"reason":"現有圖片為何未能支持本頁內容","suggestions":["建議上載的具體畫面"]},"layout":"頁面角色","designDirection":"具體排版方向"}]}',
           ...(isClearMagazine ? [
             ...(fixedTemplate ? [
-              `已發布母版固定為 ${expectedTemplateRoles.length} 頁，只可依次輸出 ${expectedTemplateRoles.map((item) => item.role).join("、")}；不可改頁數、重排、刪除或重複角色。`,
+              `已確認故事為 ${expectedTemplateRoles.length} 頁，逐頁角色依次為 ${expectedTemplateRoles.map((item:{role:string}) => item.role).join("、")}。依照這次故事順序生成，可重複使用同一 Core 頁型；母版頁型庫並非固定六頁流程。`,
               "內容必須適應已發布頁型，不可因文案語意另行更換 role。",
               "固定 body 欄位：cover=[副標]；longform/split=[段落一,段落二,重點句,資料來源]；comparison=[左標籤,右標籤,左內容,右內容,結論,資料來源]；feature=[重點一標題,重點一說明,重點二標題,重點二說明,重點三標題,重點三說明,資料來源]；end=[總結副文,提問,留言提示]。沒有資料須標示待補，不可編造。",
             ] : []),
@@ -222,7 +224,7 @@ export async function POST(req: Request) {
         temperature: 0.25,
         output_config: { format: { type: 'json_schema', schema: draftOutputSchema } },
         system: [
-          "You are SOON Content Studio. Return valid JSON only.",
+          "You are SOON Content Studio. Return valid JSON only. Required schema fields not applicable to this format must use empty strings, empty arrays, or zero; never invent information to fill them.",
           !isVideo&&isClearMagazine?magazineCopyInstruction:'',
           isVideo ? `The approved structure contains exactly ${structure.length} segments. Return exactly ${structure.length} pages, one per segment in the same order (S.1 through S.${structure.length}). Each page must contain a non-empty string array body and a string designDirection. Keep each approved segment's timing and purpose. Style examples and production prompts are reference material: their preferred segment count and example facts must NEVER override this approved structure or its factual limits.` : "",
           "Only source-supported facts may appear as statements. Do not invent observable details (including colours, shapes, textures, packaging), benefits, personal experience, prices, links or commercial relationships. Unconfirmed filming ideas must be clearly conditional production notes, never asserted dialogue or captions.",

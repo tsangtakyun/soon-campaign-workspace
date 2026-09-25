@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       : {}
     const fixedContract=isFixedCoreTemplate(formatDecision.templateContractSnapshot);
     const templateRoles=coreTemplatePageRoles(formatDecision.templateContractSnapshot);
-    const slideCount = fixedContract?templateRoles.length:Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
+    const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
     const roleDefinitions = [
       'cover：用一句吸引人的開場及一個清晰承諾帶出主題。',
       'longform：解釋主題的核心價值或背景，不得重複封面開場。',
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
       ? [
           `用家已選擇 ${slideCount} 頁，不得擅自增加或減少頁面。`,
           `各角色功能如下：\n${roleDefinitions}`,
-          fixedContract?`已選 Core 母版頁型依次為 ${templateRoles.map(p=>p.role).join('、')}。按這些角色整理故事，不改母版設計。`:'除 cover 必須在首頁、end 必須在末頁外，中段須按內容語意選擇 longform、split、comparison 或 feature。',
+          `除 cover 必須在首頁、end 必須在末頁外，中段按內容語意選擇頁型，可重複 comparison 等頁型，不必每種用一次。${fixedContract?`可用 Core 頁型：${templateRoles.map(p=>p.role).join('、')}；這是頁型庫，不是固定頁數或順序。保留各頁型母版設計。`:''}`,
         ].join('\n')
       : ''
     const isShortVideo = project.selected_format === 'short_video'
@@ -221,6 +221,8 @@ export async function POST(req: Request) {
       ? data.content.filter((item: any) => item.type === 'text').map((item: any) => item.text || '').join('\n')
       : ''
     const generated = parseJsonObject(text)
+    if(!isShortVideo&&(!Array.isArray(generated.pages)||generated.pages.length!==(project.selected_format==='single_image'?1:slideCount)))
+      throw new Error(`內容頁數未符合已確認的 ${project.selected_format==='single_image'?1:slideCount} 頁；原有內容保留，請重試。`)
     const sourceCorpus = [project.source_note || '', JSON.stringify(project.brief || {})].join('\n')
     const hasExternalSource = Boolean(project.source_url?.trim())
     const unsupportedConfirmedFacts = hasExternalSource

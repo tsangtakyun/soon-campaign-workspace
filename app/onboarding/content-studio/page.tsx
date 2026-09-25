@@ -1331,6 +1331,9 @@ export default function ContentStudioPage() {
     const deletingVideo = selected.selected_format === "short_video";
     const current = deletingVideo ? videoScript : selected.production.pages;
     if (!Array.isArray(current)) return;
+    if(!deletingVideo&&selected.selected_format==='carousel'&&(current.length<=3||index===0||index===current.length-1)){
+      setMessage('請保留封面、收尾及至少一頁內容；中間頁可按需要刪除。');return;
+    }
     if (
       !window.confirm(deletingVideo
         ? `確定刪除「${current[index]?.section || `段落 ${index + 1}`}」？`
@@ -1348,6 +1351,7 @@ export default function ContentStudioPage() {
           status: "structure_ready",
           confirmedAt: null,
         },
+        ...(!deletingVideo&&selected.selected_format==='carousel'?{formatDecision:{...selected.format_decision,slideCount:remaining.length}}:{}),
       },
       deletingVideo ? "劇本段落已刪除" : `P.${index + 1} 已刪除，頁碼已重新排列`,
     );
@@ -1812,8 +1816,8 @@ export default function ContentStudioPage() {
   async function deletePageDraft(index: number) {
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
-    if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
-      setMessage("這個標準母版固定為六頁；你可以修改內容，但不能刪除必要頁面。");
+    if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot) && (index===0||index===selected.production.pageDrafts.length-1||selected.production.pageDrafts.length<=3)) {
+      setMessage("請保留封面、收尾及至少一頁內容；中間頁可按需要刪除。");
       return;
     }
     if (!window.confirm(`確定刪除 P.${index + 1} 草稿？其餘頁面會自動重新編號`))
@@ -1826,9 +1830,11 @@ export default function ContentStudioPage() {
       }));
     await saveProject(
       {
+        formatDecision:{...selected.format_decision,slideCount:pageDrafts.length},
         production: {
           ...selected.production,
           pageDrafts,
+          pages:Array.isArray(selected.production.pages)?selected.production.pages.filter((_:unknown,i:number)=>i!==index).map((page:any,i:number)=>({...page,page:`P.${i+1}`})):selected.production.pages,
           productionStatus: "drafts_ready",
         },
       },
@@ -1853,8 +1859,8 @@ export default function ContentStudioPage() {
     const requiredRoles = coreTemplatePageRoles(selected.format_decision?.templateContractSnapshot);
     if (isFixedCoreTemplate(selected.format_decision?.templateContractSnapshot)) {
       const actualRoles = selected.production.pageDrafts.map((draft: any) => String(draft.role || draft.layout || ""));
-      if (actualRoles.length !== requiredRoles.length || requiredRoles.some((item, index) => item.role !== actualRoles[index])) {
-        setMessage("逐頁草稿與已選標準母版的六頁角色不一致，請重新生成。");
+      if (actualRoles.length !== (Number(selected.format_decision?.slideCount)||(Array.isArray(selected.production.pages)?selected.production.pages.length:0)) || actualRoles.some((role:string)=>!requiredRoles.some(item=>item.role===role))) {
+        setMessage("逐頁草稿與已確認頁數或 Core 可用頁型不一致，請重新整理內容。");
         return;
       }
       if(selected.production.pageDrafts.some((draft:any)=>productionCopyIssues(draft,selected.format_decision?.templateContractSnapshot).length)){
@@ -2395,7 +2401,7 @@ export default function ContentStudioPage() {
                         </button>
                       ))}
                     </div>
-                    {selectedFormat === "carousel" && recommendedSlideCount && !isFixedCoreTemplate(displayStyles.find(s=>s.code===selectedStyleCode)?.core?.templates?.[0]?.version.contract) ? (
+                    {selectedFormat === "carousel" && recommendedSlideCount ? (
                       <section className="slide-count-recommendation" aria-label="輪播張數">
                         <div>
                           <strong>{`SOON 建議製作 ${recommendedSlideCount} 張`}</strong>
@@ -2828,7 +2834,7 @@ export default function ContentStudioPage() {
                             <div className="next-production">
                               <div className="asset-upload-head">
                                 <div>
-                                  <b>圖片素材</b>
+                                  <b>圖片素材（共 {Array.isArray(selected.production.assets)?selected.production.assets.length:0} 張，並非頁數）</b>
                                   <p>上載現有圖片、由 AI 生成，或者搜尋有授權資料嘅網上圖片</p>
                                 </div>
                               </div>

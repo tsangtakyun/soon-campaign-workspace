@@ -29,7 +29,7 @@ request=async(url,init)=>{aiCalls++;if(failNext){failNext=false;const e=new Erro
 const assets=[{id:'one',url:'https://example.test/one.jpg'},{id:'two',url:'https://example.test/two.jpg'}];
 let state=await analysis.prepareDraftAssets(scope,'key',assets);assert.equal(state.completed,1);assert.equal(state.done,false);
 failNext=true;await assert.rejects(()=>analysis.prepareDraftAssets(scope,'key',assets),error=>error.status===504);
-state=await analysis.prepareDraftAssets(scope,'key',assets);assert.equal(state.completed,2);assert.equal(state.done,false);
+state=await analysis.prepareDraftAssets(scope,'key',assets);assert.equal(state.completed,2);assert.equal(state.done,true);assert.equal(state.assets[1].visualAnalysis.subject,'bear');
 state=await analysis.prepareDraftAssets(scope,'key',assets);assert.equal(state.done,true);assert.equal(state.assets[0].visualAnalysis.subject,'bear');assert.equal(aiCalls,3);assert.equal(imageCalls,3,'retry only downloads unfinished image');
 await analysis.prepareDraftAssets(scope,'key',assets);assert.equal(aiCalls,3,'refresh reuses all completed analysis');
 console.log('PASS: durable steps, cache, scope isolation, concurrent claim, failure recovery, invalid-output persistence, friendly timeout, bounded images, phase resume');

@@ -51,18 +51,22 @@ export function applyCoreTemplateStructure(
 ) {
   if (!isFixedCoreTemplate(contract)) return Array.isArray(current) ? current : [];
   const existing = Array.isArray(current) ? current : [];
-  return coreTemplatePageRoles(contract).map((page, index) => {
+  const available=coreTemplatePageRoles(contract);
+  return existing.map((item, index) => {
     const previous = existing[index] && typeof existing[index] === "object"
       ? existing[index] as ContractRecord
       : {};
+    const requested=String(previous.role||previous.layout||'');
+    const role=index===0?'cover':index===existing.length-1?'end':['cover','end'].includes(requested)?'longform':requested;
+    const page=available.find(p=>p.role===role)||available.find(p=>p.role==='longform')||available[0];
     return {
       ...previous,
       page: `P.${index + 1}`,
       role: page.role,
       layout: page.role,
       templatePosition: page.position,
-      templateRequired: page.required !== false,
-      templateRepeatable: page.repeatable === true,
+      templateRequired: index===0||index===existing.length-1,
+      templateRepeatable: index>0&&index<existing.length-1,
     };
   });
 }
