@@ -42,6 +42,10 @@ function harness(make){
  result=await h.run(result.pages,result.feedback);assert.equal(result.issues.length,0);assert.equal(result.feedback['P.1'],undefined);
  h=harness((p,n,targets)=>{assert.equal(targets[0].previousRejections,undefined);return p;});
  await h.run([original],{'P.1':[{field:'headline',original:'已修改舊稿',hardLimit:18,rejected:[]}]});
+ h=harness(()=>{throw Error('saved candidate should avoid provider call')});
+ const end={page:'P.7',role:'end',headline:'你吃辣是因為喜歡',subheadline:'',body:['研究不是叫你開始吃辣，也不是叫你停下來。它只是告訴你：在某些人身上、某些條件下，吃辣與更低的死亡風險同時出現過','你吃辣嗎','留言分享']};
+ result=await h.run([end],{'P.7':[{field:'body.0',original:end.body[0],hardLimit:40,rejected:[{text:'研究不作飲食建議，僅指出在某些人、某些條件下，吃辣與較低死亡風險曾同時出現',length:37,reasons:['舊規則誤判']}]}]});
+ assert.equal(h.calls(),0);assert.equal(result.issues.length,0);assert.equal(result.feedback['P.7'],undefined);
  assert.ok(productionCopyIssues({...good,headline:'六個中文字標題'},{copy_limits:{headline_chars_zh_max:4}}).length);
  console.log('PASS single-page copy fit: one request/one page, 75s budget, resume skips completed pages, valid copy/assets preserved');
 })().catch(e=>{console.error(e);process.exit(1)});

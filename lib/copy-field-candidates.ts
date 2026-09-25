@@ -52,7 +52,12 @@ export function candidateRejectionReasons(target:CopyFieldTarget,text:string):st
   if(count(s)>target.hardLimit)reasons.push(`實際${count(s)}字，超出${count(s)-target.hardLimit}字（上限${target.hardLimit}）`);
   if(colloquial(s))reasons.push('仍含口語');
   if(/(…|\.{3})/.test(s))reasons.push('不可截斷或加省略號');
-  for(const q of qualifiers)if(q.test.test(target.original)&&!q.accept.test(s))reasons.push(q.name);
+  const condensedRecommendationNegation=/(?:不是|並非).{0,3}(?:叫|要|建議)|不作.{0,4}建議/u.test(target.original)
+    && /(?:不作.{0,4}建議|不建議|無建議|沒有建議)/u.test(s);
+  for(const q of qualifiers)if(q.test.test(target.original)&&!q.accept.test(s)){
+    if(q.name.startsWith('保留否定')&&condensedRecommendationNegation)continue;
+    reasons.push(q.name);
+  }
   return reasons;
 }
 export function rejectedCopyCandidates(targets:CopyFieldTarget[],output:ReturnType<typeof readCopyCandidates>):CopyFitFeedback[]{

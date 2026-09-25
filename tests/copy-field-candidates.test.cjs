@@ -30,4 +30,7 @@ assert.ok(copyCandidateRequest('existing-model',summaryTargets).messages[0].cont
 const revised='原帖引述分類標準；MFGM說法仍待核實';
 assert.equal(applyCopyCandidates(comparison,summaryTargets,{fields:[{field:'body.4',candidates:[revised]}]}).body[4],revised);
 assert.equal(applyCopyCandidates(comparison,summaryTargets,{fields:[{field:'body.4',candidates:['分類標準與MFGM研究']}]}).body[4],comparison.body[4]);
+const end={headline:'你吃辣是因為喜歡',role:'end',body:['研究不是叫你開始吃辣，也不是叫你停下來。它只是告訴你：在某些人身上、某些條件下，吃辣與更低的死亡風險同時出現過','你吃辣嗎','留言分享']};
+const endTargets=copyFieldTargets(end,{});
+assert.equal(applyCopyCandidates(end,endTargets,{fields:[{field:'body.0',candidates:['研究不作飲食建議，僅指出在某些人、某些條件下，吃辣與較低死亡風險曾同時出現']}]}).body[0],'研究不作飲食建議，僅指出在某些人、某些條件下，吃辣與較低死亡風險曾同時出現');
 console.log('PASS field alternatives: 34-to-28 regression, exact codepoint counts, source/uncertainty guards, no full-page prompt, safe selection');

@@ -27,16 +27,27 @@ export async function repairMagazineCopy(scope:DraftScope,apiKey:string,model:st
         JSON.stringify(invalid),
       ].join('\n')}],
     };
-    const result=await runDraftStep(scope,{kind:'magazine-auto-fit-fields-v4',attempt,round,targets,pages:invalid,limits:contract?.copy_limits},model,async()=>{
-      try{
-        const response=await draftAnthropic(apiKey,request,75_000);return {response,usage:response.usage};
-      }catch(error){
-        if(error instanceof DraftStepError&&error.status===504)throw new DraftStepError(`${processedPage} 文案精簡逾時；之前完成的頁面已保存。再按製作會只處理未完成文案，毋須重新上載。`,504);
-        throw error;
-      }
-    },r=>{if(targets.length){readCopyCandidates(r.response);return;}const output=readDraftOutput(r.response,invalid.length);if(output.pages.some((p:any,i:number)=>p.page!==invalid[i].page.page))throw new Error('AI 文案頁碼不符；原稿保留。');});
-    const output=targets.length?{pages:[applyCopyCandidates(invalid[0].page,targets,readCopyCandidates(result.output.response))]}:readDraftOutput(result.output.response,invalid.length);
-    if(targets.length)feedback[processedPage]=rejectedCopyCandidates(targets,readCopyCandidates(result.output.response));
+    const savedOutput={fields:targets.flatMap(target=>target.previousRejections?.length?[{field:target.field,candidates:target.previousRejections.map(item=>item.text)}]:[])};
+    const savedPage=targets.length&&savedOutput.fields.length?applyCopyCandidates(invalid[0].page,targets,savedOutput):null;
+    const canReuse=Boolean(savedPage&&productionCopyIssues(savedPage,contract).length<invalid[0].issues.length);
+    let fieldOutput:ReturnType<typeof readCopyCandidates>|undefined;
+    let output:{pages:Record<string,any>[]};
+    if(canReuse){
+      fieldOutput=savedOutput;
+      output={pages:[savedPage!]};
+    }else{
+      const result=await runDraftStep(scope,{kind:'magazine-auto-fit-fields-v4',attempt,round,targets,pages:invalid,limits:contract?.copy_limits},model,async()=>{
+        try{
+          const response=await draftAnthropic(apiKey,request,75_000);return {response,usage:response.usage};
+        }catch(error){
+          if(error instanceof DraftStepError&&error.status===504)throw new DraftStepError(`${processedPage} 文案精簡逾時；之前完成的頁面已保存。再按製作會只處理未完成文案，毋須重新上載。`,504);
+          throw error;
+        }
+      },r=>{if(targets.length){readCopyCandidates(r.response);return;}const value=readDraftOutput(r.response,invalid.length);if(value.pages.some((p:any,i:number)=>p.page!==invalid[i].page.page))throw new Error('AI 文案頁碼不符；原稿保留。');});
+      fieldOutput=targets.length?readCopyCandidates(result.output.response):undefined;
+      output=targets.length?{pages:[applyCopyCandidates(invalid[0].page,targets,fieldOutput!)]}:readDraftOutput(result.output.response,invalid.length);
+    }
+    if(targets.length)feedback[processedPage]=rejectedCopyCandidates(targets,fieldOutput!);
     for(const [i,item]of invalid.entries()){
       const p=output.pages[i];
       const colloquial=(s:unknown)=>/[唔嘅咁睇揀]|幾時|食緊|識得/.test(String(s||''));
