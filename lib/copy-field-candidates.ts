@@ -4,7 +4,10 @@ const colloquial=(s:string)=>/[唔嘅咁睇揀]|幾時|食緊|識得/.test(s);
 const qualifiers=[
   {test:/(據報|據稱|據原帖|原帖|引述|報道|報稱|聲稱)/,accept:/(據|原帖|引述|報道|報稱|聲稱)/,name:'保留必要歸因，可用「據報／據稱」，不必重複「原帖指出」'},
   {test:/(未.{0,5}核實|待.{0,3}核實|未.{0,3}證實)/,accept:/(未.{0,5}核實|待.{0,3}核實|未.{0,3}證實)/,name:'保留尚未核實／證實的限制'},
-  {test:/(可能|或許|或有)/,accept:/(可能|或許|或有)/,name:'保留可能性，不能改成肯定結果'},
+  // Only protect uncertainty when it qualifies a factual claim. Conversational
+  // phrases such as「或許讓你安心一點」may be removed without strengthening
+  // the research conclusion and must not block copy fitting.
+  {test:/(?:可能|或許)(?:與|是|為|由|有|會|可|表示|顯示|導致|造成|增加|降低|減少)|或有(?:關|助|影響)/,accept:/(可能|或許|或有)/,name:'保留可能性，不能改成肯定結果'},
   {test:/(關聯|相關)(?!研究|資料|文獻|報道|說法|內容|資訊)/,accept:/(關聯|相關)/,name:'只表示相關／關聯，不能改成因果'},
   {test:/(條件|前提|只限|僅限)/,accept:/(條件|前提|只限|僅限|限制)/,name:'保留適用條件／前提，不可刪成無條件說法'},
   {test:/(並非|而非|不是|不構成|不代表|不能|不可|不等於)/,accept:/(非|不是|不構成|不代表|不能|不可|不等於|不意味)/,name:'保留否定及限制，不能反轉原意'},

@@ -33,4 +33,8 @@ assert.equal(applyCopyCandidates(comparison,summaryTargets,{fields:[{field:'body
 const end={headline:'你吃辣是因為喜歡',role:'end',body:['研究不是叫你開始吃辣，也不是叫你停下來。它只是告訴你：在某些人身上、某些條件下，吃辣與更低的死亡風險同時出現過','你吃辣嗎','留言分享']};
 const endTargets=copyFieldTargets(end,{});
 assert.equal(applyCopyCandidates(end,endTargets,{fields:[{field:'body.0',candidates:['研究不作飲食建議，僅指出在某些人、某些條件下，吃辣與較低死亡風險曾同時出現']}]}).body[0],'研究不作飲食建議，僅指出在某些人、某些條件下，吃辣與較低死亡風險曾同時出現');
+const currentEnd={headline:'數字值得參考 但不是吃辣的理由',role:'end',body:['兩份大型研究方向一致，但結論有限：相關不等於因果，吃辣不是長壽的處方。如果你本來就愛吃辣、腸胃也沒問題，這個數字或許讓你安心一點；如果你腸胃敏感，這份研究不是繼續吃辣的理由','你平時吃辣的頻率是多少？','留言告訴我們，或收藏這篇備用']};
+const currentTargets=copyFieldTargets(currentEnd,{});
+assert.ok(!currentTargets.find(t=>t.field==='body.0').requirements.some(s=>s.includes('可能性')),'conversational 或許 must not become a scientific qualifier');
+assert.equal(applyCopyCandidates(currentEnd,currentTargets,{fields:[{field:'body.0',candidates:['研究只顯示相關，不代表因果；吃辣並非長壽處方']},{field:'body.1',candidates:['你平時多久吃一次辣？']},{field:'body.2',candidates:['留言分享，或收藏備用']}]}).body[0],'研究只顯示相關，不代表因果；吃辣並非長壽處方');
 console.log('PASS field alternatives: 34-to-28 regression, exact codepoint counts, source/uncertainty guards, no full-page prompt, safe selection');
