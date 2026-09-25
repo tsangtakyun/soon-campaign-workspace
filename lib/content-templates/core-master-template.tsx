@@ -151,7 +151,10 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: 
     const width=Math.max(finite(leftBox.width),finite(rightBox.width)),height=Math.min(finite(leftBox.height),finite(rightBox.height));
     const inset=24,textWidth=width-inset*2,textHeight=height-12;
     const lineHeight=finite(leftLabel.lineHeight,1.2)*1.13;
-    const size=Math.min(...[copy.fields?.label_left??copy.body?.[0]??'',copy.fields?.label_right??copy.body?.[1]??''].map(text=>fittedSize(String(text),textWidth,textHeight,finite(leftLabel.fontSize,49),lineHeight,true)));
+    const size=Math.min(...[copy.fields?.label_left??copy.body?.[0]??'',copy.fields?.label_right??copy.body?.[1]??''].map(text=>{
+      const units=Array.from(String(text)).reduce((sum,char)=>sum+(/\s/u.test(char)?.35:/[\u0000-\u007f]/u.test(char)?.72:1.08),0);
+      return Math.floor(Math.min(finite(leftLabel.fontSize,49),textWidth/Math.max(1,units),textHeight/lineHeight)*4)/4;
+    }));
     source=source.map(o=>o===leftBox||o===rightBox?{...o,width,height,top:leftBox.top}:o===leftLabel||o===rightLabel?{...o,left:finite(o===leftLabel?leftBox.left:rightBox.left)+inset,top:finite(leftBox.top)+6,width:textWidth,height:textHeight,fontSize:size,fontFamily:leftLabel.fontFamily,fontWeight:leftLabel.fontWeight,lineHeight:leftLabel.lineHeight,textAlign:'left' as const}:o);
   }
   return source.filter(o =>
