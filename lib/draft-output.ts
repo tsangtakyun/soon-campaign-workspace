@@ -39,7 +39,12 @@ export function readDraftOutput(response: any, expectedPages?: number) {
   for(const page of value.pages){
     if(page.comparisonRows!==undefined){
       const rows=page.comparisonRows;
-      if(!Array.isArray(rows)||rows.length>3||rows.some((r:any)=>!r||['label','left','right'].some(k=>typeof r[k]!=='string')||[r.label,r.left,r.right].some(s=>/[\n；;]/u.test(s))))throw new DraftOutputError();
+      if(!Array.isArray(rows)||rows.length>3||rows.some((r:any)=>!r||['label','left','right'].some(k=>typeof r[k]!=='string')))throw new DraftOutputError();
+      // A semicolon inside one comparison value is ordinary punctuation, not a
+      // fourth comparison row. Flatten accidental separators rather than
+      // rejecting an otherwise complete set of pages.
+      for(const row of rows)for(const key of ['label','left','right'])
+        row[key]=row[key].replace(/[\n；;]+/gu,'，').replace(/，{2,}/gu,'，').trim();
       if((page.role||page.layout)==='comparison'&&rows.length){
         page.comparisonLabels=rows.map((r:any)=>r.label);
         page.body[2]=rows.map((r:any)=>r.left).join('\n');

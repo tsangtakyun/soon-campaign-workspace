@@ -20,6 +20,9 @@ const response=(value)=>({stop_reason:'end_turn',content:[{type:'text',text:type
  for(const labels of [['a','b','c','d'],[12],'invalid'])
    assert.throws(()=>readDraftOutput(response({...valid,pages:[{...valid.pages[0],comparisonLabels:labels}]})),DraftOutputError);
  assert.equal(readDraftOutput(response({...valid,pages:[{...valid.pages[0],comparisonLabels:['原料','製法']}]})).pages[0].comparisonLabels.length,2);
+ const comparison=readDraftOutput(response({...valid,pages:[{...valid.pages[0],role:'comparison',body:['左','右','',''],comparisonLabels:['口感'],comparisonRows:[{label:'口感',left:'幼滑；奶味較濃',right:'清爽\n果味較突出'}]}]}));
+ assert.equal(comparison.pages[0].body[2],'幼滑，奶味較濃');
+ assert.equal(comparison.pages[0].body[3],'清爽，果味較突出');
  assert.equal(draftOutputSchema.properties.pages.items.additionalProperties,false);
  console.log('PASS draft output: structured schema, malformed/truncated/null/wrong-page rejection, bounded format-only retry');
 })().catch(error=>{console.error(error);process.exit(1)});

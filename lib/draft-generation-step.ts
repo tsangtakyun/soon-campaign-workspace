@@ -26,6 +26,19 @@ export async function readDraftStep(scope: DraftScope, key: unknown) {
 export async function runDraftStep(scope: DraftScope, key: unknown, model: string, execute: () => Promise<Record<string,unknown>>, validate?: (result:Record<string,unknown>)=>void) {
   const {id,record} = await readDraftStep(scope,key);
   if (record?.output?.completed === true) { console.info('[draft-step] cached',{id}); return {id,output:record.output,cached:true}; }
+  // A response may be complete but rejected by an older semantic validator.
+  // Revalidate durable output before starting another paid provider call.
+  if(record?.status==='failed' && record.output && validate){
+    try{
+      validate(record.output);
+      const output={...record.output,completed:true,model:record.output.model||model,recoveredAt:new Date().toISOString()};
+      const {data,error}=await scope.admin.from(table).update({status:'ready',output,error:null,updated_at:new Date().toISOString()})
+        .eq('id',id).eq('workspace_id',scope.workspaceId).eq('project_id',scope.projectId).eq('status','failed').select('id').maybeSingle();
+      if(error||!data)throw new DraftStepError('已保存草稿正在由另一個請求處理，請稍後再試。',409);
+      console.info('[draft-step] recovered',{id,model});
+      return {id,output,cached:true};
+    }catch(error){if(error instanceof DraftStepError && error.status===409)throw error;}
+  }
   // A lease is longer than the route's maximum execution time. Concurrent clicks never start a second paid call.
   if (record?.status === 'pending' && Date.now()-Date.parse(record.updated_at)<240_000)
     throw new DraftStepError('同一批草稿正在處理中，請稍後再試；已完成步驟會保留。',409);

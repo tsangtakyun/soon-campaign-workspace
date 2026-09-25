@@ -22,6 +22,11 @@ await helper.runDraftStep(scope,{kind:'fail'},'model',execute);
 await assert.rejects(()=>helper.runDraftStep(scope,{kind:'bad-json'},'model',execute,()=>{throw new Error('invalid')}),/invalid/);
 const bad=admin.rows.get(helper.draftStepId(scope,{kind:'bad-json'}));assert.equal(bad.output.completed,false);assert.ok(bad.output.usage,'retain usage even when validation fails');
 await helper.runDraftStep(scope,{kind:'bad-json'},'model',execute);
+let strict=true,recoveryCalls=0;
+await assert.rejects(()=>helper.runDraftStep(scope,{kind:'recoverable'},'model',async()=>{recoveryCalls++;return {response:{text:'saved'}}},()=>{if(strict)throw new Error('old validator')}),/old validator/);
+strict=false;
+const recovered=await helper.runDraftStep(scope,{kind:'recoverable'},'model',async()=>{recoveryCalls++;return {response:{text:'new'}}},()=>{});
+assert.equal(recovered.cached,true);assert.equal(recovered.output.response.text,'saved');assert.equal(recoveryCalls,1,'revalidate saved response without another paid call');
 request=async()=>{const error=new Error('timeout');error.name='TimeoutError';throw error};
 await assert.rejects(()=>helper.draftAnthropic('key',{},10),error=>error.status===504&&!error.message.includes('TimeoutError'));
 
