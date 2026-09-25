@@ -5,6 +5,13 @@ export type DraftScope = { admin: SupabaseClient; workspaceId: string; projectId
 export class DraftStepError extends Error {
   constructor(message: string, public status = 502) { super(message); }
 }
+// Shared by format retries. Reserve 30 seconds of the 180-second route for
+// validation and persistence instead of granting each attempt a fresh budget.
+export function draftRequestBudget(startedAt: number, now = Date.now()) {
+  const remaining = 150_000 - Math.max(0, now - startedAt);
+  if (remaining < 5_000) throw new DraftStepError('本次草稿處理時間已用盡；已完成步驟保留，請按同一按鈕接續重試，毋須重新上載。',504);
+  return remaining;
+}
 const table = 'content_project_generation_runs';
 export function draftStepId(scope: DraftScope, key: unknown) {
   const hash = createHash('sha256').update(JSON.stringify([scope.workspaceId, scope.projectId, key])).digest('hex');
@@ -44,6 +51,7 @@ export async function runDraftStep(scope: DraftScope, key: unknown, model: strin
 }
 
 export async function draftAnthropic(apiKey: string, body: Record<string,unknown>, timeoutMs: number) {
+  const startedAt=Date.now();
   try {
     const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)});
     if(!response.ok) {
@@ -66,8 +74,10 @@ export async function draftAnthropic(apiKey: string, body: Record<string,unknown
     const data=await response.json();
     return data;
   } catch(error) {
-    if(error instanceof Error && ['TimeoutError','AbortError'].includes(error.name))
+    if(error instanceof Error && ['TimeoutError','AbortError'].includes(error.name)) {
+      console.error('[draft-provider] timeout',{timeoutMs,elapsedMs:Date.now()-startedAt,model:body.model,requestBytes:Buffer.byteLength(JSON.stringify(body))});
       throw new DraftStepError('AI 此步驟逾時；已完成的圖片分析及草稿結果會保留。請稍後按同一按鈕繼續，毋須重新建立內容。',504);
+    }
     throw error;
   }
 }

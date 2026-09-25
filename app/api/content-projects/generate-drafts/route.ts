@@ -4,7 +4,7 @@ import {repairMagazineCopy} from '@/lib/repair-magazine-copy';
 import {magazineCopyInstruction,magazineCopyIssues} from '@/lib/magazine-copy-policy';
 import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
 import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
-import { runDraftStep, draftAnthropic, DraftStepError } from '@/lib/draft-generation-step';
+import { runDraftStep, draftAnthropic, DraftStepError, draftRequestBudget } from '@/lib/draft-generation-step';
 import { EDITORIAL_PAGE_GUIDANCE } from '@/lib/editorial-page-guidance';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context';
@@ -32,6 +32,7 @@ type VisualAsset = Record<string, unknown> & {
 
 
 export async function POST(req: Request) {
+  const requestStartedAt = Date.now();
   let generationId = "";
   let generationAdmin: SupabaseClient | null = null;
   try {
@@ -233,7 +234,7 @@ export async function POST(req: Request) {
       };
     const expectedPages=(fixedTemplate || isVideo) ? structure.length : project.selected_format==='single_image' ? 1 : undefined;
     const result=await withDraftFormatRetry(async formatAttempt=>runDraftStep(scope,{kind:'page-drafts-v3',request:requestBody,formatAttempt,attempt:typeof body.attempt==='string'?body.attempt.slice(0,80):''},requestBody.model,async()=>{
-      const response=await draftAnthropic(apiKey,requestBody,70_000);
+      const response=await draftAnthropic(apiKey,requestBody,draftRequestBudget(requestStartedAt));
       return {response,usage:response.usage};
     },result=>{
       readDraftOutput(result.response,expectedPages);

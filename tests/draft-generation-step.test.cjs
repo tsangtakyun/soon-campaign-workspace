@@ -4,6 +4,9 @@ function load(file,deps={}){const box={exports:{},Buffer,Error,Date,AbortSignal,
 function database(){const rows=new Map();return {rows,from(){let action='read',values,filters=[];const q={select(){return q},eq(k,v){filters.push([k,v]);return q},insert(v){action='insert';values=v;return q},update(v){action='update';values=v;return q},maybeSingle(){return Promise.resolve(run())},then(resolve,reject){return Promise.resolve(run()).then(resolve,reject)}};function run(){if(action==='insert'){if(rows.has(values.id))return {error:{code:'23505'}};rows.set(values.id,{...values});return {data:rows.get(values.id)}}const found=[...rows.values()].find(row=>filters.every(([k,v])=>row[k]===v));if(action==='update'&&found)Object.assign(found,values);return {data:found||null,error:null}}return q}}}
 async function main(){
 const helper=load('lib/draft-generation-step.ts'),admin=database(),scope={admin,workspaceId:'w',projectId:'p',actorId:'a'};
+assert.equal(helper.draftRequestBudget(1000,1000),150000);
+assert.equal(helper.draftRequestBudget(1000,71000),80000,'format retry shares total budget');
+assert.throws(()=>helper.draftRequestBudget(1000,147000),error=>error.status===504);
 let calls=0;const execute=async()=>{calls++;return {response:{text:'ok'},usage:{input_tokens:1,output_tokens:2}}};
 const first=await helper.runDraftStep(scope,{kind:'test'},'model',execute);
 assert.equal(calls,1);assert.equal(first.output.completed,true);assert.equal(admin.rows.get(first.id).status,'ready');
