@@ -3,7 +3,8 @@ let calls=0;
 const page={page:'P.4',role:'comparison',headline:'原有標題',assetIds:['one','two'],body:['甲','乙','乳脂肪≥10%\n舊文字\n原帖稱或有助改善敏感度（待核實）','植物油\n乳化劑\n不符合FDA定義','','原帖引述FDA'],fields:{left_row_2:'含MFGM',source:'原帖引述FDA',headline:'原有標題'}};
 const repaired={rows:[{label:'原料',left:'乳脂肪≥10%',right:'植物油',leftRefs:['L1'],rightRefs:['R1']},{label:'成分',left:'含MFGM',right:'乳化劑',leftRefs:['L2'],rightRefs:['R2']},{label:'法規標示',left:'',right:'不符合FDA定義',leftRefs:[],rightRefs:['R3']}],source:'原帖引述FDA；MFGM或有助改善敏感度（待核實）',noteRefs:['L3']};
 const response=x=>({content:[{type:'text',text:JSON.stringify(x)}]});
-const lib=load('lib/repair-comparison-page.ts',{'./draft-generation-step':{DraftStepError:Error,draftAnthropic:async()=>{calls++;return response(repaired)},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'saved-result',output}}}});
+let saved=null,nextResponse=repaired;
+const lib=load('lib/repair-comparison-page.ts',{'./draft-generation-step':{DraftStepError:Error,readDraftStep:async()=>({record:saved}),draftAnthropic:async()=>{calls++;return response(nextResponse)},runDraftStep:async(s,k,m,execute,validate)=>{const output=await execute();validate(output);return {id:'saved-result',output}}}});
 async function main(){
  assert.ok(lib.readComparisonRepair(response(repaired),page));
  assert.throws(()=>lib.readComparisonRepair(response({...repaired,noteRefs:[]}),page),'cannot omit an original fact');
@@ -14,6 +15,18 @@ async function main(){
  assert.equal(calls,1);assert.equal(output.assetIds,page.assetIds);assert.equal(output.headline,page.headline);
  assert.equal(output.body[2],'乳脂肪≥10%\n含MFGM\n');assert.equal(output.fields.left_row_2,undefined);assert.equal(output.fields.source,undefined);assert.equal(output.fields.headline,page.headline);
  assert.equal(page.fields.left_row_2,'含MFGM','input unchanged; displayed overrides were included in the repair');
+ const long={...repaired,rows:repaired.rows.map((r,i)=>i===2?{...r,right:'不符合FDA「Ice Cream」定義'}:r),source:'資料來源：原帖引述美國FDA標準，MFGM相關說法待核實。L3（原帖稱或有助改善敏感度，待核實）為功效說法，不與法規或成分並列。'};
+ assert.equal(lib.readComparisonRepair(response(long),page,false).rows.length,3);
+ assert.throws(()=>lib.readComparisonRepair(response(long),page),/超出母版字數/);
+ const patch={updates:[{field:'rows.2.right',text:'不符FDA「Ice Cream」定義'},{field:'source',text:'原帖引述FDA；MFGM或有助改善敏感度（待核實）'}]};
+ const fitted=lib.applyComparisonFit(response(patch),long,page);
+ assert.equal(JSON.stringify(fitted.rows.slice(0,2)),JSON.stringify(long.rows.slice(0,2)));
+ assert.equal(JSON.stringify(fitted.noteRefs),JSON.stringify(long.noteRefs));
+ assert.throws(()=>lib.applyComparisonFit(response({updates:[...patch.updates,{field:'rows.0.left',text:'改動'}]}),long,page));
+ assert.throws(()=>lib.applyComparisonFit(response({updates:patch.updates.map(u=>u.field==='source'?{...u,text:'原帖引述FDA；含MFGM'}:u)}),long,page));
+ saved={output:{response:response(long),completed:false}};nextResponse=patch;
+ const before=calls;await lib.repairComparisonPage({},'key','configured-model',page);
+ assert.equal(calls-before,1,'resume persisted alignment; only compact overflow fields');
  console.log('PASS comparison alignment: complete fact references, no side swapping, numeric/uncertainty guards, stale overrides cleared, assets preserved');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
