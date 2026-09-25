@@ -33,6 +33,7 @@ import {
 } from "@/lib/onboarding-session";
 import type { FabricControls } from "@/components/editor/DesignCanvas";
 import { createClient } from "@/lib/supabase";
+import { externalizeEditorMedia, editorSaveError } from "@/lib/editor-save-payload";
 import {
   isBechillWorkspace,
   isEggWorkspace,
@@ -2710,12 +2711,26 @@ function ScheduledPostsPageContent() {
 
     setIsSavingDesign(true);
     setSaveDesignMessage("");
+    let saveStage = "匯出畫布";
     try {
       const multiplier = Math.max(1, canvasSize.w / Math.max(1, canvas.width || canvasSize.w));
       const dataUrl = controls.exportPNG(multiplier);
       if (!dataUrl) throw new Error("未能匯出畫布");
       const imageBlob = await fetch(dataUrl).then((response) => response.blob());
       const supabase = createClient();
+      saveStage = "保存圖片素材";
+      setSaveDesignMessage("正在保存圖片素材及可編輯圖層…");
+      const canvasJson = await externalizeEditorMedia(
+        { ...canvas.toObject(["data"]), coordinateWidth: canvas.width, coordinateHeight: canvas.height },
+        async (blob) => {
+          const extension = blob.type === "image/svg+xml" ? "svg" : blob.type === "image/jpeg" ? "jpg" : blob.type === "image/webp" ? "webp" : "png";
+          const path = `${activeWorkspaceId}/designs/media-${crypto.randomUUID()}.${extension}`;
+          const { error } = await supabase.storage.from("brand-assets").upload(path, blob, { contentType: blob.type, upsert: false });
+          if (error) throw error;
+          return supabase.storage.from("brand-assets").getPublicUrl(path).data.publicUrl;
+        },
+      );
+      saveStage = "上載輸出圖片";
       const storagePath = `${activeWorkspaceId}/designs/${selectedPost.id}-${Date.now()}.png`;
       const { error: uploadError } = await supabase.storage
         .from("brand-assets")
@@ -2723,8 +2738,7 @@ function ScheduledPostsPageContent() {
       if (uploadError) throw uploadError;
       const { data: publicUrlData } = supabase.storage.from("brand-assets").getPublicUrl(storagePath);
       const imageUrl = publicUrlData.publicUrl;
-      const canvasJson = { ...canvas.toObject(["data"]), coordinateWidth: canvas.width, coordinateHeight: canvas.height };
-
+      saveStage = "保存可編輯設計";
       const isContentProjectDesign = Boolean(externalProjectId && externalEditImage);
       const isMasterTemplateDesign = Boolean(isTemplateMaster && masterTemplate?.draft.id);
       const response = await fetch(
@@ -2750,7 +2764,7 @@ function ScheduledPostsPageContent() {
         },
       );
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.detail || result.error || "儲存失敗");
+      if (!response.ok) throw new Error(editorSaveError(response.status, result));
 
       if (isMasterTemplateDesign) {
         setMasterTemplate((current) => current ? { ...current, draft: { ...current.draft, status: "review", pageDesigns: result.draft?.page_designs || current.draft.pageDesigns } } : current);
@@ -2770,7 +2784,9 @@ function ScheduledPostsPageContent() {
       setDesignMode(false);
       setSelectedPost(null);
     } catch (error) {
-      setSaveDesignMessage(error instanceof Error ? error.message : "儲存失敗，請再試一次。");
+      const message = error instanceof Error ? error.message : "儲存失敗，請再試一次。";
+      console.error("[editor/save] failed", { stage: saveStage, message });
+      setSaveDesignMessage(`${saveStage}未完成：${message}`);
     } finally {
       setIsSavingDesign(false);
     }

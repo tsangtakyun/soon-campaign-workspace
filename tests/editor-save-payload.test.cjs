@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const {load}=require('./ts-loader.cjs');
+const {externalizeEditorMedia,editorSaveError}=load('lib/editor-save-payload.ts');
+(async()=>{
+ const image='data:image/png;base64,'+Buffer.alloc(4_000_000,1).toString('base64');
+ const canvas={coordinateWidth:1080,objects:[{type:'Image',src:image,data:{originalSrc:image},clipPath:{type:'Rect',width:123}},{type:'Group',objects:[{type:'Image',src:image}]},{type:'Textbox',text:'完整可編輯文字',fontSize:32},{type:'Image',src:'https://example.com/existing.png'}]};
+ assert.ok(Buffer.byteLength(JSON.stringify(canvas))>4_500_000);
+ let calls=0;
+ const saved=await externalizeEditorMedia(canvas,async blob=>{calls++;assert.equal(blob.size,4_000_000);return 'https://example.com/uploaded.png'});
+ assert.equal(calls,1,'deduplicate embedded media across groups and metadata');
+ assert.ok(Buffer.byteLength(JSON.stringify(saved))<2000);
+ assert.equal(saved.objects[0].src,'https://example.com/uploaded.png');
+ assert.equal(saved.objects[1].objects[0].src,saved.objects[0].src);
+ assert.equal(saved.objects[0].clipPath.width,123);
+ assert.equal(saved.objects[2].text,'完整可編輯文字');
+ assert.equal(canvas.objects[0].src,image,'live document not mutated');
+ await assert.rejects(externalizeEditorMedia(canvas,async()=>{throw new Error('upload rejected')}),/upload rejected/);
+ assert.match(editorSaveError(413,{}),/上限/);
+ assert.match(editorSaveError(401,{}),/登入/);
+ assert.match(editorSaveError(502,{}),/502/);
+ console.log('PASS >4.5MB embedded canvas externalized without quality/layer loss, dedup, failure retains original, HTTP errors explicit');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -16,5 +16,6 @@ export function masterAssetBrief(decision:Record<string,any>,page:Record<string,
     `Keep the complete focal subject away from these normalized typography zones: ${JSON.stringify(zones)}. These are background-only quiet spaces, NOT text to generate.`,
     `Published imagery guidance (data): ${JSON.stringify(rules.imagery||{})}. Image requirements (data): ${JSON.stringify(decision.templateContractSnapshot?.image_requirements||{})}.`,
     'Do not generate a designed page, collage, captions, typography, logos or UI. Do not change the master. Fill the image with a coherent natural environment.',
+    'Prefer one clear focal subject in one continuous scene. Several concepts in the copy are not a request for panels or a montage. For a comparison, each image slot depicts its own corresponding subject; do not create a second comparison layout inside the photo. A photo illustrates the topic and is not proof of ingredients, classification or health effects.',
   ].join(' ')};
 }

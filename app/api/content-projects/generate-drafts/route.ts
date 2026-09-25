@@ -5,6 +5,7 @@ import {magazineCopyInstruction,magazineCopyIssues} from '@/lib/magazine-copy-po
 import { draftOutputSchema, readDraftOutput, withDraftFormatRetry } from '@/lib/draft-output';
 import { prepareDraftAssets } from '@/lib/draft-asset-analysis';
 import { runDraftStep, draftAnthropic, DraftStepError } from '@/lib/draft-generation-step';
+import { EDITORIAL_PAGE_GUIDANCE } from '@/lib/editorial-page-guidance';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { projectStyleContext, projectBrand, confirmedStyleHash } from '@/lib/project-style-context';
 import { cookies } from "next/headers";
@@ -179,7 +180,7 @@ export async function POST(req: Request) {
             "每頁必須保存固定 templateArtboardId：cover=01_COVER、longform=02_FULL_BLEED_TEXT、split=03_IMAGE_TOP_TEXT_BOTTOM、comparison=04_COMPARISON、feature=05_LEFT_TEXT_RIGHT_IMAGE、end=06_END_CTA。",
             "所有頁面嚴格遵守 system 中逐欄字數及 body 固定次序，不按一般文章段落數生成。優先保留有來源支持的重點與必要歸因，不以縮小字體容納長文。",
             "逐頁文案只可整理及改寫已確認故事結構、Brief 與來源資料。不得新增任何數字、背景、因果、影響、例子或評價；資料不足時寧可較短，不可以常識或套話填充。報道及當事人說法必須保留歸因字眼。",
-            "cover 的 subheadline 是短 Eyebrow，最多 10 個中文字；headline 不可含任何標點並須能平衡分成最多兩行；body 只可有一個短句，建議不超過 28 個中文字。",
+            "cover 的 subheadline 是短 Eyebrow，最多 10 個中文字；headline 不可含任何標點並按語意分成最多兩行，不強求行長平均；body 只可有一個短句，建議不超過 28 個中文字。",
             "end 頁 subheadline 使用短分類如『店舖資料』或『出發前留意』；headline 不可用直線或其他標點作分隔，最多兩行；場景或帶白底的產品相預設保留原圖，不可自動退地。",
             "longform 的 headline 不可含標點並應寫成兩個可獨立斷行的短語；body 每個短句獨立成一行，最多七行，不可用逗號將多個重點塞進同一行。longform 全頁必須使用自然、簡潔的繁體中文書面語，不可使用『唔係、係、嘅、拎、睇、薯仔』等廣東話口語。",
             "版面文案使用雜誌式換行建立節奏。body 每個陣列項目應是一個完整短段，段尾不要加入逗號、句號、分號或冒號；問號及感嘆號只在語意確實需要時使用。",
@@ -191,6 +192,7 @@ export async function POST(req: Request) {
             "若沒有圖片足以證明或呈現該頁所述人物、產品、服務、場景或比較項目，assetStatus 必須為 missing，assetIds 留空或只保留確實合適的圖片，並在 assetRequest 寫出原因及 2 至 4 個具體上載建議。不可用只有共同關鍵字但內容不符的圖片頂替。",
             "imageTreatment 按畫面決定：包裝、獨立產品或人物全身而背景雜亂可用 cutout；場景、製作過程或環境氣氛用 full-bleed 或 card；無法可靠退地時用 card。不要要求所有圖片退地。",
             "feature 頁如使用食物、環境或製作場景相片，必須保留原圖並用 card，不可退地；只有清晰獨立產品相片才可用 cutout。feature headline 不可包含標點並最多兩行。",
+            EDITORIAL_PAGE_GUIDANCE,
           ] : []),
         ];
     const input = [

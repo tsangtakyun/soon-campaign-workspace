@@ -58,7 +58,7 @@ export async function repairComparisonPage<T extends Record<string,any>>(scope:D
   const effective=effectiveComparison(page);
   const facts=comparisonFacts(page);
   const input={headline:page.headline,labels:effective.body.slice(0,2),facts,dimensions:page.comparisonLabels,source:effective.body[5]||''};
-  const key={kind:'comparison-alignment-v1',input};
+  const key={kind:'comparison-alignment-v2',input};
   const saved=await readDraftStep(scope,key);
   const run=await runDraftStep(scope,key,model,async()=>{
     // Older failed runs may contain a complete alignment rejected only for length.
@@ -71,6 +71,7 @@ export async function repairComparisonPage<T extends Record<string,any>>(scope:D
         '修正比較維度錯配。最多三列，每列label為同一個具體維度，左右只填該維度資料；成分不是產品標示，功效不能與法規定義放在同一列。天然含有與人工添加須使用中性的「成分特點」，不能統稱添加成分。',
         '每格完整短句最多18字，label最多8字；英文逐字母、標點及空格計字。保留必要數值、縮寫、來源歸因、否定及未核實限制。不可用省略號截斷。',
         '缺同維度資料的一方用空字串及空Refs，不捏造。不能平行比較的說法放source註記，不勉強用「補充說明」等籠統標籤拼成一列。',
+        '只保留有實際比較價值的維度，一至三列皆可，不固定兩列或填滿三列。若某列只有一方有資料且沒有比較意義，把該事實完整移到source及noteRefs，不可刪除或新增另一方資料。',
         '每項原文fact ID必須恰好出現一次：左格leftRefs、右格rightRefs或noteRefs。Refs所指的內容必須在該格或source中完整保留意思。source合併原來源與補充限制，最多40字。',
         JSON.stringify(input),
       ].join('\n')}],

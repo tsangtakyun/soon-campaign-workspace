@@ -139,8 +139,8 @@ function clean(value: unknown) {
   return String(value || "").trim();
 }
 
-/** The published Core master owns geometry. Asset fitting and copy binding may
- * never replace, move or resize its layout. Optional empty decoration is omitted. */
+/** Preserve the published page structure. Approved refinements only pack text
+ * inside its existing area and synchronize comparison peers; no master mutation. */
 function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: MasterAsset): FabricObjectJson[] {
   let source=design.canvasJson?.objects || [];
   // Explicit comparison header correction: derive a matched pair from the
@@ -157,11 +157,71 @@ function pageObjects(design: CoreMasterPageDesign, copy: MasterCopy, _primary?: 
     }));
     source=source.map(o=>o===leftBox||o===rightBox?{...o,width,height,top:leftBox.top}:o===leftLabel||o===rightLabel?{...o,left:finite(o===leftLabel?leftBox.left:rightBox.left)+inset,top:finite(leftBox.top)+6,width:textWidth,height:textHeight,fontSize:size,fontFamily:leftLabel.fontFamily,fontWeight:leftLabel.fontWeight,lineHeight:leftLabel.lineHeight,textAlign:'left' as const}:o);
   }
+  for(let n=1;n<=3;n++){
+    const peers=source.filter(o=>o.data?.binding===`content.left_row_${n}`||o.data?.binding===`content.right_row_${n}`);
+    const text=(o:FabricObjectJson)=>bindingValue(o.data?.role||'', '',copy,'',o.data?.binding);
+    const populated=peers.filter(o=>text(o)&&text(o)!=='原文未提供');
+    if(populated.length){
+      const size=Math.min(...populated.map(o=>fittedSize(text(o),finite(o.width)*finite(o.scaleX,1),finite(o.height)*finite(o.scaleY,1),finite(o.fontSize,41),finite(o.lineHeight,1.16)*1.13,true)));
+      source=source.map(o=>peers.includes(o)?{...o,fontSize:text(o)==='原文未提供'?Math.min(size,22):size,...(text(o)==='原文未提供'?{fill:'#6D6D6D',fontWeight:400}:{})}:o);
+    }else if(peers.length===2){
+      source=source.filter(o=>!peers.includes(o)&&o.data?.binding!==`content.comparison_label_${n}`&&!new RegExp(`^row_rule_[01]_${n-1}$`).test(o.data?.role||''));
+    }
+  }
+  source=packEditorialText(source,copy);
   return source.filter(o =>
     !(o.data?.role === 'highlight_box' && !copy.fields?.highlight)
   ).map(o => /text/i.test(o.type || '') && o.data?.binding?.startsWith('content.')
     ? {...o,data:{...o.data,fitText:true}}
     : o);
+}
+
+/** Content-aware spacing shared by PNG and editable output. Long text keeps
+ * the original slots; short copy must not inherit empty paragraphs' gaps. */
+function packEditorialText(source:FabricObjectJson[],copy:MasterCopy){
+  const role=copy.role||copy.layout;
+  if(!['cover','longform','split'].includes(role||''))return source;
+  if(copy.fields?.highlight)return source; // preserve an explicitly boxed callout
+  const get=(name:string)=>source.find(o=>o.data?.role===name);
+  const value=(o:FabricObjectJson)=>bindingValue(o.data?.role||'','',copy,'',o.data?.binding);
+  const measure=(o:FabricObjectJson,size:number)=>{
+    const width=finite(o.width)*finite(o.scaleX,1);
+    const lines=value(o).split('\n').reduce((total,line)=>{
+      let count=1,used=0;
+      for(const ch of Array.from(line)){const advance=(/[\u0000-\u007f]/.test(ch)?.62:1.02)*size;if(used+advance>width){count++;used=0;}used+=advance;}
+      return total+count;
+    },0);
+    return Math.ceil(lines*size*finite(o.lineHeight,1.16)*1.13);
+  };
+  const changes=new Map<FabricObjectJson,FabricObjectJson>();
+  if(role==='cover'){
+    const headline=get('headline'),subtitle=get('subheadline');
+    if(headline&&subtitle&&value(headline)&&value(subtitle)){
+      const size=fittedSize(value(headline),finite(headline.width),finite(headline.height),finite(headline.fontSize),finite(headline.lineHeight,1.16)*1.13);
+      const height=measure(headline,size),nextTop=finite(headline.top)+height+20;
+      if(nextTop<finite(subtitle.top)){
+        changes.set(headline,{...headline,height,fontSize:size});
+        changes.set(subtitle,{...subtitle,top:nextTop});
+      }
+    }
+  }else{
+    const names=role==='split'?['eyebrow','headline','accent','body_1','body_2','highlight']:['body_1','body_2','highlight'];
+    const objects=names.map(get).filter((o):o is FabricObjectJson=>!!o&&(o.data?.role==='accent'||!!value(o)));
+    const start=role==='split'?finite(get('headline')?.top,174):finite(get('body_1')?.top,866);
+    const limit=role==='split'?1195:1250;
+    const metrics=objects.map(o=>{
+      const name=o.data?.role;
+      const size=name==='headline'?finite(o.fontSize,100):name==='highlight'&&role==='longform'?40:finite(o.fontSize,35);
+      const height=name==='accent'?finite(o.height,7):measure(o,size);
+      return {o,size,height};
+    });
+    const total=metrics.reduce((sum,m)=>sum+m.height,0)+Math.max(0,metrics.length-1)*24;
+    if(total<=limit-start){
+      let top=role==='split'?start+(limit-start-total)/2:start;
+      for(const {o,size,height} of metrics){changes.set(o,{...o,top,height,scaleY:1,fontSize:size});top+=height+24;}
+    }
+  }
+  return source.map(o=>changes.get(o)||o);
 }
 
 /** Conservative CJK/Latin wrapping estimate; both renderers use the same size. */
