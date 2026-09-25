@@ -18,6 +18,7 @@ import { getWorkspaceAccess } from "@/lib/workspace-access";
 import { contentStylePromptFromDecision } from "@/lib/content-style-library";
 import { isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
+import { mergeAssignedAssetsIntoDrafts } from "@/lib/page-asset-assignments";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -325,6 +326,7 @@ export async function POST(req: Request) {
           };
       return { ...draft, role, layout: role, templateArtboardId: artboardByRole[role], assetId: allowedIds[0] || "", assetIds: allowedIds, assetStatus, assetRequest: assetStatus === "missing" ? request : undefined };
     });
+    if(!isVideo)normalizedPages=mergeAssignedAssetsIntoDrafts(normalizedPages,analyzedAssets);
     // Save drafts first. The production action fits invalid copy in a separate
     // request so generation time cannot consume the repair timeout budget.
     const copyReview=!isVideo&&isClearMagazine?normalizedPages.flatMap((page:Record<string,any>,index:number)=>{const issues=magazineCopyIssues(page);return issues.length?[{page:`P.${index+1}`,issues}]:[];}):[];

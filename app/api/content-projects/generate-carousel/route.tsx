@@ -22,6 +22,7 @@ import { verifiedExtensionAssets } from '@/lib/verified-extension-assets';
 import { resolveComposition } from '@/lib/composition-mode';
 import {repairComparisonPage} from '@/lib/repair-comparison-page';
 import {anthropicModel} from '@/lib/anthropic-models';
+import {mergeAssignedAssetsIntoDrafts} from '@/lib/page-asset-assignments';
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -884,16 +885,16 @@ export async function POST(req: Request) {
       productionStatus !== "images_ready"
     )
       return NextResponse.json({ error: "請先確認逐頁草稿" }, { status: 400 });
-    const drafts = ((project.production.pageDrafts || []) as Draft[]).map(draft => ({ ...draft,
+    const sourceAssets = project.production.assets || [];
+    const drafts = mergeAssignedAssetsIntoDrafts(((project.production.pageDrafts || []) as Draft[]).map(draft => ({ ...draft,
       headline: readerFacingCopy(draft.headline), subheadline: readerFacingCopy(draft.subheadline),
       body: draft.body?.map(readerFacingCopy),
-    }));
+    })),sourceAssets) as Draft[];
     if(body.repairComparison===true){
       const index=drafts.findIndex((_,i)=>requestedPage===`P.${i+1}`);
       if(index<0||!usesPublishedCoreMaster||!(drafts[index].role==='comparison'||drafts[index].layout==='comparison'))return NextResponse.json({error:'請選擇一頁比較頁修正，其他頁面不變。'},{status:400});
       drafts[index]=await repairComparisonPage({admin:access.admin,workspaceId,projectId,actorId:user.id},process.env.ANTHROPIC_API_KEY||'',anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL),drafts[index]);
     }
-    const sourceAssets = project.production.assets || [];
     const extensionIds = [...new Set(sourceAssets.flatMap((a:any)=>[a.extensionId,...Object.values(a.compositionVariants||{}).map((v:any)=>v.extensionId)].filter(Boolean)))];
     const extensionRuns = extensionIds.length ? await access.admin.from('content_project_generation_runs')
       .select('id,status,input,output').eq('workspace_id',workspaceId).eq('project_id',projectId).in('id',extensionIds) : {data:[],error:null};

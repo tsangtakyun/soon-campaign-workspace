@@ -27,6 +27,7 @@ import { SoonIcon, type SoonIconName } from "@/components/ui/SoonIcon";
 import { contentStyleTemplates as styleTemplates, type ContentStyleTemplate } from "@/lib/content-style-library";
 import { clearMagazineCarouselV1, isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
+import { mergeAssignedAssetsIntoDrafts } from "@/lib/page-asset-assignments";
 import {
   resolveActiveWorkspace,
   WORKSPACE_CHANGED_EVENT,
@@ -1127,7 +1128,7 @@ export default function ContentStudioPage() {
       }
       setMessage(successMessage);
       if (nextStep) goToStep(nextStep);
-      return true;
+      return payload.project;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能儲存");
       if(throwOnFailure)throw error;
@@ -1844,7 +1845,7 @@ export default function ContentStudioPage() {
   }
 
   async function confirmPageDrafts(optimizeBackground = false, retryPage?: string, currentProject = selected):Promise<void> {
-    const selected=currentProject;
+    let selected=currentProject;
     if (preparingImages.current || saving) return;
     if (!selected?.production || !Array.isArray(selected.production.pageDrafts))
       return;
@@ -1854,6 +1855,16 @@ export default function ContentStudioPage() {
     }
     if (editingDraft !== null) {
       setMessage("請先儲存正在編輯的頁面");
+      return;
+    }
+    const assignedDrafts=mergeAssignedAssetsIntoDrafts(selected.production.pageDrafts,(selected.production.assets||[]) as ProjectAsset[]);
+    const assignmentChanged=assignedDrafts.some((draft:any,index:number)=>{
+      const current=selected.production.pageDrafts[index]||{};
+      return draft.assetId!==current.assetId||JSON.stringify(draft.assetIds||[])!==JSON.stringify(current.assetIds||[])||draft.assetStatus!==current.assetStatus;
+    });
+    if(assignmentChanged){
+      const saved=await saveProject({production:{...selected.production,pageDrafts:assignedDrafts}},'已同步本頁指定圖片，正在繼續製作…');
+      if(saved)await confirmPageDrafts(optimizeBackground,retryPage,{...selected,...saved});
       return;
     }
     const requiredRoles = coreTemplatePageRoles(selected.format_decision?.templateContractSnapshot);

@@ -22,6 +22,7 @@ const deps={
 '@/lib/content-templates/clear-magazine-carousel-v1':{isClearMagazineCarousel:()=>false},
 '@/lib/core-template-contract':{isFixedCoreTemplate:()=>false,coreTemplatePageRoles:()=>[],applyCoreTemplateStructure:p=>p}
 };
+deps['@/lib/page-asset-assignments']={mergeAssignedAssetsIntoDrafts:p=>p};
 deps['@/lib/draft-generation-step'].draftRequestBudget=()=>150000;
 deps['@/lib/draft-output']=compile(fs.readFileSync('lib/draft-output.ts','utf8'),{'./draft-generation-step':{DraftStepError:StepError}});
 const route=compile(fs.readFileSync('app/api/content-projects/generate-drafts/route.ts','utf8'),deps);
