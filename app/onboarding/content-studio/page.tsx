@@ -552,7 +552,7 @@ export default function ContentStudioPage() {
     const key=`${selected.id}:${selected.production.generationRequested}`;
     if(autoDraftAttempt.current===key)return;
     autoDraftAttempt.current=key;
-    void confirmPageDrafts(selected.production.compositionMode==='ai');
+    void confirmPageDrafts(false);
   },[selected?.id,selected?.production?.generationRequested,selected?.production?.productionStatus,saving,isShortVideo,activeStep]);
   const compositionPreviewSignature=JSON.stringify(['preview-master-authority-four-edges-v4',selected?.id,selected?.production?.compositionMode,selected?.production?.pages,
     (selected?.production?.assets as ProjectAsset[]|undefined)?.map(a=>[a.id,a.url,a.assignedPage,a.isCover]),
@@ -1915,7 +1915,7 @@ export default function ContentStudioPage() {
     preparingImages.current = true;
     setSaving(true);
     try {
-    const mode:CompositionMode=optimizeBackground?'ai':selected.production.compositionMode==='ai'?'ai':'original';
+    const mode:CompositionMode=optimizeBackground?'ai':'original';
     let preparedAssets = setCompositionMode((selected.production.assets||[]) as ProjectAsset[],mode);
     const priorPreparation=selected.production.backgroundPreparation as {issues?:OptimizationIssue[]}|undefined;
     let issues:OptimizationIssue[]=retryPage?(priorPreparation?.issues||[]).filter(i=>i.page!==retryPage):[];
@@ -3303,17 +3303,12 @@ export default function ContentStudioPage() {
                                           : "請檢查文案、圖片配對及版面指示；確認後會鎖定這個製作版本。"}
                                       </p>
                                     </div>
-                                    {selected.selected_format !== 'short_video' && selected.production.compositionMode!=='original' ? <div>
-                                      <p>AI 會先分析各頁，只在有需要時延伸背景，再製作圖片；會使用圖片生成額度。原圖保留，可還原。請勿關閉頁面。</p>
-                                      <button type="button" disabled={saving || editingDraft !== null} onClick={()=>void confirmPageDrafts(true)}>{saving ? '正在處理…' : 'AI 優化構圖並生成圖片 →'}</button>
-                                    </div> : null}
                                     <button
                                       type="button"
-                                      style={selected.selected_format !== 'short_video' ? {background:'transparent',color:'var(--soon-oxblood)',border:'1px solid var(--soon-line)'} : undefined}
                                       disabled={saving || editingDraft !== null}
-                                      onClick={() => void confirmPageDrafts()}
+                                      onClick={() => void confirmPageDrafts(false)}
                                     >
-                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : selected.production.compositionMode==='original'?"使用原圖製作圖片 →":"保留目前構圖，直接生成 →"}
+                                      {selected.selected_format === "short_video" ? "確認短片製作包 →" : "確認並生成全套圖片 →"}
                                     </button>
                                   </div>
                                 ) : selected.production.productionStatus === "package_ready" ? (
@@ -3482,7 +3477,7 @@ export default function ContentStudioPage() {
                                                     下載圖片
                                                   </a>
                                                 </div>
-                                                {permissions?.canEdit && !selected.production.compositionMode ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={extensionActions()} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
+                                                {permissions?.canEdit && selected.production.compositionMode!=='ai' ? <PageCompositionAdvisor contract={selected.format_decision?.templateContractSnapshot} drafts={(selected.production.pageDrafts || []) as any[]} assets={(selected.production.assets || []) as ProjectAsset[]} page={page.page} actions={extensionActions()} analyze={analyzeAssetFocus} saveFocus={saveAssetFocus} disabled={saving}/> : null}
                                                 {permissions?.canEdit && selected.production.compositionMode==='ai'?<button type="button" disabled={saving} onClick={()=>void changePageComposition(page.page,(selected.production?.pageDrafts as any[])?.find(d=>d.page===page.page)?.compositionMode==='original'?'ai':'original')}>
                                                   {(selected.production.pageDrafts as any[])?.find(d=>d.page===page.page)?.compositionMode==='original'?'重用本頁 AI 構圖':'本頁還原原圖構圖'}
                                                 </button>:null}

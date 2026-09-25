@@ -16,7 +16,10 @@ async function main(){
  assert.equal(rejected[0].url,'original');assert.equal(rejected[0].extensionRejectedUrl,'original');assert.equal(rejected[0].autoExtensionDeclinedUrl,undefined);
  const source=fs.readFileSync('app/onboarding/content-studio/page.tsx','utf8');
  assert.ok(source.indexOf('preparedAssets = await optimizeCarouselAssets') < source.indexOf('assets: preparedAssets'));
- assert.ok(source.includes('AI 優化構圖並生成圖片 →'));
+ assert.ok(source.includes('void confirmPageDrafts(false)'));
+ assert.ok(source.includes('確認並生成全套圖片 →'));
+ assert.ok(!source.includes('AI 優化構圖並生成圖片 →'));
+ assert.ok(source.includes("selected.production.compositionMode!=='ai' ? <PageCompositionAdvisor"));
  console.log('PASS: extension finishes before render, deduplication, opt-out, original retention and failure stop');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
