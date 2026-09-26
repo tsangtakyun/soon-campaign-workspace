@@ -482,6 +482,7 @@ export default function ContentStudioPage() {
   const stylePreviewInFlightRef = useRef(new Set<string>());
   const [promptOpen, setPromptOpen] = useState(false);
   const [editingPage, setEditingPage] = useState<number | null>(null);
+  const [expandedStoryPage, setExpandedStoryPage] = useState<number | null>(0);
   const [editingDraft, setEditingDraft] = useState<number | null>(null);
   const [uploadingAssets, setUploadingAssets] = useState(false);
   const [assetUploadStatus, setAssetUploadStatus] = useState<{ type: "progress" | "error" | "success"; text: string } | null>(null);
@@ -960,6 +961,8 @@ export default function ContentStudioPage() {
     setCustomDirectionText("");
     setEntrySourceMode("content");
     setDirectionRecommendations([]);
+    setEditingPage(null);
+    setExpandedStoryPage(0);
     setRecommendedFormat("");
     setFormatReason("");
     setSelectedFormat("");
@@ -1034,6 +1037,8 @@ export default function ContentStudioPage() {
 
   useEffect(() => {
     if (!selected) return;
+    setEditingPage(null);
+    setExpandedStoryPage(0);
     setBrief({
       angle: selected.brief?.angle || "交由 AI 決定",
       summary: selected.brief?.summary || selected.source_note || "",
@@ -1414,22 +1419,78 @@ export default function ContentStudioPage() {
         : `確定刪除 P.${index + 1}？刪除後其餘頁面會自動重新編號`)
     )
       return;
-    const remaining = current
-      .filter((_: unknown, pageIndex: number) => pageIndex !== index)
-      .map((page: any, pageIndex: number) => deletingVideo ? page : ({ ...page, page: `P.${pageIndex + 1}` }));
+    const remaining = current.filter((_: unknown, pageIndex: number) => pageIndex !== index);
+    const oldToNewPage = new Map<string,string>();
+    const renumbered = remaining.map((page: any, pageIndex: number) => {
+      if(deletingVideo)return page;
+      const nextPage=`P.${pageIndex+1}`;
+      if(page.page)oldToNewPage.set(page.page,nextPage);
+      return {...page,page:nextPage};
+    });
+    const assets = deletingVideo ? selected.production.assets : ((selected.production.assets||[]) as ProjectAsset[]).map((asset)=>{
+      if(!asset.assignedPage||asset.assignedPage==='auto')return asset;
+      const nextPage=oldToNewPage.get(asset.assignedPage);
+      return nextPage?{...asset,assignedPage:nextPage,isCover:nextPage==='P.1'&&asset.isCover}:{...asset,assignedPage:'auto',isCover:false};
+    });
     await saveProject(
       {
         production: {
           ...selected.production,
-          ...(deletingVideo ? { script: remaining, pages: [] } : { pages: remaining }),
+          ...(deletingVideo ? { script: renumbered, pages: [] } : { pages: renumbered, assets }),
           status: "structure_ready",
           confirmedAt: null,
         },
-        ...(!deletingVideo&&selected.selected_format==='carousel'?{formatDecision:{...selected.format_decision,slideCount:remaining.length}}:{}),
+        ...(!deletingVideo&&selected.selected_format==='carousel'?{formatDecision:{...selected.format_decision,slideCount:renumbered.length}}:{}),
       },
       deletingVideo ? "劇本段落已刪除" : `P.${index + 1} 已刪除，頁碼已重新排列`,
     );
     setEditingPage(null);
+    setExpandedStoryPage((value)=>value===null?null:Math.min(value,Math.max(0,renumbered.length-1)));
+  }
+
+  async function addStoryPage(){
+    if(!selected?.production||selected.selected_format!=='carousel')return;
+    const current=Array.isArray(selected.production.pages)?selected.production.pages as any[]:[];
+    if(current.length>=10){setMessage('輪播貼文最多 10 頁');return;}
+    const insertionIndex=Math.max(1,current.length-1);
+    const withNew=[...current];
+    withNew.splice(insertionIndex,0,{headline:'新增頁面',purpose:'補充一個重點',copyDirection:'',visualDirection:''});
+    const oldToNewPage=new Map<string,string>();
+    const pages=withNew.map((page,index)=>{
+      const nextPage=`P.${index+1}`;
+      if(page.page)oldToNewPage.set(page.page,nextPage);
+      return {...page,page:nextPage};
+    });
+    const assets=((selected.production.assets||[]) as ProjectAsset[]).map((asset)=>{
+      const nextPage=oldToNewPage.get(asset.assignedPage);
+      return nextPage?{...asset,assignedPage:nextPage,isCover:nextPage==='P.1'&&asset.isCover}:asset;
+    });
+    const saved=await saveProject({
+      production:{...selected.production,pages,assets,status:'structure_ready',confirmedAt:null},
+      formatDecision:{...selected.format_decision,slideCount:pages.length},
+    },`已新增 P.${insertionIndex+1}`);
+    if(saved){setExpandedStoryPage(insertionIndex);setEditingPage(insertionIndex);}
+  }
+
+  async function moveStoryPage(index:number,direction:-1|1){
+    if(!selected?.production||selected.selected_format!=='carousel')return;
+    const current=Array.isArray(selected.production.pages)?selected.production.pages as any[]:[];
+    const target=index+direction;
+    if(index<=0||index>=current.length-1||target<=0||target>=current.length-1)return;
+    const moved=[...current];
+    [moved[index],moved[target]]=[moved[target],moved[index]];
+    const oldToNewPage=new Map<string,string>();
+    const pages=moved.map((page,pageIndex)=>{
+      const nextPage=`P.${pageIndex+1}`;
+      if(page.page)oldToNewPage.set(page.page,nextPage);
+      return {...page,page:nextPage};
+    });
+    const assets=((selected.production.assets||[]) as ProjectAsset[]).map((asset)=>{
+      const nextPage=oldToNewPage.get(asset.assignedPage);
+      return nextPage?{...asset,assignedPage:nextPage,isCover:nextPage==='P.1'&&asset.isCover}:asset;
+    });
+    const saved=await saveProject({production:{...selected.production,pages,assets,status:'structure_ready',confirmedAt:null}},'內容次序已更新');
+    if(saved){setExpandedStoryPage(target);setEditingPage((value)=>value===index?target:value);}
   }
 
   async function imageDimensions(file: File) {
@@ -2807,7 +2868,6 @@ export default function ContentStudioPage() {
                         <span>STEP {visibleStudioSteps.findIndex((step) => step.id === (isShortVideo?activeStep:imageStep(activeStep))) + 1}</span>
                         <h3>{stepLabel(activeStep)}</h3>
                       </div>
-                      <em>按照已確認的內容設定製作</em>
                     </div>
                     {!isShortVideo && activeStep==='structure' && Array.isArray(selected.production?.pageDrafts) && selected.production.pageDrafts.length>0 && (
                       <button type="button" disabled={saving} onClick={()=>goToStep('drafts')}>查看製作文案／繼續製作 →</button>
@@ -2819,7 +2879,7 @@ export default function ContentStudioPage() {
                       <SoonLoading
                         compact
                         title="SOON 正在繼續製作"
-                        description={isShortVideo ? "正在整理劇本及拍攝安排。" : "正在整理內容、核對資料及準備配圖安排。"}
+                        description="請保留此頁開啟"
                         steps={isShortVideo ? ["整理劇本", "核對資料", "安排鏡頭"] : ["整理內容", "核對資料", "安排配圖"]}
                       />
                     ) : selected.production?.status ? (
@@ -2865,16 +2925,35 @@ export default function ContentStudioPage() {
                         </div>
                         </details>
                         <div className="story-pages">
-                          <h4>{isShortVideo ? "短片劇本" : "內容順序"}</h4>
+                          <div className="story-pages-heading">
+                            <h4>{isShortVideo ? "短片劇本" : "內容順序"}</h4>
+                            {!isShortVideo?<span>{Array.isArray(selected.production.pages)?selected.production.pages.length:0} 頁</span>:null}
+                          </div>
                           {(isShortVideo ? videoScript : Array.isArray(selected.production.pages)
-                            ? selected.production.pages : []).map((page: any, index: number) => (
-                            <article key={index}>
+                            ? selected.production.pages : []).map((page: any, index: number, pages:any[]) => {
+                            const expanded=isShortVideo||expandedStoryPage===index||editingPage===index;
+                            const fixedCarouselPage=!isShortVideo&&(index===0||index===pages.length-1);
+                            const pageAssets=!isShortVideo?((selected.production?.assets||[]) as ProjectAsset[]).filter(a=>a.assignedPage===(page.page||`P.${index+1}`)||(index===0&&a.isCover)):[];
+                            return <article key={page.page||index} className={expanded?'expanded':''}>
                               <span>{isShortVideo ? page.time : page.page || `P.${index + 1}`}</span>
                               <div>
+                                <div className="page-card-head">
+                                  <button className="page-title-toggle" type="button" aria-expanded={expanded} onClick={()=>!isShortVideo&&setExpandedStoryPage(expanded&&editingPage!==index?null:index)}>
+                                    <b>{isShortVideo ? page.section || "未命名段落" : page.headline || "未命名頁面"}</b>
+                                    {!isShortVideo?<small>{fixedCarouselPage?(index===0?'封面':'收尾'):pageAssets.length?'已有配圖':'未有配圖'}</small>:null}
+                                  </button>
+                                  <div>
+                                    {!isShortVideo&&!fixedCarouselPage?<>
+                                      <button type="button" disabled={saving||index<=1} onClick={()=>void moveStoryPage(index,-1)} aria-label={`上移 ${page.page||`P.${index+1}`}`}>↑</button>
+                                      <button type="button" disabled={saving||index>=pages.length-2} onClick={()=>void moveStoryPage(index,1)} aria-label={`下移 ${page.page||`P.${index+1}`}`}>↓</button>
+                                    </>:null}
+                                    {!isShortVideo?<button className="page-expand-button" type="button" aria-label={expanded?'收起頁面':'展開頁面'} onClick={()=>setExpandedStoryPage(expanded&&editingPage!==index?null:index)}>{expanded?'−':'＋'}</button>:null}
+                                  </div>
+                                </div>
                                 {editingPage === index ? (
                                   <div className="page-editor">
                                     <label>
-                                      <span>{isShortVideo ? "劇本段落" : "Headline"}</span>
+                                      <span>{isShortVideo ? "劇本段落" : "頁面標題"}</span>
                                       <input
                                         value={isShortVideo ? page.section || "" : page.headline || ""}
                                         onChange={(event) =>
@@ -2891,7 +2970,7 @@ export default function ContentStudioPage() {
                                       <input value={page.time || ""} onChange={(event) => updateStoryPage(index, "time", event.target.value)} />
                                     </label> : null}
                                     <label>
-                                      <span>{isShortVideo ? "旁白／對白" : "內容方向"}</span>
+                                      <span>{isShortVideo ? "旁白／對白" : "本頁內容"}</span>
                                       <textarea
                                         value={isShortVideo ? page.dialogue || "" :
                                           page.copyDirection ||
@@ -2941,42 +3020,41 @@ export default function ContentStudioPage() {
                                   </div>
                                 ) : (
                                   <>
-                                    <div className="page-card-head">
-                                      <h5>{isShortVideo ? page.section || "未命名段落" : page.headline || "未命名頁面"}</h5>
-                                      <div>
+                                    {!expanded&&!isShortVideo?<p className="page-card-summary">{page.purpose||page.copyDirection||'尚未加入內容'}</p>:null}
+                                    {expanded?<div className="page-card-actions">
                                         <button
-                                          onClick={() => setEditingPage(index)}
+                                          onClick={() => {setExpandedStoryPage(index);setEditingPage(index);}}
                                         >
                                           編輯
                                         </button>
-                                        <button
+                                        {(!fixedCarouselPage||isShortVideo)?<button
                                           className="delete"
                                           onClick={() => deleteStoryPage(index)}
                                         >
                                           刪除
-                                        </button>
-                                      </div>
-                                    </div>
-                                    {isShortVideo ? <>
+                                        </button>:null}
+                                      </div>:null}
+                                    {expanded&&isShortVideo ? <>
                                       <p><strong>旁白／對白：</strong>{page.dialogue || "—"}</p>
                                       <p><strong>畫面：</strong>{page.visual || "—"}</p>
                                       {page.caption ? <p><strong>字幕：</strong>{page.caption}</p> : null}
                                       {page.productionNote ? <details className="page-visual-detail"><summary>查看拍攝／生成提示</summary><p>{page.productionNote}</p></details> : null}
-                                    </> : <>
+                                    </> : expanded&&!isShortVideo?<>
                                       <p>{page.purpose || page.headline || ""}</p>
-                                      <details><summary>查看完整內容方向</summary><p>{page.copyDirection||''}</p></details>
+                                      <details><summary>查看／編輯本頁內容</summary><p>{page.copyDirection||''}</p></details>
                                       {page.visualDirection ? <details className="page-visual-detail"><summary>查看畫面建議</summary><p>{page.visualDirection}</p></details> : null}
-                                    </>}
+                                    </>:null}
                                   </>
                                 )}
-                                {!isShortVideo?<div className="story-page-assets">
-                                  <div className="story-page-thumbnails">{((selected.production?.assets||[]) as ProjectAsset[]).filter(a=>a.assignedPage===(page.page||`P.${index+1}`)||(index===0&&a.isCover)).map(a=><img key={a.id} src={a.url} alt={a.filename}/>)}</div>
+                                {!isShortVideo&&expanded&&editingPage!==index?<div className="story-page-assets">
+                                  <div className="story-page-thumbnails">{pageAssets.map(a=><img key={a.id} src={a.url} alt={a.filename}/>)}</div>
                                   <label className="asset-upload-button">＋ 上載本頁圖片<input type="file" accept="image/*" multiple disabled={saving||uploadingAssets} onChange={e=>void uploadProjectAssets(e,page.page||`P.${index+1}`)}/></label>
                                   <button type="button" disabled={saving||!!generatingAssetPage} onClick={()=>void generateProjectAsset(page.page||`P.${index+1}`)}>{generatingAssetPage===(page.page||`P.${index+1}`)?'生成中…':'AI 生成本頁配圖'}</button>
                                 </div>:null}
                               </div>
-                            </article>
-                          ))}
+                            </article>;
+                          })}
+                          {!isShortVideo?<button className="add-story-page" type="button" disabled={saving||(Array.isArray(selected.production.pages)&&selected.production.pages.length>=10)} onClick={()=>void addStoryPage()}>＋ 新增一頁</button>:null}
                         </div>
                         {Array.isArray(selected.production.sources) &&
                         selected.production.sources.length ? (
@@ -3934,10 +4012,8 @@ const editingStyles = `
   @keyframes carousel-generation-spin{to{transform:rotate(360deg)}}
   .page-drafts-heading-actions{display:flex;align-items:center;gap:8px}.page-drafts-heading-actions button{border:1px solid #d9dce1;border-radius:8px;background:#fff;color:#222;padding:8px 11px;font-size:10px;font-weight:800;cursor:pointer}.page-drafts-heading-actions button:disabled{opacity:.45;cursor:not-allowed}
   .page-drafts-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}.page-drafts-heading h4{margin:0}.page-drafts-heading .confirmed-pill{background:#e8f7ed!important;color:#208345!important}.draft-confirm-step,.generation-next-step{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px dashed #cfd2d7;border-radius:13px;padding:16px;margin-top:7px}.draft-confirm-step b,.generation-next-step b{font-size:13px}.draft-confirm-step p,.generation-next-step p{margin:5px 0 0;font-size:11px;color:#747880}.draft-confirm-step button,.generation-next-step button,.generated-carousel-head button{flex:0 0 auto;border:0;border-radius:9px;background:#111;color:#fff;padding:11px 15px;font-size:11px;font-weight:800;cursor:pointer}.draft-confirm-step button:disabled,.generation-next-step button:disabled{opacity:.45;cursor:not-allowed}.generation-next-step{background:#f6faf7;border-style:solid;border-color:#dcebe0}.generated-carousel{display:grid;gap:14px;border:1px solid #dcebe0;background:#f6faf7;border-radius:13px;padding:16px}.generated-carousel-head{display:flex;align-items:center;justify-content:space-between;gap:15px}.generated-carousel-head p{margin:4px 0 0}.generated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}.page-drafts .generated-grid article{display:block;grid-template-columns:none;background:#fff;border:1px solid #e1e3e6;border-radius:10px;overflow:hidden}.page-drafts .generated-grid article>img{display:block;width:100%;height:auto;aspect-ratio:4/5;object-fit:contain;background:#f3f3f1}.page-drafts .generated-grid article>div:last-child{display:grid;gap:8px;padding:10px 12px}.page-drafts .generated-grid article>div:last-child b{white-space:nowrap}.generated-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:7px}.generated-actions a{display:flex;align-items:center;justify-content:center;border-radius:7px;padding:8px 6px!important;font-size:10px;font-weight:800;text-decoration:none}.generated-edit-button{background:#eceef1;color:#222!important}.generated-download-button{background:#111;color:#fff!important}.caption-draft{white-space:pre-wrap;background:#fff;border-radius:10px;padding:13px!important}@media(max-width:700px){.draft-confirm-step,.generation-next-step{align-items:flex-start;flex-direction:column}.generated-grid{grid-template-columns:1fr 1fr}}
-  .page-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-  .page-card-head>div{display:flex;gap:5px}
-  .page-card-head button,.page-editor-actions button{border:0;border-radius:7px;background:#f0f1f3;color:#34373c;padding:6px 9px;font-size:10px;font-weight:750;cursor:pointer}
-  .page-card-head button.delete{color:#a12d2d;background:#fff0f0}
+  .story-pages-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.story-pages-heading h4{margin:2px 0 6px}.story-pages-heading span{border-radius:999px;background:#f1ebe4;color:var(--soon-oxblood);padding:5px 8px;font-size:10px;font-weight:850}
+  .story-pages article{transition:border-color .15s ease,box-shadow .15s ease}.story-pages article.expanded{border-color:#c9aaa5;box-shadow:0 3px 0 #eadbd5}.page-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.page-card-head>div{display:flex;gap:5px}.page-title-toggle{min-width:0;display:flex;align-items:center;gap:8px;border:0!important;background:transparent!important;color:#202126!important;padding:1px 0!important;text-align:left;cursor:pointer}.page-title-toggle b{overflow:hidden;text-overflow:ellipsis;font-size:13px;line-height:1.4}.page-title-toggle small{flex:0 0 auto;border-radius:999px;background:#f1f2f3;color:#747880;padding:4px 7px;font-size:9px;font-weight:800}.page-card-head>div>button,.page-card-actions button,.page-editor-actions button{border:0;border-radius:7px;background:#f0f1f3;color:#34373c;padding:6px 9px;font-size:10px;font-weight:750;cursor:pointer}.page-card-head button:disabled{opacity:.28;cursor:not-allowed}.page-card-head .page-expand-button{min-width:28px;background:#f1ebe4;color:var(--soon-oxblood);font-size:13px}.page-card-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:9px}.page-card-actions button.delete{color:#a12d2d;background:#fff0f0}.page-card-summary{display:-webkit-box!important;overflow:hidden;margin:7px 0 0!important;color:#757981!important;font-size:11px!important;line-height:1.45!important;-webkit-box-orient:vertical;-webkit-line-clamp:1}.add-story-page{width:100%;min-height:46px;border:1px dashed #c9aaa5;border-radius:11px;background:#faf8f4;color:var(--soon-oxblood);font:inherit;font-size:12px;font-weight:850;cursor:pointer}.add-story-page:hover{border-style:solid;background:#f7eee9}.add-story-page:disabled{opacity:.42;cursor:not-allowed}
   .page-editor label{margin:0 0 9px}
   .page-editor label span{font-size:10px}
   .page-editor input,.page-editor textarea{width:100%;box-sizing:border-box;font-size:12px}
@@ -3962,7 +4038,7 @@ const editingStyles = `
   .brief-source-field textarea{min-height:150px;font-size:15px;line-height:1.65}.brief-source-field>small{color:var(--soon-muted);font-size:11px}.structure-evidence{border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:13px 15px}.structure-evidence>summary,.page-visual-detail>summary{cursor:pointer;font-size:11px;font-weight:800;color:var(--soon-oxblood)}.structure-evidence>p{color:var(--soon-muted);font-size:11px;line-height:1.55}.structure-evidence .fact-grid{margin-top:12px}.story-pages article:not(:has(.page-editor))>div>p{max-width:1100px;white-space:pre-line;line-height:1.65}.page-visual-detail{margin-top:8px}.page-visual-detail p{display:block!important;margin-top:8px!important}.studio-message{position:fixed;z-index:90;top:22px;right:24px;width:min(430px,calc(100vw - 48px));box-sizing:border-box;margin:0!important;border:1px solid #d7dfbf;border-radius:12px!important;background:#f5f8eb!important;color:#334418!important;box-shadow:0 12px 34px rgba(31,25,20,.14);padding:15px 16px 15px 46px!important;font-size:13px!important;font-weight:750;line-height:1.45}.studio-message:before{content:"✓";position:absolute;left:16px;top:13px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#58731e;color:#fff;font-size:12px;font-weight:900}.studio-message.loading{border-color:#dbc8c1;background:#f7eee9!important;color:var(--soon-oxblood)!important}.studio-message.loading:before{content:"";box-sizing:border-box;top:15px;width:16px;height:16px;border:2px solid #c9aaa5;border-top-color:var(--soon-oxblood);background:transparent;animation:studio-loading-spin .8s linear infinite}.studio-message.error{border-color:#d9aaa7;background:#fff1ef!important;color:#742b30!important}.studio-message.error:before{content:"!";background:#742b30}@media(max-width:700px){.studio-message{top:12px;right:12px;width:calc(100vw - 24px)}}
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .production-ready b.working{box-sizing:border-box;background:transparent;border:3px solid #dce8b6;border-top-color:var(--soon-oxblood);animation:studio-loading-spin .8s linear infinite}
-  .catalog-choice{margin-top:28px}.catalog-choice>p{color:#70665f;font-size:14px}.catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,320px));gap:20px;margin:20px 0}.catalog-grid>article{border:1px solid #ddd3c9;border-radius:16px;padding:12px;background:#fff;overflow:hidden}.catalog-grid>article.selected{border:2px solid #6b2c30;padding:11px;box-shadow:0 3px 0 #e7d7d0}.catalog-grid h4{margin:16px 0 8px}.catalog-grid p{font-size:12px;line-height:1.5;color:#70665f}.catalog-grid button{border:1px solid #d9cec3;border-radius:8px;padding:9px 13px;background:#faf7f2;color:#6b2c30;cursor:pointer}.catalog-grid button[aria-pressed=true]{background:#6b2c30;color:#fff}.catalog-grid>article>button{width:100%}.core-catalog-example nav{display:flex;gap:6px;margin:10px 0}.core-catalog-example small{font-size:10px;color:#7b7169}.story-page-thumbnails{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.story-page-thumbnails img{width:90px;height:90px;object-fit:cover;border-radius:8px}.story-page-assets{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.story-page-assets .story-page-thumbnails{width:100%}.story-page-assets input[type=file]{display:none}.story-page-assets button{border:1px solid #d8ccc2;border-radius:8px;padding:9px 12px;background:#fff;color:#6b2c30;cursor:pointer}.compact-image-flow[data-step="structure"] .next-production{display:block}.compact-image-flow[data-step="drafts"] .next-production{display:none}.compact-image-flow .structure-status{display:none}.compact-image-flow .story-pages>h4{margin-top:0}.compact-image-flow .story-pages details{font-size:12px;color:#70665f}.compact-image-flow .structure-sources{font-size:11px}.compact-image-flow .page-drafts-heading h4{font-size:18px}
+  .catalog-choice{margin-top:28px}.catalog-choice>p{color:#70665f;font-size:14px}.catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,320px));gap:20px;margin:20px 0}.catalog-grid>article{border:1px solid #ddd3c9;border-radius:16px;padding:12px;background:#fff;overflow:hidden}.catalog-grid>article.selected{border:2px solid #6b2c30;padding:11px;box-shadow:0 3px 0 #e7d7d0}.catalog-grid h4{margin:16px 0 8px}.catalog-grid p{font-size:12px;line-height:1.5;color:#70665f}.catalog-grid button{border:1px solid #d9cec3;border-radius:8px;padding:9px 13px;background:#faf7f2;color:#6b2c30;cursor:pointer}.catalog-grid button[aria-pressed=true]{background:#6b2c30;color:#fff}.catalog-grid>article>button{width:100%}.core-catalog-canvas{position:relative;overflow:hidden;border-radius:9px}.core-catalog-loading{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:9px;background:#f5f1e9;color:#70665f;font-size:10px;font-weight:800}.core-catalog-loading i{display:block;width:22px;height:22px;border:3px solid #dbc9c1;border-top-color:var(--soon-oxblood);border-radius:50%;animation:catalog-spin .8s linear infinite}.core-catalog-example nav{display:flex;gap:6px;margin:10px 0}.core-catalog-example small{display:block;font-size:10px;line-height:1.45;color:#7b7169}.story-page-thumbnails{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.story-page-thumbnails img{width:90px;height:90px;object-fit:cover;border-radius:8px}.story-page-assets{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.story-page-assets .story-page-thumbnails{width:100%}.story-page-assets input[type=file]{display:none}.story-page-assets button{border:1px solid #d8ccc2;border-radius:8px;padding:9px 12px;background:#fff;color:#6b2c30;cursor:pointer}.compact-image-flow[data-step="structure"] .next-production{display:block}.compact-image-flow[data-step="drafts"] .next-production{display:none}.compact-image-flow .structure-status{display:none}.compact-image-flow .story-pages details{font-size:12px;color:#70665f}.compact-image-flow .structure-sources{font-size:11px}.compact-image-flow .page-drafts-heading h4{font-size:18px}
   .catalog-loading-label{display:flex;align-items:center;gap:8px}.catalog-loading-label:before{content:"";width:12px;height:12px;border:2px solid #dbc9c1;border-top-color:var(--soon-oxblood);border-radius:50%;animation:catalog-spin .8s linear infinite}.catalog-grid-loading>article{display:grid;gap:12px}.catalog-grid-loading article>div{aspect-ratio:4/5;border-radius:10px;background:linear-gradient(100deg,#f1ece6 30%,#faf7f2 50%,#f1ece6 70%);background-size:220% 100%;animation:catalog-shimmer 1.4s ease-in-out infinite}.catalog-grid-loading article>i{display:block;height:15px;border-radius:999px;background:#eee7df}.catalog-grid-loading article>i:nth-of-type(2){width:68%}.catalog-grid-loading button{opacity:.45}@keyframes catalog-spin{to{transform:rotate(360deg)}}@keyframes catalog-shimmer{to{background-position-x:-220%}}
   .studio-load-error{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dbc8c1;border-radius:12px;background:#f7eee9;padding:13px 15px;color:var(--soon-oxblood);font-size:13px;font-weight:750}.studio-load-error button{flex:none;border:1px solid var(--soon-oxblood);border-radius:9px;background:#fff;color:var(--soon-oxblood);padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}@media(max-width:560px){.studio-load-error{align-items:flex-start;flex-direction:column}.studio-load-error button{width:100%}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
