@@ -12,5 +12,5 @@ export async function GET(request:Request) {
   try {
     const registry=await coreRegistry(catalogFormats[format]);
     return NextResponse.json({registryVersion:registry.registryVersion,styles:catalogStyles(registry.styles).map(s=>({...s,code:creatorCode(s.code),creatorSource:'soon_core'}))},{headers:{'Cache-Control':'private, no-store'}});
-  }catch{return NextResponse.json({error:'未能讀取 Core 已發布母版，請重試；不會以其他設計代替。'},{status:503});}
+  }catch{return NextResponse.json({error:'未能載入內容風格，請重試。'},{status:503});}
 }

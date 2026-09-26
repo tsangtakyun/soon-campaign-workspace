@@ -155,6 +155,18 @@ type DisplayStyle = ContentStyleTemplate & {
   core?: CorePublishedStyle;
 };
 
+const catalogStyleCache = new Map<string, CorePublishedStyle[]>();
+
+function conciseSlideCountReason(reason: string, count: number) {
+  const cleaned = reason.replace(/\s+/gu, " ").trim();
+  if (!cleaned) return `${count} 張足夠逐步交代主要重點，避免內容重複。`;
+  if (cleaned.length <= 54) return cleaned;
+  if (/(?:研究|數據|因果|風險)/u.test(cleaned)) {
+    return `${count} 張足夠交代研究數字、設計差異、限制及建議。`;
+  }
+  return `${count} 張足夠逐步交代主要重點，避免內容重複。`;
+}
+
 type DirectionRecommendation = {
   id: string;
   title: string;
@@ -1084,15 +1096,18 @@ export default function ContentStudioPage() {
   }, [directionRecommendations.length, startingProject]);
 
   useEffect(() => {
-    if(activeStep!=='format'||!workspaceId||!['carousel','single_image'].includes(selectedFormat))return;
+    if(!workspaceId||!['carousel','single_image'].includes(selectedFormat))return;
+    const cacheKey=selectedFormat;
+    const cached=catalogStyleCache.get(cacheKey);
+    if(cached&&styleRetry===0){setCoreStyles(cached);setStyleMessage('');setLoadingStyles(false);return;}
     let cancelled=false;setLoadingStyles(true);setStyleMessage('');setCoreStyles([]);
-    fetch(`/api/content-styles/catalog?workspaceId=${encodeURIComponent(workspaceId)}&format=${selectedFormat}`,{cache:'no-store'})
+    fetch(`/api/content-styles/catalog?workspaceId=${encodeURIComponent(workspaceId)}&format=${selectedFormat}`)
       .then(async r=>{const p=await r.json();if(!r.ok)throw Error(p.error);return p;})
-      .then(p=>{if(cancelled)return;setCoreStyles(p.styles||[]);if(!p.styles?.length)setStyleMessage('此格式暫未有已發布嘅可編輯母版。');})
-      .catch(e=>{if(!cancelled)setStyleMessage(e.message||'未能載入 Core 示範');})
+      .then(p=>{if(cancelled)return;const styles=Array.isArray(p.styles)?p.styles:[];if(styles.length)catalogStyleCache.set(cacheKey,styles);setCoreStyles(styles);if(!styles.length)setStyleMessage('此格式暫未有可用內容風格。');})
+      .catch(e=>{if(!cancelled)setStyleMessage(e.message||'未能載入內容風格');})
       .finally(()=>{if(!cancelled)setLoadingStyles(false);});
     return()=>{cancelled=true;};
-  },[activeStep,workspaceId,selectedFormat,styleRetry]);
+  },[workspaceId,selectedFormat,styleRetry]);
 
   useEffect(() => {
     const activeFormat = selected?.selected_format || selectedFormat;
@@ -2556,7 +2571,6 @@ export default function ContentStudioPage() {
                         <span>STEP 2</span>
                         <h3>用甚麼形式最能說清楚？</h3>
                       </div>
-                      <em>{formatReason || "SOON 已按內容重點提供建議，你仍可自行選擇"}</em>
                     </div>
                     <div className="format-grid">
                       {formats.map((format) => (
@@ -2585,7 +2599,7 @@ export default function ContentStudioPage() {
                       <section className="slide-count-recommendation" aria-label="輪播張數">
                         <div>
                           <strong>{`SOON 建議製作 ${recommendedSlideCount} 張`}</strong>
-                          <small>{slideCountReason || "你可以按今次需要選擇 3–10 張。"}</small>
+                          <small>{conciseSlideCountReason(slideCountReason, recommendedSlideCount)}</small>
                         </div>
                         <div className="quantity-options" aria-label="選擇輪播圖片數量">
                           {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
@@ -2597,8 +2611,9 @@ export default function ContentStudioPage() {
                       </section>
                     ) : null}
                     {['carousel','single_image'].includes(selectedFormat)?<section className="catalog-choice">
-                      <h3>選擇內容風格</h3><p>先睇 Core 母版示範；下一步加入你嘅內容同圖片。</p>
-                      {loadingStyles?<p role="status">正在載入 Core 示範…</p>:styleMessage?<p role="alert">{styleMessage}<button type="button" onClick={()=>setStyleRetry(n=>n+1)}>重新載入</button></p>:null}
+                      <h3>選擇內容風格</h3>
+                      {loadingStyles?<p className="catalog-loading-label" role="status">正在載入內容風格…</p>:styleMessage?<p role="alert">{styleMessage}<button type="button" onClick={()=>setStyleRetry(n=>n+1)}>重新載入</button></p>:null}
+                      {loadingStyles&&!displayStyles.length?<div className="catalog-grid catalog-grid-loading" aria-hidden="true"><article><div/><i/><i/><button type="button" tabIndex={-1}>載入中</button></article></div>:null}
                       <div className="catalog-grid">{displayStyles.map(s=><article key={s.code} className={selectedStyleCode===s.code?'selected':''}>
                         <CoreCatalogExample contract={s.core?.templates?.[0]?.version.contract}/>
                         <h4>{s.name}</h4><p>{s.note}</p>
@@ -3975,6 +3990,7 @@ const editingStyles = `
   .new-content-entry{border:1px solid var(--soon-line);border-radius:20px;background:#fff;padding:clamp(22px,4vw,42px)}.new-content-head{max-width:560px;margin-bottom:26px}.new-content-head>span{color:var(--soon-oxblood);font-size:11px;font-weight:800;letter-spacing:.08em}.new-content-head h2{font-size:28px;margin:7px 0}.new-content-head p{margin:0;color:var(--soon-muted);font-size:13px}.entry-format-grid button{border:1px solid var(--soon-line);background:#faf8f4;color:var(--soon-ink)}.entry-format-grid button:hover{border-color:var(--soon-oxblood);transform:translateY(-2px)}.entry-format-grid button:disabled{opacity:.5;cursor:wait}.entry-topic-link{display:flex;justify-content:space-between;gap:15px;margin-top:24px;padding-top:18px;border-top:1px solid #eee8e2;font-size:12px}.entry-topic-link span{color:var(--soon-muted)}.entry-topic-link a{color:var(--soon-oxblood);font-weight:750;text-decoration:none}@media(max-width:760px){.new-content-entry{padding:20px 15px}.new-content-head h2{font-size:23px}.entry-topic-link{align-items:flex-start;flex-direction:column}}
   .production-ready b.working{box-sizing:border-box;background:transparent;border:3px solid #dce8b6;border-top-color:var(--soon-oxblood);animation:studio-loading-spin .8s linear infinite}
   .catalog-choice{margin-top:28px}.catalog-choice>p{color:#70665f;font-size:14px}.catalog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,320px));gap:20px;margin:20px 0}.catalog-grid>article{border:1px solid #ddd3c9;border-radius:16px;padding:12px;background:#fff;overflow:hidden}.catalog-grid>article.selected{border:2px solid #6b2c30;padding:11px;box-shadow:0 3px 0 #e7d7d0}.catalog-grid h4{margin:16px 0 8px}.catalog-grid p{font-size:12px;line-height:1.5;color:#70665f}.catalog-grid button{border:1px solid #d9cec3;border-radius:8px;padding:9px 13px;background:#faf7f2;color:#6b2c30;cursor:pointer}.catalog-grid button[aria-pressed=true]{background:#6b2c30;color:#fff}.catalog-grid>article>button{width:100%}.core-catalog-example nav{display:flex;gap:6px;margin:10px 0}.core-catalog-example small{font-size:10px;color:#7b7169}.story-page-thumbnails{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.story-page-thumbnails img{width:90px;height:90px;object-fit:cover;border-radius:8px}.story-page-assets{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.story-page-assets .story-page-thumbnails{width:100%}.story-page-assets input[type=file]{display:none}.story-page-assets button{border:1px solid #d8ccc2;border-radius:8px;padding:9px 12px;background:#fff;color:#6b2c30;cursor:pointer}.compact-image-flow[data-step="structure"] .next-production{display:block}.compact-image-flow[data-step="drafts"] .next-production{display:none}.compact-image-flow .structure-status{display:none}.compact-image-flow .story-pages>h4{margin-top:0}.compact-image-flow .story-pages details{font-size:12px;color:#70665f}.compact-image-flow .structure-sources{font-size:11px}.compact-image-flow .page-drafts-heading h4{font-size:18px}
+  .catalog-loading-label{display:flex;align-items:center;gap:8px}.catalog-loading-label:before{content:"";width:12px;height:12px;border:2px solid #dbc9c1;border-top-color:var(--soon-oxblood);border-radius:50%;animation:catalog-spin .8s linear infinite}.catalog-grid-loading>article{display:grid;gap:12px}.catalog-grid-loading article>div{aspect-ratio:4/5;border-radius:10px;background:linear-gradient(100deg,#f1ece6 30%,#faf7f2 50%,#f1ece6 70%);background-size:220% 100%;animation:catalog-shimmer 1.4s ease-in-out infinite}.catalog-grid-loading article>i{display:block;height:15px;border-radius:999px;background:#eee7df}.catalog-grid-loading article>i:nth-of-type(2){width:68%}.catalog-grid-loading button{opacity:.45}@keyframes catalog-spin{to{transform:rotate(360deg)}}@keyframes catalog-shimmer{to{background-position-x:-220%}}
   .studio-load-error{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;border:1px solid #dbc8c1;border-radius:12px;background:#f7eee9;padding:13px 15px;color:var(--soon-oxblood);font-size:13px;font-weight:750}.studio-load-error button{flex:none;border:1px solid var(--soon-oxblood);border-radius:9px;background:#fff;color:var(--soon-oxblood);padding:8px 12px;font:inherit;font-size:12px;cursor:pointer}@media(max-width:560px){.studio-load-error{align-items:flex-start;flex-direction:column}.studio-load-error button{width:100%}}
   .style-rule-preview{margin-top:14px;border:1px solid var(--soon-line);border-radius:12px;background:#faf8f4;padding:14px}.style-rule-preview summary{cursor:pointer;font-size:12px;font-weight:800;color:var(--soon-oxblood)}.style-rule-preview>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.style-rule-preview section{display:grid;align-content:start;gap:6px}.style-rule-preview section b{font-size:11px}.style-rule-preview section span{color:var(--soon-muted);font-size:10px;line-height:1.45}.style-rule-preview>small{color:#92959b;font-size:9px}@media(max-width:650px){.style-rule-preview>div{grid-template-columns:1fr}}
   .format-grid button{color:var(--soon-ink);transition:border-color .16s ease,transform .16s ease,background .16s ease}.format-grid button strong{color:var(--soon-ink);font-weight:800}.format-grid button small{color:#5f636b}.format-grid button[data-format="carousel"]>i{background:#f8e7a8;color:#6b5412}.format-grid button[data-format="single_image"]>i{background:#dce9f8;color:#315a82}.format-grid button[data-format="human_video"]>i{background:#e7dfef;color:#654a79}.format-grid button[data-format="ai_video"]>i{background:#dff0df;color:#35683c}.format-grid button.active strong{color:#fff}.format-grid button.active small{color:#eadfdf}.format-grid button.active>i{background:#fff;color:var(--soon-oxblood)}

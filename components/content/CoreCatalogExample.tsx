@@ -28,7 +28,6 @@ export function CoreCatalogExample({contract}:{contract:unknown}) {
   return <section className="core-catalog-example">
     <div ref={host} style={{aspectRatio:'4 / 5',overflow:'hidden',background:'#f5f1e9'}}/>
     {error||!design?<p role="status">示範未能載入，請重試。</p>:null}
-    <nav aria-label="Core 母版示範">{(['cover','longform','end'] as const).filter(r=>getCoreMasterPageDesign(contract,r)).map((r,i)=><button type="button" key={r} aria-pressed={role===r} onClick={()=>setRole(r)}>{r==='cover'?'封面':r==='end'?'收尾':'內文'}</button>)}</nav>
-    <small>Core 已發布母版示範 · 非今次內容</small>
+    <nav aria-label="內容風格示範">{(['cover','longform','end'] as const).filter(r=>getCoreMasterPageDesign(contract,r)).map((r)=><button type="button" key={r} aria-pressed={role===r} onClick={()=>setRole(r)}>{r==='cover'?'封面':r==='end'?'收尾':'內文'}</button>)}</nav>
   </section>;
 }
