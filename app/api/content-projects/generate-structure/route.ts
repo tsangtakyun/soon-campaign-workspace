@@ -111,7 +111,9 @@ export async function POST(req: Request) {
       : {}
     const fixedContract=isFixedCoreTemplate(formatDecision.templateContractSnapshot);
     const templateRoles=coreTemplatePageRoles(formatDecision.templateContractSnapshot);
-    const slideCount = Math.min(10, Math.max(3, Number(formatDecision.slideCount) || 5))
+    const rawSlideCount = Number(formatDecision.slideCount)
+    const hasPlannedSlideCount = Number.isFinite(rawSlideCount) && rawSlideCount >= 3 && rawSlideCount <= 10
+    const slideCount = hasPlannedSlideCount ? Math.round(rawSlideCount) : null
     const roleDefinitions = [
       'cover：用一句吸引人的開場及一個清晰承諾帶出主題。',
       'longform：解釋主題的核心價值或背景，不得重複封面開場。',
@@ -122,7 +124,9 @@ export async function POST(req: Request) {
     ].join('\n')
     const roleInstruction = project.selected_format === 'carousel'
       ? [
-          `用家已選擇 ${slideCount} 頁，不得擅自增加或減少頁面。`,
+          slideCount
+            ? `SOON 已按內容分析建議 ${slideCount} 頁，請以此頁數整理，避免重複。`
+            : '按真正可拆分的獨立重點決定 3 至 10 頁；不得為湊頁數重複內容。',
           `各角色功能如下：\n${roleDefinitions}`,
           `除 cover 必須在首頁、end 必須在末頁外，中段按內容語意選擇頁型，可重複 comparison 等頁型，不必每種用一次。${fixedContract?`可用 Core 頁型：${templateRoles.map(p=>p.role).join('、')}；這是頁型庫，不是固定頁數或順序。保留各頁型母版設計。`:''}`,
         ].join('\n')
@@ -134,7 +138,9 @@ export async function POST(req: Request) {
         ? formatDecision.videoMethod === 'ai_video_generation'
           ? '這是 AI 生成短片。script 必須是連續、有時間碼的劇本段落；每段提供旁白／字幕、具體畫面及可供影片模型使用的生成提示。不要聲稱影片已經生成。'
           : '這是真人拍攝短片。script 必須剛好 9 段，對應 S.1 至 S.9，並是連續、有時間碼的可拍攝劇本；每段提供自然對白／旁白、人物動作、鏡頭畫面、字幕及拍攝提示。'
-        : `這是輪播貼文。pages 必須剛好輸出 ${slideCount} 頁，由 P.1 至 P.${slideCount}。`
+        : slideCount
+          ? `這是輪播貼文。pages 必須剛好輸出 ${slideCount} 頁，由 P.1 至 P.${slideCount}。`
+          : '這是輪播貼文。按內容需要輸出 3 至 10 頁；P.1 是封面，最後一頁是收尾，中間每頁必須有獨立重點。'
 
     const outputSchema = isShortVideo
       ? [
@@ -221,8 +227,10 @@ export async function POST(req: Request) {
       ? data.content.filter((item: any) => item.type === 'text').map((item: any) => item.text || '').join('\n')
       : ''
     const generated = parseJsonObject(text)
-    if(!isShortVideo&&(!Array.isArray(generated.pages)||generated.pages.length!==(project.selected_format==='single_image'?1:slideCount)))
-      throw new Error(`內容頁數未符合已確認的 ${project.selected_format==='single_image'?1:slideCount} 頁；原有內容保留，請重試。`)
+    const generatedPageCount = Array.isArray(generated.pages) ? generated.pages.length : 0
+    const expectedPageCount = project.selected_format === 'single_image' ? 1 : slideCount
+    if(!isShortVideo&&(!Array.isArray(generated.pages)||(expectedPageCount ? generatedPageCount!==expectedPageCount : generatedPageCount<3||generatedPageCount>10)))
+      throw new Error(expectedPageCount ? `內容頁數未符合 ${expectedPageCount} 頁；原有內容保留，請重試。` : '內容頁數必須介乎 3 至 10 頁；原有內容保留，請重試。')
     const sourceCorpus = [project.source_note || '', JSON.stringify(project.brief || {})].join('\n')
     const hasExternalSource = Boolean(project.source_url?.trim())
     const unsupportedConfirmedFacts = hasExternalSource
@@ -281,6 +289,13 @@ export async function POST(req: Request) {
 
     const updates: Record<string, unknown> = {
       production,
+      ...(!isShortVideo && project.selected_format === 'carousel' ? {
+        format_decision: {
+          ...formatDecision,
+          slideCount: generatedPageCount,
+          slideCountSource: slideCount ? formatDecision.slideCountSource || 'soon_ai' : 'structure_ai',
+        },
+      } : {}),
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     }
@@ -290,7 +305,7 @@ export async function POST(req: Request) {
       .update(updates)
       .eq('id', projectId)
       .eq('workspace_id', workspaceId)
-      .select('id,production,updated_at')
+      .select('id,production,format_decision,updated_at')
       .single()
     if (saveError) throw saveError
 

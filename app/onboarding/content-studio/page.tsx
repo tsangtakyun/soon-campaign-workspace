@@ -157,16 +157,6 @@ type DisplayStyle = ContentStyleTemplate & {
 
 const catalogStyleCache = new Map<string, CorePublishedStyle[]>();
 
-function conciseSlideCountReason(reason: string, count: number) {
-  const cleaned = reason.replace(/\s+/gu, " ").trim();
-  if (!cleaned) return `${count} 張足夠逐步交代主要重點，避免內容重複。`;
-  if (cleaned.length <= 54) return cleaned;
-  if (/(?:研究|數據|因果|風險)/u.test(cleaned)) {
-    return `${count} 張足夠交代研究數字、設計差異、限制及建議。`;
-  }
-  return `${count} 張足夠逐步交代主要重點，避免內容重複。`;
-}
-
 type DirectionRecommendation = {
   id: string;
   title: string;
@@ -415,9 +405,9 @@ function projectListDetails(project: Project) {
     ? production.pageDrafts.length
     : Array.isArray(production.pages)
       ? production.pages.length
-      : Number(project.format_decision?.slideCount || 0);
+      : 0;
   const format = project.selected_format === "carousel"
-    ? `${pageCount || "—"} 頁輪播`
+    ? pageCount ? `${pageCount} 頁輪播` : "輪播貼文"
     : project.selected_format === "single_image"
       ? "單張貼文"
       : project.selected_format === "short_video"
@@ -478,7 +468,6 @@ export default function ContentStudioPage() {
   const [customDirectionsOpen, setCustomDirectionsOpen] = useState(false);
   const [customDirectionText, setCustomDirectionText] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
-  const [carouselSlideCount, setCarouselSlideCount] = useState(5);
   const [videoMethod, setVideoMethod] = useState("human_filming");
   const [selectedStyleCode, setSelectedStyleCode] = useState("");
   const [expandedStyleCode, setExpandedStyleCode] = useState<string | null>(null);
@@ -1024,9 +1013,6 @@ export default function ContentStudioPage() {
           setVideoMethod(payload.recommendedVideoMethod);
         }
       }
-      if ((project.selected_format || nextRecommendedFormat || selectedFormat) === "carousel" && normalizedSlideCount) {
-        setCarouselSlideCount(normalizedSlideCount);
-      }
       if (recommendations[0]) {
         setBrief((current) => ({
           ...current,
@@ -1066,9 +1052,6 @@ export default function ContentStudioPage() {
     setSlideCountReason("");
     setCustomDirectionsOpen(false);
     setSelectedFormat(selected.selected_format || "");
-    setCarouselSlideCount(
-      Math.min(10, Math.max(3, Number(selected.format_decision?.slideCount) || 5)),
-    );
     setVideoMethod(
       selected.format_decision?.videoMethod === "ai_video_generation"
         ? "ai_video_generation"
@@ -2595,21 +2578,6 @@ export default function ContentStudioPage() {
                         </button>
                       ))}
                     </div>
-                    {selectedFormat === "carousel" && recommendedSlideCount ? (
-                      <section className="slide-count-recommendation" aria-label="輪播張數">
-                        <div>
-                          <strong>{`SOON 建議製作 ${recommendedSlideCount} 張`}</strong>
-                          <small>{conciseSlideCountReason(slideCountReason, recommendedSlideCount)}</small>
-                        </div>
-                        <div className="quantity-options" aria-label="選擇輪播圖片數量">
-                          {Array.from({ length: 8 }, (_, index) => index + 3).map((count) => (
-                            <button type="button" key={count} className={carouselSlideCount === count ? "active" : ""} onClick={() => setCarouselSlideCount(count)}>
-                              {count} 張{count === recommendedSlideCount ? <small>SOON 建議</small> : null}
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
                     {['carousel','single_image'].includes(selectedFormat)?<section className="catalog-choice">
                       <h3>選擇內容風格</h3>
                       {loadingStyles?<p className="catalog-loading-label" role="status">正在載入內容風格…</p>:styleMessage?<p role="alert">{styleMessage}<button type="button" onClick={()=>setStyleRetry(n=>n+1)}>重新載入</button></p>:null}
@@ -2634,6 +2602,10 @@ export default function ContentStudioPage() {
                         onClick={async () => {
                           const styleChanged=selected.selected_format!==selectedFormat||selected.format_decision?.templateCode!==selectedStyleCode;
                           if(styleChanged && selected.production?.pages && !window.confirm('更改格式／風格後，會按母版重新整理故事。已上載素材及現有成品會保留。確定繼續？'))return;
+                          const existingSlideCountSource=selected.format_decision?.slideCountSource;
+                          const carriedSlideCount=existingSlideCountSource==='soon_ai'||existingSlideCountSource==='structure_ai'
+                            ? Number(selected.format_decision?.slideCount)||null
+                            : null;
                           const saved = await saveProject(
                             {
                               formatDecision: {
@@ -2652,8 +2624,8 @@ export default function ContentStudioPage() {
                                   templateContentHash:displayStyles.find(s=>s.code===selectedStyleCode)?.core?.templates?.[0]?.version.contentHash,
                                 }:{}),
                                 ...(selectedFormat === "carousel" ? {
-                                  slideCount: carouselSlideCount,
-                                  slideCountSource: recommendedSlideCount === carouselSlideCount ? "soon_ai" : "manual",
+                                  slideCount: recommendedSlideCount || carriedSlideCount,
+                                  slideCountSource: recommendedSlideCount ? "soon_ai" : carriedSlideCount ? existingSlideCountSource : "structure_ai",
                                   slideCountReason: slideCountReason || null,
                                 } : {}),
                               },
@@ -2844,11 +2816,12 @@ export default function ContentStudioPage() {
                       <button type="button" disabled={saving} onClick={()=>goToStep('structure')}>← 返回內容及配圖</button>
                     )}
                     {generatingStructure ? (
-                      <div className="production-ready is-generating" role="status" aria-live="polite">
-                        <b className="working" />
-                        <h4>{isShortVideo ? "正在整理短片劇本" : `正在重新整理 ${carouselSlideCount} 頁內容`}</h4>
-                        <p>SOON 正在重新核對資料</p>
-                      </div>
+                      <SoonLoading
+                        compact
+                        title="SOON 正在繼續製作"
+                        description={isShortVideo ? "正在整理劇本及拍攝安排。" : "正在整理內容、核對資料及準備配圖安排。"}
+                        steps={isShortVideo ? ["整理劇本", "核對資料", "安排鏡頭"] : ["整理內容", "核對資料", "安排配圖"]}
+                      />
                     ) : selected.production?.status ? (
                       <div className="structure-result">
                         <div className="structure-status">
