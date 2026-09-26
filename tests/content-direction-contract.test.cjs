@@ -15,6 +15,13 @@ for (const text of [
   '最多只可有 1 個 hook 以問號結尾',
   '相對風險／絕對風險／百分點',
   '自然、直接的香港廣東話書面語',
+  'title 是觀眾會在封面看見的主 Hook',
+  '12 至 26 個中文字',
+  'weakHeadlinePattern',
+  'hasStrongAudienceHooks',
+  '反而',
+  'title 只准一個主句',
+  '具體行為＋反而＋意外結果＋問號',
 ]) assert.ok(route.includes(text), text)
 
 for (const removed of ['You are SOON, a senior Hong Kong content strategist', '你是否也遇過這個問題？', '大家一直以為如此']) {
@@ -25,6 +32,7 @@ for (const text of [
   'hookMechanism',
   '內容依據',
   '製作前核實',
+  '封面題目',
   'frameworkId: selectedRecommendation?.frameworkId',
   'primaryHookMechanism: selectedRecommendation?.primaryHookMechanism',
   'verificationFlags: selectedRecommendation?.verificationFlags',

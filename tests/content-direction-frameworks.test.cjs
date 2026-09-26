@@ -4,7 +4,7 @@ const { load } = require('./ts-loader.cjs')
 
 const frameworks = load(path.resolve('lib/content-direction-frameworks.ts'))
 
-assert.equal(frameworks.DIRECTION_CONTRACT_VERSION, 'direction-framework-v1')
+assert.equal(frameworks.DIRECTION_CONTRACT_VERSION, 'direction-framework-v2')
 assert.equal(frameworks.CONTENT_DIRECTION_FRAMEWORKS.length, 80)
 assert.equal(new Set(frameworks.CONTENT_DIRECTION_FRAMEWORKS.map((item) => item.category)).size, 8)
 assert.equal(new Set(frameworks.CONTENT_DIRECTION_FRAMEWORKS.map((item) => item.mechanism)).size, 10)
