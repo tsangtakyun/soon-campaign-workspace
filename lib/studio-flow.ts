@@ -1,6 +1,6 @@
 export type StudioStep = 'brief'|'format'|'structure'|'assets'|'style'|'drafts'|'carousel';
 export const imageStudioSteps: Array<{id:StudioStep;label:string}> = [
-  {id:'brief',label:'Brief'},{id:'format',label:'格式及風格'},
+  {id:'brief',label:'內容方向'},{id:'format',label:'格式及風格'},
   {id:'structure',label:'內容及配圖'},{id:'carousel',label:'成品及編輯'},
 ];
 export function imageStep(step:StudioStep):StudioStep {
