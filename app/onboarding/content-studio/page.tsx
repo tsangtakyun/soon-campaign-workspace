@@ -435,6 +435,17 @@ function projectListDetails(project: Project) {
   return { status, format, updated };
 }
 
+function projectTitleFromSummary(summary: string) {
+  const firstLine = summary
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) || "未命名內容";
+  const withoutLabel = firstLine.replace(/^(主題|題目|標題|topic)\s*[：:]\s*/i, "");
+  const sentenceEnd = withoutLabel.search(/[。！？?!]/);
+  const firstSentence = sentenceEnd >= 0 ? withoutLabel.slice(0, sentenceEnd + 1) : withoutLabel;
+  return firstSentence.replace(/\s+/g, " ").slice(0, 36);
+}
+
 export default function ContentStudioPage() {
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -444,6 +455,7 @@ export default function ContentStudioPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [startingProject, setStartingProject] = useState(false);
+  const [startingProjectStage, setStartingProjectStage] = useState<"creating" | "analyzing">("creating");
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [generatingCarousel, setGeneratingCarousel] = useState(false);
   const [generatingStructure, setGeneratingStructure] = useState(false);
@@ -502,6 +514,7 @@ export default function ContentStudioPage() {
   const studioLoadedRef = useRef(false);
   const savedRevisionRef=useRef<Record<string,string>>({});
   const previewAttemptRef=useRef('');
+  const directionsSectionRef = useRef<HTMLDivElement | null>(null);
 
   const selected = useMemo(
     () => projects.find((project) => project.id === selectedId) || null,
@@ -1040,6 +1053,14 @@ export default function ContentStudioPage() {
   }, [selected?.id]);
 
   useEffect(() => {
+    if (!directionRecommendations.length || startingProject) return;
+    const frame = window.requestAnimationFrame(() => {
+      directionsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [directionRecommendations.length, startingProject]);
+
+  useEffect(() => {
     if(activeStep!=='format'||!workspaceId||!['carousel','single_image'].includes(selectedFormat))return;
     let cancelled=false;setLoadingStyles(true);setStyleMessage('');setCoreStyles([]);
     fetch(`/api/content-styles/catalog?workspaceId=${encodeURIComponent(workspaceId)}&format=${selectedFormat}`,{cache:'no-store'})
@@ -1171,6 +1192,7 @@ export default function ContentStudioPage() {
     const summary = String(brief.summary || "").trim();
     if (!workspaceId || !summary || startingProject || !permissions?.canEdit) return;
     setStartingProject(true);
+    setStartingProjectStage("creating");
     setMessage("");
     try {
       const response = await fetch("/api/content-projects", {
@@ -1178,7 +1200,7 @@ export default function ContentStudioPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           workspaceId,
-          title: summary.replace(/\s+/g, " ").slice(0, 40),
+          title: projectTitleFromSummary(summary),
           sourceNote: summary,
           brief: { ...brief, summary },
         }),
@@ -1192,6 +1214,7 @@ export default function ContentStudioPage() {
       url.searchParams.set("project", payload.project.id);
       window.history.replaceState(null, "", url);
       goToStep("brief");
+      setStartingProjectStage("analyzing");
       await recommendDirections(payload.project, summary);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "未能建立內容");
@@ -2235,6 +2258,23 @@ export default function ContentStudioPage() {
           <section className="studio-workspace">
             {loading ? (
               <SoonLoading title="正在準備你的內容" description="SOON 正在整理製作進度及最近修改。" steps={["讀取內容", "整理素材", "恢復進度"]} />
+            ) : startingProject ? (
+              <section className="content-starting-state" role="status" aria-live="polite">
+                <div className="content-starting-spinner" aria-hidden="true" />
+                <span>開始製作</span>
+                <h2>SOON 正在準備製作方向</h2>
+                <div className="content-starting-steps" aria-label="準備進度">
+                  <div className={startingProjectStage === "creating" ? "active" : "done"}>
+                    <i>{startingProjectStage === "creating" ? "1" : "✓"}</i>
+                    <strong>建立內容</strong>
+                  </div>
+                  <b aria-hidden="true" />
+                  <div className={startingProjectStage === "analyzing" ? "active" : ""}>
+                    <i>2</i>
+                    <strong>分析重點與方向</strong>
+                  </div>
+                </div>
+              </section>
             ) : selected ? (
               <>
                 <div className="project-head">
@@ -2290,23 +2330,39 @@ export default function ContentStudioPage() {
                         <span>STEP 1</span>
                         <h3>你今次想講甚麼？</h3>
                       </div>
-                      <em>不需要先懂得寫 Brief，零碎想法也可以</em>
                     </div>
-                    <label className="brief-source-field">
-                      <span>寫下你知道的事情</span>
-                      <textarea
-                        value={brief.summary}
-                        onChange={(event) => {
-                          setBrief({ ...brief, summary: event.target.value });
-                          setDirectionRecommendations([]);
-                          setRecommendedSlideCount(null);
-                          setSlideCountReason("");
-                        }}
-                        placeholder={"例如：我想介紹新產品，但不確定應該突出功能、使用方法還是顧客感受。\n亦可以直接貼上文章、產品資料、活動詳情或任何零碎想法。"}
-                      />
-                      <small>毋須整理語句或決定格式，SOON 會先找出值得說的重點。</small>
-                    </label>
-                    <div className="angle-field">
+                    {directionRecommendations.length ? (
+                      <details className="brief-source-review">
+                        <summary>查看或修改原始內容</summary>
+                        <label className="brief-source-field">
+                          <span>原始內容</span>
+                          <textarea
+                            value={brief.summary}
+                            onChange={(event) => {
+                              setBrief({ ...brief, summary: event.target.value });
+                              setDirectionRecommendations([]);
+                              setRecommendedSlideCount(null);
+                              setSlideCountReason("");
+                            }}
+                          />
+                        </label>
+                      </details>
+                    ) : (
+                      <label className="brief-source-field">
+                        <span>寫下你知道的事情</span>
+                        <textarea
+                          value={brief.summary}
+                          onChange={(event) => {
+                            setBrief({ ...brief, summary: event.target.value });
+                            setDirectionRecommendations([]);
+                            setRecommendedSlideCount(null);
+                            setSlideCountReason("");
+                          }}
+                          placeholder={"例如：我想介紹新產品，但不確定應該突出功能、使用方法還是顧客感受。\n亦可以直接貼上文章、產品資料、活動詳情或任何零碎想法。"}
+                        />
+                      </label>
+                    )}
+                    <div className="angle-field" ref={directionsSectionRef}>
                       <div className="direction-heading">
                         <div>
                           <span>{directionRecommendations.length ? "SOON 建議的製作方向" : "讓 SOON 整理今次內容"}</span>
@@ -3668,9 +3724,7 @@ export default function ContentStudioPage() {
                     {startingProject ? "正在開始製作…" : "開始製作 →"}
                   </button>
                 </div>
-                {startingProject ? (
-                  <p className="studio-message loading" role="status">正在建立內容…</p>
-                ) : studioLoadError ? (
+                {studioLoadError ? (
                   <div className="studio-load-error" role="alert">
                     <span>{message}</span>
                     <button type="button" onClick={() => void loadStudio()}>重新載入</button>
@@ -3784,6 +3838,8 @@ const editingStyles = `
   .project-creator{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;padding:3px 0 0!important}.project-creator img,.project-creator-avatar{width:24px!important;height:24px!important;flex:0 0 24px!important;border-radius:50%!important;object-fit:cover!important}.project-creator-avatar{display:grid!important;place-items:center!important;background:#e8e9ec!important;color:#303238!important;-webkit-text-fill-color:#303238!important;font-size:10px!important;font-weight:800!important}.project-creator small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#696d75!important;-webkit-text-fill-color:#696d75!important;font-size:11px!important;font-weight:650!important}
   .project-list-card{position:relative;border:1px solid transparent;border-radius:12px;margin-bottom:7px;overflow:visible}.project-list-card.active{background:#fff;border-color:#dedfe3;box-shadow:0 5px 18px rgba(0,0,0,.05)}.project-select-button{width:100%;min-width:0;border:0;background:transparent;color:#111;text-align:left;padding:13px 44px 13px 13px;display:grid;gap:7px;cursor:pointer}.project-select-button>strong{display:-webkit-box;overflow:hidden;font-size:14px;line-height:1.35;color:#111;-webkit-text-fill-color:#111;-webkit-box-orient:vertical;-webkit-line-clamp:2}.project-list-meta{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;padding:0!important;white-space:nowrap}.project-list-meta>span{border-radius:999px;background:#edf6d4;color:#52691a!important;-webkit-text-fill-color:#52691a!important;padding:3px 6px;font-size:9px!important;font-weight:850}.project-list-meta>small,.project-list-meta>time{color:#777b84;font-size:9px}.project-card-menu{position:absolute;z-index:4;top:9px;right:8px}.project-card-menu summary{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;color:#6c7078;cursor:pointer;list-style:none}.project-card-menu summary::-webkit-details-marker{display:none}.project-card-menu summary:hover,.project-card-menu[open] summary{background:#f1ebe4;color:#6b2c30}.project-card-menu>button{position:absolute;top:32px;right:0;width:max-content;border:1px solid #e7d5d2;border-radius:8px;background:#fff;color:#b42318;padding:8px 10px;font:inherit;font-size:10px;font-weight:750;box-shadow:0 8px 24px rgba(32,33,38,.14);cursor:pointer}.project-card-menu>button:disabled{cursor:wait;opacity:.55}
   .entry-source-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 18px}.entry-source-options button{display:grid;gap:4px;border:1px solid #ded5cd;border-radius:12px;background:#faf8f4;color:#202126;padding:14px 15px;text-align:left;cursor:pointer}.entry-source-options button:hover{border-color:#b46a61}.entry-source-options button.active{border-color:#6b2c30;background:#fff;box-shadow:0 0 0 1px #6b2c30,3px 3px 0 #ddc6c1}.entry-source-options strong{font-size:13px}.entry-source-options small{color:#777b84;font-size:10px;line-height:1.4}@media(max-width:620px){.entry-source-options{grid-template-columns:1fr}}
+  .content-starting-state{display:grid;place-items:center;align-content:center;min-height:560px;border:1px solid #ded5cd;border-radius:20px;background:#fff;padding:42px;text-align:center}.content-starting-spinner{width:34px;height:34px;border:3px solid #ddc6c1;border-top-color:#6b2c30;border-radius:50%;animation:studio-loading-spin .8s linear infinite}.content-starting-state>span{margin-top:20px;color:#6b2c30;font-size:11px;font-weight:850;letter-spacing:.08em}.content-starting-state h2{margin:7px 0 30px;font-size:clamp(27px,4vw,38px);letter-spacing:-.04em}.content-starting-steps{display:flex;align-items:center;justify-content:center;gap:12px;width:min(520px,100%)}.content-starting-steps>div{display:flex;align-items:center;gap:8px;color:#99949a;font-size:12px}.content-starting-steps>div.active,.content-starting-steps>div.done{color:#202126}.content-starting-steps i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#ebe4dc;font-size:10px;font-style:normal;font-weight:850}.content-starting-steps .active i{background:#6b2c30;color:#fff}.content-starting-steps .done i{background:#edf6d4;color:#52691a}.content-starting-steps>b{display:block;width:54px;height:1px;background:#ded5cd}@media(max-width:620px){.content-starting-state{min-height:440px;padding:28px 18px}.content-starting-steps{align-items:flex-start;flex-direction:column;width:max-content}.content-starting-steps>b{width:1px;height:22px;margin-left:13px}}
+  .brief-source-review{margin-bottom:18px;border:1px solid #ded5cd;border-radius:12px;background:#faf8f4;padding:0 15px}.brief-source-review>summary{cursor:pointer;color:#6b2c30;padding:13px 0;font-size:11px;font-weight:850}.brief-source-review[open]>summary{border-bottom:1px solid #eee8e2}.brief-source-review .brief-source-field{margin:14px 0!important}.brief-source-review .brief-source-field textarea{min-height:170px}.angle-field{scroll-margin-top:118px}
   .studio-loading{min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#202126}
   .studio-loading-spinner{width:28px;height:28px;border:3px solid #dedfe3;border-top-color:#111;border-radius:50%;animation:studio-loading-spin .8s linear infinite}
   .studio-loading h2{margin:16px 0 5px;font-size:20px;color:#111}
