@@ -2481,7 +2481,7 @@ export default function ContentStudioPage() {
                           )
                         }}
                       >
-                        {directionRecommendations.length ? "採用此方向，選擇格式 →" : "請先分析內容"}
+                        {directionRecommendations.length ? "繼續製作 →" : "請先分析內容"}
                       </button>
                     </div>
                   </div>
