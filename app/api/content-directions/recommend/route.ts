@@ -101,14 +101,15 @@ function hasDirectionDiversity(recommendations: Recommendation[]) {
 }
 
 const weakHeadlinePattern = /藏在.{0,8}數字|真係假|是真是假|兩種讀法|背後真相|有一件事.{0,8}(?:未講|沒講|冇講)|值得關注|研究數字\s*(?:vs|VS|對比)|一文看懂|唔係你諗|不是你想|數字係咁|有幾大關係/u
+const overColloquialTitlePattern = /嘅人|低咗|高咗|差咗|少咗|多咗|睇清楚/u
 const weakOpeningPattern = /你是否也遇過|大家一直以為|先記下這幾個重點|兩份研究、兩個國家|同一份研究.{0,12}兩種讀法|件事複雜得多/u
-const concreteTensionPattern = /\d|%|％|反而|竟然|原來|唔係|不是|死亡|死|長命|風險|高咗|低咗|上升|下跌|少咗|多咗|錯|失敗|成功|點解|為什麼/u
+const concreteTensionPattern = /\d|%|％|反而|竟然|原來|唔係|不是|死亡|死|長命|風險|增加|降低|上升|下跌|差幾遠|錯|失敗|成功|點解|為什麼/u
 
 function hasStrongAudienceHooks(recommendations: Recommendation[]) {
   return recommendations.every((item) => {
     const title = item.title.replace(/\s+/g, '')
     const hook = item.hook.replace(/\s+/g, '')
-    if (Array.from(title).length < 8 || Array.from(title).length > 28 || weakHeadlinePattern.test(title) || weakOpeningPattern.test(hook)) return false
+    if (Array.from(title).length < 8 || Array.from(title).length > 28 || weakHeadlinePattern.test(title) || overColloquialTitlePattern.test(title) || weakOpeningPattern.test(hook)) return false
     return concreteTensionPattern.test(title) && concreteTensionPattern.test(`${title}${hook}`)
   })
 }
@@ -270,7 +271,7 @@ export async function POST(request: Request) {
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL), max_tokens: 2400, temperature: 0.45,
-        system: `你是 SOON，一位熟悉香港社交媒體的資深內容策劃。只輸出有效 JSON。所有面向用家的文字必須跟隨輸入語氣，使用自然、直接的香港廣東話書面語；避免新聞稿、教科書、台式或內地書面語。不可虛構資料、人物、數字、流程、品牌動機或因果。模板只代表敘事機制，不可直接照抄。title 只准一個主句，12 至 22 個中文字；不可用破折號、冒號或「但係／但」再接解說尾巴。反常識研究優先採用「具體行為＋反而＋意外結果＋問號」。禁止「唔係你諗嘅意思」「數字係咁」「有幾大關係」等抽象尾句；先講觀眾關心的人、行為和結果，不要先講研究數目或國家。`,
+        system: `你是 SOON，一位熟悉香港社交媒體的資深內容策劃。只輸出有效 JSON。所有面向用家的文字必須跟隨輸入語氣，使用自然、直接的香港廣東話書面語；避免新聞稿、教科書、台式或內地書面語。封面 title 要比內文更俐落，採用香港讀者自然接受的書面字詞：優先用「的人／降低／增加／差幾遠／弄清楚」，不要寫成「嘅人／低咗／高咗／差咗／睇清楚」。廣東話語氣詞只在能增加吸引力時保留，例如「真係」。不可虛構資料、人物、數字、流程、品牌動機或因果。模板只代表敘事機制，不可直接照抄。title 只准一個主句，12 至 22 個中文字；不可用破折號、冒號或「但係／但」再接解說尾巴。反常識研究優先採用「具體行為＋反而＋意外結果＋問號」。禁止「唔係你諗嘅意思」「數字係咁」「有幾大關係」等抽象尾句；先講觀眾關心的人、行為和結果，不要先講研究數目或國家。`,
         messages: [{ role: 'user', content: `根據資料推薦剛好 3 個可直接製作、而且真正不同的內容方向。每個方向只講一個核心概念。\n\n封面題目與開場硬規則：\n- title 是觀眾會在封面看見的主 Hook，不是內部方向名稱、文章欄目名或研究摘要。\n- title 以 12 至 26 個中文字為目標，第一眼就要看見具體人物／行為，以及最意外但有來源支持的結果、數字、風險或衝突。\n- 反常識題材優先使用「反而」等自然轉折；若資料只證明相關而非因果，可用問號保留不確定性。\n- hook 是封面之後的第一句，要補充一個具體數字、對比或懸念，不可只是重講 title。\n- 禁止「藏在數字裡」「真係假／是真是假」「兩種讀法」「背後真相」「有一件事未講清楚」「值得關注」「件事複雜得多」等抽象萬用句。\n- 禁止用「研究數字」「證據解讀」「文化角度」等分類名稱做 title。\n- 研究限制放入 concept、verificationFlags 或後續內容；不要用整段免責聲明淹沒封面張力。\n\n多樣性硬規則：\n- 3 個方向必須使用 3 種不同 primaryHookMechanism。\n- 至少來自 2 種 categoryId。\n- 最多只可有 1 個 hook 以問號結尾。\n- 禁止「你是否也遇過」「大家一直以為」「先記下這幾個重點」等萬用開場。\n- title 與 hook 必須題材專屬；換成另一題材後仍成立即代表太空泛。\n- Hook 直接呈現最具體的反差、風險、好奇缺口或受眾價值。\n\n事實規則：\n- 每個方向的 sourceRefs 只可使用下方來源 ID。\n- 有研究或數字時，分清觀察研究與實驗、相關與因果、樣本／比較組／適用人群、相對風險／絕對風險／百分點。\n- 資料未能確認時加入 verificationFlags，絕不可在 Hook 補作事實。\n- 品牌沒有公開解釋時，只可寫成分析或可能考慮；不可當作內部事實。\n\n${format ? `用家已選格式：${format}` : '用家尚未選擇格式。請判斷 carousel、single_image 或 short_video 哪一種最能說清楚。'}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n來源段落：${JSON.stringify(sourceReferences)}\n可選框架：${JSON.stringify(frameworkCandidates.map((candidate) => ({ id: candidate.id, categoryId: candidate.category, category: candidate.categoryLabel, primaryHookMechanism: candidate.mechanism, mechanism: candidate.mechanismLabel, mechanismDescription: candidate.mechanismDescription, template: candidate.template, example: candidate.example, constraints: candidate.constraints })))}\n以上例子只用來理解機制，例子中的數字、人物及情境不得沿用。只能從可選框架選擇 frameworkId、categoryId 及 primaryHookMechanism。\n${format === 'carousel' || !format ? '如建議或已選 carousel，按真正可拆分的獨立重點建議 3 至 10 張；不可為湊頁數重複內容。' : 'recommendedSlideCount 必須是 null。'}\n輸出前逐條檢查：title 是否已經係一條足以令目標受眾停低的封面 Hook；是否具體；是否有張力；是否自然香港廣東話；是否忠於來源。不合格就重寫。\n只輸出 {"recommendations":[{"id":"stable-slug","frameworkId":"候選框架 id","title":"面向觀眾的封面題目，12至26個中文字","concept":"一句具體構想及必要研究限制","reason":"一句選用理由","hook":"封面後第一句，以具體證據或懸念推進","categoryId":"候選 categoryId","category":"內容分類","primaryHookMechanism":"候選機制 id","secondaryHookMechanism":"另一機制 id 或空字串","sourceRefs":["S1"],"verificationFlags":["需要人手核實的具體事項"],"version":"${DIRECTION_CONTRACT_VERSION}"}],"recommendedFormat":"carousel|single_image|short_video","recommendedVideoMethod":"human_filming|ai_video_generation|null","formatReason":"一句說明為何此格式最適合","recommendedSlideCount":6,"slideCountReason":"一句解釋內容可如何分頁","directionContractVersion":"${DIRECTION_CONTRACT_VERSION}"}` }],
       }),
     })

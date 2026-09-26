@@ -16,12 +16,14 @@ for (const text of [
   '相對風險／絕對風險／百分點',
   '自然、直接的香港廣東話書面語',
   'title 是觀眾會在封面看見的主 Hook',
-  '12 至 26 個中文字',
+  '12 至 22 個中文字',
   'weakHeadlinePattern',
   'hasStrongAudienceHooks',
   '反而',
   'title 只准一個主句',
   '具體行為＋反而＋意外結果＋問號',
+  'overColloquialTitlePattern',
+  '的人／降低／增加／差幾遠／弄清楚',
 ]) assert.ok(route.includes(text), text)
 
 for (const removed of ['You are SOON, a senior Hong Kong content strategist', '你是否也遇過這個問題？', '大家一直以為如此']) {

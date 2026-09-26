@@ -1,4 +1,4 @@
-export const DIRECTION_CONTRACT_VERSION = 'direction-framework-v2'
+export const DIRECTION_CONTRACT_VERSION = 'direction-framework-v3'
 
 export type ContentCategoryId =
   | 'culture_context'
