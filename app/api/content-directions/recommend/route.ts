@@ -46,6 +46,14 @@ const clean = (value: unknown, max = 500) => typeof value === 'string' ? value.t
 const cleanList = (value: unknown, maxItems = 4, maxLength = 160) => Array.isArray(value)
   ? value.map((item) => clean(item, maxLength)).filter(Boolean).slice(0, maxItems)
   : []
+const polishCoverTitle = (value: unknown) => clean(value, 40)
+  .replace(/嘅人/gu, '的人')
+  .replace(/(?:風險)?低咗/gu, (match) => match.startsWith('風險') ? '風險降低' : '降低')
+  .replace(/(?:風險)?高咗/gu, (match) => match.startsWith('風險') ? '風險增加' : '增加')
+  .replace(/差咗幾遠/gu, '差幾遠')
+  .replace(/少咗/gu, '減少')
+  .replace(/多咗/gu, '增加')
+  .replace(/睇清楚/gu, '弄清楚')
 const normalizeSlideCount = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
   const count = Math.round(Number(value))
@@ -74,7 +82,7 @@ function normalize(value: unknown, sourceReferences: SourceReference[], framewor
     }
     return {
       id: clean(item?.id, 100) || `direction-${index + 1}`,
-      title: clean(item?.title, 40),
+      title: polishCoverTitle(item?.title),
       concept: clean(item?.concept, 180),
       reason: clean(item?.reason, 180),
       hook: clean(item?.hook, 100),
@@ -115,7 +123,8 @@ function hasStrongAudienceHooks(recommendations: Recommendation[]) {
 }
 
 function fallback(summary: string, frameworks: DirectionFramework[], sourceReferences: SourceReference[]): Recommendation[] {
-  const subject = summary.replace(/https?:\/\/\S+/giu, ' ').replace(/\s+/g, ' ').slice(0, 24) || '今次題材'
+  const labelledSubject = summary.match(/主題[：:]\s*(.+?)(?=\s*內容類型[：:]|\n|$)/u)?.[1]
+  const subject = (labelledSubject || summary.replace(/https?:\/\/\S+/giu, ' ')).replace(/\s+/g, ' ').replace(/[？?。！!]$/u, '').slice(0, 24) || '今次題材'
   const chosen: DirectionFramework[] = []
   for (const framework of frameworks) {
     if (chosen.some((item) => item.mechanism === framework.mechanism)) continue
@@ -131,8 +140,15 @@ function fallback(summary: string, frameworks: DirectionFramework[], sourceRefer
     benefit_promise: `用幾頁拆清楚${subject}最值得留意嘅重點。`, risk_warning: `講${subject}之前，先避開呢個最常見誤解。`,
     position_conflict: `同一個${subject}，兩種講法可以得出完全不同結論。`, unfinished_story: `${subject}去到呢個轉捩點，事情先真正開始。`,
   }
+  const titleFor: Record<HookMechanismId, string> = {
+    counter_intuition: `${subject}，真係同你想像一樣？`, curiosity_gap: `${subject}，關鍵差異在哪裡？`,
+    number_tension: `${subject}，數字相差幾遠？`, identity_callout: `${subject}，你需要知道甚麼？`,
+    before_after: `${subject}前後，結果差幾遠？`, direct_question: `${subject}，我們理解錯了嗎？`,
+    benefit_promise: `弄清楚${subject}的3個重點`, risk_warning: `${subject}，最易忽略哪個風險？`,
+    position_conflict: `${subject}，兩種說法誰較合理？`, unfinished_story: `${subject}，轉捩點之後發生甚麼？`,
+  }
   return candidates.map((framework, index) => ({
-    id: `fallback-${framework.id}`, title: framework.template.replace(/＿+/gu, '').replace(/[？?]$/u, '').slice(0, 28) || framework.categoryLabel,
+    id: `fallback-${framework.id}`, title: polishCoverTitle(titleFor[framework.mechanism]),
     concept: `以「${framework.categoryLabel}」角度整理${subject}，並以${framework.mechanismLabel}帶入核心內容。`,
     reason: `現有資料符合「${framework.categoryLabel}」所需輸入，亦可與另外兩個方向形成不同敘事。`,
     hook: hookFor[framework.mechanism], category: framework.categoryLabel, categoryId: framework.category,

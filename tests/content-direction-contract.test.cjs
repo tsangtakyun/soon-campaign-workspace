@@ -24,6 +24,10 @@ for (const text of [
   '具體行為＋反而＋意外結果＋問號',
   'overColloquialTitlePattern',
   '的人／降低／增加／差幾遠／弄清楚',
+  'polishCoverTitle',
+  ".replace(/嘅人/gu, '的人')",
+  ".replace(/差咗幾遠/gu, '差幾遠')",
+  'titleFor',
 ]) assert.ok(route.includes(text), text)
 
 for (const removed of ['You are SOON, a senior Hong Kong content strategist', '你是否也遇過這個問題？', '大家一直以為如此']) {
