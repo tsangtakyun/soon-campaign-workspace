@@ -2,6 +2,16 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { anthropicModel } from '@/lib/anthropic-models'
+import {
+  CONTENT_DIRECTION_FRAMEWORKS,
+  DIRECTION_CONTRACT_VERSION,
+  extractSourceReferences,
+  retrieveDirectionFrameworks,
+  type ContentCategoryId,
+  type DirectionFramework,
+  type HookMechanismId,
+  type SourceReference,
+} from '@/lib/content-direction-frameworks'
 import { isUuid } from '@/lib/oauth-connections'
 import { createServerSupabase } from '@/lib/server-supabase'
 import { getWorkspaceAccess } from '@/lib/workspace-access'
@@ -16,6 +26,13 @@ type Recommendation = {
   reason: string
   hook: string
   category: string
+  categoryId: ContentCategoryId
+  primaryHookMechanism: HookMechanismId
+  hookMechanism: string
+  secondaryHookMechanism?: HookMechanismId
+  frameworkId: string
+  sourceRefs: SourceReference[]
+  verificationFlags: string[]
   version?: string
 }
 
@@ -26,32 +43,90 @@ type FormatRecommendation = {
 }
 
 const clean = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : ''
+const cleanList = (value: unknown, maxItems = 4, maxLength = 160) => Array.isArray(value)
+  ? value.map((item) => clean(item, maxLength)).filter(Boolean).slice(0, maxItems)
+  : []
 const normalizeSlideCount = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
   const count = Math.round(Number(value))
   return Number.isFinite(count) ? Math.min(10, Math.max(3, count)) : null
 }
 
-function normalize(value: unknown): Recommendation[] {
+function normalize(value: unknown, sourceReferences: SourceReference[], frameworks: DirectionFramework[]): Recommendation[] {
   if (!Array.isArray(value)) return []
-  return value.slice(0, 3).map((item, index) => ({
-    id: clean(item?.id, 100) || `direction-${index + 1}`,
-    title: clean(item?.title, 80),
-    concept: clean(item?.concept, 180),
-    reason: clean(item?.reason, 180),
-    hook: clean(item?.hook, 160),
-    category: clean(item?.category, 80) || '內容解說',
-    version: clean(item?.version, 80) || undefined,
-  })).filter((item) => item.title && item.concept)
+  const sourceMap = new Map(sourceReferences.map((reference) => [reference.id, reference]))
+  return value.slice(0, 3).map((item, index) => {
+    const framework = frameworks.find((candidate) => candidate.id === clean(item?.frameworkId, 100)) || frameworks[index]
+    const categoryId = CONTENT_DIRECTION_FRAMEWORKS.some((candidate) => candidate.category === item?.categoryId)
+      ? item.categoryId as ContentCategoryId
+      : framework?.category || 'practical_value'
+    const primaryHookMechanism = CONTENT_DIRECTION_FRAMEWORKS.some((candidate) => candidate.mechanism === item?.primaryHookMechanism)
+      ? item.primaryHookMechanism as HookMechanismId
+      : framework?.mechanism || 'curiosity_gap'
+    const secondaryHookMechanism = CONTENT_DIRECTION_FRAMEWORKS.some((candidate) => candidate.mechanism === item?.secondaryHookMechanism)
+      ? item.secondaryHookMechanism as HookMechanismId
+      : undefined
+    const sourceRefs = cleanList(item?.sourceRefs, 4, 20).map((id) => sourceMap.get(id)).filter(Boolean) as SourceReference[]
+    const verificationFlags = cleanList(item?.verificationFlags, 4, 160)
+    if (categoryId === 'evidence_interpretation') {
+      if (!verificationFlags.some((flag) => /相對風險|絕對風險|百分點/u.test(flag))) verificationFlags.push('確認數字屬相對風險、絕對風險或百分點')
+      if (!verificationFlags.some((flag) => /研究設計|樣本|適用人群/u.test(flag))) verificationFlags.push('確認研究設計、樣本及適用人群')
+    }
+    return {
+      id: clean(item?.id, 100) || `direction-${index + 1}`,
+      title: clean(item?.title, 40),
+      concept: clean(item?.concept, 180),
+      reason: clean(item?.reason, 180),
+      hook: clean(item?.hook, 100),
+      category: framework?.categoryLabel || clean(item?.category, 80) || '內容解說',
+      categoryId,
+      primaryHookMechanism,
+      hookMechanism: framework?.mechanismLabel || primaryHookMechanism,
+      secondaryHookMechanism,
+      frameworkId: framework?.id || clean(item?.frameworkId, 100) || `framework-${index + 1}`,
+      sourceRefs: sourceRefs.length ? sourceRefs : sourceReferences.slice(0, 1),
+      verificationFlags,
+      version: clean(item?.version, 80) || DIRECTION_CONTRACT_VERSION,
+    }
+  }).filter((item) => item.title && item.concept && item.hook)
 }
 
-function fallback(summary: string): Recommendation[] {
-  const subject = summary.replace(/\s+/g, ' ').slice(0, 34) || '今次題材'
-  return [
-    { id: 'problem-solution', title: '由問題帶出解決方法', concept: `先指出受眾面對的問題，再以「${subject}」提供清晰答案。`, reason: '結構直接，適合讓新受眾迅速理解內容價值。', hook: '你是否也遇過這個問題？', category: '問題解決', version: 'creator-fallback-v1' },
-    { id: 'contrast-truth', title: '拆解常見誤解', concept: `以常見看法與實際情況的差異，帶出「${subject}」的重點。`, reason: '反差較容易引起停留，同時建立專業可信度。', hook: '大家一直以為如此，其實關鍵並不在這裡。', category: '反差／真相拆解', version: 'creator-fallback-v1' },
-    { id: 'practical-guide', title: '整理成實用指南', concept: `將「${subject}」整理成可以立即理解和保存的步驟。`, reason: '資訊層次清楚，適合輪播貼文及收藏型內容。', hook: '先記下這幾個重點，需要時就能用上。', category: '教育解說', version: 'creator-fallback-v1' },
-  ]
+function hasDirectionDiversity(recommendations: Recommendation[]) {
+  if (recommendations.length !== 3) return false
+  const mechanisms = new Set(recommendations.map((item) => item.primaryHookMechanism))
+  const categories = new Set(recommendations.map((item) => item.categoryId))
+  const questionHooks = recommendations.filter((item) => /[？?]$/u.test(item.hook)).length
+  const genericHook = recommendations.some((item) => /你是否也遇過|大家一直以為|先記下這幾個重點/u.test(item.hook))
+  return mechanisms.size === 3 && categories.size >= 2 && questionHooks <= 1 && !genericHook
+}
+
+function fallback(summary: string, frameworks: DirectionFramework[], sourceReferences: SourceReference[]): Recommendation[] {
+  const subject = summary.replace(/https?:\/\/\S+/giu, ' ').replace(/\s+/g, ' ').slice(0, 24) || '今次題材'
+  const chosen: DirectionFramework[] = []
+  for (const framework of frameworks) {
+    if (chosen.some((item) => item.mechanism === framework.mechanism)) continue
+    if (chosen.length === 2 && new Set(chosen.map((item) => item.category)).size === 1 && chosen[0]?.category === framework.category) continue
+    chosen.push(framework)
+    if (chosen.length === 3) break
+  }
+  const candidates = chosen.length === 3 ? chosen : retrieveDirectionFrameworks(summary, '', 20).filter((framework, index, all) => all.findIndex((item) => item.mechanism === framework.mechanism) === index).slice(0, 3)
+  const hookFor: Record<HookMechanismId, string> = {
+    counter_intuition: `${subject}，可能同你一直以為嘅唔一樣。`, curiosity_gap: `${subject}背後，最關鍵嗰點通常冇人講。`,
+    number_tension: `${subject}入面，邊個數字最容易被睇錯？`, identity_callout: `如果你都關心${subject}，呢個角度值得睇。`,
+    before_after: `${subject}前後相比，真正改變咗啲乜？`, direct_question: `${subject}，我哋係咪一直理解錯咗？`,
+    benefit_promise: `用幾頁拆清楚${subject}最值得留意嘅重點。`, risk_warning: `講${subject}之前，先避開呢個最常見誤解。`,
+    position_conflict: `同一個${subject}，兩種講法可以得出完全不同結論。`, unfinished_story: `${subject}去到呢個轉捩點，事情先真正開始。`,
+  }
+  return candidates.map((framework, index) => ({
+    id: `fallback-${framework.id}`, title: framework.template.replace(/＿+/gu, '').replace(/[？?]$/u, '').slice(0, 28) || framework.categoryLabel,
+    concept: `以「${framework.categoryLabel}」角度整理${subject}，並以${framework.mechanismLabel}帶入核心內容。`,
+    reason: `現有資料符合「${framework.categoryLabel}」所需輸入，亦可與另外兩個方向形成不同敘事。`,
+    hook: hookFor[framework.mechanism], category: framework.categoryLabel, categoryId: framework.category,
+    primaryHookMechanism: framework.mechanism, frameworkId: framework.id, sourceRefs: sourceReferences.slice(0, 1),
+    hookMechanism: framework.mechanismLabel,
+    verificationFlags: framework.category === 'evidence_interpretation' ? ['確認數字屬相對風險、絕對風險或百分點', '確認研究設計、樣本及適用人群'] : [],
+    version: `${DIRECTION_CONTRACT_VERSION}-fallback-${index + 1}`,
+  }))
 }
 
 function fallbackFormat(summary: string): FormatRecommendation {
@@ -111,6 +186,8 @@ export async function POST(request: Request) {
     const projectId = clean(body.projectId, 80)
     const summary = clean(body.summary, 5000)
     const format = clean(body.format, 80)
+    const sourceReferences = extractSourceReferences(summary)
+    const frameworkCandidates = retrieveDirectionFrameworks(summary, format, 10)
     const fallbackFormatRecommendation = resolveFormatRecommendation({}, summary, format)
     if (!isUuid(workspaceId) || !isUuid(projectId) || !summary) {
       return NextResponse.json({ error: 'Missing recommendation context' }, { status: 400 })
@@ -136,21 +213,27 @@ export async function POST(request: Request) {
         const baseUrl = (process.env.SOON_CORE_URL || 'https://soon-core.vercel.app').replace(/\/$/, '')
         const response = await fetch(`${baseUrl}/api/intelligence/directions/recommend`, {
           method: 'POST', headers: { 'content-type': 'application/json', 'x-soon-knowledge-key': coreKey },
-          body: JSON.stringify({ workspaceId, projectId, summary, format, workspace, brand: brandKit }),
+          body: JSON.stringify({
+            workspaceId, projectId, summary, format, workspace, brand: brandKit,
+            directionContractVersion: DIRECTION_CONTRACT_VERSION,
+            frameworkCandidates,
+            sourceReferences,
+          }),
           cache: 'no-store', signal: AbortSignal.timeout(10000),
         })
         if (response.ok) {
           const payload = await response.json()
-          coreRecommendations = normalize(payload?.recommendations)
+          coreRecommendations = normalize(payload?.recommendations, sourceReferences, frameworkCandidates)
           coreSlideCount = normalizeSlideCount(payload?.recommendedSlideCount)
           coreSlideCountReason = clean(payload?.slideCountReason, 180)
-          if (coreRecommendations.length && (format !== 'carousel' || coreSlideCount)) {
+          if (payload?.directionContractVersion === DIRECTION_CONTRACT_VERSION && hasDirectionDiversity(coreRecommendations) && (format !== 'carousel' || coreSlideCount)) {
             const coreFormatRecommendation = resolveFormatRecommendation(payload, summary, format)
             return NextResponse.json({
               recommendations: coreRecommendations,
               recommendedSlideCount: coreSlideCount,
               slideCountReason: coreSlideCountReason,
               ...coreFormatRecommendation,
+              directionContractVersion: DIRECTION_CONTRACT_VERSION,
               source: 'soon_core',
             })
           }
@@ -162,34 +245,38 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return NextResponse.json({
-      recommendations: coreRecommendations.length ? coreRecommendations : fallback(summary),
+      recommendations: hasDirectionDiversity(coreRecommendations) ? coreRecommendations : fallback(summary, frameworkCandidates, sourceReferences),
       recommendedSlideCount: coreSlideCount,
       slideCountReason: coreSlideCountReason,
       ...fallbackFormatRecommendation,
-      source: coreRecommendations.length ? 'soon_core' : 'fallback',
+      directionContractVersion: DIRECTION_CONTRACT_VERSION,
+      source: hasDirectionDiversity(coreRecommendations) ? 'soon_core' : 'fallback',
     })
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL), max_tokens: 1200, temperature: 0.3,
-        system: 'You are SOON, a senior Hong Kong content strategist. Return valid JSON only. Use concise polished Traditional Chinese. Never invent claims or facts.',
-        messages: [{ role: 'user', content: `根據以下資料推薦剛好 3 個明顯不同、可直接製作的內容方向。每個方向只需一個核心概念。\n${format ? `用家已選格式：${format}` : '用家尚未選擇格式。請先按題材判斷 carousel、single_image 或 short_video 哪一種最能說清楚。'}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n${format === 'carousel' || !format ? '如建議或已選 carousel，同時按題材可拆成的獨立內容重點，建議 3 至 10 張輪播圖片；否則 recommendedSlideCount 為 null。' : 'recommendedSlideCount 必須是 null。'}\n只輸出 {"recommendations":[{"id":"stable-slug","title":"最多14字","concept":"一句具體構想","reason":"一句適合原因","hook":"示例開場句","category":"內容分類","version":"ai-v1"}],"recommendedFormat":"carousel|single_image|short_video","recommendedVideoMethod":"human_filming|ai_video_generation|null","formatReason":"一句說明為何此格式最適合","recommendedSlideCount":6,"slideCountReason":"一句具體解釋內容可如何分頁"}` }],
+        model: anthropicModel(process.env.ANTHROPIC_CONTENT_MODEL), max_tokens: 2400, temperature: 0.45,
+        system: `你是 SOON，一位熟悉香港社交媒體的資深內容策劃。只輸出有效 JSON。所有面向用家的文字必須跟隨輸入語氣，使用自然、直接的香港廣東話書面語；避免新聞稿、教科書、台式或內地書面語。不可虛構資料、人物、數字、流程、品牌動機或因果。模板只代表敘事機制，不可直接照抄。`,
+        messages: [{ role: 'user', content: `根據資料推薦剛好 3 個可直接製作、而且真正不同的內容方向。每個方向只講一個核心概念。\n\n多樣性硬規則：\n- 3 個方向必須使用 3 種不同 primaryHookMechanism。\n- 至少來自 2 種 categoryId。\n- 最多只可有 1 個 hook 以問號結尾。\n- 禁止「你是否也遇過」「大家一直以為」「先記下這幾個重點」等萬用開場。\n- Hook 必須題材專屬；換成另一題材後仍成立即代表太空泛。\n- Hook 只用一句，直接呈現最具體的反差、風險、好奇缺口或受眾價值。\n\n事實規則：\n- 每個方向的 sourceRefs 只可使用下方來源 ID。\n- 有研究或數字時，分清觀察研究與實驗、相關與因果、樣本／比較組／適用人群、相對風險／絕對風險／百分點。\n- 資料未能確認時加入 verificationFlags，絕不可在 Hook 補作事實。\n- 品牌沒有公開解釋時，只可寫成分析或可能考慮；不可當作內部事實。\n\n${format ? `用家已選格式：${format}` : '用家尚未選擇格式。請判斷 carousel、single_image 或 short_video 哪一種最能說清楚。'}\n題材：${summary}\n品牌資料：${JSON.stringify({ workspace, brandKit })}\n來源段落：${JSON.stringify(sourceReferences)}\n可選框架：${JSON.stringify(frameworkCandidates.map((candidate) => ({ id: candidate.id, categoryId: candidate.category, category: candidate.categoryLabel, primaryHookMechanism: candidate.mechanism, mechanism: candidate.mechanismLabel, mechanismDescription: candidate.mechanismDescription, template: candidate.template, example: candidate.example, constraints: candidate.constraints })))}\n以上例子只用來理解機制，例子中的數字、人物及情境不得沿用。只能從可選框架選擇 frameworkId、categoryId 及 primaryHookMechanism。\n${format === 'carousel' || !format ? '如建議或已選 carousel，按真正可拆分的獨立重點建議 3 至 10 張；不可為湊頁數重複內容。' : 'recommendedSlideCount 必須是 null。'}\n輸出前自行檢查：具體度、張力、香港口語自然度、事實忠誠度均須合格，不合格就重寫。\n只輸出 {"recommendations":[{"id":"stable-slug","frameworkId":"候選框架 id","title":"最多14個中文字","concept":"一句具體構想","reason":"一句選用理由","hook":"一句題材專屬開場","categoryId":"候選 categoryId","category":"內容分類","primaryHookMechanism":"候選機制 id","secondaryHookMechanism":"另一機制 id 或空字串","sourceRefs":["S1"],"verificationFlags":["需要人手核實的具體事項"],"version":"${DIRECTION_CONTRACT_VERSION}"}],"recommendedFormat":"carousel|single_image|short_video","recommendedVideoMethod":"human_filming|ai_video_generation|null","formatReason":"一句說明為何此格式最適合","recommendedSlideCount":6,"slideCountReason":"一句解釋內容可如何分頁","directionContractVersion":"${DIRECTION_CONTRACT_VERSION}"}` }],
       }),
     })
     const data = await response.json()
     if (!response.ok) throw new Error(data?.error?.message || 'Recommendation failed')
     const output = Array.isArray(data.content) ? data.content.find((item: any) => item.type === 'text')?.text : ''
     const parsed = JSON.parse(String(output || '').replace(/^```json\s*|\s*```$/g, ''))
-    const recommendations = normalize(parsed?.recommendations)
+    const recommendations = normalize(parsed?.recommendations, sourceReferences, frameworkCandidates)
     const formatRecommendation = resolveFormatRecommendation(parsed, summary, format)
     const recommendedSlideCount = formatRecommendation.recommendedFormat === 'carousel' ? normalizeSlideCount(parsed?.recommendedSlideCount) : null
     return NextResponse.json({
-      recommendations: recommendations.length ? recommendations : (coreRecommendations.length ? coreRecommendations : fallback(summary)),
+      recommendations: hasDirectionDiversity(recommendations)
+        ? recommendations
+        : (hasDirectionDiversity(coreRecommendations) ? coreRecommendations : fallback(summary, frameworkCandidates, sourceReferences)),
       recommendedSlideCount,
       slideCountReason: recommendedSlideCount ? clean(parsed?.slideCountReason, 180) : '',
       ...formatRecommendation,
-      source: recommendations.length ? 'creator_ai' : (coreRecommendations.length ? 'soon_core' : 'fallback'),
+      directionContractVersion: DIRECTION_CONTRACT_VERSION,
+      source: hasDirectionDiversity(recommendations) ? 'creator_ai' : (hasDirectionDiversity(coreRecommendations) ? 'soon_core' : 'fallback'),
     })
   } catch (error) {
     console.error('[content-directions] recommendation failed', error)
