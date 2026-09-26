@@ -29,6 +29,9 @@ for (const text of [
   ".replace(/差咗幾遠/gu, '差幾遠')",
   ".replace(/風險真係低(?=\\d)/gu, '風險真係降低')",
   ".replace(/？.+$/u, '？')",
+  ".replace(/的人，死亡/gu, '的人死亡')",
+  "'兩份研究、$1、'",
+  "'食辣數字背後差幾遠？'",
   '問號後不可再加解說',
   'titleFor',
 ]) assert.ok(route.includes(text), text)

@@ -57,6 +57,9 @@ const polishCoverTitle = (value: unknown) => clean(value, 40)
   .replace(/多咗/gu, '增加')
   .replace(/睇清楚/gu, '弄清楚')
   .replace(/搞清楚/gu, '弄清楚')
+  .replace(/的人，死亡/gu, '的人死亡')
+  .replace(/^(?:中美|兩國|跨國)?兩份研究、(?:超過|近)?(\d+萬人)[，,]/u, '兩份研究、$1、')
+  .replace(/食辣數字差幾遠$/u, '食辣數字背後差幾遠？')
   .replace(/？.+$/u, '？')
 const normalizeSlideCount = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null
