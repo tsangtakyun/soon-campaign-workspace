@@ -25,6 +25,11 @@ import { ClaimOnboardingSession } from "@/components/onboarding/ClaimOnboardingS
 import { SoonLoading } from "@/components/ui/SoonLoading";
 import { SoonIcon, type SoonIconName } from "@/components/ui/SoonIcon";
 import { contentStyleTemplates as styleTemplates, type ContentStyleTemplate } from "@/lib/content-style-library";
+import {
+  detectContentInputs,
+  DIRECTION_CONTRACT_VERSION,
+  retrieveDirectionFrameworks,
+} from "@/lib/content-direction-frameworks";
 import { clearMagazineCarouselV1, isClearMagazineCarousel } from "@/lib/content-templates/clear-magazine-carousel-v1";
 import { applyCoreTemplateStructure, coreTemplatePageRoles, isFixedCoreTemplate } from "@/lib/core-template-contract";
 import { mergeAssignedAssetsIntoDrafts } from "@/lib/page-asset-assignments";
@@ -165,6 +170,7 @@ type DirectionRecommendation = {
   sourceRefs?: Array<{ id: string; label: string; excerpt: string }>;
   verificationFlags?: string[];
   version?: string;
+  source?: string;
 };
 
 type StudioStep = "brief" | "format" | "structure" | "assets" | "style" | "drafts" | "carousel";
@@ -384,37 +390,6 @@ function contextualPreviewSlides(template: DisplayStyle, angle: string): Context
   ];
 }
 
-function workspaceAngleOptions(workspace: WorkspaceSummary | null) {
-  if (workspace?.promptProfileKey === "egg-carousel-v1") {
-    return [
-      "交由 AI 決定",
-      "反差／真相拆解",
-      "新聞資料解說",
-      "人物故事",
-      "文化／社會角度",
-      "輕鬆趣聞",
-    ];
-  }
-  if (workspace?.promptProfileKey === "bunchill-content-v1") {
-    return [
-      "交由 AI 決定",
-      "擬人化搞笑",
-      "香港日常感",
-      "無厘頭反差",
-      "溫柔共鳴",
-      "角色小故事",
-    ];
-  }
-  return [
-    "交由 AI 決定",
-    "教育解說",
-    "問題解決",
-    "故事角度",
-    "趨勢切入",
-    "輕鬆幽默",
-  ];
-}
-
 function projectListDetails(project: Project) {
   const production = project.production || {};
   const status = production.productionStatus === "images_ready"
@@ -472,7 +447,16 @@ export default function ContentStudioPage() {
   const [message, setMessage] = useState("");
   const [studioLoadError, setStudioLoadError] = useState(false);
   const [entrySourceMode, setEntrySourceMode] = useState<"content" | "idea">("content");
-  const [brief, setBrief] = useState({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
+  const [brief, setBrief] = useState({
+    angle: "交由 AI 決定",
+    summary: "",
+    directionId: "",
+    directionVersion: "",
+    directionSource: "",
+    frameworkId: "",
+    categoryId: "",
+    hookMechanism: "",
+  });
   const [directionRecommendations, setDirectionRecommendations] = useState<DirectionRecommendation[]>([]);
   const [recommendingDirections, setRecommendingDirections] = useState(false);
   const [recommendedSlideCount, setRecommendedSlideCount] = useState<number | null>(null);
@@ -480,6 +464,7 @@ export default function ContentStudioPage() {
   const [recommendedFormat, setRecommendedFormat] = useState("");
   const [formatReason, setFormatReason] = useState("");
   const [customDirectionsOpen, setCustomDirectionsOpen] = useState(false);
+  const [customDirectionText, setCustomDirectionText] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("");
   const [carouselSlideCount, setCarouselSlideCount] = useState(5);
   const [videoMethod, setVideoMethod] = useState("human_filming");
@@ -552,10 +537,17 @@ export default function ContentStudioPage() {
       : imageStudioSteps,
     [selected?.selected_format],
   );
-  const angleOptions = useMemo(
-    () => workspaceAngleOptions(workspace),
-    [workspace],
-  );
+  const applicableDirectionFrameworks = useMemo(() => {
+    const candidates = retrieveDirectionFrameworks(
+      brief.summary,
+      selected?.selected_format || selectedFormat,
+      20,
+    );
+    const signals = detectContentInputs(brief.summary);
+    const hasSpecificInput = Object.values(signals).some(Boolean);
+    const inputBacked = candidates.filter((framework) => framework.requiredInputs.length > 0);
+    return (hasSpecificInput && inputBacked.length >= 3 ? inputBacked : candidates).slice(0, 6);
+  }, [brief.summary, selected?.selected_format, selectedFormat]);
   const displayStyles = useMemo<DisplayStyle[]>(() => {
     const format = activeStep==='format' ? selectedFormat : selected?.selected_format || selectedFormat;
     const coreFormat = format === "short_video"
@@ -954,7 +946,17 @@ export default function ContentStudioPage() {
   function openNewContent() {
     setSelectedId(null);
     setMessage("");
-    setBrief({ angle: "交由 AI 決定", summary: "", directionId: "", directionVersion: "", directionSource: "" });
+    setBrief({
+      angle: "交由 AI 決定",
+      summary: "",
+      directionId: "",
+      directionVersion: "",
+      directionSource: "",
+      frameworkId: "",
+      categoryId: "",
+      hookMechanism: "",
+    });
+    setCustomDirectionText("");
     setEntrySourceMode("content");
     setDirectionRecommendations([]);
     setRecommendedFormat("");
@@ -987,7 +989,12 @@ export default function ContentStudioPage() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.detail || payload?.error || "未能取得內容方向建議");
-      const recommendations = Array.isArray(payload?.recommendations) ? payload.recommendations : [];
+      const recommendations = Array.isArray(payload?.recommendations)
+        ? payload.recommendations.map((recommendation: DirectionRecommendation) => ({
+            ...recommendation,
+            source: typeof payload?.source === "string" ? payload.source : "recommendation",
+          }))
+        : [];
       setDirectionRecommendations(recommendations);
       const hasSlideCount = payload?.recommendedSlideCount !== null && payload?.recommendedSlideCount !== undefined && payload?.recommendedSlideCount !== "";
       const slideCount = Number(payload?.recommendedSlideCount);
@@ -1014,7 +1021,10 @@ export default function ContentStudioPage() {
           angle: recommendations[0].title,
           directionId: recommendations[0].id,
           directionVersion: recommendations[0].version || "",
-          directionSource: payload?.source || "",
+          directionSource: recommendations[0].source || "recommendation",
+          frameworkId: recommendations[0].frameworkId || "",
+          categoryId: recommendations[0].categoryId || "",
+          hookMechanism: recommendations[0].primaryHookMechanism || "",
         }));
       }
     } catch (error) {
@@ -1032,7 +1042,13 @@ export default function ContentStudioPage() {
       directionId: selected.brief?.directionId || "",
       directionVersion: selected.brief?.directionVersion || "",
       directionSource: selected.brief?.directionSource || "",
+      frameworkId: selected.brief?.frameworkId || "",
+      categoryId: selected.brief?.categoryId || "",
+      hookMechanism: selected.brief?.hookMechanism || "",
     });
+    setCustomDirectionText(
+      selected.brief?.directionSource === "manual" ? selected.brief?.angle || "" : "",
+    );
     setDirectionRecommendations([]);
     setRecommendedSlideCount(null);
     setSlideCountReason("");
@@ -2389,7 +2405,10 @@ export default function ContentStudioPage() {
                                   angle: recommendation.title,
                                   directionId: recommendation.id,
                                   directionVersion: recommendation.version || "",
-                                  directionSource: brief.directionSource,
+                                  directionSource: recommendation.source || "recommendation",
+                                  frameworkId: recommendation.frameworkId || "",
+                                  categoryId: recommendation.categoryId || "",
+                                  hookMechanism: recommendation.primaryHookMechanism || "",
                                 })}
                               >
                                 <div className="direction-card-top">
@@ -2428,20 +2447,64 @@ export default function ContentStudioPage() {
                         </div>
                       ) : null}
                       <button type="button" className="custom-directions-toggle" onClick={() => setCustomDirectionsOpen((open) => !open)}>
-                        自行選擇方向 <SoonIcon name="chevron-down" size={14} />
+                        自訂方向 <SoonIcon name="chevron-down" size={14} />
                       </button>
                       {customDirectionsOpen ? (
-                        <div className="angle-options custom-direction-options">
-                          {angleOptions.filter((option) => option !== "交由 AI 決定").map((option) => (
-                            <button
-                              type="button"
-                              key={option}
-                              className={brief.angle === option && !brief.directionId ? "active" : ""}
-                              onClick={() => setBrief({ ...brief, angle: option, directionId: "", directionVersion: "", directionSource: "manual" })}
-                            >
-                              {option}
-                            </button>
-                          ))}
+                        <div className="custom-direction-panel">
+                          <label className="custom-direction-input">
+                            <span>輸入自己的方向</span>
+                            <input
+                              value={customDirectionText}
+                              onChange={(event) => {
+                                const angle = event.target.value;
+                                setCustomDirectionText(angle);
+                                setBrief({
+                                  ...brief,
+                                  angle,
+                                  directionId: "",
+                                  directionVersion: "",
+                                  directionSource: "manual",
+                                  frameworkId: "",
+                                  categoryId: "",
+                                  hookMechanism: "",
+                                });
+                              }}
+                              placeholder="例如：用兩份研究拆解相關與因果的分別"
+                            />
+                          </label>
+                          <div className="applicable-frameworks">
+                            <strong>或從適用框架中選擇</strong>
+                            <div className="applicable-framework-grid">
+                              {applicableDirectionFrameworks.map((framework) => {
+                                const directionId = `manual-framework:${framework.id}`;
+                                const active = brief.directionId === directionId;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={framework.id}
+                                    className={active ? "active" : ""}
+                                    aria-pressed={active}
+                                    onClick={() => {
+                                      setCustomDirectionText("");
+                                      setBrief({
+                                        ...brief,
+                                        angle: `${framework.categoryLabel} × ${framework.mechanismLabel}`,
+                                        directionId,
+                                        directionVersion: DIRECTION_CONTRACT_VERSION,
+                                        directionSource: "manual_framework",
+                                        frameworkId: framework.id,
+                                        categoryId: framework.category,
+                                        hookMechanism: framework.mechanism,
+                                      });
+                                    }}
+                                  >
+                                    <span>{framework.categoryLabel} · {framework.mechanismLabel}</span>
+                                    <b>{framework.template}</b>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       ) : null}
                     </div>
@@ -2450,7 +2513,7 @@ export default function ContentStudioPage() {
                         disabled={
                           saving ||
                           !String(brief.summary || "").trim() ||
-                          !directionRecommendations.length ||
+                          (!brief.directionId && (!String(brief.angle || "").trim() || brief.angle === "交由 AI 決定")) ||
                           !permissions?.canEdit
                         }
                         onClick={() => {
@@ -2470,9 +2533,9 @@ export default function ContentStudioPage() {
                                 source: brief.directionSource || "manual",
                                 directionTitle: brief.angle,
                                 directionVersion: brief.directionVersion || null,
-                                frameworkId: selectedRecommendation?.frameworkId || null,
-                                categoryId: selectedRecommendation?.categoryId || null,
-                                primaryHookMechanism: selectedRecommendation?.primaryHookMechanism || null,
+                                frameworkId: selectedRecommendation?.frameworkId || brief.frameworkId || null,
+                                categoryId: selectedRecommendation?.categoryId || brief.categoryId || null,
+                                primaryHookMechanism: selectedRecommendation?.primaryHookMechanism || brief.hookMechanism || null,
                                 secondaryHookMechanism: selectedRecommendation?.secondaryHookMechanism || null,
                                 sourceRefs: selectedRecommendation?.sourceRefs?.map((reference) => reference.id) || [],
                                 verificationFlags: selectedRecommendation?.verificationFlags || [],
@@ -2481,7 +2544,7 @@ export default function ContentStudioPage() {
                           )
                         }}
                       >
-                        {directionRecommendations.length ? "繼續製作 →" : "請先分析內容"}
+                        {brief.directionId || (String(brief.angle || "").trim() && brief.angle !== "交由 AI 決定") ? "繼續製作 →" : "請選擇內容方向"}
                       </button>
                     </div>
                   </div>
@@ -3844,7 +3907,7 @@ const styles = `
   .caption-draft{display:grid!important;gap:9px;white-space:normal!important;background:#fff;border-radius:10px;padding:13px!important}.caption-draft label{display:flex!important;align-items:center;justify-content:space-between;gap:12px;margin:0!important}.caption-draft label span{color:#747880;font-size:10px}.caption-draft textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;border:1px solid #d9dcdf!important;border-radius:9px;background:#fff!important;color:#202126!important;padding:11px!important;font:inherit;font-size:12px;line-height:1.55}.caption-draft>div{display:flex;align-items:center;justify-content:flex-end;gap:8px}.caption-draft button,.download-all-button{border:0;border-radius:8px;background:#6b2c30;color:#fff!important;padding:9px 12px;font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}.caption-draft button:disabled{opacity:.45;cursor:not-allowed}.download-all-button{margin-right:auto;background:#202126}@media(max-width:700px){.caption-draft>div{align-items:stretch;flex-direction:column}.download-all-button{text-align:center;margin-right:0}}
   .studio-progress{position:sticky;top:0;z-index:12;margin-bottom:18px;border:1px solid #ded5cd;border-radius:14px;background:rgba(246,242,235,.97);padding:8px;backdrop-filter:blur(10px)}.studio-progress .studio-step-nav{position:static!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;backdrop-filter:none!important}.studio-step-nav button b{font:inherit}.studio-step-nav button.done{border:1px solid #d8e6ae!important}.studio-step-nav button.done:hover{border-color:#6b2c30!important;background:#fff!important;color:#6b2c30!important;box-shadow:0 2px 0 #ddc6c1}@media(max-width:700px){.studio-progress{overflow:hidden}.studio-progress .studio-step-nav{display:flex!important}.studio-step-nav button{min-width:115px!important}}
   .actual-style-preview{position:relative;aspect-ratio:4/5;overflow:hidden;background:#171717}.actual-style-preview img{object-fit:cover}.style-preview-arrow{position:absolute;z-index:3;top:50%;display:grid;place-items:center;width:36px;height:36px;transform:translateY(-50%);border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(17,17,17,.72);color:#fff;font-size:18px;font-weight:800;box-shadow:0 3px 12px rgba(0,0,0,.2);cursor:pointer;backdrop-filter:blur(5px)}.style-preview-arrow:hover,.style-preview-arrow:focus-visible{background:#fff;color:#202126;outline:2px solid #fff;outline-offset:2px}.style-preview-arrow.previous{left:10px}.style-preview-arrow.next{right:10px}.style-preview-count{position:absolute;z-index:3;top:10px;right:10px;border-radius:999px;background:rgba(17,17,17,.72);color:#fff;padding:5px 8px;font-size:8px;font-weight:800;letter-spacing:.08em;backdrop-filter:blur(5px)}.style-preview-dots{position:absolute;z-index:3;left:50%;bottom:11px;display:flex;gap:5px;transform:translateX(-50%);border-radius:999px;background:rgba(17,17,17,.56);padding:6px 8px}.style-preview-dots i{display:block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.48)}.style-preview-dots i.active{width:14px;border-radius:4px;background:#fff}.contextual-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;aspect-ratio:4/5;padding:10px;background:#eee8e2}.contextual-preview>div{position:relative;min-width:0;overflow:hidden;border-radius:8px;padding:9px;display:flex;flex-direction:column;align-items:stretch;text-align:left;box-shadow:0 1px 0 rgba(32,33,38,.08)}.preview-page-role{position:absolute;z-index:3;top:7px;right:7px;border-radius:999px;background:rgba(255,255,255,.9);color:#202126;padding:3px 6px;font-size:6px;font-weight:850;letter-spacing:.04em}.preview-image-area{display:block;flex:0 0 48%;margin:-9px -9px 8px;opacity:.84;background-image:linear-gradient(135deg,rgba(255,255,255,.15),rgba(32,33,38,.18));background-position:center;background-size:cover}.preview-page-copy{position:relative;z-index:2;display:flex;min-height:0;flex:1;flex-direction:column;justify-content:flex-end;gap:4px}.contextual-preview small{font-size:6px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.contextual-preview strong{display:-webkit-box;overflow:hidden;font-size:10px;line-height:1.16;letter-spacing:-.025em;-webkit-box-orient:vertical;-webkit-line-clamp:3}.contextual-preview p{display:-webkit-box;overflow:hidden;margin:0;font-size:6px;line-height:1.35;opacity:.72;-webkit-box-orient:vertical;-webkit-line-clamp:3}.contextual-preview .cover .preview-image-area{flex-basis:58%}.contextual-preview .cover strong{font-size:13px}.contextual-preview .end{justify-content:center}.contextual-preview .end .preview-image-area{position:absolute;inset:0;margin:0;opacity:.16}.contextual-preview .end .preview-page-copy{justify-content:center}.contextual-preview[data-style*="product"] .preview-image-area{border-radius:0 0 55% 0}.contextual-preview[data-style*="problem"] .content .preview-image-area{clip-path:polygon(0 0,100% 0,88% 100%,0 100%)}.contextual-preview[data-style*="bold"] strong{text-transform:uppercase;font-weight:900}.template-copy em{color:#777b83;font-size:9px;font-style:normal}.style-recommendation-reason{display:grid;gap:2px;margin:2px 0 0;border-left:2px solid #c7e63a;padding-left:7px;color:#555b63;font-size:9px;line-height:1.45}.style-recommendation-reason b{color:#52691a;font-size:8px}.template-copy>button{margin-top:3px;border:0;border-radius:8px;background:#f1ebe4;color:#6b2c30;padding:8px;text-align:center;font-size:10px;font-weight:800;cursor:pointer}.style-template-grid>article.active .template-copy>button{background:#6b2c30;color:#fff}
-  .brief-step-heading{border-bottom:1px solid #ededee;padding-bottom:18px;margin-bottom:22px}.brief-step-heading h3{margin:0;font-size:20px}.direction-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}.direction-heading>div{display:grid;gap:5px}.direction-heading>div>span{color:#202126;font-size:14px;font-weight:800}.direction-heading>div>small{color:#6f737d;font-size:11px;line-height:1.45}.direction-recommend-button{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;border:0;border-radius:10px;background:#6b2c30;color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.direction-recommend-button.subtle{border:0;background:transparent;color:#6b2c30;padding:7px 0}.direction-recommend-button.subtle:hover{text-decoration:underline;text-underline-offset:3px}.direction-recommend-button:disabled{opacity:.42;cursor:not-allowed}.direction-hint{margin:4px 0 0;border-radius:9px;background:#f7eee9;color:#7d5554;padding:10px 12px;font-size:11px}.direction-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}.direction-card-grid>article{min-width:0;border:1px solid #ded5cd;border-radius:14px;background:#faf8f4;color:#202126;overflow:hidden}.direction-card-grid>article:hover{border-color:#b46a61}.direction-card-grid>article.active{border-color:#6b2c30;box-shadow:0 0 0 1px #6b2c30,4px 4px 0 #ddc6c1;background:#fff}.direction-card-select{width:100%;min-height:100%;border:0;background:transparent;color:inherit;padding:15px;text-align:left;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;gap:8px;font:inherit}.direction-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.direction-card-top i{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#edf6d4;color:#52691a}.direction-card-top span{border-radius:999px;background:#f1ebe4;color:#6b2c30;padding:4px 7px;font-size:8px;font-weight:850}.direction-card-grid strong{font-size:15px;line-height:1.35}.direction-card-grid p{margin:0;color:#4f535a;font-size:11px;line-height:1.5}.direction-card-grid em{margin-top:auto;border-top:1px solid #eee8e2;padding-top:8px;color:#6b2c30;font-size:10px;font-style:normal;line-height:1.45}.direction-card-grid em b{display:block;margin-bottom:3px;color:#8c6a67;font-size:8px;letter-spacing:.04em}.direction-card-details{border-top:1px solid #eee8e2;margin:0 15px;padding:0 0 11px}.direction-card-details summary{width:max-content;cursor:pointer;color:#6b2c30;padding:9px 0 5px;font-size:9px;font-weight:800}.direction-card-details>p,.direction-card-evidence p{padding-top:5px;color:#777b83;font-size:10px}.direction-card-details b{display:block;margin-top:7px;color:#4f535a;font-size:9px}.direction-card-meta{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 7px}.direction-card-meta span{border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:800}.direction-card-evidence,.direction-card-verification{margin-top:8px;border-top:1px solid #eee8e2;padding-top:2px}.direction-card-verification ul{margin:5px 0 0;padding-left:16px;color:#8a5c38;font-size:9px;line-height:1.5}.custom-directions-toggle{display:flex;align-items:center;gap:6px;width:max-content;margin-top:4px;border:0;background:transparent;color:#6b2c30;padding:5px 0;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.custom-direction-options{border-top:1px solid #eee8e2;padding-top:10px}@media(max-width:850px){.direction-card-grid{grid-template-columns:1fr}.direction-heading{align-items:stretch;flex-direction:column}.direction-recommend-button:not(.subtle){width:100%}.direction-recommend-button.subtle{align-self:flex-start}}
+  .brief-step-heading{border-bottom:1px solid #ededee;padding-bottom:18px;margin-bottom:22px}.brief-step-heading h3{margin:0;font-size:20px}.direction-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}.direction-heading>div{display:grid;gap:5px}.direction-heading>div>span{color:#202126;font-size:14px;font-weight:800}.direction-heading>div>small{color:#6f737d;font-size:11px;line-height:1.45}.direction-recommend-button{display:flex;align-items:center;justify-content:center;gap:7px;flex:none;border:0;border-radius:10px;background:#6b2c30;color:#fff;padding:11px 14px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.direction-recommend-button.subtle{border:0;background:transparent;color:#6b2c30;padding:7px 0}.direction-recommend-button.subtle:hover{text-decoration:underline;text-underline-offset:3px}.direction-recommend-button:disabled{opacity:.42;cursor:not-allowed}.direction-hint{margin:4px 0 0;border-radius:9px;background:#f7eee9;color:#7d5554;padding:10px 12px;font-size:11px}.direction-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}.direction-card-grid>article{min-width:0;border:1px solid #ded5cd;border-radius:14px;background:#faf8f4;color:#202126;overflow:hidden}.direction-card-grid>article:hover{border-color:#b46a61}.direction-card-grid>article.active{border-color:#6b2c30;box-shadow:0 0 0 1px #6b2c30,4px 4px 0 #ddc6c1;background:#fff}.direction-card-select{width:100%;min-height:100%;border:0;background:transparent;color:inherit;padding:15px;text-align:left;cursor:pointer;display:flex;flex-direction:column;align-items:stretch;gap:8px;font:inherit}.direction-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.direction-card-top i{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#edf6d4;color:#52691a}.direction-card-top span{border-radius:999px;background:#f1ebe4;color:#6b2c30;padding:4px 7px;font-size:8px;font-weight:850}.direction-card-grid strong{font-size:15px;line-height:1.35}.direction-card-grid p{margin:0;color:#4f535a;font-size:11px;line-height:1.5}.direction-card-grid em{margin-top:auto;border-top:1px solid #eee8e2;padding-top:8px;color:#6b2c30;font-size:10px;font-style:normal;line-height:1.45}.direction-card-grid em b{display:block;margin-bottom:3px;color:#8c6a67;font-size:8px;letter-spacing:.04em}.direction-card-details{border-top:1px solid #eee8e2;margin:0 15px;padding:0 0 11px}.direction-card-details summary{width:max-content;cursor:pointer;color:#6b2c30;padding:9px 0 5px;font-size:9px;font-weight:800}.direction-card-details>p,.direction-card-evidence p{padding-top:5px;color:#777b83;font-size:10px}.direction-card-details b{display:block;margin-top:7px;color:#4f535a;font-size:9px}.direction-card-meta{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 7px}.direction-card-meta span{border-radius:999px;background:#edf6d4;color:#52691a;padding:4px 7px;font-size:8px;font-weight:800}.direction-card-evidence,.direction-card-verification{margin-top:8px;border-top:1px solid #eee8e2;padding-top:2px}.direction-card-verification ul{margin:5px 0 0;padding-left:16px;color:#8a5c38;font-size:9px;line-height:1.5}.custom-directions-toggle{display:flex;align-items:center;gap:6px;width:max-content;margin-top:4px;border:0;background:transparent;color:#6b2c30;padding:5px 0;font:inherit;font-size:11px;font-weight:800;cursor:pointer}.custom-direction-panel{display:grid;gap:14px;border-top:1px solid #eee8e2;padding-top:12px}.custom-direction-input{margin:0!important}.custom-direction-input input{min-height:44px}.applicable-frameworks{display:grid;gap:8px}.applicable-frameworks>strong{font-size:11px;color:#555961}.applicable-framework-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.applicable-framework-grid button{display:grid;gap:5px;border:1px solid #ded5cd;border-radius:11px;background:#faf8f4;padding:11px 12px;text-align:left;color:#202126;cursor:pointer}.applicable-framework-grid button:hover{border-color:#b46a61}.applicable-framework-grid button.active{border-color:#6b2c30;box-shadow:0 0 0 1px #6b2c30;background:#fff}.applicable-framework-grid span{color:#6b2c30;font-size:9px;font-weight:800}.applicable-framework-grid b{font-size:11px;line-height:1.45}@media(max-width:850px){.direction-card-grid,.applicable-framework-grid{grid-template-columns:1fr}.direction-heading{align-items:stretch;flex-direction:column}.direction-recommend-button:not(.subtle){width:100%}.direction-recommend-button.subtle{align-self:flex-start}}
   .project-list>.new-project-button{display:block!important;width:100%!important;min-height:42px;margin:0 0 13px!important;border:1px solid #c9aaa5!important;border-radius:10px!important;background:#f7eee9!important;color:#6b2c30!important;-webkit-text-fill-color:#6b2c30!important;padding:10px 12px!important;font:inherit;font-size:12px!important;font-weight:800!important;text-align:left;cursor:pointer}.project-list>.new-project-button:hover,.project-list>.new-project-button.active{border-color:#6b2c30!important;background:#fff!important;box-shadow:3px 3px 0 #ddc6c1}
   .site-nav{display:none}.studio-page{min-height:100vh;background:#f7f7f8;color:#202126;display:grid;grid-template-columns:240px minmax(0,1fr)}.studio-shell{min-width:0;background:#fff}.studio-topbar{min-height:72px;border-bottom:1px solid #ebecef;padding:0 28px;display:flex;align-items:center;justify-content:space-between}.studio-topbar h1{font-size:22px;margin:0}.studio-topbar p{font-size:13px;color:#777b84;margin:4px 0 0}.studio-topbar button,.actions button,.prompt-modal footer button{border:0;border-radius:10px;padding:11px 17px;background:#111;color:#fff;font-weight:750;cursor:pointer}.secondary{background:#f0f1f3!important;color:#27292e!important}.studio-layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 72px)}.project-list{min-width:0;background:#f7f7f8;border-right:1px solid #e8e9ec;padding:20px 14px}.project-list>div{display:flex;justify-content:space-between;padding:0 8px 12px}.project-list>div span{color:#8a8e96}.project-list>button{width:100%;border:1px solid transparent;background:transparent;border-radius:12px;text-align:left;padding:13px;margin-bottom:7px;display:grid;gap:5px;cursor:pointer}.project-list>button.active{background:#fff;border-color:#dedfe3;box-shadow:0 5px 18px rgba(0,0,0,.05)}.project-list button span{font-size:11px;color:#777b84}.project-list button strong{font-size:14px;line-height:1.35}.project-list button em{font-style:normal;font-size:11px;color:#a0a3aa}.empty{font-size:13px;color:#8a8e96;padding:20px 8px;line-height:1.6}.studio-workspace{min-width:0;padding:30px;max-width:1050px;width:100%;box-sizing:border-box}.project-head{display:flex;justify-content:space-between;gap:30px;align-items:flex-start;margin-bottom:26px}.project-head>div>span{font-size:12px;font-weight:750;color:#777b84}.project-head h2{font-size:25px;line-height:1.3;margin:6px 0}.project-head a{font-size:12px;color:#555961}.stage-track{display:flex;align-items:center;gap:8px;white-space:nowrap;padding-top:8px}.stage-track b{font-size:11px;color:#a4a7ae}.stage-track b.done{color:#111}.stage-track i{display:block;width:26px;height:1px;background:#d9dadd}.editor-card{min-width:0;border:1px solid #e1e2e5;border-radius:18px;padding:26px;box-shadow:0 10px 35px rgba(20,22,26,.05)}.section-title{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #ededee;padding-bottom:18px;margin-bottom:22px}.section-title span{font-size:10px;font-weight:800;letter-spacing:.1em;color:#888c94}.section-title h3{margin:4px 0 0;font-size:20px}.section-title em{font-size:11px;color:#8c9098;font-style:normal}.editor-card label,.prompt-modal label{display:grid;gap:7px;margin:15px 0}.editor-card label>span,.prompt-modal label>span{font-size:12px;font-weight:750;color:#555961}.editor-card input,.editor-card textarea,.prompt-modal input,.prompt-modal textarea{appearance:none;border:1px solid #dfe1e5;border-radius:10px;padding:12px 13px;font:inherit;resize:vertical;background:#fff!important;color:#111!important;-webkit-text-fill-color:#111!important;color-scheme:light}.editor-card input::placeholder,.editor-card textarea::placeholder,.prompt-modal input::placeholder,.prompt-modal textarea::placeholder{color:#8b8e95!important;-webkit-text-fill-color:#8b8e95!important;opacity:1}.editor-card textarea{min-height:90px}.two-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.angle-field{display:grid;gap:9px;margin:18px 0}.angle-field>span{font-size:12px;font-weight:750;color:#555961}.angle-field small{color:#8b8f97;font-size:11px}.angle-options{display:flex;gap:8px;flex-wrap:wrap}.angle-options button{border:1px solid #dfe1e5;background:#fff;color:#2b2d31;border-radius:999px;padding:9px 13px;font-weight:700;cursor:pointer}.angle-options button.active{background:#111;color:#fff;border-color:#111}.actions{display:flex;justify-content:flex-end;gap:9px;margin-top:22px;flex-wrap:wrap}.actions button:disabled{opacity:.45;cursor:not-allowed}.format-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.format-grid button{border:1px solid #dedfe3;background:#fafafa;border-radius:13px;padding:17px;text-align:left;display:grid;gap:5px;cursor:pointer}.format-grid button.active{background:#111;color:#fff;border-color:#111}.format-grid span{font-size:12px;color:#7d8189}.format-grid .active span{color:#ccc}.production-ready{text-align:center;padding:45px 20px}.production-ready b{display:grid;place-items:center;margin:auto;width:44px;height:44px;border-radius:50%;background:#e8f8ed;color:#20813d;font-size:20px}.production-ready h4{font-size:19px;margin:14px 0 7px}.production-ready p{max-width:500px;margin:auto;color:#737780;line-height:1.6}.structure-result{display:grid;gap:22px}.structure-status{display:flex;gap:14px;align-items:flex-start;background:#f5faf6;border-radius:13px;padding:16px}.structure-status>b{display:grid;place-items:center;flex:0 0 32px;height:32px;border-radius:50%;background:#dff4e5;color:#20813d}.structure-status h4,.story-pages>h4{margin:2px 0 6px;font-size:16px}.structure-status p{margin:0;color:#646971;line-height:1.55}.fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.fact-grid section{background:#f7f7f8;border-radius:12px;padding:14px}.fact-grid h5,.structure-sources h5{margin:0 0 9px;font-size:12px}.fact-grid ul{margin:0;padding-left:17px;color:#5f636b;font-size:12px;line-height:1.55}.story-pages{display:grid;gap:9px}.story-pages article{display:grid;grid-template-columns:48px 1fr;gap:12px;border:1px solid #e4e5e8;border-radius:12px;padding:13px}.story-pages article>span{font-size:11px;font-weight:800;background:#111;color:#fff;border-radius:8px;padding:7px;height:max-content;text-align:center}.story-pages h5{margin:1px 0 6px}.story-pages p{font-size:12px;color:#656a72;line-height:1.5;margin:3px 0}.story-pages p strong{color:#2b2e33}.structure-sources{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.structure-sources h5{width:100%}.structure-sources a{font-size:11px;color:#454951;background:#f1f2f4;padding:7px 10px;border-radius:999px;text-decoration:none}.next-production{border:1px dashed #cfd2d7;border-radius:12px;padding:15px}.next-production p{margin:5px 0 0;color:#747880;font-size:12px}.studio-message{background:#f4f4f5;border-radius:9px;padding:10px 13px;font-size:12px}.welcome{text-align:center;padding:100px 20px}.welcome>span{font-size:40px}.welcome h2{margin:14px 0 8px}.welcome p{color:#777b84}.welcome a{display:inline-block;background:#111;color:#fff;border-radius:10px;padding:11px 16px;text-decoration:none;margin-top:10px}.welcome small{display:block;margin-top:18px;color:#a33}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.46);z-index:100;display:grid;place-items:center;padding:22px}.prompt-modal{background:#fff!important;color:#111!important;color-scheme:light;width:min(760px,100%);max-height:90vh;overflow:auto;border-radius:18px;padding:24px}.prompt-modal header{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding-bottom:15px}.prompt-modal header span{font-size:10px;font-weight:800;background:#fff0c2;padding:4px 7px;border-radius:6px}.prompt-modal h2{margin:8px 0 3px;color:#111}.prompt-modal header p{margin:0;color:#777;font-size:12px}.prompt-modal header button{border:0;background:transparent;color:#111;font-size:25px;cursor:pointer}.prompt-modal textarea{min-height:130px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.prompt-modal footer{display:flex;justify-content:flex-end;gap:9px;margin-top:20px}@media(max-width:900px){.studio-page{display:block;width:100%;max-width:100vw}.studio-shell,.studio-layout,.project-list,.studio-workspace,.editor-card{min-width:0;max-width:100%}.studio-layout{display:block}.project-list{border-right:0;border-bottom:1px solid #ddd}.project-head{display:block}.stage-track{max-width:100%;margin-top:18px;overflow-x:auto;padding-bottom:6px}.two-fields,.format-grid,.fact-grid{grid-template-columns:1fr}.studio-workspace{padding:20px;overflow:hidden}}
   @media(max-width:900px){.project-list{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:10px 12px}.project-list>div{flex:0 0 auto;align-items:center;padding:0 5px}.project-list>.new-project-button{flex:0 0 132px;width:132px!important;margin:0!important}.project-list-card{flex:0 0 220px;margin:0}.project-select-button{min-height:54px;padding-top:9px;padding-bottom:9px}.project-list .empty{padding:10px}}
