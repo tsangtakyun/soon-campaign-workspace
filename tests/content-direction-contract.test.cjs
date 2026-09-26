@@ -27,6 +27,9 @@ for (const text of [
   'polishCoverTitle',
   ".replace(/嘅人/gu, '的人')",
   ".replace(/差咗幾遠/gu, '差幾遠')",
+  ".replace(/風險真係低(?=\\d)/gu, '風險真係降低')",
+  ".replace(/？.+$/u, '？')",
+  '問號後不可再加解說',
   'titleFor',
 ]) assert.ok(route.includes(text), text)
 
